@@ -1,24 +1,40 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { MOCK_CLIENTS } from '../constants';
-import { Building, ChevronDown, User as UserIcon } from 'lucide-react';
+import { ChevronDown, User as UserIcon } from 'lucide-react';
+
+function ClientLogo({ name, logoUrl }: { name: string; logoUrl?: string }) {
+  if (logoUrl) {
+    return <img src={logoUrl} alt={name} className="h-10 w-auto max-w-[140px] object-contain" />;
+  }
+  const initials = name
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+  return (
+    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-xs font-bold text-blue-700">
+      {initials}
+    </span>
+  );
+}
 
 export default function Topbar() {
-  const { user, currentClient, switchClient, canSwitchClient } = useAuth();
+  const { user, currentClient, clients, switchClient, canSwitchClient } = useAuth();
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-6">
       <div className="flex flex-1 items-center">
-        {canSwitchClient && (
+        {canSwitchClient ? (
           <div className="flex items-center gap-2">
-            <Building className="h-5 w-5 text-zinc-400" />
+            <ClientLogo name={currentClient?.name ?? ''} logoUrl={currentClient?.logoUrl} />
             <div className="relative">
               <select
                 value={currentClient?.id}
                 onChange={(e) => switchClient(e.target.value)}
                 className="appearance-none bg-transparent py-1.5 pl-3 pr-8 text-sm font-medium text-zinc-900 focus:outline-none focus:ring-0 border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
               >
-                {MOCK_CLIENTS.map((client) => (
+                {clients.map((client) => (
                   <option key={client.id} value={client.id}>
                     {client.name}
                   </option>
@@ -27,15 +43,14 @@ export default function Topbar() {
               <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
             </div>
           </div>
-        )}
-        {!canSwitchClient && (
-          <div className="flex items-center gap-2 text-sm font-medium text-zinc-900">
-            <Building className="h-5 w-5 text-zinc-400" />
-            {currentClient?.name}
+        ) : (
+          <div className="flex items-center gap-2">
+            <ClientLogo name={currentClient?.name ?? ''} logoUrl={currentClient?.logoUrl} />
+            <span className="text-sm font-medium text-zinc-900">{currentClient?.name}</span>
           </div>
         )}
       </div>
-      
+
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-3 border-l border-zinc-200 pl-4">
           <div className="flex flex-col items-end">

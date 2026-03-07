@@ -11,6 +11,7 @@ export interface User {
 export interface Client {
   id: string;
   name: string;
+  logoUrl?: string;
 }
 
 export interface Vehicle {

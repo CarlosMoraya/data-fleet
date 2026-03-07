@@ -1,14 +1,14 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  LayoutDashboard, 
-  Truck, 
-  ClipboardCheck, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Truck,
+  ClipboardCheck,
+  Settings,
   LogOut,
-  Building2,
-  Users
+  Users,
+  Shield
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -67,6 +67,40 @@ export default function Sidebar() {
         </nav>
       </div>
       
+      {user?.role === 'Admin Master' && (
+        <div className="border-t border-blue-800 px-3 py-4">
+          <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-blue-400">Admin</p>
+          <NavLink
+            to="/admin/clients"
+            className={({ isActive }) =>
+              cn(
+                isActive
+                  ? 'bg-blue-700 text-white font-medium'
+                  : 'text-blue-200 hover:bg-blue-800 hover:text-white',
+                'group flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors'
+              )
+            }
+          >
+            <Shield className="mr-3 h-5 w-5 flex-shrink-0" aria-hidden="true" />
+            Clientes
+          </NavLink>
+          <NavLink
+            to="/admin/users"
+            className={({ isActive }) =>
+              cn(
+                isActive
+                  ? 'bg-blue-700 text-white font-medium'
+                  : 'text-blue-200 hover:bg-blue-800 hover:text-white',
+                'group flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors'
+              )
+            }
+          >
+            <Users className="mr-3 h-5 w-5 flex-shrink-0" aria-hidden="true" />
+            Usuários
+          </NavLink>
+        </div>
+      )}
+
       <div className="border-t border-blue-800 p-4">
         <button
           onClick={handleLogout}

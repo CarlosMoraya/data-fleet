@@ -1,32 +1,27 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Role } from '../types';
-import { MOCK_CLIENTS } from '../constants';
 import { Truck } from 'lucide-react';
-
-const ROLES: Role[] = [
-  'Driver',
-  'Yard Auditor',
-  'Fleet Assistant',
-  'Fleet Analyst',
-  'Manager',
-  'Director',
-  'Admin Master',
-];
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<Role>('Fleet Analyst');
-  const [clientId, setClientId] = useState(MOCK_CLIENTS[0].id);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(email, role, clientId);
-    navigate('/');
+    setError('');
+    setSubmitting(true);
+    const { error: loginError } = await login(email, password);
+    setSubmitting(false);
+    if (loginError) {
+      setError(loginError);
+    } else {
+      navigate('/');
+    }
   };
 
   return (
@@ -40,16 +35,13 @@ export default function Login() {
         <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-zinc-900">
           Sign in to Data Fleet
         </h2>
-        <p className="mt-2 text-center text-sm text-zinc-600">
-          Simulated authentication for multi-tenant demo
-        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-sm sm:rounded-2xl sm:px-10 border border-zinc-100">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label className="block text-sm font-medium text-zinc-700">Email address</label>
+              <label className="block text-sm font-medium text-zinc-700">Email</label>
               <div className="mt-1">
                 <input
                   type="email"
@@ -63,7 +55,7 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-700">Password</label>
+              <label className="block text-sm font-medium text-zinc-700">Senha</label>
               <div className="mt-1">
                 <input
                   type="password"
@@ -76,42 +68,19 @@ export default function Login() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-zinc-700">Simulate Role</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-                className="mt-1 block w-full rounded-xl border border-zinc-200 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-              >
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-zinc-700">Simulate Client Tenant</label>
-              <select
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                className="mt-1 block w-full rounded-xl border border-zinc-200 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-              >
-                {MOCK_CLIENTS.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {error && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                {error}
+              </p>
+            )}
 
             <div>
               <button
                 type="submit"
-                className="flex w-full justify-center rounded-xl border border-transparent bg-orange-500 py-2.5 px-4 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
+                disabled={submitting}
+                className="flex w-full justify-center rounded-xl border border-transparent bg-orange-500 py-2.5 px-4 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Sign in
+                {submitting ? 'Entrando...' : 'Entrar'}
               </button>
             </div>
           </form>

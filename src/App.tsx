@@ -11,6 +11,8 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Vehicles from './pages/Vehicles';
 import Checklists from './pages/Checklists';
+import AdminClients from './pages/AdminClients';
+import AdminUsers from './pages/AdminUsers';
 
 export default function App() {
   return (
@@ -24,6 +26,8 @@ export default function App() {
             <Route path="checklists" element={<Checklists />} />
             <Route path="users" element={<div className="p-8 text-zinc-500">Users management coming soon...</div>} />
             <Route path="settings" element={<div className="p-8 text-zinc-500">Settings coming soon...</div>} />
+            <Route path="admin/clients" element={<AdminClients />} />
+            <Route path="admin/users" element={<AdminUsers />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
