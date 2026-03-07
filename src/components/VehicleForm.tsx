@@ -91,35 +91,35 @@ export default function VehicleForm({ vehicle, onClose, onSave }: VehicleFormPro
               <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">License Plate</label>
-                  <input type="text" name="licensePlate" required value={formData.licensePlate || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                  <input type="text" name="licensePlate" required value={formData.licensePlate || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Brand/Model</label>
-                  <input type="text" name="brandModel" required value={formData.brandModel || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                  <input type="text" name="brandModel" required value={formData.brandModel || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Year</label>
-                  <input type="number" name="year" required value={formData.year || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                  <input type="number" name="year" required value={formData.year || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Color</label>
-                  <input type="text" name="color" required value={formData.color || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                  <input type="text" name="color" required value={formData.color || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Renavam</label>
-                  <input type="text" name="renavam" required value={formData.renavam || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                  <input type="text" name="renavam" required value={formData.renavam || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Chassi</label>
-                  <input type="text" name="chassi" required value={formData.chassi || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                  <input type="text" name="chassi" required value={formData.chassi || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Detran (UF)</label>
-                  <input type="text" name="detranUF" required value={formData.detranUF || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                  <input type="text" name="detranUF" required value={formData.detranUF || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Status</label>
-                  <select name="status" value={formData.status || 'Available'} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm">
+                  <select name="status" value={formData.status || 'Available'} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm">
                     <option value="Available">Available</option>
                     <option value="In Use">In Use</option>
                     <option value="Maintenance">Maintenance</option>
@@ -134,34 +134,34 @@ export default function VehicleForm({ vehicle, onClose, onSave }: VehicleFormPro
               <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Acquisition</label>
-                  <select name="acquisition" value={formData.acquisition || 'Owned'} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm">
+                  <select name="acquisition" value={formData.acquisition || 'Owned'} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm">
                     <option value="Owned">Owned</option>
                     <option value="Rented">Rented</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Owner</label>
-                  <input type="text" name="owner" required value={formData.owner || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                  <input type="text" name="owner" required value={formData.owner || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Fipe Price (R$)</label>
-                  <input type="number" name="fipePrice" required value={formData.fipePrice || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                  <input type="number" name="fipePrice" required value={formData.fipePrice || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Tracker</label>
-                  <input type="text" name="tracker" required value={formData.tracker || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                  <input type="text" name="tracker" required value={formData.tracker || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">ANTT</label>
-                  <input type="text" name="antt" required value={formData.antt || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                  <input type="text" name="antt" required value={formData.antt || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Autonomy (km)</label>
-                  <input type="number" name="autonomy" required value={formData.autonomy || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                  <input type="number" name="autonomy" required value={formData.autonomy || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">CRLV Upload</label>
-                  <input type="file" name="crlvUpload" className="mt-1 block w-full text-sm text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-zinc-50 file:text-zinc-700 hover:file:bg-zinc-100" />
+                  <input type="file" name="crlvUpload" className="mt-1 block w-full text-sm text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
                 </div>
               </div>
             </div>
@@ -172,7 +172,7 @@ export default function VehicleForm({ vehicle, onClose, onSave }: VehicleFormPro
               <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Type</label>
-                  <select name="type" value={formData.type || 'Light'} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm">
+                  <select name="type" value={formData.type || 'Light'} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm">
                     <option value="Light">Light</option>
                     <option value="Medium">Medium</option>
                     <option value="Heavy">Heavy</option>
@@ -181,7 +181,7 @@ export default function VehicleForm({ vehicle, onClose, onSave }: VehicleFormPro
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Energy Source</label>
-                  <select name="energySource" value={formData.energySource || 'Combustão'} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm">
+                  <select name="energySource" value={formData.energySource || 'Combustão'} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm">
                     <option value="Combustão">Combustão</option>
                     <option value="Elétrico">Elétrico</option>
                     <option value="Híbrido">Híbrido</option>
@@ -192,13 +192,13 @@ export default function VehicleForm({ vehicle, onClose, onSave }: VehicleFormPro
                 {formData.type === 'Cavalo' && (
                   <>
                     <div className="flex items-center h-full pt-6">
-                      <input id="semiReboque" name="semiReboque" type="checkbox" checked={formData.semiReboque || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900" />
+                      <input id="semiReboque" name="semiReboque" type="checkbox" checked={formData.semiReboque || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600" />
                       <label htmlFor="semiReboque" className="ml-2 block text-sm text-zinc-900">Has Semi-reboque?</label>
                     </div>
                     {formData.semiReboque && (
                       <div>
                         <label className="block text-sm font-medium text-zinc-700">Placa Semi-Reboque</label>
-                        <input type="text" name="placaSemiReboque" required value={formData.placaSemiReboque || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                        <input type="text" name="placaSemiReboque" required value={formData.placaSemiReboque || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                       </div>
                     )}
                   </>
@@ -209,27 +209,27 @@ export default function VehicleForm({ vehicle, onClose, onSave }: VehicleFormPro
                   <>
                     <div>
                       <label className="block text-sm font-medium text-zinc-700">Fuel Type</label>
-                      <input type="text" name="fuelType" required value={formData.fuelType || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                      <input type="text" name="fuelType" required value={formData.fuelType || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-zinc-700">Tank Capacity (L)</label>
-                      <input type="number" name="tankCapacity" required value={formData.tankCapacity || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                      <input type="number" name="tankCapacity" required value={formData.tankCapacity || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-zinc-700">Avg. Consumption (Km/L)</label>
-                      <input type="number" step="0.1" name="avgConsumption" required value={formData.avgConsumption || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                      <input type="number" step="0.1" name="avgConsumption" required value={formData.avgConsumption || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                     </div>
                   </>
                 )}
 
                 <div className="flex items-center h-full pt-6">
-                  <input id="coolingEquipment" name="coolingEquipment" type="checkbox" checked={formData.coolingEquipment || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900" />
+                  <input id="coolingEquipment" name="coolingEquipment" type="checkbox" checked={formData.coolingEquipment || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600" />
                   <label htmlFor="coolingEquipment" className="ml-2 block text-sm text-zinc-900">Cooling Equipment?</label>
                 </div>
                 {formData.coolingEquipment && (
                   <div>
                     <label className="block text-sm font-medium text-zinc-700">Cooling Brand/Model</label>
-                    <input type="text" name="coolingBrand" placeholder="e.g. Termoking, Thermo Star" required value={formData.coolingBrand || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:text-sm" />
+                    <input type="text" name="coolingBrand" placeholder="e.g. Termoking, Thermo Star" required value={formData.coolingBrand || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                   </div>
                 )}
               </div>
@@ -241,7 +241,7 @@ export default function VehicleForm({ vehicle, onClose, onSave }: VehicleFormPro
           <button type="button" onClick={onClose} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 transition-colors">
             Cancel
           </button>
-          <button type="submit" form="vehicle-form" className="inline-flex justify-center rounded-xl border border-transparent bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 transition-colors">
+          <button type="submit" form="vehicle-form" className="inline-flex justify-center rounded-xl border border-transparent bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors">
             Save Vehicle
           </button>
         </div>

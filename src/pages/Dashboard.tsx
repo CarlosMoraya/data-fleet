@@ -100,7 +100,7 @@ export default function Dashboard() {
                   cursor={{ fill: '#f4f4f5' }}
                   contentStyle={{ borderRadius: '12px', border: '1px solid #e4e4e7', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 />
-                <Bar dataKey="count" fill="#18181b" radius={[4, 4, 0, 0]} barSize={40} />
+                <Bar dataKey="count" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </div>
