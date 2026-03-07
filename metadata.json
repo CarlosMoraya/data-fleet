@@ -1,0 +1,5 @@
+{
+  "name": "Data Fleet",
+  "description": "A multi-tenant SaaS for fleet management with role-based access control and advanced vehicle CRUD.",
+  "requestFramePermissions": []
+}
