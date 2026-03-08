@@ -25,7 +25,7 @@ export default function Sidebar() {
     { name: 'Dashboard', to: '/', icon: LayoutDashboard, roles: ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
     { name: 'Vehicles', to: '/vehicles', icon: Truck, roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
     { name: 'Checklists', to: '/checklists', icon: ClipboardCheck, roles: ['Driver', 'Yard Auditor', 'Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
-    { name: 'Users', to: '/users', icon: Users, roles: ['Manager', 'Director', 'Admin Master'] },
+    { name: 'Users', to: '/users', icon: Users, roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
     { name: 'Settings', to: '/settings', icon: Settings, roles: ['Manager', 'Director', 'Admin Master'] },
   ];
 

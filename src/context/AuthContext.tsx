@@ -67,10 +67,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        fetchProfile(session.user.id, session.user.email ?? '');
-      } else {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setLoading(true);
+        fetchProfile(session.user.id, session.user.email ?? '').finally(() => setLoading(false));
+      } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setCurrentClient(null);
         setAllClients([]);

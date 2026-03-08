@@ -238,8 +238,9 @@ export default function AdminClients() {
     };
 
     if (editing) {
-      const { error } = await supabase.from('clients').update(payload).eq('id', editing.id);
+      const { data, error } = await supabase.from('clients').update(payload).eq('id', editing.id).select();
       if (error) throw new Error(error.message);
+      if (!data || data.length === 0) throw new Error('Nenhuma linha atualizada — verifique a política RLS de UPDATE.');
     } else {
       const { error } = await supabase.from('clients').insert(payload);
       if (error) throw new Error(error.message);

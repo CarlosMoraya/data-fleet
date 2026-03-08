@@ -37,7 +37,7 @@ serve(async (req: Request) => {
 
     // Autenticar o caller
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return json({ error: "Não autorizado" }, 401);
+    if (!authHeader) return json({ error: "Não autorizado (sem Authorization header)" }, 401);
 
     const token = authHeader.replace("Bearer ", "");
     const { data: { user: caller }, error: authError } = await supabaseAdmin.auth.getUser(token);
@@ -56,27 +56,11 @@ serve(async (req: Request) => {
 
     // Apenas Fleet Assistant ou superior pode criar usuários
     if (callerRank < ROLE_RANK["Fleet Assistant"]) {
-      return json({ error: "Acesso negado. Papel insuficiente." }, 403);
+      return json({ error: "Acesso negado. Papel insuficiente para criar usuários." }, 403);
     }
 
-    const body = await req.json();
-    const { action } = body;
-
-    // ─── AÇÃO: DELETAR USUÁRIO ───────────────────────────────────────
-    if (action === "delete") {
-      const { user_id } = body;
-      if (!user_id) return json({ error: "user_id é obrigatório." }, 400);
-
-      // Deletar perfil
-      await supabaseAdmin.from("profiles").delete().eq("id", user_id);
-      // Deletar conta auth
-      await supabaseAdmin.auth.admin.deleteUser(user_id);
-
-      return json({ success: true }, 200);
-    }
-
-    // ─── AÇÃO: CRIAR USUÁRIO (padrão) ────────────────────────────────
-    const { email, password, name, role, client_id } = body;
+    // Ler os dados do novo usuário (sem client_id — é sempre o do caller)
+    const { email, password, name, role } = await req.json();
 
     if (!email || !password || !name || !role) {
       return json({ error: "Todos os campos são obrigatórios." }, 400);
@@ -89,10 +73,8 @@ serve(async (req: Request) => {
       return json({ error: `Você não tem permissão para criar usuários com o papel "${role}".` }, 403);
     }
 
-    // Admin Master pode especificar client_id; demais usam o próprio
-    const targetClientId = callerProfile.role === "Admin Master" && client_id
-      ? client_id
-      : callerProfile.client_id;
+    // Usar o client_id do próprio caller (isolamento de unidade)
+    const clientId = callerProfile.client_id;
 
     // Criar conta no Supabase Auth
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -106,7 +88,7 @@ serve(async (req: Request) => {
     // Criar perfil na tabela profiles
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
-      .insert({ id: newUser.user.id, name, role, client_id: targetClientId });
+      .insert({ id: newUser.user.id, name, role, client_id: clientId });
 
     if (profileError) {
       // Rollback: deletar o auth user criado

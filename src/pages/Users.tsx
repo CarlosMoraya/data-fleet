@@ -5,6 +5,16 @@ import { supabase } from '../lib/supabase';
 import { Pencil, Trash2, Plus, Search, X } from 'lucide-react';
 import { Role } from '../types';
 
+const ROLE_RANK: Record<Role, number> = {
+  'Driver': 1,
+  'Yard Auditor': 2,
+  'Fleet Assistant': 3,
+  'Fleet Analyst': 4,
+  'Manager': 5,
+  'Director': 6,
+  'Admin Master': 7,
+};
+
 const ALL_ROLES: Role[] = [
   'Driver', 'Yard Auditor', 'Fleet Assistant',
   'Fleet Analyst', 'Manager', 'Director', 'Admin Master',
@@ -20,18 +30,17 @@ const ROLE_COLORS: Record<Role, string> = {
   'Admin Master':    'bg-orange-100 text-orange-700',
 };
 
+/** Retorna os papéis que o usuário com `myRole` pode criar */
+function creatableRoles(myRole: Role): Role[] {
+  const myRank = ROLE_RANK[myRole];
+  return ALL_ROLES.filter((r) => ROLE_RANK[r] < myRank);
+}
+
 interface UserRow {
   id: string;
   name: string;
   role: Role;
-  client_id: string;
-  client_name: string;
   created_at: string;
-}
-
-interface ClientOption {
-  id: string;
-  name: string;
 }
 
 // ─── Componentes auxiliares ────────────────────────────────────────────────
@@ -60,29 +69,30 @@ interface CreateForm {
   email: string;
   password: string;
   role: Role;
-  client_id: string;
 }
-
-const emptyCreate: CreateForm = { name: '', email: '', password: '', role: 'Driver', client_id: '' };
 
 function CreateUserModal({
   open,
-  clients,
+  availableRoles,
   onClose,
   onCreated,
 }: {
   open: boolean;
-  clients: ClientOption[];
+  availableRoles: Role[];
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [form, setForm] = useState<CreateForm>(emptyCreate);
+  const defaultRole = availableRoles[availableRoles.length - 1] ?? 'Driver';
+  const [form, setForm] = useState<CreateForm>({ name: '', email: '', password: '', role: defaultRole });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (open) { setForm(emptyCreate); setError(''); }
-  }, [open]);
+    if (open) {
+      setForm({ name: '', email: '', password: '', role: availableRoles[availableRoles.length - 1] ?? 'Driver' });
+      setError('');
+    }
+  }, [open, availableRoles]);
 
   if (!open) return null;
 
@@ -91,16 +101,18 @@ function CreateUserModal({
     setSaving(true);
     setError('');
     try {
-      const { error: fnError } = await supabase.functions.invoke('create-user', {
+      const { data, error: fnError } = await supabase.functions.invoke('create-user', {
         body: {
           email: form.email.trim(),
           password: form.password,
           name: form.name.trim(),
           role: form.role,
-          client_id: form.client_id,
         },
       });
-      if (fnError) throw new Error(fnError.message);
+      if (fnError) {
+        const msg = typeof data === 'object' && data?.error ? data.error : fnError.message;
+        throw new Error(msg);
+      }
       onCreated();
       onClose();
     } catch (err: any) {
@@ -157,18 +169,7 @@ function CreateUserModal({
               required value={form.role} onChange={set('role')}
               className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
-              {ALL_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-zinc-700">Cliente *</label>
-            <select
-              required value={form.client_id} onChange={set('client_id')}
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="">Selecione um cliente...</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {availableRoles.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
 
@@ -198,31 +199,23 @@ function CreateUserModal({
 
 // ─── Modal: Editar usuário ─────────────────────────────────────────────────
 
-interface EditForm {
-  name: string;
-  role: Role;
-  client_id: string;
-}
-
 function EditUserModal({
   open,
   user,
-  clients,
   onClose,
   onSaved,
 }: {
   open: boolean;
   user: UserRow | null;
-  clients: ClientOption[];
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [form, setForm] = useState<EditForm>({ name: '', role: 'Driver', client_id: '' });
+  const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (user) setForm({ name: user.name, role: user.role, client_id: user.client_id });
+    if (user) setName(user.name);
     setError('');
   }, [user, open]);
 
@@ -235,7 +228,7 @@ function EditUserModal({
     try {
       const { error: dbError } = await supabase
         .from('profiles')
-        .update({ name: form.name.trim(), role: form.role, client_id: form.client_id })
+        .update({ name: name.trim() })
         .eq('id', user.id);
       if (dbError) throw new Error(dbError.message);
       onSaved();
@@ -246,9 +239,6 @@ function EditUserModal({
       setSaving(false);
     }
   };
-
-  const set = (key: keyof EditForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -264,29 +254,16 @@ function EditUserModal({
           <div>
             <label className="block text-sm font-medium text-zinc-700">Nome *</label>
             <input
-              type="text" required value={form.name} onChange={set('name')}
+              type="text" required value={name} onChange={(e) => setName(e.target.value)}
               className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-700">Cargo *</label>
-            <select
-              required value={form.role} onChange={set('role')}
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              {ALL_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-zinc-700">Cliente *</label>
-            <select
-              required value={form.client_id} onChange={set('client_id')}
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <label className="block text-sm font-medium text-zinc-700">Cargo</label>
+            <p className="mt-1 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-500">
+              {user.role} <span className="text-zinc-400">(não editável aqui)</span>
+            </p>
           </div>
 
           {error && (
@@ -315,55 +292,47 @@ function EditUserModal({
 
 // ─── Página principal ──────────────────────────────────────────────────────
 
-export default function AdminUsers() {
-  const { user } = useAuth();
+const CAN_MANAGE: Role[] = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
+
+export default function Users() {
+  const { user, currentClient } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
-  const [clients, setClients] = useState<ClientOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filterClient, setFilterClient] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
 
-  if (user?.role !== 'Admin Master') return <Navigate to="/" replace />;
+  if (!user || !CAN_MANAGE.includes(user.role)) return <Navigate to="/" replace />;
+
+  const myRank = ROLE_RANK[user.role];
+  const available = creatableRoles(user.role);
 
   const fetchUsers = async () => {
     setLoading(true);
     const { data } = await supabase
       .from('profiles')
-      .select('id, name, role, client_id, created_at, clients(name)')
+      .select('id, name, role, created_at')
+      .eq('client_id', currentClient.id)
       .order('name');
 
     if (data) {
+      // Filtrar no client apenas papéis abaixo do usuário logado (segurança extra no frontend)
       setUsers(
-        data.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          role: p.role as Role,
-          client_id: p.client_id,
-          client_name: (Array.isArray(p.clients) ? p.clients[0] : p.clients)?.name ?? '—',
-          created_at: p.created_at,
-        }))
+        (data as UserRow[]).filter(
+          (u) => ROLE_RANK[u.role] < myRank && u.id !== user.id
+        )
       );
     }
     setLoading(false);
   };
 
-  const fetchClients = async () => {
-    const { data } = await supabase.from('clients').select('id, name').order('name');
-    if (data) setClients(data);
-  };
-
   useEffect(() => {
     fetchUsers();
-    fetchClients();
-  }, []);
+  }, [currentClient.id]);
 
-  const filtered = users.filter((u) => {
-    const matchSearch = u.name.toLowerCase().includes(search.toLowerCase());
-    const matchClient = filterClient ? u.client_id === filterClient : true;
-    return matchSearch && matchClient;
-  });
+  const filtered = users.filter((u) =>
+    u.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   const handleDelete = async (u: UserRow) => {
     if (!window.confirm(`Excluir o usuário "${u.name}"? Esta ação não pode ser desfeita.`)) return;
@@ -379,34 +348,29 @@ export default function AdminUsers() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">Usuários</h1>
-          <p className="mt-1 text-sm text-zinc-500">Gerencie os usuários de todos os clientes.</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            Gerencie os usuários da unidade <span className="font-medium text-zinc-700">{currentClient.name}</span>.
+          </p>
         </div>
-        <button
-          onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Novo Usuário
-        </button>
+        {available.length > 0 && (
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Novo Usuário
+          </button>
+        )}
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-3">
-        <div className="relative max-w-xs flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-          <input
-            type="text" placeholder="Buscar por nome..."
-            value={search} onChange={(e) => setSearch(e.target.value)}
-            className="block w-full rounded-xl border border-zinc-200 py-2 pl-9 pr-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
-        <select
-          value={filterClient} onChange={(e) => setFilterClient(e.target.value)}
-          className="rounded-xl border border-zinc-200 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        >
-          <option value="">Todos os clientes</option>
-          {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+      {/* Busca */}
+      <div className="relative max-w-xs">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+        <input
+          type="text" placeholder="Buscar por nome..."
+          value={search} onChange={(e) => setSearch(e.target.value)}
+          className="block w-full rounded-xl border border-zinc-200 py-2 pl-9 pr-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
       </div>
 
       {/* Tabela */}
@@ -417,7 +381,7 @@ export default function AdminUsers() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center text-sm text-zinc-400">
-            {search || filterClient ? 'Nenhum usuário encontrado.' : 'Nenhum usuário cadastrado ainda.'}
+            {search ? 'Nenhum usuário encontrado.' : 'Nenhum usuário cadastrado nesta unidade.'}
           </div>
         ) : (
           <table className="min-w-full divide-y divide-zinc-200">
@@ -425,7 +389,6 @@ export default function AdminUsers() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Usuário</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cargo</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cliente</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cadastrado em</th>
                 <th className="px-6 py-3" />
               </tr>
@@ -436,13 +399,12 @@ export default function AdminUsers() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <UserInitials name={u.name} />
-                      <span className="text-sm font-medium text-zinc-900">{u.name}</span>
+                      <span className="truncate text-sm font-medium text-zinc-900">{u.name}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <RoleBadge role={u.role} />
                   </td>
-                  <td className="px-6 py-4 text-sm text-zinc-600">{u.client_name}</td>
                   <td className="px-6 py-4 text-sm text-zinc-500">
                     {new Date(u.created_at).toLocaleDateString('pt-BR')}
                   </td>
@@ -473,7 +435,7 @@ export default function AdminUsers() {
 
       <CreateUserModal
         open={createOpen}
-        clients={clients}
+        availableRoles={available}
         onClose={() => setCreateOpen(false)}
         onCreated={fetchUsers}
       />
@@ -481,7 +443,6 @@ export default function AdminUsers() {
       <EditUserModal
         open={!!editingUser}
         user={editingUser}
-        clients={clients}
         onClose={() => setEditingUser(null)}
         onSaved={fetchUsers}
       />
