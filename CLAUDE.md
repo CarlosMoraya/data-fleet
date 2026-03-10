@@ -1,59 +1,64 @@
-# CLAUDE.md
+# CLAUDE.md — Context Router
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> **Instrução de Entrada**: Sempre leia este índice antes de qualquer ação. Identifique a categoria da tarefa e carregue o módulo de contexto correspondente ANTES de codificar.
 
-## Commands
+---
+
+## Atalhos Rápidos
 
 ```bash
-# Install dependencies
-npm install
-
-# Start dev server (port 3000, all interfaces)
-npm run dev
-
-# Type-check (no emit) — used as lint
-npm run lint
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
+npm run dev       # Dev server (porta 3000)
+npm run lint      # Type-check (tsc --noEmit)
+npm run build     # Build produção
+npm run preview   # Preview do build
+npx playwright test  # Rodar testes E2E
 ```
 
-There is no test suite configured.
+---
 
-## Environment
+## Mapa de Roteamento de Contexto
 
-Copy `.env.example` to `.env.local` and set `GEMINI_API_KEY` to a valid Gemini API key before running.
+Antes de codificar, carregue o módulo relevante com `cat`:
 
-The `GEMINI_API_KEY` is exposed to the Vite client bundle via `vite.config.ts` using `define`. The `@` alias maps to the project root.
+| Categoria | Quando usar | Comando |
+|-----------|-------------|---------|
+| **Frontend** | Componentes React, páginas, routing, layout, Tailwind | `cat .claude/arch-frontend.md` |
+| **Backend** | Supabase, auth, Edge Functions, RLS, banco de dados | `cat .claude/arch-backend.md` |
+| **Testes** | Escrever/rodar E2E, Playwright, fixtures, debugging | `cat .claude/testing.md` |
+| **Estilo** | Convenções de código, nomenclatura, padrões React/TS | `cat .claude/style-guide.md` |
+| **Modelo de Dados** | Types, interfaces, roles, multi-tenancy, schema | `cat .claude/data-model.md` |
 
-## Architecture
+**Regra**: Para tarefas que cruzam múltiplas categorias, carregue todos os módulos relevantes. Ex: criar uma nova página com CRUD Supabase → carregue Frontend + Backend + Modelo de Dados.
 
-**Data Fleet** is a multi-tenant SaaS fleet management app built with React 19, Vite, TypeScript, and Tailwind CSS v4.
+---
 
-### Key patterns
+## Protocolo de Auto-Sincronização
 
-- **Multi-tenancy via `clientId`**: All data entities (`Vehicle`, etc.) carry a `clientId` field. Filtering by `currentClient.id` from `AuthContext` is the standard pattern for scoping data to the active tenant.
-- **Role-based access**: Roles are defined in `src/types.ts` (`Driver`, `Yard Auditor`, `Fleet Assistant`, `Fleet Analyst`, `Manager`, `Director`, `Admin Master`). Permission checks are done inline using `user.role` comparisons (e.g., `canEdit` in `Vehicles.tsx`). Client-switching is only available to Manager/Director/Admin Master.
-- **Mock data as source of truth**: There is no backend or database yet. All data lives in `src/constants.ts` (`MOCK_CLIENTS`, `MOCK_VEHICLES`). Pages use local `useState` initialized from this mock data to simulate CRUD.
-- **Auth state**: `AuthContext` holds the logged-in `User` and `currentClient`. There is no real authentication — `Login.tsx` accepts any email and a selected role/client.
+> **DIRETRIZ RÍGIDA**: Se você alterar ferramentas, bibliotecas, padrões arquiteturais, interfaces, tabelas do banco, configuração de testes ou convenções de código, sua **última ação obrigatória ANTES do commit** deve ser atualizar o módulo correspondente na pasta `.claude/`.
 
-### Structure
+Checklist de sincronização:
+- [ ] Adicionou/removeu dependência → atualizar `arch-frontend.md` ou `arch-backend.md`
+- [ ] Criou/alterou interface/type → atualizar `data-model.md`
+- [ ] Criou/alterou tabela Supabase ou RLS → atualizar `arch-backend.md` + `data-model.md`
+- [ ] Adicionou/alterou página ou componente → atualizar `arch-frontend.md`
+- [ ] Adicionou/alterou teste E2E → atualizar `testing.md`
+- [ ] Mudou convenção ou padrão → atualizar `style-guide.md`
 
-| Path | Purpose |
-|------|---------|
-| `src/types.ts` | Shared TypeScript interfaces (`User`, `Client`, `Vehicle`, `Role`) |
-| `src/constants.ts` | Mock data for clients and vehicles |
-| `src/context/AuthContext.tsx` | Auth + client context; exposes `useAuth()` hook |
-| `src/components/Layout.tsx` | Shell with sidebar + outlet for nested routes |
-| `src/components/VehicleForm.tsx` | Multi-step form for creating/editing vehicles |
-| `src/pages/Dashboard.tsx` | KPI cards + Recharts bar/pie charts scoped to current client |
-| `src/pages/Vehicles.tsx` | Vehicle table with inline edit; mutation is local state only |
-| `src/pages/Checklists.tsx` | Checklist page (stub) |
-| `src/lib/utils.ts` | `cn()` helper (clsx + tailwind-merge) |
+---
 
-### Routing
+## Gestão de Memória (Gatilho /compact)
 
-Routes are defined in `src/App.tsx`. Protected pages nest under the `<Layout>` route (`/`). Unauthenticated access is not yet enforced by a guard — the login flow is purely UI-driven.
+Após concluir tarefas que envolveram leitura de **2 ou mais módulos de contexto** da pasta `.claude/`, você **DEVE**:
+
+1. Sugerir ao usuário: _"Tarefa concluída. Recomendo executar `/compact` para limpar a janela de contexto e economizar tokens."_
+2. Ou executar `/compact` automaticamente se a janela de contexto estiver acima de 70% de utilização.
+
+Isso garante que sessões longas não degradem a qualidade das respostas por saturação de contexto.
+
+---
+
+## Identificação do Projeto
+
+**Data Fleet** — SaaS multi-tenant de gestão de frotas.
+Stack: React 19 + Vite + TypeScript + Tailwind CSS v4 + Supabase.
+Para detalhes completos, consulte os módulos em `.claude/`.
