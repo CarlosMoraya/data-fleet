@@ -205,6 +205,121 @@ CREATE POLICY "tenant_managers_delete_profiles" ON public.profiles
   );
 
 -- ------------------------------------------------------------
+-- 9. TABELA: vehicles (frota)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.vehicles (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id           UUID NOT NULL REFERENCES public.clients(id),
+
+  -- Classificação
+  type                TEXT NOT NULL CHECK (type IN ('Light', 'Medium', 'Heavy', 'Cavalo')),
+  energy_source       TEXT NOT NULL CHECK (energy_source IN ('Combustão', 'Elétrico', 'Híbrido')),
+  cooling_equipment   BOOLEAN NOT NULL DEFAULT false,
+
+  -- Campos condicionais
+  semi_reboque        BOOLEAN,
+  placa_semi_reboque  TEXT,
+  fuel_type           TEXT,
+  tank_capacity       NUMERIC,
+  avg_consumption     NUMERIC,
+  cooling_brand       TEXT,
+
+  -- Identificação
+  license_plate       TEXT NOT NULL,
+  renavam             TEXT NOT NULL,
+  chassi              TEXT NOT NULL,
+  detran_uf           TEXT NOT NULL,
+  brand_model         TEXT NOT NULL,
+  year                INT NOT NULL,
+  color               TEXT NOT NULL,
+
+  -- Operacional
+  acquisition         TEXT NOT NULL CHECK (acquisition IN ('Owned', 'Rented')),
+  fipe_price          NUMERIC NOT NULL DEFAULT 0,
+  tracker             TEXT NOT NULL DEFAULT '',
+  antt                TEXT NOT NULL DEFAULT '',
+  owner               TEXT NOT NULL DEFAULT '',
+  status              TEXT NOT NULL CHECK (status IN ('Available', 'Maintenance', 'In Use')) DEFAULT 'Available',
+  autonomy            NUMERIC NOT NULL DEFAULT 0,
+  crlv_upload         TEXT,
+
+  created_at          TIMESTAMPTZ DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Placa única por tenant (dois tenants podem ter a mesma placa)
+CREATE UNIQUE INDEX IF NOT EXISTS vehicles_client_plate_uniq
+  ON public.vehicles(client_id, license_plate);
+
+-- Trigger para atualizar updated_at automaticamente
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER vehicles_updated_at
+  BEFORE UPDATE ON public.vehicles
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- RLS
+ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
+
+-- Fleet Assistant+ lê veículos do próprio tenant
+CREATE POLICY "vehicles_select_tenant" ON public.vehicles
+  FOR SELECT
+  USING (
+    client_id = public.get_my_client_id()
+    AND public.role_rank(public.get_my_role()) >= public.role_rank('Fleet Assistant')
+  );
+
+-- Admin Master lê todos
+CREATE POLICY "vehicles_select_admin" ON public.vehicles
+  FOR SELECT
+  USING (public.is_admin_master());
+
+-- Fleet Analyst+ insere no próprio tenant
+CREATE POLICY "vehicles_insert_tenant" ON public.vehicles
+  FOR INSERT
+  WITH CHECK (
+    client_id = public.get_my_client_id()
+    AND public.role_rank(public.get_my_role()) >= public.role_rank('Fleet Analyst')
+  );
+
+-- Admin Master insere em qualquer tenant
+CREATE POLICY "vehicles_insert_admin" ON public.vehicles
+  FOR INSERT
+  WITH CHECK (public.is_admin_master());
+
+-- Fleet Analyst+ atualiza no próprio tenant
+CREATE POLICY "vehicles_update_tenant" ON public.vehicles
+  FOR UPDATE
+  USING (
+    client_id = public.get_my_client_id()
+    AND public.role_rank(public.get_my_role()) >= public.role_rank('Fleet Analyst')
+  );
+
+-- Admin Master atualiza qualquer
+CREATE POLICY "vehicles_update_admin" ON public.vehicles
+  FOR UPDATE
+  USING (public.is_admin_master());
+
+-- Fleet Analyst+ deleta no próprio tenant
+CREATE POLICY "vehicles_delete_tenant" ON public.vehicles
+  FOR DELETE
+  USING (
+    client_id = public.get_my_client_id()
+    AND public.role_rank(public.get_my_role()) >= public.role_rank('Fleet Analyst')
+  );
+
+-- Admin Master deleta qualquer
+CREATE POLICY "vehicles_delete_admin" ON public.vehicles
+  FOR DELETE
+  USING (public.is_admin_master());
+
+-- ------------------------------------------------------------
 -- PRÓXIMO PASSO: crie o primeiro usuário em
 --   Supabase Dashboard → Authentication → Users → Invite User
 --   ou via:

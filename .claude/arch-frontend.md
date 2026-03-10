@@ -21,17 +21,18 @@ src/
 │   └── AuthContext.tsx   # Auth + client context → useAuth() hook
 ├── lib/
 │   ├── supabase.ts      # Supabase client (VITE_SUPABASE_URL + ANON_KEY)
-│   └── utils.ts         # cn() helper (clsx + tailwind-merge)
+│   ├── utils.ts         # cn() helper (clsx + tailwind-merge)
+│   └── vehicleMappers.ts # Mapper camelCase (TS) ↔ snake_case (Supabase) para Vehicle
 ├── pages/
 │   ├── Login.tsx        # Login com email/senha (Supabase Auth)
 │   ├── Dashboard.tsx    # KPIs + gráficos (ainda mock data)
-│   ├── Vehicles.tsx     # Tabela de veículos (ainda MOCK_VEHICLES)
+│   ├── Vehicles.tsx     # CRUD de veículos (Supabase — Fleet Assistant+ acessa, Fleet Analyst+ edita)
 │   ├── Checklists.tsx   # Stub — "No checklists"
 │   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+)
 │   ├── AdminUsers.tsx   # CRUD todos usuários (Admin Master only)
 │   └── AdminClients.tsx # CRUD clientes (Admin Master only)
 ├── types.ts             # Interfaces compartilhadas
-├── constants.ts         # Mock data (MOCK_CLIENTS, MOCK_VEHICLES)
+├── constants.ts         # Mock data (MOCK_CLIENTS, MOCK_VEHICLES — Dashboard ainda usa MOCK_VEHICLES)
 └── App.tsx              # Definição de rotas
 ```
 

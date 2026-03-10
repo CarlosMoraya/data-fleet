@@ -5,22 +5,49 @@ import { X } from 'lucide-react';
 interface VehicleFormProps {
   vehicle: Vehicle | null;
   onClose: () => void;
-  onSave: (vehicle: Vehicle) => void;
+  onSave: (vehicle: Partial<Vehicle>) => Promise<void>;
 }
 
 export default function VehicleForm({ vehicle, onClose, onSave }: VehicleFormProps) {
-  const [formData, setFormData] = useState<Partial<Vehicle>>({
-    type: 'Light',
-    energySource: 'Combustão',
-    coolingEquipment: false,
-    status: 'Available',
-    acquisition: 'Owned',
-    ...vehicle
+  const [formData, setFormData] = useState<Partial<Vehicle>>(() => {
+    try {
+      const savedData = sessionStorage.getItem('vehicleFormData');
+      if (savedData) {
+        return JSON.parse(savedData);
+      }
+    } catch (e) {
+      console.error('Failed to parse vehicleFormData from sessionStorage', e);
+    }
+    
+    return {
+      type: 'Light',
+      energySource: 'Combustão',
+      coolingEquipment: false,
+      acquisition: 'Owned',
+      ...vehicle,
+    };
   });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // We strictly overwrite state if `vehicle` reference changes to a new specific editing vehicle
+    if (vehicle) {
+      setFormData(prev => ({
+        ...prev,
+        ...vehicle
+      }));
+    }
+    setError(null);
+  }, [vehicle]);
+
+  useEffect(() => {
+    sessionStorage.setItem('vehicleFormData', JSON.stringify(formData));
+  }, [formData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    
+
     if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
       setFormData(prev => ({ ...prev, [name]: checked }));
@@ -29,9 +56,22 @@ export default function VehicleForm({ vehicle, onClose, onSave }: VehicleFormPro
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData as Vehicle);
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(formData);
+    } catch (err: unknown) {
+      const pgError = err as { code?: string; message?: string };
+      if (pgError?.code === '23505') {
+        setError('Esta placa já está cadastrada para este cliente.');
+      } else {
+        setError('Erro ao salvar veículo. Tente novamente.');
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -41,49 +81,23 @@ export default function VehicleForm({ vehicle, onClose, onSave }: VehicleFormPro
           <h2 className="text-xl font-semibold text-zinc-900">
             {vehicle ? 'Edit Vehicle' : 'Add Vehicle'}
           </h2>
-          <div className="flex items-center gap-4">
-            {!vehicle && (
-              <button
-                type="button"
-                onClick={() => {
-                  setFormData({
-                    type: 'Cavalo',
-                    energySource: 'Combustão',
-                    coolingEquipment: true,
-                    coolingBrand: 'Thermo King',
-                    status: 'Available',
-                    acquisition: 'Owned',
-                    licensePlate: 'ABC-1234',
-                    brandModel: 'Volvo FH 540',
-                    year: 2024,
-                    color: 'Branco',
-                    renavam: '12345678901',
-                    chassi: '9BWZZZ37Z4T000001',
-                    detranUF: 'SP',
-                    owner: 'Acme Logistics',
-                    fipePrice: 650000,
-                    tracker: 'Omnilink',
-                    antt: '12345678',
-                    autonomy: 1400,
-                    semiReboque: true,
-                    placaSemiReboque: 'XYZ-9876',
-                    fuelType: 'Diesel',
-                    tankCapacity: 400,
-                    avgConsumption: 3.5,
-                  });
-                }}
-                className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
-              >
-                Fill Mock Data
-              </button>
-            )}
-            <button onClick={onClose} className="text-zinc-400 hover:text-zinc-500 transition-colors">
-              <X className="h-6 w-6" />
-            </button>
-          </div>
+          <button onClick={() => {
+            sessionStorage.removeItem('vehicleFormOpen');
+            sessionStorage.removeItem('vehicleFormEditing');
+            sessionStorage.removeItem('vehicleFormData');
+            onClose();
+          }} className="text-zinc-400 hover:text-zinc-500 transition-colors">
+            <X className="h-6 w-6" />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
+          {error && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           <form id="vehicle-form" onSubmit={handleSubmit} className="space-y-8">
             {/* Basic Info */}
             <div>
@@ -94,8 +108,12 @@ export default function VehicleForm({ vehicle, onClose, onSave }: VehicleFormPro
                   <input type="text" name="licensePlate" required value={formData.licensePlate || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700">Brand/Model</label>
-                  <input type="text" name="brandModel" required value={formData.brandModel || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
+                  <label className="block text-sm font-medium text-zinc-700">Brand</label>
+                  <input type="text" name="brand" required value={formData.brand || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700">Model</label>
+                  <input type="text" name="model" required value={formData.model || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Year</label>
@@ -116,14 +134,6 @@ export default function VehicleForm({ vehicle, onClose, onSave }: VehicleFormPro
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Detran (UF)</label>
                   <input type="text" name="detranUF" required value={formData.detranUF || ''} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700">Status</label>
-                  <select name="status" value={formData.status || 'Available'} onChange={handleChange} className="mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm">
-                    <option value="Available">Available</option>
-                    <option value="In Use">In Use</option>
-                    <option value="Maintenance">Maintenance</option>
-                  </select>
                 </div>
               </div>
             </div>
@@ -238,11 +248,17 @@ export default function VehicleForm({ vehicle, onClose, onSave }: VehicleFormPro
         </div>
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-zinc-200 bg-zinc-50 rounded-b-2xl">
-          <button type="button" onClick={onClose} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 transition-colors">
+          <button type="button" onClick={() => {
+            sessionStorage.removeItem('vehicleFormOpen');
+            sessionStorage.removeItem('vehicleFormEditing');
+            sessionStorage.removeItem('vehicleFormData');
+            onClose();
+          }} disabled={saving} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 transition-colors disabled:opacity-50">
             Cancel
           </button>
-          <button type="submit" form="vehicle-form" className="inline-flex justify-center rounded-xl border border-transparent bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors">
-            Save Vehicle
+          <button type="submit" form="vehicle-form" disabled={saving} className="inline-flex justify-center items-center gap-2 rounded-xl border border-transparent bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50">
+            {saving && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
+            {saving ? 'Saving...' : 'Save Vehicle'}
           </button>
         </div>
       </div>

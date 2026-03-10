@@ -86,21 +86,21 @@ interface Vehicle {
 
 ## Mock Data (src/constants.ts)
 
-- `MOCK_CLIENTS`: array de clientes de exemplo
-- `MOCK_VEHICLES`: array de veículos com `clientId`
-- **Status**: serão migrados para Supabase progressivamente
+- `MOCK_CLIENTS`: array de clientes de exemplo (não importado em nenhuma página ativamente)
+- `MOCK_VEHICLES`: ainda usado por `Dashboard.tsx` (remover quando Dashboard migrar)
+- **Status de migração**:
   - Clients → migrado (tabela `clients`)
   - Users → migrado (tabela `profiles` + auth.users)
-  - Vehicles → **próximo** (ainda mock)
-  - Checklists → planejado
+  - Vehicles → **migrado** (tabela `vehicles` + RLS)
+  - Checklists → planejado (próximo passo)
 
 ## Schema Supabase (supabase/schema.sql)
 
 Tabelas ativas:
 - `profiles` (id UUID PK → auth.users, name, email, role, client_id FK → clients)
 - `clients` (id UUID PK, name, logo_url)
+- `vehicles` (id UUID PK, client_id FK → clients, + todos os campos da interface Vehicle em snake_case)
 
 Tabelas planejadas:
-- `vehicles` (espelhando interface Vehicle acima)
 - `checklist_templates`
 - `checklists`

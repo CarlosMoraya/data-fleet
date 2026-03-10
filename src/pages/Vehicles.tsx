@@ -1,31 +1,109 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { MOCK_VEHICLES } from '../constants';
 import { Vehicle } from '../types';
-import { Plus, Search, Filter, MoreVertical, Edit2, Trash2, Truck } from 'lucide-react';
+import { Plus, Search, Filter, Edit2, Trash2, Truck } from 'lucide-react';
 import VehicleForm from '../components/VehicleForm';
-import { cn } from '../lib/utils';
+import { supabase } from '../lib/supabase';
+import { vehicleFromRow, vehicleToRow, VehicleRow } from '../lib/vehicleMappers';
+
+const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
+const ROLES_CAN_EDIT = ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
 
 export default function Vehicles() {
   const { currentClient, user } = useAuth();
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
-  
-  // In a real app, this would be fetched from an API
-  const [vehicles, setVehicles] = useState<Vehicle[]>(MOCK_VEHICLES);
-  
-  const clientVehicles = vehicles.filter(v => v.clientId === currentClient?.id);
-  const canEdit = ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'].includes(user?.role || '');
-
-  const handleSave = (vehicle: Vehicle) => {
-    if (editingVehicle) {
-      setVehicles(vehicles.map(v => v.id === vehicle.id ? vehicle : v));
-    } else {
-      setVehicles([...vehicles, { ...vehicle, id: `v${Date.now()}`, clientId: currentClient?.id || '' }]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [isFormOpen, setIsFormOpen] = useState(() => {
+    return sessionStorage.getItem('vehicleFormOpen') === 'true';
+  });
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(() => {
+    try {
+      const savedVehicle = sessionStorage.getItem('vehicleFormEditing');
+      return savedVehicle ? JSON.parse(savedVehicle) : null;
+    } catch {
+      return null;
     }
+  });
+
+  const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
+
+  // Redirect Drivers and Yard Auditors
+  if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
+    return <Navigate to="/checklists" replace />;
+  }
+
+  const fetchVehicles = useCallback(async () => {
+    if (!currentClient?.id) return;
+    setLoading(true);
+    setError(null);
+    const { data, error: fetchError } = await supabase
+      .from('vehicles')
+      .select('*')
+      .eq('client_id', currentClient.id)
+      .order('license_plate');
+
+    if (fetchError) {
+      setError('Erro ao carregar veículos. Tente novamente.');
+    } else {
+      setVehicles((data as VehicleRow[]).map(vehicleFromRow));
+    }
+    setLoading(false);
+  }, [currentClient?.id]);
+
+  useEffect(() => {
+    fetchVehicles();
+  }, [fetchVehicles]);
+
+  const handleSave = async (vehicle: Partial<Vehicle>): Promise<void> => {
+    if (!currentClient?.id) return;
+    const row = vehicleToRow(vehicle, currentClient.id);
+
+    if (editingVehicle) {
+      const { error: updateError } = await supabase
+        .from('vehicles')
+        .update(row)
+        .eq('id', editingVehicle.id);
+      if (updateError) throw updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from('vehicles')
+        .insert(row);
+      if (insertError) throw insertError;
+    }
+
+    await fetchVehicles();
     setIsFormOpen(false);
     setEditingVehicle(null);
+    sessionStorage.removeItem('vehicleFormOpen');
+    sessionStorage.removeItem('vehicleFormEditing');
+    sessionStorage.removeItem('vehicleFormData');
   };
+
+  const handleDelete = async (vehicle: Vehicle) => {
+    if (!window.confirm(`Excluir o veículo ${vehicle.licensePlate}? Esta ação não pode ser desfeita.`)) return;
+    const { error: deleteError } = await supabase
+      .from('vehicles')
+      .delete()
+      .eq('id', vehicle.id);
+    if (deleteError) {
+      setError('Erro ao excluir veículo. Tente novamente.');
+    } else {
+      await fetchVehicles();
+    }
+  };
+
+  const filteredVehicles = vehicles.filter(v => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      v.licensePlate.toLowerCase().includes(q) ||
+      `${v.brand} ${v.model}`.toLowerCase().includes(q) ||
+      v.chassi.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -34,10 +112,13 @@ export default function Vehicles() {
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Vehicles</h1>
           <p className="text-sm text-zinc-500 mt-1">Manage your fleet inventory and details.</p>
         </div>
-        
+
         {canEdit && (
           <button
             onClick={() => {
+              sessionStorage.removeItem('vehicleFormData'); // clear any drafts for adding new
+              sessionStorage.setItem('vehicleFormOpen', 'true');
+              sessionStorage.removeItem('vehicleFormEditing');
               setEditingVehicle(null);
               setIsFormOpen(true);
             }}
@@ -56,6 +137,8 @@ export default function Vehicles() {
           </div>
           <input
             type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
             className="block w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
             placeholder="Search by plate, model, or chassis..."
           />
@@ -66,85 +149,101 @@ export default function Vehicles() {
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-zinc-200">
-            <thead className="bg-zinc-50">
-              <tr>
-                <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider sm:pl-6">Vehicle</th>
-                <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Type / Energy</th>
-                <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Owner</th>
-                <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-200 bg-white">
-              {clientVehicles.map((vehicle) => (
-                <tr key={vehicle.id} className="hover:bg-zinc-50 transition-colors">
-                  <td className="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
-                    <div className="flex items-center">
-                      <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-zinc-100 flex items-center justify-center border border-zinc-200">
-                        <Truck className="h-5 w-5 text-zinc-500" />
-                      </div>
-                      <div className="ml-4">
-                        <div className="font-medium text-zinc-900">{vehicle.licensePlate}</div>
-                        <div className="text-sm text-zinc-500">{vehicle.brandModel} ({vehicle.year})</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
-                    <div className="text-zinc-900">{vehicle.type}</div>
-                    <div>{vehicle.energySource}</div>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm">
-                    <span className={cn(
-                      "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset",
-                      vehicle.status === 'Available' ? "bg-green-50 text-green-700 ring-green-600/20" :
-                      vehicle.status === 'In Use' ? "bg-blue-50 text-blue-700 ring-blue-600/20" :
-                      "bg-amber-50 text-amber-700 ring-amber-600/20"
-                    )}>
-                      {vehicle.status}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
-                    <div className="text-zinc-900">{vehicle.owner}</div>
-                    <div>{vehicle.acquisition}</div>
-                  </td>
-                  <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                    {canEdit && (
-                      <button 
-                        onClick={() => {
-                          setEditingVehicle(vehicle);
-                          setIsFormOpen(true);
-                        }}
-                        className="text-zinc-400 hover:text-zinc-900 transition-colors"
-                      >
-                        <Edit2 className="h-5 w-5" />
-                        <span className="sr-only">Edit</span>
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {clientVehicles.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-10 text-center text-sm text-zinc-500">
-                    No vehicles found for this client.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
         </div>
+      )}
+
+      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-orange-500" />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-zinc-200">
+              <thead className="bg-zinc-50">
+                <tr>
+                  <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider sm:pl-6">Vehicle</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Type / Energy</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Owner</th>
+                  <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 bg-white">
+                {filteredVehicles.map((vehicle) => (
+                  <tr key={vehicle.id} className="hover:bg-zinc-50 transition-colors">
+                    <td className="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-zinc-100 flex items-center justify-center border border-zinc-200">
+                          <Truck className="h-5 w-5 text-zinc-500" />
+                        </div>
+                        <div className="ml-4">
+                          <div className="font-medium text-zinc-900">{vehicle.licensePlate}</div>
+                          <div className="text-sm text-zinc-500">{vehicle.brand} {vehicle.model} ({vehicle.year})</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                      <div className="text-zinc-900">{vehicle.type}</div>
+                      <div>{vehicle.energySource}</div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                      <div className="text-zinc-900">{vehicle.owner}</div>
+                      <div>{vehicle.acquisition}</div>
+                    </td>
+                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                      {canEdit && (
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => {
+                              sessionStorage.removeItem('vehicleFormData'); // draft
+                              sessionStorage.setItem('vehicleFormOpen', 'true');
+                              sessionStorage.setItem('vehicleFormEditing', JSON.stringify(vehicle));
+                              setEditingVehicle(vehicle);
+                              setIsFormOpen(true);
+                            }}
+                            className="text-zinc-400 hover:text-zinc-900 transition-colors"
+                          >
+                            <Edit2 className="h-5 w-5" />
+                            <span className="sr-only">Edit</span>
+                          </button>
+                          <button
+                            onClick={() => handleDelete(vehicle)}
+                            className="text-zinc-400 hover:text-red-600 transition-colors"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                            <span className="sr-only">Delete</span>
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {filteredVehicles.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-10 text-center text-sm text-zinc-500">
+                      {search ? 'No vehicles match your search.' : 'No vehicles found for this client.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {isFormOpen && (
-        <VehicleForm 
-          vehicle={editingVehicle} 
-          onClose={() => setIsFormOpen(false)} 
-          onSave={handleSave} 
+        <VehicleForm
+          vehicle={editingVehicle}
+          onClose={() => {
+            setIsFormOpen(false);
+            setEditingVehicle(null);
+          }}
+          onSave={handleSave}
         />
       )}
     </div>

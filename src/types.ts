@@ -34,7 +34,8 @@ export interface Vehicle {
   renavam: string;
   chassi: string;
   detranUF: string;
-  brandModel: string;
+  brand: string;
+  model: string;
   year: number;
   color: string;
   acquisition: 'Owned' | 'Rented';
@@ -42,7 +43,7 @@ export interface Vehicle {
   tracker: string;
   antt: string;
   owner: string;
-  status: 'Available' | 'Maintenance' | 'In Use';
   autonomy: number;
   crlvUpload?: string;
+  status?: 'Available' | 'In Use' | 'Maintenance';
 }

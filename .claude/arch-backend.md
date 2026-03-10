@@ -18,11 +18,19 @@
 ### Tabelas existentes
 - `profiles` — dados do usuário (vinculado a auth.users)
 - `clients` — tenants/empresas
+- `vehicles` — veículos da frota (CRUD completo com RLS)
 
 ### Tabelas planejadas (ainda não criadas)
-- `vehicles` — veículos da frota (próximo passo)
 - `checklist_templates` — templates de checklist por tipo de veículo
 - `checklists` — checklists preenchidos
+
+### Tabela `vehicles` — colunas principais
+`id`, `client_id`, `type`, `energy_source`, `cooling_equipment`, `semi_reboque`, `placa_semi_reboque`, `fuel_type`, `tank_capacity`, `avg_consumption`, `cooling_brand`, `license_plate`, `renavam`, `chassi`, `detran_uf`, `brand_model`, `year`, `color`, `acquisition`, `fipe_price`, `tracker`, `antt`, `owner`, `status`, `autonomy`, `crlv_upload`, `created_at`, `updated_at`
+
+RLS vehicles:
+- SELECT: Fleet Assistant (rank 3)+ do próprio tenant + Admin Master (cross-tenant)
+- INSERT/UPDATE/DELETE: Fleet Analyst (rank 4)+ do próprio tenant + Admin Master
+- Unique index em `(client_id, license_plate)`
 
 ### Row Level Security (RLS)
 - Todas as tabelas devem ter RLS habilitado
