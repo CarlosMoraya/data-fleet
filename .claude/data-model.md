@@ -17,6 +17,7 @@ Driver(1) < Yard Auditor(2) < Fleet Assistant(3) < Fleet Analyst(4) < Manager(5)
 - Client switching: apenas Manager(5)+
 - Área admin (`/admin/*`): apenas Admin Master(7)
 - Gestão de usuários (`/users`): Fleet Assistant(3)+
+- **Exclusão de veículos**: Manager(5)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteVehicles` estiver ativo.
 - Route guard: Driver/Yard Auditor → redirect para `/checklists`
 
 ### User
@@ -27,6 +28,7 @@ interface User {
   email: string;
   role: Role;
   clientId: string; // tenant primário
+  canDeleteVehicles: boolean;
 }
 ```
 
@@ -61,7 +63,8 @@ interface Vehicle {
   renavam: string;
   chassi: string;
   detranUF: string;
-  brandModel: string;
+  brand: string;
+  model: string;
   year: number;
   color: string;
 
@@ -97,9 +100,9 @@ interface Vehicle {
 ## Schema Supabase (supabase/schema.sql)
 
 Tabelas ativas:
-- `profiles` (id UUID PK → auth.users, name, email, role, client_id FK → clients)
+- `profiles` (id UUID PK → auth.users, name, email, role, client_id FK → clients, can_delete_vehicles)
 - `clients` (id UUID PK, name, logo_url)
-- `vehicles` (id UUID PK, client_id FK → clients, + todos os campos da interface Vehicle em snake_case)
+- `vehicles` (id UUID PK, client_id FK → clients, brand, model, crlv_upload, ... + demais campos snake_case)
 
 Tabelas planejadas:
 - `checklist_templates`

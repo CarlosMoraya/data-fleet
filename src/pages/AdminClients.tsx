@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Pencil, Trash2, Plus, Search, X, Upload } from 'lucide-react';
+import { capitalizeWords } from '../lib/inputHelpers';
 
 interface ClientRow {
   id: string;
@@ -233,7 +234,7 @@ export default function AdminClients() {
 
   const handleSave = async (form: FormData) => {
     const payload = {
-      name: form.name.trim(),
+      name: capitalizeWords(form.name),
       logo_url: form.logo_url.trim() || null,
     };
 

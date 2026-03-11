@@ -76,7 +76,7 @@ serve(async (req: Request) => {
     }
 
     // ─── AÇÃO: CRIAR USUÁRIO (padrão) ────────────────────────────────
-    const { email, password, name, role, client_id } = body;
+    const { email, password, name, role, client_id, can_delete_vehicles } = body;
 
     if (!email || !password || !name || !role) {
       return json({ error: "Todos os campos são obrigatórios." }, 400);

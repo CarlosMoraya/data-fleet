@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Pencil, Trash2, Plus, Search, X } from 'lucide-react';
 import { Role } from '../types';
+import { capitalizeWords } from '../lib/inputHelpers';
 
 const ROLE_RANK: Record<Role, number> = {
   'Driver': 1,
@@ -40,6 +41,7 @@ interface UserRow {
   id: string;
   name: string;
   role: Role;
+  can_delete_vehicles: boolean;
   created_at: string;
 }
 
@@ -69,6 +71,7 @@ interface CreateForm {
   email: string;
   password: string;
   role: Role;
+  canDeleteVehicles: boolean;
 }
 
 function CreateUserModal({
@@ -83,13 +86,13 @@ function CreateUserModal({
   onCreated: () => void;
 }) {
   const defaultRole = availableRoles[availableRoles.length - 1] ?? 'Driver';
-  const [form, setForm] = useState<CreateForm>({ name: '', email: '', password: '', role: defaultRole });
+  const [form, setForm] = useState<CreateForm>({ name: '', email: '', password: '', role: defaultRole, canDeleteVehicles: false });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (open) {
-      setForm({ name: '', email: '', password: '', role: availableRoles[availableRoles.length - 1] ?? 'Driver' });
+      setForm({ name: '', email: '', password: '', role: availableRoles[availableRoles.length - 1] ?? 'Driver', canDeleteVehicles: false });
       setError('');
     }
   }, [open, availableRoles]);
@@ -103,10 +106,11 @@ function CreateUserModal({
     try {
       const { data, error: fnError } = await supabase.functions.invoke('create-user', {
         body: {
-          email: form.email.trim(),
+          email: form.email.trim().toLowerCase(),
           password: form.password,
-          name: form.name.trim(),
+          name: capitalizeWords(form.name),
           role: form.role,
+          can_delete_vehicles: form.canDeleteVehicles,
         },
       });
       if (fnError) {
@@ -173,6 +177,24 @@ function CreateUserModal({
             </select>
           </div>
 
+          <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+            <input
+              id="create-can-delete"
+              type="checkbox"
+              checked={form.canDeleteVehicles}
+              onChange={(e) => setForm((f) => ({ ...f, canDeleteVehicles: e.target.checked }))}
+              className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+            />
+            <div>
+              <label htmlFor="create-can-delete" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                Pode excluir veículos
+              </label>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Permite que este usuário exclua cadastros de veículos da frota.
+              </p>
+            </div>
+          </div>
+
           {error && (
             <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
           )}
@@ -211,11 +233,15 @@ function EditUserModal({
   onSaved: () => void;
 }) {
   const [name, setName] = useState('');
+  const [canDelete, setCanDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (user) setName(user.name);
+    if (user) {
+      setName(user.name);
+      setCanDelete(user.can_delete_vehicles);
+    }
     setError('');
   }, [user, open]);
 
@@ -228,7 +254,7 @@ function EditUserModal({
     try {
       const { error: dbError } = await supabase
         .from('profiles')
-        .update({ name: name.trim() })
+        .update({ name: capitalizeWords(name), can_delete_vehicles: canDelete })
         .eq('id', user.id);
       if (dbError) throw new Error(dbError.message);
       onSaved();
@@ -264,6 +290,24 @@ function EditUserModal({
             <p className="mt-1 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-500">
               {user.role} <span className="text-zinc-400">(não editável aqui)</span>
             </p>
+          </div>
+
+          <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+            <input
+              id="edit-can-delete"
+              type="checkbox"
+              checked={canDelete}
+              onChange={(e) => setCanDelete(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+            />
+            <div>
+              <label htmlFor="edit-can-delete" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                Pode excluir veículos
+              </label>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Permite que este usuário exclua cadastros de veículos da frota.
+              </p>
+            </div>
           </div>
 
           {error && (
@@ -311,7 +355,7 @@ export default function Users() {
     setLoading(true);
     const { data } = await supabase
       .from('profiles')
-      .select('id, name, role, created_at')
+      .select('id, name, role, can_delete_vehicles, created_at')
       .eq('client_id', currentClient.id)
       .order('name');
 

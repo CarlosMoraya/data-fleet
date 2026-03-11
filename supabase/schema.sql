@@ -241,6 +241,7 @@ CREATE TABLE IF NOT EXISTS public.vehicles (
   owner               TEXT NOT NULL DEFAULT '',
   status              TEXT NOT NULL CHECK (status IN ('Available', 'Maintenance', 'In Use')) DEFAULT 'Available',
   autonomy            NUMERIC NOT NULL DEFAULT 0,
+  acquisition_date    DATE,
   crlv_upload         TEXT,
 
   created_at          TIMESTAMPTZ DEFAULT NOW(),

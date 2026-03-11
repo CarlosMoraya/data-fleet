@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Pencil, Trash2, Plus, Search, X } from 'lucide-react';
 import { Role } from '../types';
+import { capitalizeWords } from '../lib/inputHelpers';
 
 const ALL_ROLES: Role[] = [
   'Driver', 'Yard Auditor', 'Fleet Assistant',
@@ -93,9 +94,9 @@ function CreateUserModal({
     try {
       const { error: fnError } = await supabase.functions.invoke('create-user', {
         body: {
-          email: form.email.trim(),
+          email: form.email.trim().toLowerCase(),
           password: form.password,
-          name: form.name.trim(),
+          name: capitalizeWords(form.name),
           role: form.role,
           client_id: form.client_id,
         },
@@ -235,7 +236,7 @@ function EditUserModal({
     try {
       const { error: dbError } = await supabase
         .from('profiles')
-        .update({ name: form.name.trim(), role: form.role, client_id: form.client_id })
+        .update({ name: capitalizeWords(form.name), role: form.role, client_id: form.client_id })
         .eq('id', user.id);
       if (dbError) throw new Error(dbError.message);
       onSaved();

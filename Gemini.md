@@ -50,4 +50,14 @@ Checklist de sincronização:
 
 **Data Fleet** — SaaS multi-tenant de gestão de frotas.
 Stack: React 19 + Vite + TypeScript + Tailwind CSS v4 + Supabase.
-Para detalhes completos, consulte os arquivos presentes em `.claude/`.
+---
+
+## Registro de Mudanças (Sessão Atual)
+
+- **Upload de CRLV**: Implementado upload para Supabase Storage (bucket `vehicle-documents`) com compressão de imagens e suporte a PDF.
+- **Permissões de Veículos**:
+    - `Fleet Assistant`: Agora pode visualizar e **cadastrar** veículos (mas não editar/deletar).
+    - `Fleet Analyst`: Pode editar, mas só deleta se o flag `canDeleteVehicles` estiver ativo em seu perfil.
+- **Gestão de Usuários**: Adicionado checkbox "Pode excluir veículos" nos modais de criação/edição de usuários (controlado por Manager+).
+- **Backend**: Atualizada Edge Function `create-user` e tabela `profiles` com o novo campo de permissão.
+- **Auto-Sync**: Atualizados manuais em `.claude/` (Frontend, Backend, Data Model).

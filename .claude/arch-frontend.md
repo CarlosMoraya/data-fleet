@@ -22,7 +22,8 @@ src/
 ├── lib/
 │   ├── supabase.ts      # Supabase client (VITE_SUPABASE_URL + ANON_KEY)
 │   ├── utils.ts         # cn() helper (clsx + tailwind-merge)
-│   └── vehicleMappers.ts # Mapper camelCase (TS) ↔ snake_case (Supabase) para Vehicle
+│   ├── vehicleMappers.ts # Mapper camelCase (TS) ↔ snake_case (Supabase) para Vehicle
+  └── storageHelpers.ts # Helper para upload/delete de arquivos e compressão de imagens
 ├── pages/
 │   ├── Login.tsx        # Login com email/senha (Supabase Auth)
 │   ├── Dashboard.tsx    # KPIs + gráficos (ainda mock data)

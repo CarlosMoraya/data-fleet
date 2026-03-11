@@ -1,4 +1,10 @@
 import { Vehicle } from '../types';
+import {
+  normalizeUpper,
+  capitalizeWords,
+  commaToFloat,
+  normalizeTrim,
+} from './inputHelpers';
 
 /** Row retornado pelo Supabase (snake_case) */
 export interface VehicleRow {
@@ -27,6 +33,7 @@ export interface VehicleRow {
   antt: string;
   owner: string;
   autonomy: number;
+  acquisition_date: string | null;
   crlv_upload: string | null;
 }
 
@@ -58,11 +65,12 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
     antt: row.antt,
     owner: row.owner,
     autonomy: row.autonomy,
+    acquisitionDate: row.acquisition_date ?? undefined,
     crlvUpload: row.crlv_upload ?? undefined,
   };
 }
 
-/** Converte Partial<Vehicle> (camelCase) para payload de insert/update (snake_case) */
+/** Converte Partial<Vehicle> (camelCase) para payload de insert/update (snake_case) com normalização */
 export function vehicleToRow(vehicle: Partial<Vehicle>, clientId: string): Omit<VehicleRow, 'id'> {
   return {
     client_id: clientId,
@@ -70,25 +78,26 @@ export function vehicleToRow(vehicle: Partial<Vehicle>, clientId: string): Omit<
     energy_source: vehicle.energySource ?? 'Combustão',
     cooling_equipment: vehicle.coolingEquipment ?? false,
     semi_reboque: vehicle.semiReboque ?? null,
-    placa_semi_reboque: vehicle.placaSemiReboque ?? null,
-    fuel_type: vehicle.fuelType ?? null,
-    tank_capacity: vehicle.tankCapacity != null ? Number(vehicle.tankCapacity) : null,
-    avg_consumption: vehicle.avgConsumption != null ? Number(vehicle.avgConsumption) : null,
-    cooling_brand: vehicle.coolingBrand ?? null,
-    license_plate: vehicle.licensePlate ?? '',
-    renavam: vehicle.renavam ?? '',
-    chassi: vehicle.chassi ?? '',
-    detran_uf: vehicle.detranUF ?? '',
-    brand: vehicle.brand ?? '',
-    model: vehicle.model ?? '',
+    placa_semi_reboque: vehicle.placaSemiReboque ? normalizeUpper(vehicle.placaSemiReboque) : null,
+    fuel_type: vehicle.fuelType ? capitalizeWords(vehicle.fuelType) : null,
+    tank_capacity: vehicle.tankCapacity != null ? commaToFloat(vehicle.tankCapacity) : null,
+    avg_consumption: vehicle.avgConsumption != null ? commaToFloat(vehicle.avgConsumption) : null,
+    cooling_brand: vehicle.coolingBrand ? capitalizeWords(vehicle.coolingBrand) : null,
+    license_plate: normalizeUpper(vehicle.licensePlate),
+    renavam: normalizeTrim(vehicle.renavam),
+    chassi: normalizeUpper(vehicle.chassi),
+    detran_uf: normalizeUpper(vehicle.detranUF),
+    brand: normalizeUpper(vehicle.brand),
+    model: normalizeUpper(vehicle.model),
     year: vehicle.year != null ? parseInt(String(vehicle.year), 10) : 0,
-    color: vehicle.color ?? '',
+    color: capitalizeWords(vehicle.color),
     acquisition: vehicle.acquisition ?? 'Owned',
-    fipe_price: vehicle.fipePrice != null ? Number(vehicle.fipePrice) : 0,
-    tracker: vehicle.tracker ?? '',
-    antt: vehicle.antt ?? '',
-    owner: vehicle.owner ?? '',
-    autonomy: vehicle.autonomy != null ? Number(vehicle.autonomy) : 0,
+    fipe_price: commaToFloat(vehicle.fipePrice),
+    tracker: capitalizeWords(vehicle.tracker),
+    antt: normalizeTrim(vehicle.antt),
+    owner: capitalizeWords(vehicle.owner),
+    autonomy: commaToFloat(vehicle.autonomy),
+    acquisition_date: vehicle.acquisitionDate ?? null,
     crlv_upload: vehicle.crlvUpload ?? null,
   };
 }

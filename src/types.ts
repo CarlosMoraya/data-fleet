@@ -6,6 +6,7 @@ export interface User {
   email: string;
   role: Role;
   clientId: string; // The primary client they belong to
+  canDeleteVehicles: boolean;
 }
 
 export interface Client {
@@ -44,6 +45,7 @@ export interface Vehicle {
   antt: string;
   owner: string;
   autonomy: number;
+  acquisitionDate?: string;
   crlvUpload?: string;
   status?: 'Available' | 'In Use' | 'Maintenance';
 }

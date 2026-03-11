@@ -6,9 +6,12 @@ import { Plus, Search, Filter, Edit2, Trash2, Truck } from 'lucide-react';
 import VehicleForm from '../components/VehicleForm';
 import { supabase } from '../lib/supabase';
 import { vehicleFromRow, vehicleToRow, VehicleRow } from '../lib/vehicleMappers';
+import { uploadVehicleDocument, deleteVehicleDocument } from '../lib/storageHelpers';
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
+const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
 const ROLES_CAN_EDIT = ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
+const ROLES_CAN_ALWAYS_DELETE = ['Manager', 'Director', 'Admin Master'];
 
 export default function Vehicles() {
   const { currentClient, user } = useAuth();
@@ -28,7 +31,9 @@ export default function Vehicles() {
     }
   });
 
+  const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
+  const canDelete = ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') || (user?.canDeleteVehicles === true);
 
   // Redirect Drivers and Yard Auditors
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
@@ -57,9 +62,11 @@ export default function Vehicles() {
     fetchVehicles();
   }, [fetchVehicles]);
 
-  const handleSave = async (vehicle: Partial<Vehicle>): Promise<void> => {
+  const handleSave = async (vehicle: Partial<Vehicle>, file: File | null): Promise<void> => {
     if (!currentClient?.id) return;
     const row = vehicleToRow(vehicle, currentClient.id);
+
+    let savedId = editingVehicle?.id;
 
     if (editingVehicle) {
       const { error: updateError } = await supabase
@@ -68,10 +75,27 @@ export default function Vehicles() {
         .eq('id', editingVehicle.id);
       if (updateError) throw updateError;
     } else {
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from('vehicles')
-        .insert(row);
+        .insert(row)
+        .select('id')
+        .single();
       if (insertError) throw insertError;
+      savedId = inserted.id;
+    }
+
+    // Upload document if a new file was selected
+    if (file && savedId) {
+      // If replacing, delete old file first
+      if (vehicle.crlvUpload) {
+        await deleteVehicleDocument(vehicle.crlvUpload);
+      }
+      const publicUrl = await uploadVehicleDocument(currentClient.id, savedId, file);
+      const { error: updateUrlError } = await supabase
+        .from('vehicles')
+        .update({ crlv_upload: publicUrl })
+        .eq('id', savedId);
+      if (updateUrlError) throw updateUrlError;
     }
 
     await fetchVehicles();
@@ -84,6 +108,12 @@ export default function Vehicles() {
 
   const handleDelete = async (vehicle: Vehicle) => {
     if (!window.confirm(`Excluir o veículo ${vehicle.licensePlate}? Esta ação não pode ser desfeita.`)) return;
+
+    // Delete document from Storage first (if exists)
+    if (vehicle.crlvUpload) {
+      await deleteVehicleDocument(vehicle.crlvUpload);
+    }
+
     const { error: deleteError } = await supabase
       .from('vehicles')
       .delete()
@@ -113,7 +143,7 @@ export default function Vehicles() {
           <p className="text-sm text-zinc-500 mt-1">Manage your fleet inventory and details.</p>
         </div>
 
-        {canEdit && (
+        {canCreate && (
           <button
             onClick={() => {
               sessionStorage.removeItem('vehicleFormData'); // clear any drafts for adding new
@@ -196,8 +226,8 @@ export default function Vehicles() {
                       <div>{vehicle.acquisition}</div>
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      {canEdit && (
-                        <div className="flex items-center justify-end gap-3">
+                      <div className="flex items-center justify-end gap-3">
+                        {canEdit && (
                           <button
                             onClick={() => {
                               sessionStorage.removeItem('vehicleFormData'); // draft
@@ -211,6 +241,8 @@ export default function Vehicles() {
                             <Edit2 className="h-5 w-5" />
                             <span className="sr-only">Edit</span>
                           </button>
+                        )}
+                        {canDelete && (
                           <button
                             onClick={() => handleDelete(vehicle)}
                             className="text-zinc-400 hover:text-red-600 transition-colors"
@@ -218,8 +250,8 @@ export default function Vehicles() {
                             <Trash2 className="h-5 w-5" />
                             <span className="sr-only">Delete</span>
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
