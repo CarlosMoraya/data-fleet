@@ -14,6 +14,7 @@ import Checklists from './pages/Checklists';
 import AdminClients from './pages/AdminClients';
 import AdminUsers from './pages/AdminUsers';
 import Users from './pages/Users';
+import Settings from './pages/Settings';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -34,7 +35,7 @@ export default function App() {
             <Route path="vehicles" element={<Vehicles />} />
             <Route path="checklists" element={<Checklists />} />
             <Route path="users" element={<Users />} />
-            <Route path="settings" element={<div className="p-8 text-zinc-500">Settings coming soon...</div>} />
+            <Route path="settings" element={<Settings />} />
             <Route path="admin/clients" element={<AdminClients />} />
             <Route path="admin/users" element={<AdminUsers />} />
           </Route>

@@ -10,7 +10,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
   {
     id: 'v1',
     clientId: 'client_1',
-    type: 'Heavy',
+    type: 'Truck',
     energySource: 'Combustão',
     coolingEquipment: false,
     fuelType: 'Diesel',
@@ -35,7 +35,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
   {
     id: 'v2',
     clientId: 'client_1',
-    type: 'Light',
+    type: 'Utilitário',
     energySource: 'Elétrico',
     coolingEquipment: true,
     coolingBrand: 'Thermo Star',

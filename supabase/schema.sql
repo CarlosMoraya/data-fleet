@@ -212,7 +212,7 @@ CREATE TABLE IF NOT EXISTS public.vehicles (
   client_id           UUID NOT NULL REFERENCES public.clients(id),
 
   -- Classificação
-  type                TEXT NOT NULL CHECK (type IN ('Light', 'Medium', 'Heavy', 'Cavalo')),
+  type                TEXT NOT NULL CHECK (type IN ('Passeio', 'Utilitário', 'Van', 'Moto', 'Vuc', 'Toco', 'Truck', 'Cavalo')),
   energy_source       TEXT NOT NULL CHECK (energy_source IN ('Combustão', 'Elétrico', 'Híbrido')),
   cooling_equipment   BOOLEAN NOT NULL DEFAULT false,
 

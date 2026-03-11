@@ -30,6 +30,7 @@ src/
 │   ├── Vehicles.tsx     # CRUD de veículos (Supabase — Fleet Assistant+ acessa, Fleet Analyst+ edita)
 │   ├── Checklists.tsx   # Stub — "No checklists"
 │   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+)
+│   ├── Settings.tsx     # Configurações de campos (Manager+)
 │   ├── AdminUsers.tsx   # CRUD todos usuários (Admin Master only)
 │   └── AdminClients.tsx # CRUD clientes (Admin Master only)
 ├── types.ts             # Interfaces compartilhadas

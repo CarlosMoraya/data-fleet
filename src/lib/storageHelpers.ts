@@ -86,13 +86,14 @@ export function validateFile(file: File): void {
 export async function uploadVehicleDocument(
   clientId: string,
   vehicleId: string,
-  file: File
+  file: File,
+  docType: 'crlv' | 'sanitary-inspection' | 'gr' = 'crlv'
 ): Promise<string> {
   validateFile(file);
 
   const prepared = await prepareFile(file);
   const ext = prepared.type === 'application/pdf' ? 'pdf' : 'jpg';
-  const path = `${clientId}/${vehicleId}/crlv.${ext}`;
+  const path = `${clientId}/${vehicleId}/${docType}.${ext}`;
 
   const { error } = await supabase.storage
     .from(BUCKET)

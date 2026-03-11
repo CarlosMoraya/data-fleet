@@ -27,9 +27,13 @@ export default function Dashboard() {
 
   // Chart Data
   const categoryData = [
-    { name: 'Light', count: clientVehicles.filter(v => v.type === 'Light').length },
-    { name: 'Medium', count: clientVehicles.filter(v => v.type === 'Medium').length },
-    { name: 'Heavy', count: clientVehicles.filter(v => v.type === 'Heavy').length },
+    { name: 'Passeio', count: clientVehicles.filter(v => v.type === 'Passeio').length },
+    { name: 'Utilitário', count: clientVehicles.filter(v => v.type === 'Utilitário').length },
+    { name: 'Van', count: clientVehicles.filter(v => v.type === 'Van').length },
+    { name: 'Moto', count: clientVehicles.filter(v => v.type === 'Moto').length },
+    { name: 'Vuc', count: clientVehicles.filter(v => v.type === 'Vuc').length },
+    { name: 'Toco', count: clientVehicles.filter(v => v.type === 'Toco').length },
+    { name: 'Truck', count: clientVehicles.filter(v => v.type === 'Truck').length },
     { name: 'Cavalo', count: clientVehicles.filter(v => v.type === 'Cavalo').length },
   ];
 

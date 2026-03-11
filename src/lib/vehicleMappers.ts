@@ -35,6 +35,13 @@ export interface VehicleRow {
   autonomy: number;
   acquisition_date: string | null;
   crlv_upload: string | null;
+  tag: string | null;
+  sanitary_inspection_upload: string | null;
+  spare_key: boolean;
+  vehicle_manual: boolean;
+  gr_upload: string | null;
+  gr_expiration_date: string | null;
+  category: string | null;
 }
 
 /** Converte row do Supabase (snake_case) para interface Vehicle (camelCase) */
@@ -67,6 +74,13 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
     autonomy: row.autonomy,
     acquisitionDate: row.acquisition_date ?? undefined,
     crlvUpload: row.crlv_upload ?? undefined,
+    tag: row.tag ?? undefined,
+    sanitaryInspectionUpload: row.sanitary_inspection_upload ?? undefined,
+    spareKey: row.spare_key,
+    vehicleManual: row.vehicle_manual,
+    grUpload: row.gr_upload ?? undefined,
+    grExpirationDate: row.gr_expiration_date ?? undefined,
+    category: row.category as Vehicle['category'] ?? undefined,
   };
 }
 
@@ -74,7 +88,7 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
 export function vehicleToRow(vehicle: Partial<Vehicle>, clientId: string): Omit<VehicleRow, 'id'> {
   return {
     client_id: clientId,
-    type: vehicle.type ?? 'Light',
+    type: vehicle.type ?? 'Passeio',
     energy_source: vehicle.energySource ?? 'Combustão',
     cooling_equipment: vehicle.coolingEquipment ?? false,
     semi_reboque: vehicle.semiReboque ?? null,
@@ -99,5 +113,12 @@ export function vehicleToRow(vehicle: Partial<Vehicle>, clientId: string): Omit<
     autonomy: commaToFloat(vehicle.autonomy),
     acquisition_date: vehicle.acquisitionDate ?? null,
     crlv_upload: vehicle.crlvUpload ?? null,
+    tag: vehicle.tag ? normalizeTrim(vehicle.tag) : null,
+    sanitary_inspection_upload: vehicle.sanitaryInspectionUpload ?? null,
+    spare_key: vehicle.spareKey ?? false,
+    vehicle_manual: vehicle.vehicleManual ?? false,
+    gr_upload: vehicle.grUpload ?? null,
+    gr_expiration_date: vehicle.grExpirationDate ?? null,
+    category: vehicle.category ?? null,
   };
 }

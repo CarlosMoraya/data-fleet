@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Vehicle } from '../types';
+import { Vehicle, VehicleFieldSettings } from '../types';
 import { Plus, Search, Filter, Edit2, Trash2, Truck } from 'lucide-react';
 import VehicleForm from '../components/VehicleForm';
 import { supabase } from '../lib/supabase';
 import { vehicleFromRow, vehicleToRow, VehicleRow } from '../lib/vehicleMappers';
 import { uploadVehicleDocument, deleteVehicleDocument } from '../lib/storageHelpers';
+import { fieldSettingsFromRow, defaultFieldSettings, VehicleFieldSettingsRow } from '../lib/fieldSettingsMappers';
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
@@ -30,6 +31,7 @@ export default function Vehicles() {
       return null;
     }
   });
+  const [fieldSettings, setFieldSettings] = useState<VehicleFieldSettings | null>(null);
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
@@ -58,11 +60,25 @@ export default function Vehicles() {
     setLoading(false);
   }, [currentClient?.id]);
 
+  const fetchFieldSettings = useCallback(async () => {
+    if (!currentClient?.id) return;
+    const { data } = await supabase
+      .from('vehicle_field_settings')
+      .select('*')
+      .eq('client_id', currentClient.id)
+      .maybeSingle();
+    setFieldSettings(data ? fieldSettingsFromRow(data as VehicleFieldSettingsRow) : defaultFieldSettings(currentClient.id));
+  }, [currentClient?.id]);
+
   useEffect(() => {
     fetchVehicles();
-  }, [fetchVehicles]);
+    fetchFieldSettings();
+  }, [fetchVehicles, fetchFieldSettings]);
 
-  const handleSave = async (vehicle: Partial<Vehicle>, file: File | null): Promise<void> => {
+  const handleSave = async (
+    vehicle: Partial<Vehicle>,
+    files: { crlv: File | null; sanitaryInspection: File | null; gr: File | null }
+  ): Promise<void> => {
     if (!currentClient?.id) return;
     const row = vehicleToRow(vehicle, currentClient.id);
 
@@ -84,18 +100,29 @@ export default function Vehicles() {
       savedId = inserted.id;
     }
 
-    // Upload document if a new file was selected
-    if (file && savedId) {
-      // If replacing, delete old file first
-      if (vehicle.crlvUpload) {
-        await deleteVehicleDocument(vehicle.crlvUpload);
+    if (savedId) {
+      const urlUpdates: Record<string, string> = {};
+
+      if (files.crlv) {
+        if (vehicle.crlvUpload) await deleteVehicleDocument(vehicle.crlvUpload);
+        urlUpdates.crlv_upload = await uploadVehicleDocument(currentClient.id, savedId, files.crlv, 'crlv');
       }
-      const publicUrl = await uploadVehicleDocument(currentClient.id, savedId, file);
-      const { error: updateUrlError } = await supabase
-        .from('vehicles')
-        .update({ crlv_upload: publicUrl })
-        .eq('id', savedId);
-      if (updateUrlError) throw updateUrlError;
+      if (files.sanitaryInspection) {
+        if (vehicle.sanitaryInspectionUpload) await deleteVehicleDocument(vehicle.sanitaryInspectionUpload);
+        urlUpdates.sanitary_inspection_upload = await uploadVehicleDocument(currentClient.id, savedId, files.sanitaryInspection, 'sanitary-inspection');
+      }
+      if (files.gr) {
+        if (vehicle.grUpload) await deleteVehicleDocument(vehicle.grUpload);
+        urlUpdates.gr_upload = await uploadVehicleDocument(currentClient.id, savedId, files.gr, 'gr');
+      }
+
+      if (Object.keys(urlUpdates).length > 0) {
+        const { error: updateUrlError } = await supabase
+          .from('vehicles')
+          .update(urlUpdates)
+          .eq('id', savedId);
+        if (updateUrlError) throw updateUrlError;
+      }
     }
 
     await fetchVehicles();
@@ -109,10 +136,10 @@ export default function Vehicles() {
   const handleDelete = async (vehicle: Vehicle) => {
     if (!window.confirm(`Excluir o veículo ${vehicle.licensePlate}? Esta ação não pode ser desfeita.`)) return;
 
-    // Delete document from Storage first (if exists)
-    if (vehicle.crlvUpload) {
-      await deleteVehicleDocument(vehicle.crlvUpload);
-    }
+    // Delete documents from Storage first (if exists)
+    if (vehicle.crlvUpload) await deleteVehicleDocument(vehicle.crlvUpload);
+    if (vehicle.sanitaryInspectionUpload) await deleteVehicleDocument(vehicle.sanitaryInspectionUpload);
+    if (vehicle.grUpload) await deleteVehicleDocument(vehicle.grUpload);
 
     const { error: deleteError } = await supabase
       .from('vehicles')
@@ -271,6 +298,7 @@ export default function Vehicles() {
       {isFormOpen && (
         <VehicleForm
           vehicle={editingVehicle}
+          fieldSettings={fieldSettings}
           onClose={() => {
             setIsFormOpen(false);
             setEditingVehicle(null);

@@ -42,13 +42,16 @@ e2e/
 │   ├── pedro.setup.ts         # Auth setup Fleet Assistant
 │   └── alexandre.setup.ts     # Auth setup Manager
 ├── .auth/                     # Session storage (gitignored)
+├── assets/                    # Documentos de teste (PDF/PNG)
 ├── auth.spec.ts               # Login/logout flow
 ├── access-control.spec.ts     # Role-based route access
 ├── admin-clients.spec.ts      # Client CRUD (Admin Master)
 ├── admin-users.spec.ts        # User CRUD (Admin Master)
 ├── tenant-users.spec.ts       # User CRUD (Fleet Analyst)
-├── tenant-users-assistant.spec.ts  # User CRUD (Fleet Assistant)
-└── tenant-users-manager.spec.ts    # User CRUD (Manager)
+├── tenant-users-manager-vehicles.spec.ts  # Veículos CRUD + Configs
+├── tenant-users-assistant-vehicles.spec.ts # Veículos Permissões
+├── tenant-users.spec-analyst.ts # Veículos Permissões - Analista
+└── tenant-users-manager-seed.spec.ts # Seeding (Massa de Dados)
 ```
 
 ## Configuração

@@ -16,16 +16,17 @@
 ## Banco de Dados
 
 ### Tabelas existentes
-- `profiles` — dados do usuário (vinculado a auth.users)
-- `clients` — tenants/empresas
-- `vehicles` — veículos da frota (CRUD completo com RLS + documento CRLV)
+- `profiles` — dados do usuário (vinculado a auth.users, can_delete_vehicles flag)
+- `clients` — tenants/empresas (id, name, logo_url)
+- `vehicles` — veículos da frota (CRUD completo com RLS, novos tipos em português e diversos anexos)
+- `vehicle_field_settings` — tabelas de configurações dinâmicas de campos obrigatórios por cliente
 
 ### Tabelas planejadas (ainda não criadas)
 - `checklist_templates` — templates de checklist por tipo de veículo
 - `checklists` — checklists preenchidos
 
 ### Tabela `vehicles` — colunas principais
-`id`, `client_id`, `type`, `energy_source`, `cooling_equipment`, `semi_reboque`, `placa_semi_reboque`, `fuel_type`, `tank_capacity`, `avg_consumption`, `cooling_brand`, `license_plate`, `renavam`, `chassi`, `detran_uf`, `brand`, `model`, `year`, `color`, `acquisition`, `fipe_price`, `tracker`, `antt`, `owner`, `status`, `autonomy`, `crlv_upload`, `created_at`, `updated_at`
+`id`, `client_id`, `type` (Passeio a Cavalo), `energy_source`, `cooling_equipment`, `semi_reboque`, `placa_semi_reboque`, `fuel_type`, `tank_capacity`, `avg_consumption`, `cooling_brand`, `license_plate`, `renavam`, `chassi`, `detran_uf`, `brand`, `model`, `year`, `color`, `acquisition`, `acquisition_date`, `fipe_price`, `tracker`, `antt`, `owner`, `status`, `autonomy`, `tag`, `crlv_upload`, `sanitary_inspection_upload`, `gr_upload`, `gr_expiration_date`, `spare_key`, `vehicle_manual`, `category`, `created_at`, `updated_at`
 
 RLS vehicles:
 - SELECT: Fleet Assistant (rank 3)+ do próprio tenant + Admin Master (cross-tenant)
@@ -41,8 +42,9 @@ RLS vehicles:
 ## Storage
 
 ### Bucket `vehicle-documents` (Público)
-- **Uso**: Armazena CRLV dos veículos.
-- **Estrutura**: `{client_id}/{vehicle_id}/crlv.{ext}`
+- **Uso**: Armazena CRLV, Inspeção Sanitária e GR dos veículos.
+- **Estrutura**: `{client_id}/{vehicle_id}/{docType}.{ext}`
+- **Tipos**: `crlv`, `sanitary-inspection`, `gr`.
 - **Otimização**: Imagens comprimidas client-side antes do upload. PDFs enviados originais.
 - **Policies**:
   - SELECT: Público.

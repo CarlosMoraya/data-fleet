@@ -54,10 +54,10 @@ Stack: React 19 + Vite + TypeScript + Tailwind CSS v4 + Supabase.
 
 ## Registro de Mudanças (Sessão Atual)
 
-- **Upload de CRLV**: Implementado upload para Supabase Storage (bucket `vehicle-documents`) com compressão de imagens e suporte a PDF.
-- **Permissões de Veículos**:
-    - `Fleet Assistant`: Agora pode visualizar e **cadastrar** veículos (mas não editar/deletar).
-    - `Fleet Analyst`: Pode editar, mas só deleta se o flag `canDeleteVehicles` estiver ativo em seu perfil.
-- **Gestão de Usuários**: Adicionado checkbox "Pode excluir veículos" nos modais de criação/edição de usuários (controlado por Manager+).
-- **Backend**: Atualizada Edge Function `create-user` e tabela `profiles` com o novo campo de permissão.
-- **Auto-Sync**: Atualizados manuais em `.claude/` (Frontend, Backend, Data Model).
+- **Módulo de Veículos**: Atualizado `VehicleForm.tsx` com campos obrigatórios dinâmicos, novos uploads (Sanitária e GR) e suporte a múltiplos tipos de veículos.
+- **Banco de Dados**: Corrigida a constraint `vehicles_type_check` no Supabase para aceitar os tipos em português (Passeio, Vuc, etc.).
+- **Configurações Dinâmicas**: Lançada tabela `vehicle_field_settings` para controle per-client de campos obrigatórios do veículo.
+- **Testes E2E (Playwright)**:
+    - Criados testes de permissão por papel (Manager, Analyst, Assistant).
+    - Implementado script de *seeding* automático (`tenant-users-manager-seed.spec.ts`) para massa de dados.
+- **Auto-Sync**: Atualizados manuais em `.claude/` (Frontend, Backend, Testing, Data Model) com as novas regras de negócios.

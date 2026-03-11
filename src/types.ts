@@ -18,7 +18,7 @@ export interface Client {
 export interface Vehicle {
   id: string;
   clientId: string;
-  type: 'Light' | 'Medium' | 'Heavy' | 'Cavalo';
+  type: 'Passeio' | 'Utilitário' | 'Van' | 'Moto' | 'Vuc' | 'Toco' | 'Truck' | 'Cavalo';
   energySource: 'Combustão' | 'Elétrico' | 'Híbrido';
   coolingEquipment: boolean;
   
@@ -48,4 +48,49 @@ export interface Vehicle {
   acquisitionDate?: string;
   crlvUpload?: string;
   status?: 'Available' | 'In Use' | 'Maintenance';
+
+  // New fields
+  tag?: string;
+  sanitaryInspectionUpload?: string;
+  spareKey?: boolean;
+  vehicleManual?: boolean;
+  grUpload?: string;
+  grExpirationDate?: string;
+  category?: 'Leve' | 'Médio' | 'Pesado';
+}
+
+/** Configuração per-client de quais campos de veículo são opcionais.
+ *  `true` = opcional, `false` = obrigatório. Default: tudo obrigatório. */
+export interface VehicleFieldSettings {
+  id: string;
+  clientId: string;
+
+  // Identificação
+  renavamOptional: boolean;
+  chassiOptional: boolean;
+  detranUFOptional: boolean;
+  colorOptional: boolean;
+
+  // Propriedade & Rastreamento
+  ownerOptional: boolean;
+  fipePriceOptional: boolean;
+  trackerOptional: boolean;
+  anttOptional: boolean;
+  autonomyOptional: boolean;
+  acquisitionDateOptional: boolean;
+  tagOptional: boolean;
+  categoryOptional: boolean;
+
+  // Documentos
+  crlvUploadOptional: boolean;
+  sanitaryInspectionOptional: boolean;
+  grUploadOptional: boolean;
+  grExpirationDateOptional: boolean;
+
+  // Condicionais
+  fuelTypeOptional: boolean;
+  tankCapacityOptional: boolean;
+  avgConsumptionOptional: boolean;
+  coolingBrandOptional: boolean;
+  placaSemiReboqueOptional: boolean;
 }
