@@ -122,3 +122,55 @@ export async function deleteVehicleDocument(crlvUrl: string): Promise<void> {
   const { error } = await supabase.storage.from(BUCKET).remove([path]);
   if (error) console.warn('Aviso: não foi possível deletar o documento do Storage.', error.message);
 }
+
+// ─────────────────────────────────────────────────────────────
+// Driver Documents
+// Bucket: driver-documents
+// Mesma lógica de validação/compressão dos documentos de veículo
+// ─────────────────────────────────────────────────────────────
+
+const DRIVER_BUCKET = 'driver-documents';
+
+/**
+ * Uploads a driver document to Supabase Storage.
+ * Images are compressed before upload (max 1920px, 82% JPEG). PDFs are sent as-is.
+ * Accepted formats: PDF, JPG, PNG, WEBP. Max size: 10MB.
+ * Returns the public URL of the uploaded file.
+ */
+export async function uploadDriverDocument(
+  clientId: string,
+  driverId: string,
+  file: File,
+  docType: 'cnh' | 'gr' | 'certificate-1' | 'certificate-2' | 'certificate-3'
+): Promise<string> {
+  validateFile(file);
+
+  const prepared = await prepareFile(file);
+  const ext = prepared.type === 'application/pdf' ? 'pdf' : 'jpg';
+  const path = `${clientId}/${driverId}/${docType}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from(DRIVER_BUCKET)
+    .upload(path, prepared, { upsert: true, contentType: prepared.type });
+
+  if (error) throw new Error(`Erro ao enviar documento: ${error.message}`);
+
+  const { data } = supabase.storage.from(DRIVER_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+/**
+ * Deletes a driver document from Supabase Storage using its public URL.
+ * Silently ignores if the URL is empty or invalid.
+ */
+export async function deleteDriverDocument(url: string): Promise<void> {
+  if (!url) return;
+
+  const marker = `/driver-documents/`;
+  const idx = url.indexOf(marker);
+  if (idx === -1) return;
+
+  const path = url.slice(idx + marker.length);
+  const { error } = await supabase.storage.from(DRIVER_BUCKET).remove([path]);
+  if (error) console.warn('Aviso: não foi possível deletar o documento do Storage.', error.message);
+}

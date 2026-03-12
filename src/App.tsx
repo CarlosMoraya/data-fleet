@@ -10,6 +10,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Vehicles from './pages/Vehicles';
+import Drivers from './pages/Drivers';
 import Checklists from './pages/Checklists';
 import AdminClients from './pages/AdminClients';
 import AdminUsers from './pages/AdminUsers';
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<HomeRedirect />} />
             <Route path="vehicles" element={<Vehicles />} />
+            <Route path="drivers" element={<Drivers />} />
             <Route path="checklists" element={<Checklists />} />
             <Route path="users" element={<Users />} />
             <Route path="settings" element={<Settings />} />

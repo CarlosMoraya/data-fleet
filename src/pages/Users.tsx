@@ -42,6 +42,7 @@ interface UserRow {
   name: string;
   role: Role;
   can_delete_vehicles: boolean;
+  can_delete_drivers: boolean;
   created_at: string;
 }
 
@@ -72,6 +73,7 @@ interface CreateForm {
   password: string;
   role: Role;
   canDeleteVehicles: boolean;
+  canDeleteDrivers: boolean;
 }
 
 function CreateUserModal({
@@ -86,13 +88,13 @@ function CreateUserModal({
   onCreated: () => void;
 }) {
   const defaultRole = availableRoles[availableRoles.length - 1] ?? 'Driver';
-  const [form, setForm] = useState<CreateForm>({ name: '', email: '', password: '', role: defaultRole, canDeleteVehicles: false });
+  const [form, setForm] = useState<CreateForm>({ name: '', email: '', password: '', role: defaultRole, canDeleteVehicles: false, canDeleteDrivers: false });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (open) {
-      setForm({ name: '', email: '', password: '', role: availableRoles[availableRoles.length - 1] ?? 'Driver', canDeleteVehicles: false });
+      setForm({ name: '', email: '', password: '', role: availableRoles[availableRoles.length - 1] ?? 'Driver', canDeleteVehicles: false, canDeleteDrivers: false });
       setError('');
     }
   }, [open, availableRoles]);
@@ -111,6 +113,7 @@ function CreateUserModal({
           name: capitalizeWords(form.name),
           role: form.role,
           can_delete_vehicles: form.canDeleteVehicles,
+          can_delete_drivers: form.canDeleteDrivers,
         },
       });
       if (fnError) {
@@ -177,21 +180,40 @@ function CreateUserModal({
             </select>
           </div>
 
-          <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-            <input
-              id="create-can-delete"
-              type="checkbox"
-              checked={form.canDeleteVehicles}
-              onChange={(e) => setForm((f) => ({ ...f, canDeleteVehicles: e.target.checked }))}
-              className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-            />
-            <div>
-              <label htmlFor="create-can-delete" className="block text-sm font-medium text-zinc-700 cursor-pointer">
-                Pode excluir veículos
-              </label>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                Permite que este usuário exclua cadastros de veículos da frota.
-              </p>
+          <div className="space-y-2">
+            <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+              <input
+                id="create-can-delete-vehicles"
+                type="checkbox"
+                checked={form.canDeleteVehicles}
+                onChange={(e) => setForm((f) => ({ ...f, canDeleteVehicles: e.target.checked }))}
+                className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+              />
+              <div>
+                <label htmlFor="create-can-delete-vehicles" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                  Pode excluir veículos
+                </label>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Permite que este usuário exclua cadastros de veículos da frota.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+              <input
+                id="create-can-delete-drivers"
+                type="checkbox"
+                checked={form.canDeleteDrivers}
+                onChange={(e) => setForm((f) => ({ ...f, canDeleteDrivers: e.target.checked }))}
+                className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+              />
+              <div>
+                <label htmlFor="create-can-delete-drivers" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                  Pode excluir motoristas
+                </label>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Permite que este usuário exclua cadastros de motoristas da frota.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -233,14 +255,16 @@ function EditUserModal({
   onSaved: () => void;
 }) {
   const [name, setName] = useState('');
-  const [canDelete, setCanDelete] = useState(false);
+  const [canDeleteVehicles, setCanDeleteVehicles] = useState(false);
+  const [canDeleteDrivers, setCanDeleteDrivers] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (user) {
       setName(user.name);
-      setCanDelete(user.can_delete_vehicles);
+      setCanDeleteVehicles(user.can_delete_vehicles);
+      setCanDeleteDrivers(user.can_delete_drivers);
     }
     setError('');
   }, [user, open]);
@@ -254,7 +278,7 @@ function EditUserModal({
     try {
       const { error: dbError } = await supabase
         .from('profiles')
-        .update({ name: capitalizeWords(name), can_delete_vehicles: canDelete })
+        .update({ name: capitalizeWords(name), can_delete_vehicles: canDeleteVehicles, can_delete_drivers: canDeleteDrivers })
         .eq('id', user.id);
       if (dbError) throw new Error(dbError.message);
       onSaved();
@@ -292,21 +316,40 @@ function EditUserModal({
             </p>
           </div>
 
-          <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-            <input
-              id="edit-can-delete"
-              type="checkbox"
-              checked={canDelete}
-              onChange={(e) => setCanDelete(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-            />
-            <div>
-              <label htmlFor="edit-can-delete" className="block text-sm font-medium text-zinc-700 cursor-pointer">
-                Pode excluir veículos
-              </label>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                Permite que este usuário exclua cadastros de veículos da frota.
-              </p>
+          <div className="space-y-2">
+            <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+              <input
+                id="edit-can-delete-vehicles"
+                type="checkbox"
+                checked={canDeleteVehicles}
+                onChange={(e) => setCanDeleteVehicles(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+              />
+              <div>
+                <label htmlFor="edit-can-delete-vehicles" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                  Pode excluir veículos
+                </label>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Permite que este usuário exclua cadastros de veículos da frota.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+              <input
+                id="edit-can-delete-drivers"
+                type="checkbox"
+                checked={canDeleteDrivers}
+                onChange={(e) => setCanDeleteDrivers(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+              />
+              <div>
+                <label htmlFor="edit-can-delete-drivers" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                  Pode excluir motoristas
+                </label>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Permite que este usuário exclua cadastros de motoristas da frota.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -355,7 +398,7 @@ export default function Users() {
     setLoading(true);
     const { data } = await supabase
       .from('profiles')
-      .select('id, name, role, can_delete_vehicles, created_at')
+      .select('id, name, role, can_delete_vehicles, can_delete_drivers, created_at')
       .eq('client_id', currentClient.id)
       .order('name');
 

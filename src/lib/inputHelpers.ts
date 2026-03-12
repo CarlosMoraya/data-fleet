@@ -91,3 +91,13 @@ export function commaToFloat(value: string | number | undefined | null): number 
 export function normalizeTrim(value: string | undefined | null): string {
   return (value ?? '').trim();
 }
+
+/** Somente dígitos, limitado a 11 caracteres. Usado em: CPF */
+export function filterCPF(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 11);
+}
+
+/** Somente letras A-E, uppercase, max 5 chars. Usado em: categoria CNH (A, B, AB, AE, ABCDE...) */
+export function filterCNHCategory(value: string): string {
+  return value.replace(/[^A-Ea-e]/g, '').toUpperCase().slice(0, 5);
+}

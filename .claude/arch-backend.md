@@ -11,15 +11,17 @@
 - **Supabase Auth** com email/senha
 - `AuthContext.tsx` expõe `useAuth()` hook → `{ user, currentClient, signIn, signOut }`
 - Session persistida via Supabase (localStorage)
-- Perfil do usuário armazenado na tabela `profiles` (id, name, email, role, client_id, can_delete_vehicles)
+- Perfil do usuário armazenado na tabela `profiles` (id, name, email, role, client_id, can_delete_vehicles, can_delete_drivers)
 
 ## Banco de Dados
 
 ### Tabelas existentes
 - `profiles` — dados do usuário (vinculado a auth.users, can_delete_vehicles flag)
 - `clients` — tenants/empresas (id, name, logo_url)
-- `vehicles` — veículos da frota (CRUD completo com RLS, novos tipos em português e diversos anexos)
-- `vehicle_field_settings` — tabelas de configurações dinâmicas de campos obrigatórios por cliente
+- `vehicles` — veículos da frota (CRUD completo com RLS); coluna `driver_id UUID NULL FK → drivers(id) ON DELETE SET NULL` + índice único parcial `WHERE driver_id IS NOT NULL` garante associação 1:1 motorista×veículo
+- `vehicle_field_settings` — configurações dinâmicas de campos obrigatórios de veículo por cliente
+- `drivers` — motoristas (CRUD com RLS, CPF único por cliente, 5 uploads de documento)
+- `driver_field_settings` — configurações dinâmicas de campos obrigatórios de motorista por cliente
 
 ### Tabelas planejadas (ainda não criadas)
 - `checklist_templates` — templates de checklist por tipo de veículo
@@ -34,6 +36,11 @@ RLS vehicles:
 - DELETE: Manager(5)+ OU Fleet Analyst(4) com `can_delete_vehicles = true`
 - Unique index em `(client_id, license_plate)`
 
+### Tabela `drivers` RLS:
+- SELECT: Fleet Assistant (rank 3)+ do próprio tenant
+- INSERT/UPDATE: Fleet Analyst (rank 4)+ do próprio tenant
+- DELETE: Manager(5)+ OU Fleet Analyst(4) com `can_delete_drivers = true`
+
 ### Row Level Security (RLS)
 - Todas as tabelas devem ter RLS habilitado
 - Padrão: filtrar por `client_id` do usuário autenticado
@@ -45,10 +52,18 @@ RLS vehicles:
 - **Uso**: Armazena CRLV, Inspeção Sanitária e GR dos veículos.
 - **Estrutura**: `{client_id}/{vehicle_id}/{docType}.{ext}`
 - **Tipos**: `crlv`, `sanitary-inspection`, `gr`.
-- **Otimização**: Imagens comprimidas client-side antes do upload. PDFs enviados originais.
+- **Otimização**: Imagens comprimidas client-side antes do upload (max 1920px, 82% JPEG). PDFs enviados originais.
 - **Policies**:
   - SELECT: Público.
   - INSERT/UPDATE/DELETE: Usuários autenticados (verificável via client_id no path).
+
+### Bucket `driver-documents` (Público)
+- **Uso**: Armazena CNH, GR do motorista e até 3 certificados.
+- **Estrutura**: `{client_id}/{driver_id}/{docType}.{ext}`
+- **Tipos**: `cnh`, `gr`, `certificate-1`, `certificate-2`, `certificate-3`.
+- **Otimização**: Mesma lógica do bucket vehicle-documents (compressão de imagens, PDFs originais).
+- **Formatos aceitos**: PDF, JPG, PNG, WEBP. Máximo 10MB por arquivo.
+- **Policies**: Idênticas ao bucket vehicle-documents.
 
 ## Edge Functions
 

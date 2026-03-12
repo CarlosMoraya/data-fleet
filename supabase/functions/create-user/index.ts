@@ -76,7 +76,7 @@ serve(async (req: Request) => {
     }
 
     // ─── AÇÃO: CRIAR USUÁRIO (padrão) ────────────────────────────────
-    const { email, password, name, role, client_id, can_delete_vehicles } = body;
+    const { email, password, name, role, client_id, can_delete_vehicles, can_delete_drivers } = body;
 
     if (!email || !password || !name || !role) {
       return json({ error: "Todos os campos são obrigatórios." }, 400);
@@ -106,7 +106,7 @@ serve(async (req: Request) => {
     // Criar perfil na tabela profiles
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
-      .insert({ id: newUser.user.id, name, role, client_id: targetClientId });
+      .insert({ id: newUser.user.id, name, role, client_id: targetClientId, can_delete_vehicles: can_delete_vehicles ?? false, can_delete_drivers: can_delete_drivers ?? false });
 
     if (profileError) {
       // Rollback: deletar o auth user criado

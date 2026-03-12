@@ -67,10 +67,9 @@ Para detalhes completos, consulte os módulos em `.claude/`.
 
 ## Registro de Mudanças (Sessão Atual)
 
-- **Upload de CRLV**: Implementado upload para Supabase Storage (bucket `vehicle-documents`) com compressão de imagens e suporte a PDF.
-- **Permissões de Veículos**:
-    - `Fleet Assistant`: Agora pode visualizar e **cadastrar** veículos (mas não editar/deletar).
-    - `Fleet Analyst`: Pode editar, mas só deleta se o flag `canDeleteVehicles` estiver ativo em seu perfil.
-- **Gestão de Usuários**: Adicionado checkbox "Pode excluir veículos" nos modais de criação/edição de usuários (controlado por Manager+).
-- **Backend**: Atualizada Edge Function `create-user` e tabela `profiles` com o novo campo de permissão.
-- **Auto-Sync**: Atualizados manuais em `.claude/` (Frontend, Backend, Data Model).
+- **Módulo de Veículos**: Atualizado `VehicleForm.tsx` com campos obrigatórios dinâmicos, novos uploads (Sanitária e GR) e suporte a múltiplos tipos de veículos.
+- **Módulo de Motoristas**: Implementado CRUD completo em `Drivers.tsx` com `DriverForm.tsx`, incluindo upload de CNH, GR e até 3 certificados (armazenados em bucket `driver-documents`).
+- **Configurações Dinâmicas**: Centralizadas em `Settings.tsx`, permitindo configurar campos obrigatórios tanto para Veículos quanto para Motoristas por cliente.
+- **Permissões de Exclusão**: Separadas as permissões de exclusão de veículos (`can_delete_vehicles`) e motoristas (`can_delete_drivers`) na tabela `profiles`, com interface de gestão em `Users.tsx`.
+- **Banco de Dados**: Criadas tabelas `drivers` e `driver_field_settings`. Adicionada coluna `can_delete_drivers` em `profiles`. Corrigida constraint de tipos de veículos.
+- **Auto-Sync**: Atualizados manuais em `.claude/` (Frontend, Backend, Testing, Data Model) com as novas regras de negócios.

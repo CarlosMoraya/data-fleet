@@ -2,12 +2,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Vehicle, VehicleFieldSettings } from '../types';
-import { Plus, Search, Filter, Edit2, Trash2, Truck } from 'lucide-react';
+import { Plus, Search, Filter, Edit2, Trash2, Truck, User } from 'lucide-react';
 import VehicleForm from '../components/VehicleForm';
 import { supabase } from '../lib/supabase';
 import { vehicleFromRow, vehicleToRow, VehicleRow } from '../lib/vehicleMappers';
 import { uploadVehicleDocument, deleteVehicleDocument } from '../lib/storageHelpers';
 import { fieldSettingsFromRow, defaultFieldSettings, VehicleFieldSettingsRow } from '../lib/fieldSettingsMappers';
+
+interface AvailableDriver {
+  id: string;
+  name: string;
+  cpf: string;
+}
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
@@ -32,6 +38,7 @@ export default function Vehicles() {
     }
   });
   const [fieldSettings, setFieldSettings] = useState<VehicleFieldSettings | null>(null);
+  const [availableDrivers, setAvailableDrivers] = useState<AvailableDriver[]>([]);
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
@@ -48,7 +55,7 @@ export default function Vehicles() {
     setError(null);
     const { data, error: fetchError } = await supabase
       .from('vehicles')
-      .select('*')
+      .select('*, drivers(name)')
       .eq('client_id', currentClient.id)
       .order('license_plate');
 
@@ -58,6 +65,34 @@ export default function Vehicles() {
       setVehicles((data as VehicleRow[]).map(vehicleFromRow));
     }
     setLoading(false);
+  }, [currentClient?.id]);
+
+  const fetchAvailableDrivers = useCallback(async (currentDriverId?: string) => {
+    if (!currentClient?.id) return;
+
+    // Busca todos os motoristas do cliente
+    const { data: allDrivers } = await supabase
+      .from('drivers')
+      .select('id, name, cpf')
+      .eq('client_id', currentClient.id)
+      .order('name');
+
+    // Busca os driver_ids já ocupados por outros veículos
+    const { data: usedRows } = await supabase
+      .from('vehicles')
+      .select('driver_id')
+      .eq('client_id', currentClient.id)
+      .not('driver_id', 'is', null);
+
+    const usedIds = new Set(
+      (usedRows ?? [])
+        .map((r: { driver_id: string }) => r.driver_id)
+        .filter((id: string) => id !== currentDriverId) // exclui o motorista atual do veículo sendo editado
+    );
+
+    setAvailableDrivers(
+      (allDrivers ?? []).filter((d: AvailableDriver) => !usedIds.has(d.id))
+    );
   }, [currentClient?.id]);
 
   const fetchFieldSettings = useCallback(async () => {
@@ -74,6 +109,12 @@ export default function Vehicles() {
     fetchVehicles();
     fetchFieldSettings();
   }, [fetchVehicles, fetchFieldSettings]);
+
+  useEffect(() => {
+    if (isFormOpen) {
+      fetchAvailableDrivers(editingVehicle?.driverId);
+    }
+  }, [isFormOpen, editingVehicle?.driverId, fetchAvailableDrivers]);
 
   const handleSave = async (
     vehicle: Partial<Vehicle>,
@@ -223,8 +264,9 @@ export default function Vehicles() {
               <thead className="bg-zinc-50">
                 <tr>
                   <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider sm:pl-6">Vehicle</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Type / Energy</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Owner</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Tipo / Energia</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Proprietário</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Motorista</th>
                   <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
                     <span className="sr-only">Actions</span>
                   </th>
@@ -251,6 +293,16 @@ export default function Vehicles() {
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
                       <div className="text-zinc-900">{vehicle.owner}</div>
                       <div>{vehicle.acquisition}</div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                      {vehicle.driverName ? (
+                        <div className="flex items-center gap-1.5">
+                          <User className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
+                          <span className="text-zinc-900">{vehicle.driverName}</span>
+                        </div>
+                      ) : (
+                        <span className="text-zinc-400 italic">Sem motorista</span>
+                      )}
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                       <div className="flex items-center justify-end gap-3">
@@ -284,7 +336,7 @@ export default function Vehicles() {
                 ))}
                 {filteredVehicles.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-10 text-center text-sm text-zinc-500">
+                    <td colSpan={5} className="py-10 text-center text-sm text-zinc-500">
                       {search ? 'No vehicles match your search.' : 'No vehicles found for this client.'}
                     </td>
                   </tr>
@@ -299,6 +351,7 @@ export default function Vehicles() {
         <VehicleForm
           vehicle={editingVehicle}
           fieldSettings={fieldSettings}
+          availableDrivers={availableDrivers}
           onClose={() => {
             setIsFormOpen(false);
             setEditingVehicle(null);

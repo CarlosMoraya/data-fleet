@@ -18,12 +18,22 @@ interface VehicleFormFiles {
   gr: File | null;
 }
 
+interface AvailableDriver {
+  id: string;
+  name: string;
+  cpf: string;
+}
+
 interface VehicleFormProps {
   vehicle: Vehicle | null;
   fieldSettings: VehicleFieldSettings | null;
+  availableDrivers: AvailableDriver[];
   onClose: () => void;
   onSave: (vehicle: Partial<Vehicle>, files: VehicleFormFiles) => Promise<void>;
 }
+
+const formatCPF = (cpf: string) =>
+  cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
 
 // Mapa de filtros por nome de campo
 const FIELD_FILTERS: Record<string, (v: string) => string> = {
@@ -48,7 +58,7 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
   tag: (v) => filterAlphanumeric(v, 20),
 };
 
-export default function VehicleForm({ vehicle, fieldSettings, onClose, onSave }: VehicleFormProps) {
+export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, onClose, onSave }: VehicleFormProps) {
   const [formData, setFormData] = useState<Partial<Vehicle>>(() => {
     try {
       const savedData = sessionStorage.getItem('vehicleFormData');
@@ -98,6 +108,9 @@ export default function VehicleForm({ vehicle, fieldSettings, onClose, onSave }:
     if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
       setFormData(prev => ({ ...prev, [name]: checked }));
+    } else if (name === 'driverId') {
+      // '' significa "Nenhum motorista" → null no banco
+      setFormData(prev => ({ ...prev, driverId: value || undefined }));
     } else {
       const filter = FIELD_FILTERS[name];
       const filtered = filter ? filter(value) : value;
@@ -455,6 +468,40 @@ export default function VehicleForm({ vehicle, fieldSettings, onClose, onSave }:
                     <input type="text" name="coolingBrand" placeholder="Ex: Termoking, Thermo Star" required={req('coolingBrand')} value={formData.coolingBrand || ''} onChange={handleChange} className={inputClass} />
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Motorista Responsável */}
+            <div>
+              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Motorista Responsável</h3>
+              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-zinc-700">Motorista</label>
+                  <select
+                    name="driverId"
+                    value={formData.driverId || ''}
+                    onChange={handleChange}
+                    className={inputClass}
+                  >
+                    <option value="">Nenhum motorista</option>
+                    {/* Motorista atual (pode não estar na lista de disponíveis se já estava associado) */}
+                    {vehicle?.driverId && vehicle?.driverName && formData.driverId === vehicle.driverId && (
+                      <option key={vehicle.driverId} value={vehicle.driverId}>
+                        {vehicle.driverName}
+                      </option>
+                    )}
+                    {availableDrivers
+                      .filter(d => d.id !== vehicle?.driverId) // evita duplicata se já aparece acima
+                      .map(d => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} — CPF: {formatCPF(d.cpf)}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Apenas motoristas sem veículo atribuído são listados. Selecione "Nenhum motorista" para desassociar.
+                  </p>
+                </div>
               </div>
             </div>
           </form>

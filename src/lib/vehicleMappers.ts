@@ -42,6 +42,7 @@ export interface VehicleRow {
   gr_upload: string | null;
   gr_expiration_date: string | null;
   category: string | null;
+  driver_id: string | null;
 }
 
 /** Converte row do Supabase (snake_case) para interface Vehicle (camelCase) */
@@ -81,6 +82,8 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
     grUpload: row.gr_upload ?? undefined,
     grExpirationDate: row.gr_expiration_date ?? undefined,
     category: row.category as Vehicle['category'] ?? undefined,
+    driverId: row.driver_id ?? undefined,
+    driverName: (row as VehicleRow & { drivers?: { name: string } }).drivers?.name ?? undefined,
   };
 }
 
@@ -120,5 +123,6 @@ export function vehicleToRow(vehicle: Partial<Vehicle>, clientId: string): Omit<
     gr_upload: vehicle.grUpload ?? null,
     gr_expiration_date: vehicle.grExpirationDate ?? null,
     category: vehicle.category ?? null,
+    driver_id: vehicle.driverId ?? null,
   };
 }

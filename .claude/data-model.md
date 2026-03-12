@@ -18,6 +18,7 @@ Driver(1) < Yard Auditor(2) < Fleet Assistant(3) < Fleet Analyst(4) < Manager(5)
 - Área admin (`/admin/*`): apenas Admin Master(7)
 - Gestão de usuários (`/users`): Fleet Assistant(3)+
 - **Exclusão de veículos**: Manager(5)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteVehicles` estiver ativo.
+- **Exclusão de motoristas**: Manager(5)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteDrivers` estiver ativo.
 - Route guard: Driver/Yard Auditor → redirect para `/checklists`
 
 ### User
@@ -29,6 +30,7 @@ interface User {
   role: Role;
   clientId: string; // tenant primário
   canDeleteVehicles: boolean;
+  canDeleteDrivers: boolean;
 }
 ```
 
@@ -89,6 +91,10 @@ interface Vehicle {
   spareKey: boolean;
   vehicleManual: boolean;
   category?: 'Leve' | 'Médio' | 'Pesado';
+
+  // Associação motorista (1:1)
+  driverId?: string;    // FK → drivers.id (nullable)
+  driverName?: string;  // Nome do motorista (vem do JOIN, não persistido diretamente)
 }
 ```
 
@@ -123,6 +129,53 @@ interface VehicleFieldSettings {
 }
 ```
 
+### Driver
+```ts
+interface Driver {
+  id: string;
+  clientId: string;
+  name: string;          // Sempre obrigatório
+  cpf: string;           // Sempre obrigatório — armazenar somente dígitos (11 chars)
+  issueDate?: string;
+  expirationDate?: string;
+  cnhUpload?: string;    // URL Storage (driver-documents)
+  registrationNumber?: string;
+  category?: string;     // A, B, AB, AE, ABCDE, etc.
+  renach?: string;
+  grUpload?: string;     // URL Storage
+  grExpirationDate?: string;
+  certificate1Upload?: string; // URL Storage
+  courseName1?: string;
+  certificate2Upload?: string;
+  courseName2?: string;
+  certificate3Upload?: string;
+  courseName3?: string;
+}
+```
+
+### DriverFieldSettings
+```ts
+interface DriverFieldSettings {
+  id: string;
+  clientId: string;
+  // true = opcional, false = obrigatório. Default: tudo obrigatório.
+  issueDateOptional: boolean;
+  expirationDateOptional: boolean;
+  cnhUploadOptional: boolean;
+  registrationNumberOptional: boolean;
+  categoryOptional: boolean;
+  renachOptional: boolean;
+  grUploadOptional: boolean;
+  grExpirationDateOptional: boolean;
+  certificate1UploadOptional: boolean;
+  courseName1Optional: boolean;
+  certificate2UploadOptional: boolean;
+  courseName2Optional: boolean;
+  certificate3UploadOptional: boolean;
+  courseName3Optional: boolean;
+}
+```
+
 ## Multi-Tenancy
 
 - **Padrão**: toda entidade tem `clientId` (TS) / `client_id` (Supabase)
@@ -138,6 +191,7 @@ interface VehicleFieldSettings {
   - Clients → migrado (tabela `clients`)
   - Users → migrado (tabela `profiles` + auth.users)
   - Vehicles → **migrado** (tabela `vehicles` + RLS)
+  - Drivers → **migrado** (tabela `drivers` + RLS; SQL em `supabase/migrations/create_drivers_tables.sql`)
   - Checklists → planejado (próximo passo)
 
 ## Schema Supabase (supabase/schema.sql)
@@ -147,6 +201,9 @@ Tabelas ativas:
 - `clients` (id UUID PK, name, logo_url)
 - `vehicles` (id UUID PK, client_id FK → clients, brand, model, crlv_upload, renavam, chassi, etc. + check constraints atualizados)
 - `vehicle_field_settings` (client_id PK/FK → clients, renavam_optional, chassi_optional, e demais flags de configurabilidade)
+- `vehicles` — adicionado: `driver_id UUID NULL FK → drivers(id) ON DELETE SET NULL` + `UNIQUE INDEX idx_vehicles_driver_unique WHERE driver_id IS NOT NULL` (garante 1:1)
+- `drivers` (id UUID PK, client_id FK, name, cpf — UNIQUE(client_id, cpf), issue_date, expiration_date, cnh_upload, registration_number, category, renach, gr_upload, gr_expiration_date, certificate1_upload, course_name1, certificate2_upload, course_name2, certificate3_upload, course_name3)
+- `driver_field_settings` (client_id PK/FK → clients, issue_date_optional, cnh_upload_optional, e demais flags)
 
 Tabelas planejadas:
 - `checklist_templates`
