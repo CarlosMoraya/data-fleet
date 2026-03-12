@@ -25,6 +25,9 @@ export interface VehicleFieldSettingsRow {
   avg_consumption_optional: boolean;
   cooling_brand_optional: boolean;
   placa_semi_reboque_optional: boolean;
+  pbt_optional: boolean;
+  cmt_optional: boolean;
+  eixos_optional: boolean;
 }
 
 /** snake_case → camelCase */
@@ -53,6 +56,9 @@ export function fieldSettingsFromRow(row: VehicleFieldSettingsRow): VehicleField
     avgConsumptionOptional: row.avg_consumption_optional,
     coolingBrandOptional: row.cooling_brand_optional,
     placaSemiReboqueOptional: row.placa_semi_reboque_optional,
+    pbtOptional: row.pbt_optional,
+    cmtOptional: row.cmt_optional,
+    eixosOptional: row.eixos_optional,
   };
 }
 
@@ -84,6 +90,9 @@ export function fieldSettingsToRow(
     avg_consumption_optional: settings.avgConsumptionOptional,
     cooling_brand_optional: settings.coolingBrandOptional,
     placa_semi_reboque_optional: settings.placaSemiReboqueOptional,
+    pbt_optional: settings.pbtOptional,
+    cmt_optional: settings.cmtOptional,
+    eixos_optional: settings.eixosOptional,
   };
 }
 
@@ -113,6 +122,9 @@ export function defaultFieldSettings(clientId: string): VehicleFieldSettings {
     avgConsumptionOptional: false,
     coolingBrandOptional: false,
     placaSemiReboqueOptional: false,
+    pbtOptional: false,
+    cmtOptional: false,
+    eixosOptional: false,
   };
 }
 
@@ -139,6 +151,9 @@ const FIELD_TO_SETTING: Record<string, keyof VehicleFieldSettings> = {
   avgConsumption: 'avgConsumptionOptional',
   coolingBrand: 'coolingBrandOptional',
   placaSemiReboque: 'placaSemiReboqueOptional',
+  pbt: 'pbtOptional',
+  cmt: 'cmtOptional',
+  eixos: 'eixosOptional',
 };
 
 /** Retorna true se o campo é obrigatório. Campos não mapeados são sempre obrigatórios. */
@@ -175,4 +190,8 @@ export const CONFIGURABLE_FIELDS: { key: keyof VehicleFieldSettings; label: stri
   { key: 'avgConsumptionOptional', label: 'Consumo Médio', section: 'Campos Condicionais', note: 'Quando Fonte = Combustão' },
   { key: 'coolingBrandOptional', label: 'Marca do Refrigerador', section: 'Campos Condicionais', note: 'Quando Refrigeração = Sim' },
   { key: 'placaSemiReboqueOptional', label: 'Placa Semi-Reboque', section: 'Campos Condicionais', note: 'Quando Tipo = Cavalo' },
+  // Peso & Capacidade
+  { key: 'pbtOptional', label: 'PBT (Peso Bruto Total)', section: 'Especificações Técnicas' },
+  { key: 'cmtOptional', label: 'CMT (Cap. Máxima de Tração)', section: 'Especificações Técnicas' },
+  { key: 'eixosOptional', label: 'Eixos', section: 'Especificações Técnicas' },
 ];

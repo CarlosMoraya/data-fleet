@@ -101,3 +101,18 @@ export function filterCPF(value: string): string {
 export function filterCNHCategory(value: string): string {
   return value.replace(/[^A-Ea-e]/g, '').toUpperCase().slice(0, 5);
 }
+
+/** Somente dígitos, limitado a 14 caracteres. Usado em: CNPJ */
+export function filterCNPJ(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 14);
+}
+
+/** Somente dígitos, limitado a 11 caracteres. Usado em: Telefone */
+export function filterPhone(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 11);
+}
+
+/** Somente dígitos, limitado a 8 caracteres. Usado em: CEP */
+export function filterCEP(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 8);
+}

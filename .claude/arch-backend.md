@@ -11,17 +11,18 @@
 - **Supabase Auth** com email/senha
 - `AuthContext.tsx` expõe `useAuth()` hook → `{ user, currentClient, signIn, signOut }`
 - Session persistida via Supabase (localStorage)
-- Perfil do usuário armazenado na tabela `profiles` (id, name, email, role, client_id, can_delete_vehicles, can_delete_drivers)
+- Perfil do usuário armazenado na tabela `profiles` (id, name, email, role, client_id, can_delete_vehicles, can_delete_drivers, can_delete_workshops)
 
 ## Banco de Dados
 
 ### Tabelas existentes
-- `profiles` — dados do usuário (vinculado a auth.users, can_delete_vehicles flag)
+- `profiles` — dados do usuário (vinculado a auth.users, can_delete_vehicles, can_delete_drivers, can_delete_workshops flags)
 - `clients` — tenants/empresas (id, name, logo_url)
 - `vehicles` — veículos da frota (CRUD completo com RLS); coluna `driver_id UUID NULL FK → drivers(id) ON DELETE SET NULL` + índice único parcial `WHERE driver_id IS NOT NULL` garante associação 1:1 motorista×veículo
 - `vehicle_field_settings` — configurações dinâmicas de campos obrigatórios de veículo por cliente
 - `drivers` — motoristas (CRUD com RLS, CPF único por cliente, 5 uploads de documento)
 - `driver_field_settings` — configurações dinâmicas de campos obrigatórios de motorista por cliente
+- `workshops` — oficinas parceiras (CRUD com RLS, CNPJ único por cliente, 10 especialidades)
 
 ### Tabelas planejadas (ainda não criadas)
 - `checklist_templates` — templates de checklist por tipo de veículo
@@ -40,6 +41,14 @@ RLS vehicles:
 - SELECT: Fleet Assistant (rank 3)+ do próprio tenant
 - INSERT/UPDATE: Fleet Analyst (rank 4)+ do próprio tenant
 - DELETE: Manager(5)+ OU Fleet Analyst(4) com `can_delete_drivers = true`
+
+### Tabela `workshops` RLS:
+- SELECT: Fleet Assistant (rank 3)+ do próprio tenant
+- INSERT: Fleet Assistant (rank 3)+ do próprio tenant
+- UPDATE: Fleet Analyst (rank 4)+ do próprio tenant
+- DELETE: Manager(5)+ OU Fleet Analyst(4) com `can_delete_workshops = true`
+- Unique constraint: `(client_id, cnpj)`
+- Especialidades: array `TEXT[]` com 10 valores predefinidos (Mecânica Geral, Elétrica, Funilaria/Pintura, Pneus, Ar Condicionado, Suspensão, Freios, Injeção Eletrônica, Câmbio/Transmissão, Refrigeração Baú)
 
 ### Row Level Security (RLS)
 - Todas as tabelas devem ter RLS habilitado
@@ -69,7 +78,7 @@ RLS vehicles:
 
 ### `create-user` (ativa, deployed)
 - Cria/deleta usuário (auth + profile)
-- Mantém `can_delete_vehicles` no perfil.
+- Mantém 3 flags de permissão no perfil: `can_delete_vehicles`, `can_delete_drivers`, `can_delete_workshops`
 - Validação de hierarquia de roles (não pode criar role >= próprio)
 - Endpoint: `POST /functions/v1/create-user`
 - Requer `Authorization: Bearer <session_token>`

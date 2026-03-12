@@ -8,6 +8,7 @@ export interface User {
   clientId: string; // The primary client they belong to
   canDeleteVehicles: boolean;
   canDeleteDrivers: boolean;
+  canDeleteWorkshops: boolean;
 }
 
 export interface Client {
@@ -59,6 +60,11 @@ export interface Vehicle {
   grExpirationDate?: string;
   category?: 'Leve' | 'Médio' | 'Pesado';
 
+  // Especificações de peso/capacidade
+  pbt?: number;   // Peso Bruto Total (t)
+  cmt?: number;   // Capacidade Máxima de Tração (t)
+  eixos?: number; // Número de eixos
+
   // Associação motorista (1:1)
   driverId?: string;    // FK → drivers.id (nullable)
   driverName?: string;  // Nome do motorista (vem do JOIN, não persistido diretamente)
@@ -91,6 +97,26 @@ export interface Driver {
   courseName2?: string;
   certificate3Upload?: string;
   courseName3?: string;
+}
+
+export interface Workshop {
+  id: string;
+  clientId: string;
+  name: string;
+  cnpj: string;
+  phone?: string;
+  email?: string;
+  contactPerson?: string;
+  addressStreet?: string;
+  addressNumber?: string;
+  addressComplement?: string;
+  addressNeighborhood?: string;
+  addressCity?: string;
+  addressState?: string;
+  addressZip?: string;
+  specialties?: string[];
+  notes?: string;
+  active: boolean;
 }
 
 /** Configuração per-client de quais campos de motorista são opcionais.
@@ -154,4 +180,9 @@ export interface VehicleFieldSettings {
   avgConsumptionOptional: boolean;
   coolingBrandOptional: boolean;
   placaSemiReboqueOptional: boolean;
+
+  // Peso & Capacidade
+  pbtOptional: boolean;
+  cmtOptional: boolean;
+  eixosOptional: boolean;
 }

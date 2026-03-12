@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (userId: string, email: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, name, role, client_id, can_delete_vehicles, can_delete_drivers, clients(id, name, logo_url)')
+      .select('id, name, role, client_id, can_delete_vehicles, can_delete_drivers, can_delete_workshops, clients(id, name, logo_url)')
       .eq('id', userId)
       .single();
 
@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clientId: profile.client_id,
         canDeleteVehicles: profile.can_delete_vehicles ?? false,
         canDeleteDrivers: profile.can_delete_drivers ?? false,
+        canDeleteWorkshops: profile.can_delete_workshops ?? false,
       });
       setCurrentClient(client ?? null);
 

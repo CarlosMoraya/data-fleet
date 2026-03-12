@@ -43,6 +43,9 @@ export interface VehicleRow {
   gr_expiration_date: string | null;
   category: string | null;
   driver_id: string | null;
+  pbt: number | null;
+  cmt: number | null;
+  eixos: number | null;
 }
 
 /** Converte row do Supabase (snake_case) para interface Vehicle (camelCase) */
@@ -84,6 +87,9 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
     category: row.category as Vehicle['category'] ?? undefined,
     driverId: row.driver_id ?? undefined,
     driverName: (row as VehicleRow & { drivers?: { name: string } }).drivers?.name ?? undefined,
+    pbt: row.pbt ?? undefined,
+    cmt: row.cmt ?? undefined,
+    eixos: row.eixos ?? undefined,
   };
 }
 
@@ -124,5 +130,8 @@ export function vehicleToRow(vehicle: Partial<Vehicle>, clientId: string): Omit<
     gr_expiration_date: vehicle.grExpirationDate ?? null,
     category: vehicle.category ?? null,
     driver_id: vehicle.driverId ?? null,
+    pbt: vehicle.pbt != null ? commaToFloat(vehicle.pbt) : null,
+    cmt: vehicle.cmt != null ? commaToFloat(vehicle.cmt) : null,
+    eixos: vehicle.eixos != null ? parseInt(String(vehicle.eixos), 10) : null,
   };
 }

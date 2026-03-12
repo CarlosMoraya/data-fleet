@@ -56,6 +56,9 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
   coolingBrand: filterText,
   placaSemiReboque: filterPlate,
   tag: (v) => filterAlphanumeric(v, 20),
+  pbt: filterNumericComma,
+  cmt: filterNumericComma,
+  eixos: filterDigitsOnly,
 };
 
 export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, onClose, onSave }: VehicleFormProps) {
@@ -422,6 +425,20 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                     <option value="Elétrico">Elétrico</option>
                     <option value="Híbrido">Híbrido</option>
                   </select>
+                </div>
+
+                {/* PBT / CMT / Eixos */}
+                <div>
+                  <Label name="pbt">PBT — Peso Bruto Total (t)</Label>
+                  <input type="text" name="pbt" required={req('pbt')} inputMode="decimal" value={formData.pbt ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 3,5" />
+                </div>
+                <div>
+                  <Label name="cmt">CMT — Cap. Máxima de Tração (t)</Label>
+                  <input type="text" name="cmt" required={req('cmt')} inputMode="decimal" value={formData.cmt ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 45,0" />
+                </div>
+                <div>
+                  <Label name="eixos">Eixos</Label>
+                  <input type="text" name="eixos" required={req('eixos')} inputMode="numeric" maxLength={2} value={formData.eixos ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 2" />
                 </div>
 
                 {/* Conditional: Cavalo */}

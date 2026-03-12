@@ -11,11 +11,13 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Vehicles from './pages/Vehicles';
 import Drivers from './pages/Drivers';
+import Workshops from './pages/Workshops';
 import Checklists from './pages/Checklists';
 import AdminClients from './pages/AdminClients';
 import AdminUsers from './pages/AdminUsers';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import Cadastros from './pages/Cadastros';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -33,10 +35,18 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<HomeRedirect />} />
-            <Route path="vehicles" element={<Vehicles />} />
-            <Route path="drivers" element={<Drivers />} />
+            <Route path="cadastros" element={<Cadastros />}>
+              <Route index element={<Navigate to="veiculos" replace />} />
+              <Route path="veiculos" element={<Vehicles />} />
+              <Route path="motoristas" element={<Drivers />} />
+              <Route path="oficinas" element={<Workshops />} />
+              <Route path="usuarios" element={<Users />} />
+            </Route>
+            {/* Redirects para compatibilidade com rotas antigas */}
+            <Route path="vehicles" element={<Navigate to="/cadastros/veiculos" replace />} />
+            <Route path="drivers" element={<Navigate to="/cadastros/motoristas" replace />} />
+            <Route path="users" element={<Navigate to="/cadastros/usuarios" replace />} />
             <Route path="checklists" element={<Checklists />} />
-            <Route path="users" element={<Users />} />
             <Route path="settings" element={<Settings />} />
             <Route path="admin/clients" element={<AdminClients />} />
             <Route path="admin/users" element={<AdminUsers />} />

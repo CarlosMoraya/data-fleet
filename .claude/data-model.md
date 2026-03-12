@@ -19,6 +19,7 @@ Driver(1) < Yard Auditor(2) < Fleet Assistant(3) < Fleet Analyst(4) < Manager(5)
 - Gestão de usuários (`/users`): Fleet Assistant(3)+
 - **Exclusão de veículos**: Manager(5)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteVehicles` estiver ativo.
 - **Exclusão de motoristas**: Manager(5)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteDrivers` estiver ativo.
+- **Exclusão de oficinas**: Manager(5)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteWorkshops` estiver ativo.
 - Route guard: Driver/Yard Auditor → redirect para `/checklists`
 
 ### User
@@ -31,6 +32,7 @@ interface User {
   clientId: string; // tenant primário
   canDeleteVehicles: boolean;
   canDeleteDrivers: boolean;
+  canDeleteWorkshops: boolean;
 }
 ```
 
@@ -92,6 +94,11 @@ interface Vehicle {
   vehicleManual: boolean;
   category?: 'Leve' | 'Médio' | 'Pesado';
 
+  // Especificações de peso/capacidade
+  pbt?: number;   // Peso Bruto Total (t)
+  cmt?: number;   // Capacidade Máxima de Tração (t)
+  eixos?: number; // Número de eixos
+
   // Associação motorista (1:1)
   driverId?: string;    // FK → drivers.id (nullable)
   driverName?: string;  // Nome do motorista (vem do JOIN, não persistido diretamente)
@@ -126,6 +133,9 @@ interface VehicleFieldSettings {
   categoryOptional: boolean;
   spareKeyOptional: boolean;
   vehicleManualOptional: boolean;
+  pbtOptional: boolean;
+  cmtOptional: boolean;
+  eixosOptional: boolean;
 }
 ```
 
@@ -176,6 +186,31 @@ interface DriverFieldSettings {
 }
 ```
 
+### Workshop
+```ts
+interface Workshop {
+  id: string;
+  clientId: string;
+  name: string;
+  cnpj: string;              // Armazenar somente dígitos (14 chars)
+  phone?: string;            // Somente dígitos (até 11 chars)
+  email?: string;
+  contactPerson?: string;
+  addressStreet?: string;
+  addressNumber?: string;
+  addressComplement?: string;
+  addressNeighborhood?: string;
+  addressCity?: string;
+  addressState?: string;     // UF (2 chars)
+  addressZip?: string;       // CEP (8 digits)
+  specialties?: string[];    // Array de especialidades (Mecânica Geral, Elétrica, Funilaria/Pintura, etc.)
+  notes?: string;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+```
+
 ## Multi-Tenancy
 
 - **Padrão**: toda entidade tem `clientId` (TS) / `client_id` (Supabase)
@@ -197,13 +232,14 @@ interface DriverFieldSettings {
 ## Schema Supabase (supabase/schema.sql)
 
 Tabelas ativas:
-- `profiles` (id UUID PK → auth.users, name, email, role, client_id FK → clients, can_delete_vehicles)
+- `profiles` (id UUID PK → auth.users, name, email, role, client_id FK → clients, can_delete_vehicles, can_delete_drivers, can_delete_workshops)
 - `clients` (id UUID PK, name, logo_url)
 - `vehicles` (id UUID PK, client_id FK → clients, brand, model, crlv_upload, renavam, chassi, etc. + check constraints atualizados)
 - `vehicle_field_settings` (client_id PK/FK → clients, renavam_optional, chassi_optional, e demais flags de configurabilidade)
 - `vehicles` — adicionado: `driver_id UUID NULL FK → drivers(id) ON DELETE SET NULL` + `UNIQUE INDEX idx_vehicles_driver_unique WHERE driver_id IS NOT NULL` (garante 1:1)
 - `drivers` (id UUID PK, client_id FK, name, cpf — UNIQUE(client_id, cpf), issue_date, expiration_date, cnh_upload, registration_number, category, renach, gr_upload, gr_expiration_date, certificate1_upload, course_name1, certificate2_upload, course_name2, certificate3_upload, course_name3)
 - `driver_field_settings` (client_id PK/FK → clients, issue_date_optional, cnh_upload_optional, e demais flags)
+- `workshops` (id UUID PK, client_id FK → clients, name, cnpj — UNIQUE(client_id, cnpj), phone, email, contact_person, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_zip, specialties TEXT[], notes, active, created_at, updated_at) com RLS policies
 
 Tabelas planejadas:
 - `checklist_templates`
