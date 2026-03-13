@@ -1,6 +1,10 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ChevronDown, User as UserIcon } from 'lucide-react';
+import { ChevronDown, User as UserIcon, Menu } from 'lucide-react';
+
+interface TopbarProps {
+  onMenuClick: () => void;
+}
 
 function ClientLogo({ name, logoUrl }: { name: string; logoUrl?: string }) {
   if (logoUrl) {
@@ -19,12 +23,18 @@ function ClientLogo({ name, logoUrl }: { name: string; logoUrl?: string }) {
   );
 }
 
-export default function Topbar() {
+export default function Topbar({ onMenuClick }: TopbarProps) {
   const { user, currentClient, clients, switchClient, canSwitchClient } = useAuth();
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-6">
-      <div className="flex flex-1 items-center">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4 md:px-6">
+      <div className="flex flex-1 items-center gap-3 md:gap-4">
+        <button
+          onClick={onMenuClick}
+          className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 lg:hidden"
+        >
+          <Menu className="h-5 w-5 md:h-6 md:w-6" />
+        </button>
         {canSwitchClient ? (
           <div className="flex items-center gap-2">
             <ClientLogo name={currentClient?.name ?? ''} logoUrl={currentClient?.logoUrl} />

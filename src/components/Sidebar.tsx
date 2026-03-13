@@ -13,7 +13,12 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -32,7 +37,22 @@ export default function Sidebar() {
   const visibleNavItems = navItems.filter(item => item.roles.includes(user?.role || ''));
 
   return (
-    <div className="flex h-full w-64 flex-col border-r border-blue-800 bg-blue-900">
+    <>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-zinc-900/80 backdrop-blur-sm lg:hidden transition-opacity"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col border-r border-blue-800 bg-blue-900 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0",
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
       <div className="flex h-16 shrink-0 items-center px-6 border-b border-blue-800 bg-blue-900">
         <div className="flex items-center gap-2">
           <div className="bg-blue-600 p-1.5 rounded-lg">
@@ -49,6 +69,7 @@ export default function Sidebar() {
               key={item.name}
               to={item.to}
               end={item.to === '/'}
+              onClick={onClose}
               className={({ isActive }) =>
                 cn(
                   isActive
@@ -73,6 +94,7 @@ export default function Sidebar() {
           <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-blue-400">Admin</p>
           <NavLink
             to="/admin/clients"
+            onClick={onClose}
             className={({ isActive }) =>
               cn(
                 isActive
@@ -87,6 +109,7 @@ export default function Sidebar() {
           </NavLink>
           <NavLink
             to="/admin/users"
+            onClick={onClose}
             className={({ isActive }) =>
               cn(
                 isActive
@@ -111,6 +134,7 @@ export default function Sidebar() {
           Logout
         </button>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
