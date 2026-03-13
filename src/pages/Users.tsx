@@ -78,17 +78,22 @@ interface CreateForm {
   canDeleteWorkshops: boolean;
 }
 
+const CAN_MANAGE_PERMISSIONS: Role[] = ['Manager', 'Director', 'Admin Master'];
+
 function CreateUserModal({
   open,
   availableRoles,
+  currentUserRole,
   onClose,
   onCreated,
 }: {
   open: boolean;
   availableRoles: Role[];
+  currentUserRole: Role;
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const canManagePermissions = CAN_MANAGE_PERMISSIONS.includes(currentUserRole);
   const defaultRole = availableRoles[availableRoles.length - 1] ?? 'Driver';
   const [form, setForm] = useState<CreateForm>({ name: '', email: '', password: '', role: defaultRole, canDeleteVehicles: false, canDeleteDrivers: false, canDeleteWorkshops: false });
   const [saving, setSaving] = useState(false);
@@ -183,59 +188,61 @@ function CreateUserModal({
             </select>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-              <input
-                id="create-can-delete-vehicles"
-                type="checkbox"
-                checked={form.canDeleteVehicles}
-                onChange={(e) => setForm((f) => ({ ...f, canDeleteVehicles: e.target.checked }))}
-                className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-              />
-              <div>
-                <label htmlFor="create-can-delete-vehicles" className="block text-sm font-medium text-zinc-700 cursor-pointer">
-                  Pode excluir veículos
-                </label>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  Permite que este usuário exclua cadastros de veículos da frota.
-                </p>
+          {canManagePermissions && (
+            <div className="space-y-2">
+              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                <input
+                  id="create-can-delete-vehicles"
+                  type="checkbox"
+                  checked={form.canDeleteVehicles}
+                  onChange={(e) => setForm((f) => ({ ...f, canDeleteVehicles: e.target.checked }))}
+                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+                />
+                <div>
+                  <label htmlFor="create-can-delete-vehicles" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                    Pode excluir veículos
+                  </label>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Permite que este usuário exclua cadastros de veículos da frota.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                <input
+                  id="create-can-delete-drivers"
+                  type="checkbox"
+                  checked={form.canDeleteDrivers}
+                  onChange={(e) => setForm((f) => ({ ...f, canDeleteDrivers: e.target.checked }))}
+                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+                />
+                <div>
+                  <label htmlFor="create-can-delete-drivers" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                    Pode excluir motoristas
+                  </label>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Permite que este usuário exclua cadastros de motoristas da frota.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                <input
+                  id="create-can-delete-workshops"
+                  type="checkbox"
+                  checked={form.canDeleteWorkshops}
+                  onChange={(e) => setForm((f) => ({ ...f, canDeleteWorkshops: e.target.checked }))}
+                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+                />
+                <div>
+                  <label htmlFor="create-can-delete-workshops" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                    Pode excluir oficinas
+                  </label>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Permite que este usuário exclua cadastros de oficinas parceiras.
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-              <input
-                id="create-can-delete-drivers"
-                type="checkbox"
-                checked={form.canDeleteDrivers}
-                onChange={(e) => setForm((f) => ({ ...f, canDeleteDrivers: e.target.checked }))}
-                className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-              />
-              <div>
-                <label htmlFor="create-can-delete-drivers" className="block text-sm font-medium text-zinc-700 cursor-pointer">
-                  Pode excluir motoristas
-                </label>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  Permite que este usuário exclua cadastros de motoristas da frota.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-              <input
-                id="create-can-delete-workshops"
-                type="checkbox"
-                checked={form.canDeleteWorkshops}
-                onChange={(e) => setForm((f) => ({ ...f, canDeleteWorkshops: e.target.checked }))}
-                className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-              />
-              <div>
-                <label htmlFor="create-can-delete-workshops" className="block text-sm font-medium text-zinc-700 cursor-pointer">
-                  Pode excluir oficinas
-                </label>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  Permite que este usuário exclua cadastros de oficinas parceiras.
-                </p>
-              </div>
-            </div>
-          </div>
+          )}
 
           {error && (
             <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
@@ -266,14 +273,17 @@ function CreateUserModal({
 function EditUserModal({
   open,
   user,
+  currentUserRole,
   onClose,
   onSaved,
 }: {
   open: boolean;
   user: UserRow | null;
+  currentUserRole: Role;
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const canManagePermissions = CAN_MANAGE_PERMISSIONS.includes(currentUserRole);
   const [name, setName] = useState('');
   const [canDeleteVehicles, setCanDeleteVehicles] = useState(false);
   const [canDeleteDrivers, setCanDeleteDrivers] = useState(false);
@@ -298,9 +308,15 @@ function EditUserModal({
     setSaving(true);
     setError('');
     try {
+      const updates: Record<string, unknown> = { name: capitalizeWords(name) };
+      if (canManagePermissions) {
+        updates.can_delete_vehicles = canDeleteVehicles;
+        updates.can_delete_drivers = canDeleteDrivers;
+        updates.can_delete_workshops = canDeleteWorkshops;
+      }
       const { error: dbError } = await supabase
         .from('profiles')
-        .update({ name: capitalizeWords(name), can_delete_vehicles: canDeleteVehicles, can_delete_drivers: canDeleteDrivers, can_delete_workshops: canDeleteWorkshops })
+        .update(updates)
         .eq('id', user.id);
       if (dbError) throw new Error(dbError.message);
       onSaved();
@@ -338,59 +354,61 @@ function EditUserModal({
             </p>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-              <input
-                id="edit-can-delete-vehicles"
-                type="checkbox"
-                checked={canDeleteVehicles}
-                onChange={(e) => setCanDeleteVehicles(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-              />
-              <div>
-                <label htmlFor="edit-can-delete-vehicles" className="block text-sm font-medium text-zinc-700 cursor-pointer">
-                  Pode excluir veículos
-                </label>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  Permite que este usuário exclua cadastros de veículos da frota.
-                </p>
+          {canManagePermissions && (
+            <div className="space-y-2">
+              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                <input
+                  id="edit-can-delete-vehicles"
+                  type="checkbox"
+                  checked={canDeleteVehicles}
+                  onChange={(e) => setCanDeleteVehicles(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+                />
+                <div>
+                  <label htmlFor="edit-can-delete-vehicles" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                    Pode excluir veículos
+                  </label>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Permite que este usuário exclua cadastros de veículos da frota.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                <input
+                  id="edit-can-delete-drivers"
+                  type="checkbox"
+                  checked={canDeleteDrivers}
+                  onChange={(e) => setCanDeleteDrivers(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+                />
+                <div>
+                  <label htmlFor="edit-can-delete-drivers" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                    Pode excluir motoristas
+                  </label>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Permite que este usuário exclua cadastros de motoristas da frota.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                <input
+                  id="edit-can-delete-workshops"
+                  type="checkbox"
+                  checked={canDeleteWorkshops}
+                  onChange={(e) => setCanDeleteWorkshops(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+                />
+                <div>
+                  <label htmlFor="edit-can-delete-workshops" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                    Pode excluir oficinas
+                  </label>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Permite que este usuário exclua cadastros de oficinas parceiras.
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-              <input
-                id="edit-can-delete-drivers"
-                type="checkbox"
-                checked={canDeleteDrivers}
-                onChange={(e) => setCanDeleteDrivers(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-              />
-              <div>
-                <label htmlFor="edit-can-delete-drivers" className="block text-sm font-medium text-zinc-700 cursor-pointer">
-                  Pode excluir motoristas
-                </label>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  Permite que este usuário exclua cadastros de motoristas da frota.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-              <input
-                id="edit-can-delete-workshops"
-                type="checkbox"
-                checked={canDeleteWorkshops}
-                onChange={(e) => setCanDeleteWorkshops(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-              />
-              <div>
-                <label htmlFor="edit-can-delete-workshops" className="block text-sm font-medium text-zinc-700 cursor-pointer">
-                  Pode excluir oficinas
-                </label>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  Permite que este usuário exclua cadastros de oficinas parceiras.
-                </p>
-              </div>
-            </div>
-          </div>
+          )}
 
           {error && (
             <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
@@ -562,6 +580,7 @@ export default function Users() {
       <CreateUserModal
         open={createOpen}
         availableRoles={available}
+        currentUserRole={user.role}
         onClose={() => setCreateOpen(false)}
         onCreated={fetchUsers}
       />
@@ -569,6 +588,7 @@ export default function Users() {
       <EditUserModal
         open={!!editingUser}
         user={editingUser}
+        currentUserRole={user.role}
         onClose={() => setEditingUser(null)}
         onSaved={fetchUsers}
       />
