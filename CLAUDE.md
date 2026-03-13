@@ -71,5 +71,6 @@ Para detalhes completos, consulte os módulos em `.claude/`.
 - **Módulo de Motoristas**: Implementado CRUD completo em `Drivers.tsx` com `DriverForm.tsx`, incluindo upload de CNH, GR e até 3 certificados (armazenados em bucket `driver-documents`).
 - **Configurações Dinâmicas**: Centralizadas em `Settings.tsx`, permitindo configurar campos obrigatórios tanto para Veículos quanto para Motoristas por cliente.
 - **Permissões de Exclusão**: Separadas as permissões de exclusão de veículos (`can_delete_vehicles`) e motoristas (`can_delete_drivers`) na tabela `profiles`, com interface de gestão em `Users.tsx`.
-- **Banco de Dados**: Criadas tabelas `drivers` e `driver_field_settings`. Adicionada coluna `can_delete_drivers` em `profiles`. Corrigida constraint de tipos de veículos.
+- **Módulo de Oficinas**: Implementado CRUD completo em `Workshops.tsx` com `WorkshopForm.tsx`, incluindo gestão de endereços e especialidades técnica.
+- **Banco de Dados**: Criadas tabelas `drivers`, `driver_field_settings` e `workshops`. Adicionadas colunas `can_delete_drivers` e `can_delete_workshops` em `profiles`. Corrigida constraint de tipos de veículos.
 - **Auto-Sync**: Atualizados manuais em `.claude/` (Frontend, Backend, Testing, Data Model) com as novas regras de negócios.

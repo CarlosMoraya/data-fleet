@@ -184,7 +184,6 @@ interface DriverFieldSettings {
   certificate3UploadOptional: boolean;
   courseName3Optional: boolean;
 }
-```
 
 ### Workshop
 ```ts

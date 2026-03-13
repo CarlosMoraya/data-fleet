@@ -22,7 +22,7 @@
 - `vehicle_field_settings` — configurações dinâmicas de campos obrigatórios de veículo por cliente
 - `drivers` — motoristas (CRUD com RLS, CPF único por cliente, 5 uploads de documento)
 - `driver_field_settings` — configurações dinâmicas de campos obrigatórios de motorista por cliente
-- `workshops` — oficinas parceiras (CRUD com RLS, CNPJ único por cliente, 10 especialidades)
+- `workshops` — oficinas parceiras (CRUD com RLS, CNPJ único por cliente, sem uploads)
 
 ### Tabelas planejadas (ainda não criadas)
 - `checklist_templates` — templates de checklist por tipo de veículo
@@ -43,9 +43,9 @@ RLS vehicles:
 - DELETE: Manager(5)+ OU Fleet Analyst(4) com `can_delete_drivers = true`
 
 ### Tabela `workshops` RLS:
-- SELECT: Fleet Assistant (rank 3)+ do próprio tenant
-- INSERT: Fleet Assistant (rank 3)+ do próprio tenant
-- UPDATE: Fleet Analyst (rank 4)+ do próprio tenant
+- SELECT: Fleet Assistant (rank 3)+ do próprio tenant + Admin Master
+- INSERT: Fleet Assistant (rank 3)+ do próprio tenant + Admin Master
+- UPDATE: Fleet Analyst (rank 4)+ do próprio tenant + Admin Master
 - DELETE: Manager(5)+ OU Fleet Analyst(4) com `can_delete_workshops = true`
 - Unique constraint: `(client_id, cnpj)`
 - Especialidades: array `TEXT[]` com 10 valores predefinidos (Mecânica Geral, Elétrica, Funilaria/Pintura, Pneus, Ar Condicionado, Suspensão, Freios, Injeção Eletrônica, Câmbio/Transmissão, Refrigeração Baú)
