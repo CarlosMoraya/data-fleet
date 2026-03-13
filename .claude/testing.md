@@ -51,7 +51,9 @@ e2e/
 ├── tenant-users-manager-vehicles.spec.ts  # Veículos CRUD + Configs
 ├── tenant-users-assistant-vehicles.spec.ts # Veículos Permissões
 ├── tenant-users.spec-analyst.ts # Veículos Permissões - Analista
-└── tenant-users-manager-seed.spec.ts # Seeding (Massa de Dados)
+├── tenant-users-manager-seed.spec.ts # Seeding (Massa de Dados)
+├── tenant-users-manager-workshops.spec.ts # Oficinas CRUD (Fluxo Completo)
+└── tenant-users.spec-analyst-workshops.ts # Oficinas Permissões - Analista
 ```
 
 ## Configuração

@@ -64,9 +64,14 @@ src/
 ## Layout Shell
 
 O `Layout.tsx` renderiza:
-1. `<Sidebar>` — navegação lateral com links condicionais por role
-2. `<Topbar>` — exibe client atual, switcher (Manager/Director/Admin Master), info do user
+1. `<Sidebar>` — navegação lateral com suporte a **Mobile Drawer** (hambúrguer menu)
+2. `<Topbar>` — exibe client atual, switcher, info do user e botão de menu no mobile
 3. `<Outlet>` — conteúdo da página ativa
+
+## Deploy & Hosting
+
+- **Vercel**: Hospedagem recomendada para o frontend React.
+- **`vercel.json`**: Configurado com rewrites para garantir que rotas SPA (ex: `/cadastros/oficinas`) funcionam ao recarregar.
 
 ## Padrões de Componentes
 
