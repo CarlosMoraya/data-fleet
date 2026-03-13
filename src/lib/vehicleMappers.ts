@@ -46,6 +46,15 @@ export interface VehicleRow {
   pbt: number | null;
   cmt: number | null;
   eixos: number | null;
+  warranty: boolean;
+  warranty_end_date: string | null;
+  first_revision_max_km: number | null;
+  first_revision_deadline: string | null;
+  cooling_first_revision_deadline: string | null;
+  has_insurance: boolean;
+  insurance_policy_upload: string | null;
+  has_maintenance_contract: boolean;
+  maintenance_contract_upload: string | null;
 }
 
 /** Converte row do Supabase (snake_case) para interface Vehicle (camelCase) */
@@ -90,6 +99,15 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
     pbt: row.pbt ?? undefined,
     cmt: row.cmt ?? undefined,
     eixos: row.eixos ?? undefined,
+    warranty: row.warranty ?? false,
+    warrantyEndDate: row.warranty_end_date ?? undefined,
+    firstRevisionMaxKm: row.first_revision_max_km ?? undefined,
+    firstRevisionDeadline: row.first_revision_deadline ?? undefined,
+    coolingFirstRevisionDeadline: row.cooling_first_revision_deadline ?? undefined,
+    hasInsurance: row.has_insurance ?? false,
+    insurancePolicyUpload: row.insurance_policy_upload ?? undefined,
+    hasMaintenanceContract: row.has_maintenance_contract ?? false,
+    maintenanceContractUpload: row.maintenance_contract_upload ?? undefined,
   };
 }
 
@@ -133,5 +151,14 @@ export function vehicleToRow(vehicle: Partial<Vehicle>, clientId: string): Omit<
     pbt: vehicle.pbt != null ? commaToFloat(vehicle.pbt) : null,
     cmt: vehicle.cmt != null ? commaToFloat(vehicle.cmt) : null,
     eixos: vehicle.eixos != null ? parseInt(String(vehicle.eixos), 10) : null,
+    warranty: vehicle.warranty ?? false,
+    warranty_end_date: vehicle.warrantyEndDate ?? null,
+    first_revision_max_km: vehicle.firstRevisionMaxKm != null ? parseInt(String(vehicle.firstRevisionMaxKm), 10) : null,
+    first_revision_deadline: vehicle.firstRevisionDeadline ?? null,
+    cooling_first_revision_deadline: vehicle.coolingFirstRevisionDeadline ?? null,
+    has_insurance: vehicle.hasInsurance ?? false,
+    insurance_policy_upload: vehicle.insurancePolicyUpload ?? null,
+    has_maintenance_contract: vehicle.hasMaintenanceContract ?? false,
+    maintenance_contract_upload: vehicle.maintenanceContractUpload ?? null,
   };
 }

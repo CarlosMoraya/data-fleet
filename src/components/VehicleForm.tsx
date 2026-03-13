@@ -16,6 +16,8 @@ interface VehicleFormFiles {
   crlv: File | null;
   sanitaryInspection: File | null;
   gr: File | null;
+  insurancePolicy: File | null;
+  maintenanceContract: File | null;
 }
 
 interface AvailableDriver {
@@ -59,6 +61,7 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
   pbt: filterNumericComma,
   cmt: filterNumericComma,
   eixos: filterDigitsOnly,
+  firstRevisionMaxKm: filterDigitsOnly,
 };
 
 export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, onClose, onSave }: VehicleFormProps) {
@@ -79,6 +82,9 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
       acquisition: 'Owned',
       spareKey: false,
       vehicleManual: false,
+      warranty: false,
+      hasInsurance: false,
+      hasMaintenanceContract: false,
       ...vehicle,
     };
   });
@@ -87,6 +93,8 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
   const [selectedCrlvFile, setSelectedCrlvFile] = useState<File | null>(null);
   const [selectedSanitaryFile, setSelectedSanitaryFile] = useState<File | null>(null);
   const [selectedGRFile, setSelectedGRFile] = useState<File | null>(null);
+  const [selectedInsurancePolicyFile, setSelectedInsurancePolicyFile] = useState<File | null>(null);
+  const [selectedMaintenanceContractFile, setSelectedMaintenanceContractFile] = useState<File | null>(null);
 
   // Helper: retorna true se o campo é obrigatório (default: true quando settings é null)
   const req = (name: string) => fieldSettings ? isFieldRequired(name, fieldSettings) : true;
@@ -142,6 +150,8 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
   const handleCrlvFileChange = makeFileHandler(setSelectedCrlvFile);
   const handleSanitaryFileChange = makeFileHandler(setSelectedSanitaryFile);
   const handleGRFileChange = makeFileHandler(setSelectedGRFile);
+  const handleInsurancePolicyFileChange = makeFileHandler(setSelectedInsurancePolicyFile);
+  const handleMaintenanceContractFileChange = makeFileHandler(setSelectedMaintenanceContractFile);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,12 +174,24 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
       setSaving(false);
       return;
     }
+    if (formData.hasInsurance && req('insurancePolicyUpload') && !selectedInsurancePolicyFile && !formData.insurancePolicyUpload) {
+      setError('A apólice de seguro é obrigatória quando o veículo possui seguro.');
+      setSaving(false);
+      return;
+    }
+    if (formData.hasMaintenanceContract && req('maintenanceContractUpload') && !selectedMaintenanceContractFile && !formData.maintenanceContractUpload) {
+      setError('O contrato de manutenção é obrigatório quando o veículo possui contrato.');
+      setSaving(false);
+      return;
+    }
 
     try {
       await onSave(formData, {
         crlv: selectedCrlvFile,
         sanitaryInspection: selectedSanitaryFile,
         gr: selectedGRFile,
+        insurancePolicy: selectedInsurancePolicyFile,
+        maintenanceContract: selectedMaintenanceContractFile,
       });
     } catch (err: unknown) {
       const pgError = err as { code?: string; message?: string };
@@ -480,9 +502,89 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                   <label htmlFor="coolingEquipment" className="ml-2 block text-sm text-zinc-900">Equipamento de Refrigeração?</label>
                 </div>
                 {formData.coolingEquipment && (
+                  <>
+                    <div>
+                      <Label name="coolingBrand">Marca/Modelo do Refrigerador</Label>
+                      <input type="text" name="coolingBrand" placeholder="Ex: Termoking, Thermo Star" required={req('coolingBrand')} value={formData.coolingBrand || ''} onChange={handleChange} className={inputClass} />
+                    </div>
+                    <div>
+                      <Label name="coolingFirstRevisionDeadline">Data Limite da 1ª Revisão do Refrigerador</Label>
+                      <input type="date" name="coolingFirstRevisionDeadline" required={req('coolingFirstRevisionDeadline')} value={formData.coolingFirstRevisionDeadline || ''} onChange={handleChange} className={inputClass} />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Garantia & Revisões */}
+            <div>
+              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Garantia & Revisões</h3>
+              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+                <div className="flex items-center h-full pt-6">
+                  <input id="warranty" name="warranty" type="checkbox" checked={formData.warranty || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600" />
+                  <label htmlFor="warranty" className="ml-2 block text-sm text-zinc-900">Veículo em garantia?</label>
+                </div>
+                {formData.warranty && (
                   <div>
-                    <Label name="coolingBrand">Marca/Modelo do Refrigerador</Label>
-                    <input type="text" name="coolingBrand" placeholder="Ex: Termoking, Thermo Star" required={req('coolingBrand')} value={formData.coolingBrand || ''} onChange={handleChange} className={inputClass} />
+                    <Label name="warrantyEndDate">Data Final da Garantia</Label>
+                    <input type="date" name="warrantyEndDate" required={req('warrantyEndDate')} value={formData.warrantyEndDate || ''} onChange={handleChange} className={inputClass} />
+                  </div>
+                )}
+                <div>
+                  <Label name="firstRevisionMaxKm">Km Máximo da 1ª Revisão</Label>
+                  <input type="text" name="firstRevisionMaxKm" required={req('firstRevisionMaxKm')} inputMode="numeric" value={formData.firstRevisionMaxKm ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 10000" />
+                </div>
+                <div>
+                  <Label name="firstRevisionDeadline">Data Limite da 1ª Revisão</Label>
+                  <input type="date" name="firstRevisionDeadline" required={req('firstRevisionDeadline')} value={formData.firstRevisionDeadline || ''} onChange={handleChange} className={inputClass} />
+                </div>
+              </div>
+            </div>
+
+            {/* Seguro & Contrato de Manutenção */}
+            <div>
+              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Seguro & Contrato de Manutenção</h3>
+              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+                <div className="flex items-center h-full pt-2">
+                  <input id="hasInsurance" name="hasInsurance" type="checkbox" checked={formData.hasInsurance || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600" />
+                  <label htmlFor="hasInsurance" className="ml-2 block text-sm text-zinc-900">Veículo possui seguro?</label>
+                </div>
+                {formData.hasInsurance && (
+                  <div className="sm:col-span-2">
+                    <Label name="insurancePolicyUpload">Apólice de Seguro</Label>
+                    <FilePreview url={formData.insurancePolicyUpload} selectedFile={selectedInsurancePolicyFile} label="Apólice atual" />
+                    <input
+                      type="file"
+                      name="insurancePolicyUpload"
+                      accept="application/pdf,image/jpeg,image/png,image/webp"
+                      onChange={handleInsurancePolicyFileChange}
+                      className={fileInputClass}
+                    />
+                    <p className="mt-1 text-xs text-zinc-400">
+                      Formatos aceitos: PDF, JPG, PNG, WEBP. Máximo 10MB.
+                      {formData.insurancePolicyUpload ? ' Selecionar um novo arquivo irá substituir o atual.' : ''}
+                    </p>
+                  </div>
+                )}
+                <div className="flex items-center h-full pt-2">
+                  <input id="hasMaintenanceContract" name="hasMaintenanceContract" type="checkbox" checked={formData.hasMaintenanceContract || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600" />
+                  <label htmlFor="hasMaintenanceContract" className="ml-2 block text-sm text-zinc-900">Veículo possui contrato de manutenção?</label>
+                </div>
+                {formData.hasMaintenanceContract && (
+                  <div className="sm:col-span-2">
+                    <Label name="maintenanceContractUpload">Contrato de Manutenção</Label>
+                    <FilePreview url={formData.maintenanceContractUpload} selectedFile={selectedMaintenanceContractFile} label="Contrato atual" />
+                    <input
+                      type="file"
+                      name="maintenanceContractUpload"
+                      accept="application/pdf,image/jpeg,image/png,image/webp"
+                      onChange={handleMaintenanceContractFileChange}
+                      className={fileInputClass}
+                    />
+                    <p className="mt-1 text-xs text-zinc-400">
+                      Formatos aceitos: PDF, JPG, PNG, WEBP. Máximo 10MB.
+                      {formData.maintenanceContractUpload ? ' Selecionar um novo arquivo irá substituir o atual.' : ''}
+                    </p>
                   </div>
                 )}
               </div>

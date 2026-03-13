@@ -68,6 +68,19 @@ export interface Vehicle {
   // Associação motorista (1:1)
   driverId?: string;    // FK → drivers.id (nullable)
   driverName?: string;  // Nome do motorista (vem do JOIN, não persistido diretamente)
+
+  // Garantia & Revisões
+  warranty?: boolean;
+  warrantyEndDate?: string;
+  firstRevisionMaxKm?: number;
+  firstRevisionDeadline?: string;
+  coolingFirstRevisionDeadline?: string;
+
+  // Seguro & Contrato de Manutenção
+  hasInsurance?: boolean;
+  insurancePolicyUpload?: string;
+  hasMaintenanceContract?: boolean;
+  maintenanceContractUpload?: string;
 }
 
 export interface Driver {
@@ -185,4 +198,14 @@ export interface VehicleFieldSettings {
   pbtOptional: boolean;
   cmtOptional: boolean;
   eixosOptional: boolean;
+
+  // Garantia & Revisões
+  warrantyEndDateOptional: boolean;
+  firstRevisionMaxKmOptional: boolean;
+  firstRevisionDeadlineOptional: boolean;
+  coolingFirstRevisionDeadlineOptional: boolean;
+
+  // Seguro & Contrato
+  insurancePolicyUploadOptional: boolean;
+  maintenanceContractUploadOptional: boolean;
 }

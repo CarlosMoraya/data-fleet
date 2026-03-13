@@ -28,6 +28,12 @@ export interface VehicleFieldSettingsRow {
   pbt_optional: boolean;
   cmt_optional: boolean;
   eixos_optional: boolean;
+  warranty_end_date_optional: boolean;
+  first_revision_max_km_optional: boolean;
+  first_revision_deadline_optional: boolean;
+  cooling_first_revision_deadline_optional: boolean;
+  insurance_policy_upload_optional: boolean;
+  maintenance_contract_upload_optional: boolean;
 }
 
 /** snake_case → camelCase */
@@ -59,6 +65,12 @@ export function fieldSettingsFromRow(row: VehicleFieldSettingsRow): VehicleField
     pbtOptional: row.pbt_optional,
     cmtOptional: row.cmt_optional,
     eixosOptional: row.eixos_optional,
+    warrantyEndDateOptional: row.warranty_end_date_optional,
+    firstRevisionMaxKmOptional: row.first_revision_max_km_optional,
+    firstRevisionDeadlineOptional: row.first_revision_deadline_optional,
+    coolingFirstRevisionDeadlineOptional: row.cooling_first_revision_deadline_optional,
+    insurancePolicyUploadOptional: row.insurance_policy_upload_optional,
+    maintenanceContractUploadOptional: row.maintenance_contract_upload_optional,
   };
 }
 
@@ -93,6 +105,12 @@ export function fieldSettingsToRow(
     pbt_optional: settings.pbtOptional,
     cmt_optional: settings.cmtOptional,
     eixos_optional: settings.eixosOptional,
+    warranty_end_date_optional: settings.warrantyEndDateOptional,
+    first_revision_max_km_optional: settings.firstRevisionMaxKmOptional,
+    first_revision_deadline_optional: settings.firstRevisionDeadlineOptional,
+    cooling_first_revision_deadline_optional: settings.coolingFirstRevisionDeadlineOptional,
+    insurance_policy_upload_optional: settings.insurancePolicyUploadOptional,
+    maintenance_contract_upload_optional: settings.maintenanceContractUploadOptional,
   };
 }
 
@@ -125,6 +143,12 @@ export function defaultFieldSettings(clientId: string): VehicleFieldSettings {
     pbtOptional: false,
     cmtOptional: false,
     eixosOptional: false,
+    warrantyEndDateOptional: false,
+    firstRevisionMaxKmOptional: false,
+    firstRevisionDeadlineOptional: false,
+    coolingFirstRevisionDeadlineOptional: false,
+    insurancePolicyUploadOptional: false,
+    maintenanceContractUploadOptional: false,
   };
 }
 
@@ -154,6 +178,12 @@ const FIELD_TO_SETTING: Record<string, keyof VehicleFieldSettings> = {
   pbt: 'pbtOptional',
   cmt: 'cmtOptional',
   eixos: 'eixosOptional',
+  warrantyEndDate: 'warrantyEndDateOptional',
+  firstRevisionMaxKm: 'firstRevisionMaxKmOptional',
+  firstRevisionDeadline: 'firstRevisionDeadlineOptional',
+  coolingFirstRevisionDeadline: 'coolingFirstRevisionDeadlineOptional',
+  insurancePolicyUpload: 'insurancePolicyUploadOptional',
+  maintenanceContractUpload: 'maintenanceContractUploadOptional',
 };
 
 /** Retorna true se o campo é obrigatório. Campos não mapeados são sempre obrigatórios. */
@@ -194,4 +224,12 @@ export const CONFIGURABLE_FIELDS: { key: keyof VehicleFieldSettings; label: stri
   { key: 'pbtOptional', label: 'PBT (Peso Bruto Total)', section: 'Especificações Técnicas' },
   { key: 'cmtOptional', label: 'CMT (Cap. Máxima de Tração)', section: 'Especificações Técnicas' },
   { key: 'eixosOptional', label: 'Eixos', section: 'Especificações Técnicas' },
+  // Garantia & Revisões
+  { key: 'warrantyEndDateOptional', label: 'Data Final da Garantia', section: 'Garantia & Revisões', note: 'Quando Veículo em Garantia = Sim' },
+  { key: 'firstRevisionMaxKmOptional', label: 'Km Máximo da 1ª Revisão', section: 'Garantia & Revisões' },
+  { key: 'firstRevisionDeadlineOptional', label: 'Data Limite da 1ª Revisão', section: 'Garantia & Revisões' },
+  { key: 'coolingFirstRevisionDeadlineOptional', label: 'Data 1ª Revisão do Refrigerador', section: 'Garantia & Revisões', note: 'Quando Refrigeração = Sim' },
+  // Seguro & Contrato
+  { key: 'insurancePolicyUploadOptional', label: 'Apólice de Seguro', section: 'Seguro & Contrato', note: 'Quando Veículo possui seguro = Sim' },
+  { key: 'maintenanceContractUploadOptional', label: 'Contrato de Manutenção', section: 'Seguro & Contrato', note: 'Quando Veículo possui contrato = Sim' },
 ];

@@ -118,7 +118,7 @@ export default function Vehicles() {
 
   const handleSave = async (
     vehicle: Partial<Vehicle>,
-    files: { crlv: File | null; sanitaryInspection: File | null; gr: File | null }
+    files: { crlv: File | null; sanitaryInspection: File | null; gr: File | null; insurancePolicy: File | null; maintenanceContract: File | null }
   ): Promise<void> => {
     if (!currentClient?.id) return;
     const row = vehicleToRow(vehicle, currentClient.id);
@@ -156,6 +156,14 @@ export default function Vehicles() {
         if (vehicle.grUpload) await deleteVehicleDocument(vehicle.grUpload);
         urlUpdates.gr_upload = await uploadVehicleDocument(currentClient.id, savedId, files.gr, 'gr');
       }
+      if (files.insurancePolicy) {
+        if (vehicle.insurancePolicyUpload) await deleteVehicleDocument(vehicle.insurancePolicyUpload);
+        urlUpdates.insurance_policy_upload = await uploadVehicleDocument(currentClient.id, savedId, files.insurancePolicy, 'insurance-policy');
+      }
+      if (files.maintenanceContract) {
+        if (vehicle.maintenanceContractUpload) await deleteVehicleDocument(vehicle.maintenanceContractUpload);
+        urlUpdates.maintenance_contract_upload = await uploadVehicleDocument(currentClient.id, savedId, files.maintenanceContract, 'maintenance-contract');
+      }
 
       if (Object.keys(urlUpdates).length > 0) {
         const { error: updateUrlError } = await supabase
@@ -181,6 +189,8 @@ export default function Vehicles() {
     if (vehicle.crlvUpload) await deleteVehicleDocument(vehicle.crlvUpload);
     if (vehicle.sanitaryInspectionUpload) await deleteVehicleDocument(vehicle.sanitaryInspectionUpload);
     if (vehicle.grUpload) await deleteVehicleDocument(vehicle.grUpload);
+    if (vehicle.insurancePolicyUpload) await deleteVehicleDocument(vehicle.insurancePolicyUpload);
+    if (vehicle.maintenanceContractUpload) await deleteVehicleDocument(vehicle.maintenanceContractUpload);
 
     const { error: deleteError } = await supabase
       .from('vehicles')

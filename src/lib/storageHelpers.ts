@@ -87,7 +87,7 @@ export async function uploadVehicleDocument(
   clientId: string,
   vehicleId: string,
   file: File,
-  docType: 'crlv' | 'sanitary-inspection' | 'gr' = 'crlv'
+  docType: 'crlv' | 'sanitary-inspection' | 'gr' | 'insurance-policy' | 'maintenance-contract' = 'crlv'
 ): Promise<string> {
   validateFile(file);
 

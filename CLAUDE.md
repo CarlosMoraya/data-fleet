@@ -74,4 +74,5 @@ Para detalhes completos, consulte os módulos em `.claude/`.
 - **Módulo de Oficinas**: Implementado CRUD completo em `Workshops.tsx` com `WorkshopForm.tsx`, incluindo gestão de endereços e especialidades técnica. Validado com Testes E2E (Manager e Analyst).
 - **UX Responsiva**: Implementado Menu Mobile (Drawer) com botão hamburger no Topbar e overlay inteligente para melhor experiência em smartphones.
 - **Deploy & Hosting**: Adicionado `vercel.json` e orientações de deploy do frontend na Vercel com conexão ao Supabase.
+- **Seeding de Veículos**: Cadastrados 6 novos veículos (VEC0001-VEC0006) com preenchimento completo de garantia, revisão e seguro. Identificada limitação de upload (403) no perfil de Assistente, com bypass realizado via Analista.
 - **Auto-Sync**: Atualizados manuais em `.claude/` (Frontend, Backend, Testing, Data Model) com as novas funcionalidades e melhorias de UX.
