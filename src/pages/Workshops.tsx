@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Workshop } from '../types';
-import { Plus, Search, Edit2, Trash2, Wrench, MapPin } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Wrench, MapPin, Eye } from 'lucide-react';
 import WorkshopForm from '../components/WorkshopForm';
+import WorkshopDetailModal from '../components/WorkshopDetailModal';
 import { supabase } from '../lib/supabase';
 import { workshopFromRow, workshopToRow, formatCNPJ, WorkshopRow } from '../lib/workshopMappers';
 
@@ -40,6 +41,8 @@ export default function Workshops() {
       return null;
     }
   });
+
+  const [viewingWorkshop, setViewingWorkshop] = useState<Workshop | null>(null);
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
@@ -253,6 +256,14 @@ export default function Workshops() {
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                       <div className="flex items-center justify-end gap-3">
+                        <button
+                          onClick={() => setViewingWorkshop(workshop)}
+                          title="Visualizar"
+                          className="text-zinc-400 hover:text-zinc-700 transition-colors"
+                        >
+                          <Eye className="h-5 w-5" />
+                          <span className="sr-only">Visualizar</span>
+                        </button>
                         {canEdit && (
                           <button
                             onClick={() => {
@@ -293,6 +304,13 @@ export default function Workshops() {
           </div>
         )}
       </div>
+
+      {viewingWorkshop && (
+        <WorkshopDetailModal
+          workshop={viewingWorkshop}
+          onClose={() => setViewingWorkshop(null)}
+        />
+      )}
 
       {isFormOpen && (
         <WorkshopForm

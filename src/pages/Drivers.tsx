@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Driver, DriverFieldSettings } from '../types';
-import { Plus, Search, Edit2, Trash2, UserCircle, Truck } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, UserCircle, Truck, Eye } from 'lucide-react';
 import DriverForm from '../components/DriverForm';
+import DriverDetailModal from '../components/DriverDetailModal';
 import { supabase } from '../lib/supabase';
 import { driverFromRow, driverToRow, DriverRow } from '../lib/driverMappers';
 import { uploadDriverDocument, deleteDriverDocument } from '../lib/storageHelpers';
@@ -40,6 +41,7 @@ export default function Drivers() {
   const [fieldSettings, setFieldSettings] = useState<DriverFieldSettings | null>(null);
   // Mapa driver_id → placa do veículo associado
   const [driverVehicleMap, setDriverVehicleMap] = useState<Record<string, string>>({});
+  const [viewingDriver, setViewingDriver] = useState<Driver | null>(null);
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
@@ -298,6 +300,14 @@ export default function Drivers() {
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                       <div className="flex items-center justify-end gap-3">
+                        <button
+                          onClick={() => setViewingDriver(driver)}
+                          title="Visualizar"
+                          className="text-zinc-400 hover:text-zinc-700 transition-colors"
+                        >
+                          <Eye className="h-5 w-5" />
+                          <span className="sr-only">Visualizar</span>
+                        </button>
                         {canEdit && (
                           <button
                             onClick={() => {
@@ -338,6 +348,14 @@ export default function Drivers() {
           </div>
         )}
       </div>
+
+      {viewingDriver && (
+        <DriverDetailModal
+          driver={viewingDriver}
+          vehiclePlate={driverVehicleMap[viewingDriver.id]}
+          onClose={() => setViewingDriver(null)}
+        />
+      )}
 
       {isFormOpen && (
         <DriverForm

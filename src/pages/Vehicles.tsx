@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Vehicle, VehicleFieldSettings } from '../types';
-import { Plus, Search, Filter, Edit2, Trash2, Truck, User } from 'lucide-react';
+import { Plus, Search, Filter, Edit2, Trash2, Truck, User, Eye } from 'lucide-react';
 import VehicleForm from '../components/VehicleForm';
+import VehicleDetailModal from '../components/VehicleDetailModal';
 import { supabase } from '../lib/supabase';
 import { vehicleFromRow, vehicleToRow, VehicleRow } from '../lib/vehicleMappers';
 import { uploadVehicleDocument, deleteVehicleDocument } from '../lib/storageHelpers';
@@ -39,6 +40,7 @@ export default function Vehicles() {
   });
   const [fieldSettings, setFieldSettings] = useState<VehicleFieldSettings | null>(null);
   const [availableDrivers, setAvailableDrivers] = useState<AvailableDriver[]>([]);
+  const [viewingVehicle, setViewingVehicle] = useState<Vehicle | null>(null);
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
@@ -316,6 +318,14 @@ export default function Vehicles() {
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                       <div className="flex items-center justify-end gap-3">
+                        <button
+                          onClick={() => setViewingVehicle(vehicle)}
+                          title="Visualizar"
+                          className="text-zinc-400 hover:text-zinc-700 transition-colors"
+                        >
+                          <Eye className="h-5 w-5" />
+                          <span className="sr-only">Visualizar</span>
+                        </button>
                         {canEdit && (
                           <button
                             onClick={() => {
@@ -356,6 +366,13 @@ export default function Vehicles() {
           </div>
         )}
       </div>
+
+      {viewingVehicle && (
+        <VehicleDetailModal
+          vehicle={viewingVehicle}
+          onClose={() => setViewingVehicle(null)}
+        />
+      )}
 
       {isFormOpen && (
         <VehicleForm

@@ -18,7 +18,10 @@ src/
 │   ├── Topbar.tsx       # Barra superior (client switcher, user info)
 │   ├── VehicleForm.tsx  # Formulário multi-step para veículos (prop: availableDrivers)
 │   ├── DriverForm.tsx   # Formulário para motoristas (CNH, GR, certificados)
-│   └── WorkshopForm.tsx # Formulário modal para oficinas (sem uploads, 3 seções)
+│   ├── WorkshopForm.tsx # Formulário modal para oficinas (sem uploads, 3 seções)
+│   ├── VehicleDetailModal.tsx  # Modal read-only de detalhes do veículo (8 seções, links de uploads)
+│   ├── DriverDetailModal.tsx   # Modal read-only de detalhes do motorista (5 seções, links de uploads)
+│   └── WorkshopDetailModal.tsx # Modal read-only de detalhes da oficina (5 seções, sem uploads)
 ├── context/
 │   └── AuthContext.tsx   # Auth + client context → useAuth() hook
 ├── lib/
@@ -35,9 +38,9 @@ src/
 │   ├── Login.tsx        # Login com email/senha (Supabase Auth)
 │   ├── Dashboard.tsx    # KPIs + gráficos (ainda mock data)
 │   ├── Cadastros.tsx    # Layout wrapper com abas (Veículos, Motoristas, Oficinas, Usuários) + <Outlet />
-│   ├── Vehicles.tsx     # CRUD de veículos (Fleet Assistant+ acessa, Fleet Analyst+ edita)
-│   ├── Drivers.tsx      # CRUD de motoristas (Fleet Assistant+ acessa, Fleet Analyst+ edita)
-│   ├── Workshops.tsx    # CRUD de oficinas (Fleet Assistant+ acessa, Fleet Analyst+ edita, Manager+ deleta ou Fleet Analyst com flag)
+│   ├── Vehicles.tsx     # CRUD de veículos (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → VehicleDetailModal
+│   ├── Drivers.tsx      # CRUD de motoristas (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → DriverDetailModal
+│   ├── Workshops.tsx    # CRUD de oficinas (Fleet Assistant+ acessa, Fleet Analyst+ edita, Manager+ deleta ou Fleet Analyst com flag) + botão Eye → WorkshopDetailModal
 │   ├── Checklists.tsx   # Stub — "No checklists"
 │   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+)
 │   ├── Settings.tsx     # Configurações de campos obrigatórios: Veículo + Motorista (Manager+)
@@ -82,3 +85,10 @@ O `Layout.tsx` renderiza:
 - **Gráficos**: `Recharts` (BarChart, PieChart) no Dashboard, filtrados por `currentClient.id`
 - **Navegação em abas**: `Cadastros.tsx` renderiza `<NavLink>` com estilo ativo (border-b-2 orange), cada aba renderiza seu módulo via `<Outlet />`
 - **Sidebar**: item único "Cadastros" (`FolderOpen` icon) → `/cadastros`, substitui items individuais de Veículos/Motoristas/Usuários
+- **Modais de detalhe (read-only)**:
+  - `VehicleDetailModal` renderiza 8 seções (Identificação, Propriedade, Equipamentos, Adicionais, Motorista, Documentos com links, Garantia, Seguro/Manutenção) a partir de um objeto `Vehicle`
+  - `DriverDetailModal` renderiza 5 seções (Dados Pessoais, CNH, GR, Certificados, Veículo Associado) com links para uploads
+  - `WorkshopDetailModal` renderiza 5 seções (Identificação, Contato, Endereço, Especialidades, Observações) sem uploads
+  - Container externo usa `flex items-start justify-center` para iniciar no topo da viewport em telas pequenas
+  - Links de arquivo (`FileField`) exibem "Visualizar 🔗" em laranja ou "Não enviado" em cinza
+  - Acionado por botão Eye (`<Eye />` icon) nas tabelas de Vehicles, Drivers e Workshops
