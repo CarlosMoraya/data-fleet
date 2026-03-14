@@ -72,6 +72,7 @@ Para detalhes completos, consulte os módulos em `.claude/`.
 - **Configurações Dinâmicas**: Centralizadas em `Settings.tsx`, permitindo configurar campos obrigatórios tanto para Veículos quanto para Motoristas por cliente.
 - **Permissões de Exclusão**: Separadas as permissões de exclusão de veículos (`can_delete_vehicles`) e motoristas (`can_delete_drivers`) na tabela `profiles`, com interface de gestão em `Users.tsx`.
 - **Módulo de Oficinas**: Implementado CRUD completo em `Workshops.tsx` com `WorkshopForm.tsx`, incluindo gestão de endereços e especialidades técnica. Validado com Testes E2E (Manager e Analyst).
+- **Estabilidade de Testes (E2E)**: Corrigidos bugs críticos de infraestrutura de testes. Implementado `test.describe.serial` em fluxos de Oficina e Clientes, ajuste de timeouts para Edge Functions (60s) e inclusão de campos obrigatórios dinâmicos nos testes de Veículos. Resolvidos bugs BUG-001 a BUG-005.
 - **UX Responsiva**: Implementado Menu Mobile (Drawer) com botão hamburger no Topbar e overlay inteligente para melhor experiência em smartphones.
 - **Deploy & Hosting**: Adicionado `vercel.json` e orientações de deploy do frontend na Vercel com conexão ao Supabase.
 - **Seeding de Veículos**: Cadastrados 6 novos veículos (VEC0001-VEC0006) com preenchimento completo de garantia, revisão e seguro. Identificada limitação de upload (403) no perfil de Assistente, com bypass realizado via Analista.

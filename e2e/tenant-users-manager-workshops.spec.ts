@@ -4,7 +4,7 @@ const UID = Date.now().toString().slice(-6);
 const TEST_NAME = `Oficina E2E ${UID}`;
 const TEST_CNPJ = `123456780001${UID.slice(-2)}`; // 14 digits total
 
-test.describe('Módulo de Oficinas (Fluxo Completo)', () => {
+test.describe.serial('Módulo de Oficinas (Fluxo Completo)', () => {
   
   test.beforeEach(async ({ page }) => {
     // Manager (Alexandre) já está logado via storageState no projeto 'manager'
@@ -56,6 +56,9 @@ test.describe('Módulo de Oficinas (Fluxo Completo)', () => {
   });
 
   test('deve buscar oficina por nome ou CNPJ', async ({ page }) => {
+    // Esperar table carregar antes de focar na busca
+    await expect(page.locator('table')).toBeVisible();
+
     // Buscar por nome
     await page.locator('input[placeholder*="Buscar por nome ou CNPJ"]').fill(TEST_NAME);
     await expect(page.locator('table').getByText(TEST_NAME)).toBeVisible();

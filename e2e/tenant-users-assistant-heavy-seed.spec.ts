@@ -55,11 +55,9 @@ const VEHICLES = [
 
 test.describe('Seeding Heavy (Assistant): Cadastro de Veículos', () => {
   
-  test.beforeEach(async ({ page }) => {
-    page.on('console', msg => {
-      console.log(`BROWSER [${msg.type()}]: ${msg.text()}`);
-    });
-    await page.goto('/vehicles');
+  test('semeia 6 veículos com anexos como assistant', async ({ page }) => {
+    // 1. Acessa a página de veículos
+    await page.goto('/cadastros/veiculos');
     await expect(page.locator('h1', { hasText: 'Vehicles' })).toBeVisible({ timeout: 15000 });
   });
 

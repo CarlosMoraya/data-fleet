@@ -9,7 +9,7 @@ test.describe('Módulo de Veículos (Fluxo Completo)', () => {
   
   test.beforeEach(async ({ page }) => {
     // A maioria dos testes será via Manager (Alexandre) que já está logado via storageState no projeto 'manager'
-    await page.goto('/vehicles');
+    await page.goto('/cadastros/veiculos');
     await expect(page.locator('h1', { hasText: 'Vehicles' })).toBeVisible({ timeout: 15000 });
   });
 
@@ -30,11 +30,11 @@ test.describe('Módulo de Veículos (Fluxo Completo)', () => {
       await chassiSwitch.click();
     }
     
-    await page.click('button:has-text("Salvar")');
-    await expect(page.locator('text=Configurações salvas com sucesso')).toBeVisible();
+    await page.locator('.bg-white').filter({ hasText: 'Campos Obrigatórios do Veículo' }).locator('button:has-text("Salvar")').click();
+    await expect(page.locator('text=Configurações de veículos salvas com sucesso')).toBeVisible();
 
     // 3. Voltar para Veículos e abrir o formulário
-    await page.goto('/vehicles');
+    await page.goto('/cadastros/veiculos');
     await page.click('button:has-text("Add Vehicle")');
     
     const modal = page.locator('.fixed.inset-0');
@@ -97,6 +97,15 @@ test.describe('Módulo de Veículos (Fluxo Completo)', () => {
     await modal.locator('input[name="fuelType"]').fill('Diesel');
     await modal.locator('input[name="tankCapacity"]').fill('80');
     await modal.locator('input[name="avgConsumption"]').fill('12,5');
+
+    // Campos adicionais obrigatórios: Peso e Eixos
+    await modal.locator('input[name="pbt"]').fill('3,5');
+    await modal.locator('input[name="cmt"]').fill('45,0');
+    await modal.locator('input[name="eixos"]').fill('2');
+
+    // Revisão (Obrigatórios por default)
+    await modal.locator('input[name="firstRevisionMaxKm"]').fill('10000');
+    await modal.locator('input[name="firstRevisionDeadline"]').fill('2026-12-31');
 
     // Salvar
     await modal.locator('button:has-text("Salvar Veículo")').click();

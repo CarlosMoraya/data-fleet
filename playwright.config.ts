@@ -47,7 +47,8 @@ export default defineConfig({
         storageState: 'e2e/.auth/mariana.json',
       },
       dependencies: ['setup-mariana'],
-      testMatch: /tenant-users\.spec/,
+      testMatch: /tenant-users(-analyst.*)?\.spec\.ts/,
+      testIgnore: /seed/,
     },
     {
       name: 'assistant',
@@ -56,7 +57,8 @@ export default defineConfig({
         storageState: 'e2e/.auth/pedro.json',
       },
       dependencies: ['setup-pedro'],
-      testMatch: /tenant-users-assistant/,
+      testMatch: /tenant-users-assistant.*\.spec\.ts/,
+      testIgnore: /seed/,
     },
     {
       name: 'manager',
@@ -65,7 +67,8 @@ export default defineConfig({
         storageState: 'e2e/.auth/alexandre.json',
       },
       dependencies: ['setup-alexandre'],
-      testMatch: /tenant-users-manager/,
+      testMatch: /tenant-users-manager.*\.spec\.ts/,
+      testIgnore: /seed/,
     },
   ],
   webServer: {

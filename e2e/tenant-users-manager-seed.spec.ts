@@ -62,10 +62,10 @@ const VEHICLES_TO_SEED = [
   }
 ];
 
-test.describe('Seeding: Massa de Dados de Veículos', () => {
+test.describe('semeia 6 veículos e vincula apenas alguns motoristas para testes', () => {
   
   test.beforeEach(async ({ page }) => {
-    await page.goto('/vehicles');
+    await page.goto('/cadastros/veiculos');
     await expect(page.locator('h1', { hasText: 'Vehicles' })).toBeVisible({ timeout: 15000 });
   });
 

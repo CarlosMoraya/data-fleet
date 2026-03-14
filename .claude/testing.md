@@ -2,7 +2,7 @@
 
 ## Visão Geral
 
-- **44 testes E2E** passando across 4 perfis de autenticação
+- **61 testes E2E** passando across 4 perfis de autenticação
 - Framework: **Playwright**
 - Config: `playwright.config.ts`
 - Diretório: `e2e/`
@@ -85,6 +85,15 @@ Evitar locators ambíguos que matcham múltiplos elementos:
 ### Isolamento de Dados
 - `Date.now()` no nível do módulo para dados únicos por run
 - Cada teste CRUD: cria → edita → deleta seus próprios dados
+
+### Serial Execution (Race Conditions)
+Para fluxos dependentes (ex: criar -> editar -> deletar), usar `test.describe.serial` e aguardar o DB estabilizar:
+```ts
+test.describe.serial('Fluxo Crítico', () => {
+  // specs...
+  await page.waitForTimeout(500); // estabilizar estados asíncronos após post
+});
+```
 
 ### Dialog Handling
 ```ts

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Módulo de Veículos (Papel: Fleet Assistant - Pedro)', () => {
   
   test.beforeEach(async ({ page }) => {
-    await page.goto('/vehicles');
+    await page.goto('/cadastros/veiculos');
     await expect(page.locator('h1', { hasText: 'Vehicles' })).toBeVisible({ timeout: 15000 });
   });
 

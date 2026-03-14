@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Módulo de Veículos (Papel: Fleet Analyst - Mariana)', () => {
   
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/vehicles');
+  test.beforeEach(async ({ page }) => { // Analyst (Mariana) já está logada
+    await page.goto('/cadastros/veiculos');
     await expect(page.locator('h1', { hasText: 'Vehicles' })).toBeVisible({ timeout: 15000 });
   });
 

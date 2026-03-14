@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 const TEST_CLIENT_NAME = `Teste E2E ${Date.now()}`;
 const EDITED_NAME = `${TEST_CLIENT_NAME} Editado`;
 
-test.describe('Admin → Clientes', () => {
+test.describe.serial('Admin → Clientes', () => {
   test('página carrega e exibe tabela de clientes', async ({ page }) => {
     await page.goto('/admin/clients');
     await expect(page.locator('h1', { hasText: 'Clientes' })).toBeVisible();
@@ -42,9 +42,12 @@ test.describe('Admin → Clientes', () => {
     await expect(page.locator('h2', { hasText: 'Editar Cliente' })).toBeVisible();
 
     const nameInput = page.locator('input[placeholder="Ex: Acme Logistics"]');
+    await nameInput.clear();
+    await page.waitForTimeout(500);
     await nameInput.fill(EDITED_NAME);
     await expect(nameInput).toHaveValue(EDITED_NAME); // verifica que React atualizou o estado
     await page.click('button:has-text("Salvar")');
+    await page.waitForTimeout(1000); // Aguarda a tabela recarregar com folga
 
     // Verifica que o modal fechou (save completou sem erro)
     await expect(page.locator('h2', { hasText: 'Editar Cliente' })).not.toBeVisible({ timeout: 5000 });

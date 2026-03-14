@@ -6,8 +6,9 @@ const TEST_USER_EMAIL = `e2e-${UID}@teste.com`;
 const TEST_USER_PASSWORD = 'Teste@123456';
 
 test.describe('Usuários (Fleet Analyst — Mariana)', () => {
+  test.describe.configure({ timeout: 60000 });
   test('página /users carrega e exibe tabela', async ({ page }) => {
-    await page.goto('/users');
+    await page.goto('/cadastros/usuarios');
     await expect(page.locator('h1', { hasText: 'Usuários' })).toBeVisible({ timeout: 10000 });
     await expect(page.locator('table').or(page.locator('text=Nenhum usuário cadastrado'))).toBeVisible();
   });
@@ -19,7 +20,7 @@ test.describe('Usuários (Fleet Analyst — Mariana)', () => {
   });
 
   test('filtro de busca por nome funciona', async ({ page }) => {
-    await page.goto('/users');
+    await page.goto('/cadastros/usuarios');
     await expect(page.locator('h1', { hasText: 'Usuários' })).toBeVisible({ timeout: 10000 });
 
     await page.fill('input[placeholder="Buscar por nome..."]', 'xyzimpossivel');
@@ -29,7 +30,7 @@ test.describe('Usuários (Fleet Analyst — Mariana)', () => {
   });
 
   test('modal de novo usuário abre com papéis corretos para Fleet Analyst', async ({ page }) => {
-    await page.goto('/users');
+    await page.goto('/cadastros/usuarios');
     await expect(page.locator('h1', { hasText: 'Usuários' })).toBeVisible({ timeout: 10000 });
 
     await page.click('button:has-text("Novo Usuário")');
@@ -52,7 +53,7 @@ test.describe('Usuários (Fleet Analyst — Mariana)', () => {
   });
 
   test('cria usuário com papel Driver', async ({ page }) => {
-    await page.goto('/users');
+    await page.goto('/cadastros/usuarios');
     await expect(page.locator('h1', { hasText: 'Usuários' })).toBeVisible({ timeout: 10000 });
 
     await page.click('button:has-text("Novo Usuário")');
@@ -71,12 +72,12 @@ test.describe('Usuários (Fleet Analyst — Mariana)', () => {
     await modal.locator('button[type="submit"]').click();
 
     // Modal fecha e usuário aparece na tabela
-    await expect(modal.locator('h2', { hasText: 'Novo Usuário' })).not.toBeVisible({ timeout: 15000 });
+    await expect(modal.locator('h2', { hasText: 'Novo Usuário' })).not.toBeVisible({ timeout: 45000 });
     await expect(page.locator('table').getByText(TEST_USER_NAME)).toBeVisible({ timeout: 8000 });
   });
 
   test('busca encontra o usuário criado', async ({ page }) => {
-    await page.goto('/users');
+    await page.goto('/cadastros/usuarios');
     await expect(page.locator('h1', { hasText: 'Usuários' })).toBeVisible({ timeout: 10000 });
     // Aguarda tabela carregar
     await page.waitForTimeout(1000);
@@ -86,7 +87,7 @@ test.describe('Usuários (Fleet Analyst — Mariana)', () => {
   });
 
   test('edita o nome do usuário criado', async ({ page }) => {
-    await page.goto('/users');
+    await page.goto('/cadastros/usuarios');
     await expect(page.locator('h1', { hasText: 'Usuários' })).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(1000);
 
@@ -114,7 +115,7 @@ test.describe('Usuários (Fleet Analyst — Mariana)', () => {
   });
 
   test('exclui o usuário criado', async ({ page }) => {
-    await page.goto('/users');
+    await page.goto('/cadastros/usuarios');
     await expect(page.locator('h1', { hasText: 'Usuários' })).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(1000);
 

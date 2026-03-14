@@ -102,7 +102,7 @@ test.describe('Seeding Heavy (Full): Cadastro de Veículos via Analista', () => 
     page.on('console', msg => {
       console.log(`BROWSER [${msg.type()}]: ${msg.text()}`);
     });
-    await page.goto('/vehicles');
+    await page.goto('/cadastros/veiculos');
     await expect(page.locator('h1', { hasText: 'Vehicles' })).toBeVisible({ timeout: 15000 });
   });
 

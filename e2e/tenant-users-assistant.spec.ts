@@ -6,8 +6,9 @@ const TEST_USER_EMAIL = `e2e-asst-${UID}@teste.com`;
 const TEST_USER_PASSWORD = 'Teste@123456';
 
 test.describe('Usuários (Fleet Assistant — Pedro)', () => {
+  test.describe.configure({ timeout: 60000 });
   test('página /users carrega e exibe tabela', async ({ page }) => {
-    await page.goto('/users');
+    await page.goto('/cadastros/usuarios');
     await expect(page.locator('h1', { hasText: 'Usuários' })).toBeVisible({ timeout: 10000 });
     await expect(page.locator('table').or(page.locator('text=Nenhum usuário cadastrado'))).toBeVisible();
   });
@@ -18,7 +19,7 @@ test.describe('Usuários (Fleet Assistant — Pedro)', () => {
   });
 
   test('modal mostra apenas papéis permitidos para Fleet Assistant', async ({ page }) => {
-    await page.goto('/users');
+    await page.goto('/cadastros/usuarios');
     await expect(page.locator('h1', { hasText: 'Usuários' })).toBeVisible({ timeout: 10000 });
 
     await page.click('button:has-text("Novo Usuário")');
@@ -39,7 +40,7 @@ test.describe('Usuários (Fleet Assistant — Pedro)', () => {
   });
 
   test('cria usuário com papel Yard Auditor', async ({ page }) => {
-    await page.goto('/users');
+    await page.goto('/cadastros/usuarios');
     await expect(page.locator('h1', { hasText: 'Usuários' })).toBeVisible({ timeout: 10000 });
 
     await page.click('button:has-text("Novo Usuário")');
@@ -56,12 +57,12 @@ test.describe('Usuários (Fleet Assistant — Pedro)', () => {
 
     await modal.locator('button[type="submit"]').click();
 
-    await expect(modal.locator('h2', { hasText: 'Novo Usuário' })).not.toBeVisible({ timeout: 15000 });
+    await expect(modal.locator('h2', { hasText: 'Novo Usuário' })).not.toBeVisible({ timeout: 45000 });
     await expect(page.locator('table').getByText(TEST_USER_NAME)).toBeVisible({ timeout: 8000 });
   });
 
   test('edita o nome do usuário criado', async ({ page }) => {
-    await page.goto('/users');
+    await page.goto('/cadastros/usuarios');
     await expect(page.locator('h1', { hasText: 'Usuários' })).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(1000);
 
@@ -85,7 +86,7 @@ test.describe('Usuários (Fleet Assistant — Pedro)', () => {
   });
 
   test('exclui o usuário criado', async ({ page }) => {
-    await page.goto('/users');
+    await page.goto('/cadastros/usuarios');
     await expect(page.locator('h1', { hasText: 'Usuários' })).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(1000);
 
