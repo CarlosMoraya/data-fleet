@@ -1,5 +1,118 @@
 export type Role = 'Driver' | 'Yard Auditor' | 'Fleet Assistant' | 'Fleet Analyst' | 'Manager' | 'Director' | 'Admin Master';
 
+// ─── Checklist types ──────────────────────────────────────────────────────────
+
+export type VehicleCategory = 'Leve' | 'Médio' | 'Pesado' | 'Elétrico';
+export type TemplateCategory = VehicleCategory | 'Livre';
+export type TemplateStatus = 'draft' | 'published' | 'deprecated';
+export type ChecklistStatus = 'in_progress' | 'completed';
+export type ResponseStatus = 'ok' | 'issue' | 'skipped' | 'not_applicable';
+export type ActionPlanStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface ChecklistItemSuggestion {
+  id: string;
+  vehicleCategory: VehicleCategory;
+  title: string;
+  description?: string;
+  isMandatory: boolean;
+  requirePhotoIfIssue: boolean;
+  defaultAction?: string;
+  orderNumber: number;
+}
+
+export interface ChecklistTemplate {
+  id: string;
+  clientId: string;
+  vehicleCategory?: VehicleCategory; // null quando isFreeForm = true
+  isFreeForm: boolean;
+  name: string;
+  description?: string;
+  currentVersion: number;
+  status: TemplateStatus;
+  allowDriverActions: boolean;
+  allowAuditorActions: boolean;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ChecklistTemplateVersion {
+  id: string;
+  templateId: string;
+  versionNumber: number;
+  publishedAt: string;
+  publishedBy?: string;
+}
+
+export interface ChecklistItem {
+  id: string;
+  templateId: string;
+  versionNumber: number;
+  title: string;
+  description?: string;
+  isMandatory: boolean;
+  requirePhotoIfIssue: boolean;
+  defaultAction?: string;
+  orderNumber: number;
+}
+
+export interface Checklist {
+  id: string;
+  clientId: string;
+  templateId: string;
+  templateName?: string; // from join
+  versionNumber: number;
+  vehicleId?: string; // nullable — null para checklists Livre sem veículo
+  vehicleLicensePlate?: string; // from join
+  filledBy: string;
+  filledByName?: string; // from join
+  startedAt: string;
+  completedAt?: string;
+  status: ChecklistStatus;
+  latitude?: number;
+  longitude?: number;
+  deviceInfo?: string;
+  notes?: string;
+}
+
+export interface ChecklistResponse {
+  id: string;
+  checklistId: string;
+  itemId: string;
+  itemTitle?: string; // from join
+  status: ResponseStatus;
+  observation?: string;
+  photoUrl?: string;
+  respondedAt: string;
+}
+
+export interface ActionPlan {
+  id: string;
+  clientId: string;
+  checklistId: string;
+  checklistResponseId?: string;
+  vehicleId?: string;
+  vehicleLicensePlate?: string; // from join
+  reportedBy?: string;
+  reportedByName?: string; // from join
+  suggestedAction: string;
+  observedIssue?: string;
+  photoUrl?: string;
+  status: ActionPlanStatus;
+  workOrderNumber?: string;
+  completionNotes?: string;
+  completedBy?: string;
+  completedByName?: string; // from join
+  completedAt?: string;
+  latitude?: number;
+  longitude?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  // from join
+  itemTitle?: string;
+  templateName?: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -58,7 +171,7 @@ export interface Vehicle {
   vehicleManual?: boolean;
   grUpload?: string;
   grExpirationDate?: string;
-  category?: 'Leve' | 'Médio' | 'Pesado';
+  category?: 'Leve' | 'Médio' | 'Pesado' | 'Elétrico';
 
   // Especificações de peso/capacidade
   pbt?: number;   // Peso Bruto Total (t)
@@ -86,6 +199,7 @@ export interface Vehicle {
 export interface Driver {
   id: string;
   clientId: string;
+  profileId?: string; // FK → profiles.id — todo motorista é um usuário do sistema
 
   // Core identity (sempre obrigatórios)
   name: string;

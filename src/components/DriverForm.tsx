@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Driver, DriverFieldSettings } from '../types';
-import { X, FileText, ExternalLink, Loader2 } from 'lucide-react';
+import { X, FileText, ExternalLink, Loader2, UserPlus } from 'lucide-react';
 import { validateFile } from '../lib/storageHelpers';
 import { isDriverFieldRequired } from '../lib/driverFieldSettingsMappers';
+import { supabase } from '../lib/supabase';
 import {
   filterDigitsOnly,
   filterText,
@@ -22,6 +23,7 @@ interface DriverFormFiles {
 interface DriverFormProps {
   driver: Driver | null;
   fieldSettings: DriverFieldSettings | null;
+  clientId: string;
   onClose: () => void;
   onSave: (driver: Partial<Driver>, files: DriverFormFiles) => Promise<void>;
 }
@@ -37,7 +39,10 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
   courseName3: filterText,
 };
 
-export default function DriverForm({ driver, fieldSettings, onClose, onSave }: DriverFormProps) {
+export default function DriverForm({ driver, fieldSettings, clientId, onClose, onSave }: DriverFormProps) {
+  const isCreating = !driver;
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [formData, setFormData] = useState<Partial<Driver>>(() => {
     try {
       const savedData = sessionStorage.getItem('driverFormData');
@@ -135,13 +140,46 @@ export default function DriverForm({ driver, fieldSettings, onClose, onSave }: D
     }
 
     try {
-      await onSave(formData, {
-        cnh: selectedCnhFile,
-        gr: selectedGRFile,
-        certificate1: selectedCert1File,
-        certificate2: selectedCert2File,
-        certificate3: selectedCert3File,
-      });
+      let profileId: string | undefined;
+
+      // No modo criação: primeiro cria o usuário no sistema
+      if (isCreating) {
+        const { data, error: fnError } = await supabase.functions.invoke('create-user', {
+          body: {
+            email: email.trim().toLowerCase(),
+            password,
+            name: formData.name ?? '',
+            role: 'Driver',
+            client_id: clientId,
+            can_delete_vehicles: false,
+            can_delete_drivers: false,
+            can_delete_workshops: false,
+          },
+        });
+        if (fnError) {
+          let msg = fnError.message ?? 'Erro ao criar acesso do motorista.';
+          try {
+            const body = await (fnError as { context?: Response }).context?.json();
+            if (body?.error) msg = body.error;
+          } catch { /* mantém msg original */ }
+          throw new Error(msg);
+        }
+        if ((data as { error?: string })?.error) {
+          throw new Error((data as { error?: string }).error!);
+        }
+        profileId = (data as { profileId?: string })?.profileId;
+      }
+
+      await onSave(
+        { ...formData, profileId },
+        {
+          cnh: selectedCnhFile,
+          gr: selectedGRFile,
+          certificate1: selectedCert1File,
+          certificate2: selectedCert2File,
+          certificate3: selectedCert3File,
+        }
+      );
     } catch (err: unknown) {
       const pgError = err as { code?: string; message?: string };
       if (pgError?.code === '23505') {
@@ -211,6 +249,47 @@ export default function DriverForm({ driver, fieldSettings, onClose, onSave }: D
           )}
 
           <form id="driver-form" onSubmit={handleSubmit} className="space-y-8">
+            {/* Acesso ao Sistema — apenas na criação */}
+            {isCreating && (
+              <div>
+                <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4 flex items-center gap-2">
+                  <UserPlus className="h-5 w-5 text-orange-500" />
+                  Acesso ao Sistema
+                </h3>
+                <p className="mb-4 text-sm text-zinc-500">O motorista receberá um login para acessar os checklists.</p>
+                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-zinc-700">
+                      E-mail<span className="text-red-500 ml-0.5">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      placeholder="motorista@empresa.com"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700">
+                      Senha temporária<span className="text-red-500 ml-0.5">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      className={inputClass}
+                    />
+                    <p className="mt-1 text-xs text-zinc-400">O motorista deverá alterar a senha no primeiro acesso.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Dados Pessoais */}
             <div>
               <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Dados Pessoais</h3>

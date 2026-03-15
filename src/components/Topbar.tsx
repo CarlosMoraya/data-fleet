@@ -37,13 +37,22 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         </button>
         {canSwitchClient ? (
           <div className="flex items-center gap-2">
-            <ClientLogo name={currentClient?.name ?? ''} logoUrl={currentClient?.logoUrl} />
+            {currentClient ? (
+              <ClientLogo name={currentClient.name} logoUrl={currentClient.logoUrl} />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 border border-zinc-200">
+                <Menu className="h-4 w-4 text-zinc-400" />
+              </div>
+            )}
             <div className="relative">
               <select
-                value={currentClient?.id}
+                value={currentClient?.id ?? ''}
                 onChange={(e) => switchClient(e.target.value)}
                 className="appearance-none bg-transparent py-1.5 pl-3 pr-8 text-sm font-medium text-zinc-900 focus:outline-none focus:ring-0 border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
               >
+                {user?.role === 'Admin Master' && (
+                  <option value="">Todos os Clientes</option>
+                )}
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
                     {client.name}

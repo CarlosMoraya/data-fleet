@@ -317,12 +317,11 @@ function EditUserModal({
 // ─── Página principal ──────────────────────────────────────────────────────
 
 export default function AdminUsers() {
-  const { user } = useAuth();
+  const { user, currentClient, switchClient } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filterClient, setFilterClient] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
 
@@ -362,7 +361,7 @@ export default function AdminUsers() {
 
   const filtered = users.filter((u) => {
     const matchSearch = u.name.toLowerCase().includes(search.toLowerCase());
-    const matchClient = filterClient ? u.client_id === filterClient : true;
+    const matchClient = currentClient?.id ? u.client_id === currentClient.id : true;
     return matchSearch && matchClient;
   });
 
@@ -391,7 +390,6 @@ export default function AdminUsers() {
         </button>
       </div>
 
-      {/* Filtros */}
       <div className="flex flex-wrap gap-3">
         <div className="relative max-w-xs flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
@@ -401,13 +399,6 @@ export default function AdminUsers() {
             className="block w-full rounded-xl border border-zinc-200 py-2 pl-9 pr-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
-        <select
-          value={filterClient} onChange={(e) => setFilterClient(e.target.value)}
-          className="rounded-xl border border-zinc-200 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        >
-          <option value="">Todos os clientes</option>
-          {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
       </div>
 
       {/* Tabela */}
@@ -418,7 +409,7 @@ export default function AdminUsers() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center text-sm text-zinc-400">
-            {search || filterClient ? 'Nenhum usuário encontrado.' : 'Nenhum usuário cadastrado ainda.'}
+            {search || currentClient?.id ? 'Nenhum usuário encontrado.' : 'Nenhum usuário cadastrado ainda.'}
           </div>
         ) : (
           <table className="min-w-full divide-y divide-zinc-200">

@@ -13,6 +13,9 @@ import Vehicles from './pages/Vehicles';
 import Drivers from './pages/Drivers';
 import Workshops from './pages/Workshops';
 import Checklists from './pages/Checklists';
+import ChecklistFill from './pages/ChecklistFill';
+import ChecklistTemplates from './pages/ChecklistTemplates';
+import ActionPlans from './pages/ActionPlans';
 import AdminClients from './pages/AdminClients';
 import AdminUsers from './pages/AdminUsers';
 import Users from './pages/Users';
@@ -47,6 +50,9 @@ export default function App() {
             <Route path="drivers" element={<Navigate to="/cadastros/motoristas" replace />} />
             <Route path="users" element={<Navigate to="/cadastros/usuarios" replace />} />
             <Route path="checklists" element={<Checklists />} />
+            <Route path="checklists/preencher/:checklistId" element={<ChecklistFill />} />
+            <Route path="checklist-templates" element={<ChecklistTemplates />} />
+            <Route path="acoes" element={<ActionPlans />} />
             <Route path="settings" element={<Settings />} />
             <Route path="admin/clients" element={<AdminClients />} />
             <Route path="admin/users" element={<AdminUsers />} />

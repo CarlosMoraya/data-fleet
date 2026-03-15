@@ -98,6 +98,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const switchClient = (clientId: string) => {
+    if (!clientId) {
+      setCurrentClient(null);
+      return;
+    }
     const client = allClients.find((c) => c.id === clientId);
     if (client) setCurrentClient(client);
   };

@@ -55,14 +55,13 @@ export default function Workshops() {
   }
 
   const fetchWorkshops = useCallback(async () => {
-    if (!currentClient?.id) return;
     setLoading(true);
     setError(null);
-    const { data, error: fetchError } = await supabase
-      .from('workshops')
-      .select('*')
-      .eq('client_id', currentClient.id)
-      .order('name');
+    let query = supabase.from('workshops').select('*');
+    if (currentClient?.id) {
+      query = query.eq('client_id', currentClient.id);
+    }
+    const { data, error: fetchError } = await query.order('name');
 
     if (fetchError) {
       setError('Erro ao carregar oficinas. Tente novamente.');

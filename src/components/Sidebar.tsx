@@ -9,7 +9,9 @@ import {
   Settings,
   LogOut,
   Users,
-  Shield
+  Shield,
+  FileStack,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -31,6 +33,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { name: 'Dashboard', to: '/', icon: LayoutDashboard, roles: ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
     { name: 'Cadastros', to: '/cadastros', icon: FolderOpen, roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
     { name: 'Checklists', to: '/checklists', icon: ClipboardCheck, roles: ['Driver', 'Yard Auditor', 'Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
+    { name: 'Plano de Ação', to: '/acoes', icon: ClipboardList, roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
+    { name: 'Templates', to: '/checklist-templates', icon: FileStack, roles: ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
     { name: 'Configurações', to: '/settings', icon: Settings, roles: ['Manager', 'Director', 'Admin Master'] },
   ];
 

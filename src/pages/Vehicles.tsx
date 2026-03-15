@@ -52,14 +52,15 @@ export default function Vehicles() {
   }
 
   const fetchVehicles = useCallback(async () => {
-    if (!currentClient?.id) return;
     setLoading(true);
     setError(null);
-    const { data, error: fetchError } = await supabase
-      .from('vehicles')
-      .select('*, drivers(name)')
-      .eq('client_id', currentClient.id)
-      .order('license_plate');
+    let query = supabase.from('vehicles').select('*, drivers(name)');
+    
+    if (currentClient?.id) {
+      query = query.eq('client_id', currentClient.id);
+    }
+
+    const { data, error: fetchError } = await query.order('license_plate');
 
     if (fetchError) {
       setError('Erro ao carregar veículos. Tente novamente.');
@@ -70,26 +71,21 @@ export default function Vehicles() {
   }, [currentClient?.id]);
 
   const fetchAvailableDrivers = useCallback(async (currentDriverId?: string) => {
-    if (!currentClient?.id) return;
+    let driversQuery = supabase.from('drivers').select('id, name, cpf');
+    let vehiclesQuery = supabase.from('vehicles').select('driver_id').not('driver_id', 'is', null);
 
-    // Busca todos os motoristas do cliente
-    const { data: allDrivers } = await supabase
-      .from('drivers')
-      .select('id, name, cpf')
-      .eq('client_id', currentClient.id)
-      .order('name');
+    if (currentClient?.id) {
+      driversQuery = driversQuery.eq('client_id', currentClient.id);
+      vehiclesQuery = vehiclesQuery.eq('client_id', currentClient.id);
+    }
 
-    // Busca os driver_ids já ocupados por outros veículos
-    const { data: usedRows } = await supabase
-      .from('vehicles')
-      .select('driver_id')
-      .eq('client_id', currentClient.id)
-      .not('driver_id', 'is', null);
+    const { data: allDrivers } = await driversQuery.order('name');
+    const { data: usedRows } = await vehiclesQuery;
 
     const usedIds = new Set(
       (usedRows ?? [])
         .map((r: { driver_id: string }) => r.driver_id)
-        .filter((id: string) => id !== currentDriverId) // exclui o motorista atual do veículo sendo editado
+        .filter((id: string) => id !== currentDriverId)
     );
 
     setAvailableDrivers(
@@ -98,7 +94,10 @@ export default function Vehicles() {
   }, [currentClient?.id]);
 
   const fetchFieldSettings = useCallback(async () => {
-    if (!currentClient?.id) return;
+    if (!currentClient?.id) {
+      setFieldSettings(null);
+      return;
+    }
     const { data } = await supabase
       .from('vehicle_field_settings')
       .select('*')

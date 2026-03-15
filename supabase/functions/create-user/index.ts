@@ -53,9 +53,11 @@ serve(async (req: Request) => {
     if (!callerProfile) return json({ error: "Perfil não encontrado" }, 403);
 
     const callerRank = ROLE_RANK[callerProfile.role] ?? 0;
+    console.log(`Caller: ${caller.email} (${callerProfile.role}, rank ${callerRank})`);
 
     // Apenas Fleet Assistant ou superior pode criar usuários
     if (callerRank < ROLE_RANK["Fleet Assistant"]) {
+      console.error(`Acesso negado: ${callerProfile.role} tentou criar usuário.`);
       return json({ error: "Acesso negado. Papel insuficiente." }, 403);
     }
 
@@ -85,7 +87,8 @@ serve(async (req: Request) => {
     const targetRank = ROLE_RANK[role] ?? 0;
 
     // Validar hierarquia: só pode criar papéis estritamente abaixo do seu
-    if (targetRank >= callerRank) {
+    // EXCEÇÃO: Admin Master pode criar outro Admin Master
+    if (targetRank > callerRank || (targetRank === callerRank && callerProfile.role !== "Admin Master")) {
       return json({ error: `Você não tem permissão para criar usuários com o papel "${role}".` }, 403);
     }
 
@@ -101,7 +104,26 @@ serve(async (req: Request) => {
       email_confirm: true,
     });
 
-    if (createError) return json({ error: createError.message }, 400);
+    if (createError) {
+      const isEmailConflict = createError.message.toLowerCase().includes("already");
+      if (isEmailConflict && role === "Driver") {
+        // get-or-create semântico: retornar profileId do usuário existente se for Driver do mesmo client
+        const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+        const existing = users.find((u: { email?: string; id: string }) => u.email === email.toLowerCase());
+        if (existing) {
+          const { data: existingProfile } = await supabaseAdmin
+            .from("profiles")
+            .select("role, client_id")
+            .eq("id", existing.id)
+            .single();
+          if (existingProfile?.role === "Driver" && existingProfile?.client_id === targetClientId) {
+            console.log(`Driver já existe: ${email} — retornando profileId existente.`);
+            return json({ id: existing.id, profileId: existing.id }, 200);
+          }
+        }
+      }
+      return json({ error: createError.message }, 400);
+    }
 
     // Criar perfil na tabela profiles
     const { error: profileError } = await supabaseAdmin
@@ -114,7 +136,7 @@ serve(async (req: Request) => {
       return json({ error: profileError.message }, 400);
     }
 
-    return json({ id: newUser.user.id }, 200);
+    return json({ id: newUser.user.id, profileId: newUser.user.id }, 200);
   } catch (err) {
     return json({ error: String(err) }, 500);
   }

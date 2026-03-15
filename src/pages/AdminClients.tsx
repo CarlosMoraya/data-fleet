@@ -193,7 +193,7 @@ function ClientFormModal({
 }
 
 export default function AdminClients() {
-  const { user } = useAuth();
+  const { user, currentClient } = useAuth();
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -218,9 +218,11 @@ export default function AdminClients() {
     fetchClients();
   }, []);
 
-  const filtered = clients.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = clients.filter((c) => {
+    const matchSearch = c.name.toLowerCase().includes(search.toLowerCase());
+    const matchGlobalClient = currentClient ? c.id === currentClient.id : true;
+    return matchSearch && matchGlobalClient;
+  });
 
   const openCreate = () => {
     setEditing(null);

@@ -24,9 +24,29 @@
 - `driver_field_settings` — configurações dinâmicas de campos obrigatórios de motorista por cliente
 - `workshops` — oficinas parceiras (CRUD com RLS, CNPJ único por cliente, sem uploads)
 
-### Tabelas planejadas (ainda não criadas)
-- `checklist_templates` — templates de checklist por tipo de veículo
-- `checklists` — checklists preenchidos
+### Tabelas de Checklists (criadas em `create_checklist_tables.sql`)
+- `checklist_item_suggestions` — banco global de sugestões por categoria de veículo (Leve/Médio/Pesado/Elétrico). Sem `client_id`. Seed com ~45 itens pré-populados. SELECT para qualquer autenticado.
+- `checklist_templates` — templates por cliente com ciclo `draft → published → deprecated`. Colunas: `is_free_form` (bool), `vehicle_category` (nullable para templates Livre), `current_version`, `allow_driver_actions`, `allow_auditor_actions`. Constraint: apenas 1 published por (client, category) para templates não-livres. INSERT/UPDATE: Manager+.
+- `checklist_template_versions` — snapshots imutáveis ao publicar. UNIQUE (template_id, version_number).
+- `checklist_items` — itens por (template_id, version_number). Durante draft, itens editáveis livremente. Publicado: snapshot congelado.
+- `checklists` — instâncias preenchidas. `vehicle_id` nullable (NULL para templates Livre). `status` IN ('in_progress','completed'). DELETE: APENAS Admin Master.
+- `checklist_responses` — respostas por item (ok/issue/skipped/not_applicable). CASCADE delete do checklist pai. UNIQUE (checklist_id, item_id).
+- `action_plans` — ações geradas automaticamente para itens 'issue'. Campos: `suggested_action`, `observed_issue`, `photo_url`, `status` (pending/in_progress/completed/cancelled), `work_order_number`. DELETE: APENAS Admin Master.
+
+### Storage Buckets
+- `vehicle-documents` — CRLV, inspeção sanitária, GR para veículos
+- `driver-documents` — CNH, GR, certificados para motoristas
+- `checklist-photos` — fotos capturadas via câmera durante checklists. Path: `{client_id}/{checklist_id}/{item_id}/{timestamp}.jpg`
+
+### Migrations Ativas
+- `create_drivers_tables.sql` — tabelas `drivers` e `driver_field_settings`
+- `add_driver_profile_link.sql` — adiciona coluna `profile_id UUID UNIQUE FK → profiles(id)` + INDEX `idx_drivers_profile_id` na tabela `drivers` para ligar cada motorista a seu perfil de usuário do sistema (2026-03-14)
+
+### RLS — Padrões de Checklists
+- `checklists` SELECT: Driver/Auditor vê os próprios; Fleet Assistant+ vê todo o tenant; Admin Master vê tudo
+- `checklists` DELETE: APENAS Admin Master (exclusão hard-delete para trilha de auditoria)
+- `action_plans` SELECT/UPDATE: Fleet Assistant+ do tenant
+- `action_plans` DELETE: APENAS Admin Master
 
 ### Tabela `vehicles` — colunas principais
 `id`, `client_id`, `type` (Passeio a Cavalo), `energy_source`, `cooling_equipment`, `semi_reboque`, `placa_semi_reboque`, `fuel_type`, `tank_capacity`, `avg_consumption`, `cooling_brand`, `license_plate`, `renavam`, `chassi`, `detran_uf`, `brand`, `model`, `year`, `color`, `acquisition`, `acquisition_date`, `fipe_price`, `tracker`, `antt`, `owner`, `status`, `autonomy`, `tag`, `crlv_upload`, `sanitary_inspection_upload`, `gr_upload`, `gr_expiration_date`, `spare_key`, `vehicle_manual`, `category`, `created_at`, `updated_at`
@@ -37,9 +57,10 @@ RLS vehicles:
 - DELETE: Manager(5)+ OU Fleet Analyst(4) com `can_delete_vehicles = true`
 - Unique index em `(client_id, license_plate)`
 
-### Tabela `drivers` RLS:
+### Tabela `drivers` RLS (2026-03-14):
+- **profile_id**: Novo campo FK → profiles(id) para ligar cada driver a seu usuário do sistema. Criado via Edge Function `create-user` quando novo driver é registrado via DriverForm. Permite que Driver role encontre seu veículo via: `drivers.profile_id = auth.uid()` → `vehicles.driver_id = drivers.id`
 - SELECT: Fleet Assistant (rank 3)+ do próprio tenant
-- INSERT/UPDATE: Fleet Analyst (rank 4)+ do próprio tenant
+- INSERT/UPDATE: Fleet Analyst (rank 4)+ do próprio tenant + Edge Function `create-user` (insere profile_id)
 - DELETE: Manager(5)+ OU Fleet Analyst(4) com `can_delete_drivers = true`
 
 ### Tabela `workshops` RLS:

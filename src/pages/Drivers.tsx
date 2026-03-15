@@ -53,14 +53,13 @@ export default function Drivers() {
   }
 
   const fetchDrivers = useCallback(async () => {
-    if (!currentClient?.id) return;
     setLoading(true);
     setError(null);
-    const { data, error: fetchError } = await supabase
-      .from('drivers')
-      .select('*')
-      .eq('client_id', currentClient.id)
-      .order('name');
+    let query = supabase.from('drivers').select('*');
+    if (currentClient?.id) {
+      query = query.eq('client_id', currentClient.id);
+    }
+    const { data, error: fetchError } = await query.order('name');
 
     if (fetchError) {
       setError('Erro ao carregar motoristas. Tente novamente.');
@@ -71,12 +70,11 @@ export default function Drivers() {
   }, [currentClient?.id]);
 
   const fetchDriverVehicleMap = useCallback(async () => {
-    if (!currentClient?.id) return;
-    const { data } = await supabase
-      .from('vehicles')
-      .select('driver_id, license_plate')
-      .eq('client_id', currentClient.id)
-      .not('driver_id', 'is', null);
+    let query = supabase.from('vehicles').select('driver_id, license_plate').not('driver_id', 'is', null);
+    if (currentClient?.id) {
+      query = query.eq('client_id', currentClient.id);
+    }
+    const { data } = await query;
 
     const map: Record<string, string> = {};
     (data ?? []).forEach((row: { driver_id: string; license_plate: string }) => {
@@ -86,7 +84,10 @@ export default function Drivers() {
   }, [currentClient?.id]);
 
   const fetchFieldSettings = useCallback(async () => {
-    if (!currentClient?.id) return;
+    if (!currentClient?.id) {
+      setFieldSettings(null);
+      return;
+    }
     const { data } = await supabase
       .from('driver_field_settings')
       .select('*')
@@ -361,6 +362,7 @@ export default function Drivers() {
         <DriverForm
           driver={editingDriver}
           fieldSettings={fieldSettings}
+          clientId={currentClient?.id ?? ''}
           onClose={() => {
             setIsFormOpen(false);
             setEditingDriver(null);

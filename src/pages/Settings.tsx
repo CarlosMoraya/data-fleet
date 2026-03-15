@@ -93,9 +93,29 @@ export default function Settings() {
     setSuccess(false);
   };
 
+  const handleToggleAllVehicles = (makeOptional: boolean) => {
+    if (!settings) return;
+    const newSettings = { ...settings };
+    CONFIGURABLE_FIELDS.forEach(field => {
+      newSettings[field.key as keyof VehicleFieldSettings] = makeOptional as never;
+    });
+    setSettings(newSettings);
+    setSuccess(false);
+  };
+
   const handleDriverToggle = (key: keyof DriverFieldSettings) => {
     if (!driverSettings) return;
     setDriverSettings(prev => prev ? { ...prev, [key]: !prev[key] } : prev);
+    setDriverSuccess(false);
+  };
+
+  const handleToggleAllDrivers = (makeOptional: boolean) => {
+    if (!driverSettings) return;
+    const newSettings = { ...driverSettings };
+    DRIVER_CONFIGURABLE_FIELDS.forEach(field => {
+      newSettings[field.key as keyof DriverFieldSettings] = makeOptional as never;
+    });
+    setDriverSettings(newSettings);
     setDriverSuccess(false);
   };
 
@@ -194,11 +214,27 @@ export default function Settings() {
 
       {/* ─── Card: Campos Obrigatórios do Veículo ─── */}
       <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-200 flex items-center gap-3">
-          <Truck className="h-5 w-5 text-zinc-400" />
-          <div>
-            <h2 className="text-lg font-medium text-zinc-900">Campos Obrigatórios do Veículo</h2>
-            <p className="text-sm text-zinc-500">Controle quais campos são obrigatórios no cadastro de veículos. Campos marcados como "Obrigatório" devem ser preenchidos para salvar.</p>
+        <div className="px-6 py-4 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Truck className="h-5 w-5 text-zinc-400" />
+            <div>
+              <h2 className="text-lg font-medium text-zinc-900">Campos Obrigatórios do Veículo</h2>
+              <p className="text-sm text-zinc-500">Controle quais campos são obrigatórios no cadastro de veículos.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => handleToggleAllVehicles(false)}
+              className="text-xs px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium transition-colors border border-orange-200"
+            >
+              Marcar Todos
+            </button>
+            <button
+              onClick={() => handleToggleAllVehicles(true)}
+              className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-50 text-zinc-700 hover:bg-zinc-100 font-medium transition-colors border border-zinc-200"
+            >
+              Desmarcar Todos
+            </button>
           </div>
         </div>
 
@@ -271,11 +307,27 @@ export default function Settings() {
 
       {/* ─── Card: Campos Obrigatórios do Motorista ─── */}
       <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-200 flex items-center gap-3">
-          <UserCircle className="h-5 w-5 text-zinc-400" />
-          <div>
-            <h2 className="text-lg font-medium text-zinc-900">Campos Obrigatórios do Motorista</h2>
-            <p className="text-sm text-zinc-500">Controle quais campos são obrigatórios no cadastro de motoristas. Campos marcados como "Obrigatório" devem ser preenchidos para salvar.</p>
+        <div className="px-6 py-4 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <UserCircle className="h-5 w-5 text-zinc-400" />
+            <div>
+              <h2 className="text-lg font-medium text-zinc-900">Campos Obrigatórios do Motorista</h2>
+              <p className="text-sm text-zinc-500">Controle quais campos são obrigatórios no cadastro de motoristas.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => handleToggleAllDrivers(false)}
+              className="text-xs px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium transition-colors border border-orange-200"
+            >
+              Marcar Todos
+            </button>
+            <button
+              onClick={() => handleToggleAllDrivers(true)}
+              className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-50 text-zinc-700 hover:bg-zinc-100 font-medium transition-colors border border-zinc-200"
+            >
+              Desmarcar Todos
+            </button>
           </div>
         </div>
 

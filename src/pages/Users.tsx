@@ -31,10 +31,11 @@ const ROLE_COLORS: Record<Role, string> = {
   'Admin Master':    'bg-orange-100 text-orange-700',
 };
 
-/** Retorna os papéis que o usuário com `myRole` pode criar */
+/** Retorna os papéis que o usuário com `myRole` pode criar.
+ *  'Driver' é excluído — motoristas são criados exclusivamente via Cadastros > Motoristas. */
 function creatableRoles(myRole: Role): Role[] {
   const myRank = ROLE_RANK[myRole];
-  return ALL_ROLES.filter((r) => ROLE_RANK[r] < myRank);
+  return ALL_ROLES.filter((r) => ROLE_RANK[r] < myRank && r !== 'Driver');
 }
 
 interface UserRow {
@@ -453,17 +454,21 @@ export default function Users() {
 
   const fetchUsers = async () => {
     setLoading(true);
-    const { data } = await supabase
+    let query = supabase
       .from('profiles')
-      .select('id, name, role, can_delete_vehicles, can_delete_drivers, can_delete_workshops, created_at')
-      .eq('client_id', currentClient.id)
-      .order('name');
+      .select('id, name, role, can_delete_vehicles, can_delete_drivers, can_delete_workshops, created_at');
+
+    if (currentClient?.id) {
+      query = query.eq('client_id', currentClient.id);
+    }
+
+    const { data } = await query.order('name');
 
     if (data) {
-      // Filtrar no client apenas papéis abaixo do usuário logado (segurança extra no frontend)
+      // Filtrar: papéis abaixo do logado, excluindo Driver (gerenciados em Cadastros > Motoristas)
       setUsers(
         (data as UserRow[]).filter(
-          (u) => ROLE_RANK[u.role] < myRank && u.id !== user.id
+          (u) => ROLE_RANK[u.role] < myRank && u.id !== user.id && u.role !== 'Driver'
         )
       );
     }
@@ -472,7 +477,7 @@ export default function Users() {
 
   useEffect(() => {
     fetchUsers();
-  }, [currentClient.id]);
+  }, [currentClient?.id]);
 
   const filtered = users.filter((u) =>
     u.name.toLowerCase().includes(search.toLowerCase())
@@ -493,7 +498,7 @@ export default function Users() {
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">Usuários</h1>
           <p className="mt-1 text-sm text-zinc-500">
-            Gerencie os usuários da unidade <span className="font-medium text-zinc-700">{currentClient.name}</span>.
+            Gerencie os usuários da unidade <span className="font-medium text-zinc-700">{currentClient?.name || 'Todos os Clientes'}</span>.
           </p>
         </div>
         {available.length > 0 && (

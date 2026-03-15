@@ -10,6 +10,7 @@ import {
 export interface DriverRow {
   id: string;
   client_id: string;
+  profile_id?: string | null;
   name: string;
   cpf: string;
   issue_date: string | null;
@@ -33,6 +34,7 @@ export function driverFromRow(row: DriverRow): Driver {
   return {
     id: row.id,
     clientId: row.client_id,
+    profileId: row.profile_id ?? undefined,
     name: row.name,
     cpf: row.cpf,
     issueDate: row.issue_date ?? undefined,
@@ -56,6 +58,7 @@ export function driverFromRow(row: DriverRow): Driver {
 export function driverToRow(driver: Partial<Driver>, clientId: string): Omit<DriverRow, 'id'> {
   return {
     client_id: clientId,
+    profile_id: driver.profileId ?? null,
     name: capitalizeWords(driver.name),
     cpf: normalizeTrim(filterCPF(driver.cpf ?? '')),
     issue_date: driver.issueDate ?? null,

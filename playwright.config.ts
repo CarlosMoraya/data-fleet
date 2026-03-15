@@ -61,6 +61,15 @@ export default defineConfig({
       testIgnore: /seed/,
     },
     {
+      name: 'assistant-actions',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/pedro.json',
+      },
+      dependencies: ['setup-pedro'],
+      testMatch: /tenant-users-assistant-actions\.spec\.ts/,
+    },
+    {
       name: 'manager',
       use: {
         ...devices['Desktop Chrome'],

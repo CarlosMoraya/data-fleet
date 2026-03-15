@@ -17,11 +17,15 @@ src/
 │   ├── Sidebar.tsx      # Menu lateral com navegação
 │   ├── Topbar.tsx       # Barra superior (client switcher, user info)
 │   ├── VehicleForm.tsx  # Formulário multi-step para veículos (prop: availableDrivers)
-│   ├── DriverForm.tsx   # Formulário para motoristas (CNH, GR, certificados)
+│   ├── DriverForm.tsx   # Formulário para motoristas (CNH, GR, certificados + email/senha ao criar, cria usuário via Edge Function)
 │   ├── WorkshopForm.tsx # Formulário modal para oficinas (sem uploads, 3 seções)
 │   ├── VehicleDetailModal.tsx  # Modal read-only de detalhes do veículo (8 seções, links de uploads)
 │   ├── DriverDetailModal.tsx   # Modal read-only de detalhes do motorista (5 seções, links de uploads)
-│   └── WorkshopDetailModal.tsx # Modal read-only de detalhes da oficina (5 seções, sem uploads)
+│   ├── WorkshopDetailModal.tsx # Modal read-only de detalhes da oficina (5 seções, sem uploads)
+│   ├── ChecklistTemplateForm.tsx # Modal 3-step: metadados → ações → itens (sugestões ou livre)
+│   ├── ChecklistDetailModal.tsx  # Modal read-only com respostas, fotos, score de conformidade
+│   ├── ActionPlanModal.tsx       # Modal de gestão de ação (status, O.S., notas de conclusão)
+│   └── CameraCapture.tsx         # Captura de foto via câmera (getUserMedia + GPS + compressão)
 ├── context/
 │   └── AuthContext.tsx   # Auth + client context → useAuth() hook
 ├── lib/
@@ -33,7 +37,11 @@ src/
 │   ├── fieldSettingsMappers.ts  # Mapper + CONFIGURABLE_FIELDS + isFieldRequired() para Veículo
 │   ├── driverFieldSettingsMappers.ts  # Mapper + DRIVER_CONFIGURABLE_FIELDS + isDriverFieldRequired() para Motorista
 │   ├── inputHelpers.ts    # Filtros de input (filterCPF, filterCNHCategory, filterCNPJ, filterPhone, filterCEP, etc.)
-│   └── storageHelpers.ts  # Upload/delete de arquivos (vehicle-documents e driver-documents), compressão de imagens
+│   ├── storageHelpers.ts  # Upload/delete de arquivos (vehicle-documents e driver-documents), compressão de imagens
+│   ├── checklistTemplateMappers.ts # Mappers para ChecklistTemplate, ChecklistItem, ChecklistItemSuggestion
+│   ├── checklistMappers.ts         # Mappers para Checklist e ChecklistResponse
+│   ├── actionPlanMappers.ts        # Mappers + actionStatusLabel() + actionStatusColor() para ActionPlan
+│   └── checklistStorageHelpers.ts  # uploadChecklistPhoto() + deleteChecklistPhoto() — bucket checklist-photos
 ├── pages/
 │   ├── Login.tsx        # Login com email/senha (Supabase Auth)
 │   ├── Dashboard.tsx    # KPIs + gráficos (ainda mock data)
@@ -41,8 +49,11 @@ src/
 │   ├── Vehicles.tsx     # CRUD de veículos (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → VehicleDetailModal
 │   ├── Drivers.tsx      # CRUD de motoristas (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → DriverDetailModal
 │   ├── Workshops.tsx    # CRUD de oficinas (Fleet Assistant+ acessa, Fleet Analyst+ edita, Manager+ deleta ou Fleet Analyst com flag) + botão Eye → WorkshopDetailModal
-│   ├── Checklists.tsx   # Stub — "No checklists"
-│   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+)
+│   ├── Checklists.tsx   # Página de checklists: Driver vê veículo+templates Livre+histórico; Assistant+ vê tabela do tenant; Admin Master pode excluir. **Lookup de veículo via drivers.profile_id → vehicles.driver_id** (2026-03-14)
+│   ├── ChecklistFill.tsx # Tela fullscreen de preenchimento (OK/Problema/N/A, câmera, observação, auto-save, finalização com ações)
+│   ├── ChecklistTemplates.tsx # CRUD de templates (draft/published/deprecated, versionamento, filtro por categoria)
+│   ├── ActionPlans.tsx  # Painel Fleet Assistant+ — tabela de ações, filtros por status, modal de gestão
+│   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+); **não cria/lista Driver role** (drivers criados via DriverForm)
 │   ├── Settings.tsx     # Configurações de campos obrigatórios: Veículo + Motorista (Manager+)
 │   ├── AdminUsers.tsx   # CRUD todos usuários (Admin Master only)
 │   └── AdminClients.tsx # CRUD clientes (Admin Master only)
@@ -62,7 +73,7 @@ src/
   - Fleet Assistant+ → acesso a `/cadastros/*` (abas visíveis)
   - Manager+ → acesso a `/settings`
 - **Backward compatibility**: `/vehicles` → `/cadastros/veiculos`, `/drivers` → `/cadastros/motoristas`, `/users` → `/cadastros/usuarios`
-- **Rotas disponíveis**: `/`, `/cadastros/*`, `/checklists`, `/settings`, `/admin/clients`, `/admin/users`
+- **Rotas disponíveis**: `/`, `/cadastros/*`, `/checklists`, `/checklists/preencher/:checklistId`, `/checklist-templates`, `/acoes`, `/settings`, `/admin/clients`, `/admin/users`
 
 ## Layout Shell
 
@@ -79,12 +90,19 @@ O `Layout.tsx` renderiza:
 ## Padrões de Componentes
 
 - **Formulários modais**: abrem em overlay `fixed inset-0`, React `useEffect` reseta state ao abrir
+- **Criação de Drivers com usuário (2026-03-14)**:
+  - `DriverForm` em modo **criação** (sem driver existente):
+    - Exibe seção "Acesso ao Sistema" com campos obrigatórios: email (type="email"), senha (min 6 chars)
+    - Ao submeter: chama Edge Function `create-user` com role='Driver', obtém `profileId`, passa para `onSave`
+    - `onSave` insere driver com `profile_id = profileId`
+    - Se falha na criação do driver (e2g, CPF duplicado), usuário fica criado mas sem driver (aceitável, reutilizável depois)
+  - `DriverForm` em modo **edição**: email/senha não aparecem (não altera credenciais aqui)
 - **Associação motorista×veículo**: `VehicleForm` recebe prop `availableDrivers: {id, name, cpf}[]` — lista de motoristas livres. Vehicles.tsx carrega a lista via `fetchAvailableDrivers(currentDriverId?)` ao abrir o form. Drivers.tsx exibe a placa do veículo via `driverVehicleMap: Record<string, string>` (driver_id → license_plate).
 - **Tabelas**: renderizadas com map sobre array local (`useState`), ações inline (edit/delete)
 - **Client switcher**: ComboBox no Topbar, visível apenas para Manager/Director/Admin Master
 - **Gráficos**: `Recharts` (BarChart, PieChart) no Dashboard, filtrados por `currentClient.id`
 - **Navegação em abas**: `Cadastros.tsx` renderiza `<NavLink>` com estilo ativo (border-b-2 orange), cada aba renderiza seu módulo via `<Outlet />`
-- **Sidebar**: item único "Cadastros" (`FolderOpen` icon) → `/cadastros`, substitui items individuais de Veículos/Motoristas/Usuários
+- **Sidebar**: item único "Cadastros" (`FolderOpen` icon) → `/cadastros`, substitui items individuais de Veículos/Motoristas/Usuários. Novos itens: "Plano de Ação" (`ClipboardList`) para Fleet Assistant+; "Templates" (`FileStack`) para Fleet Analyst+
 - **Modais de detalhe (read-only)**:
   - `VehicleDetailModal` renderiza 8 seções (Identificação, Propriedade, Equipamentos, Adicionais, Motorista, Documentos com links, Garantia, Seguro/Manutenção) a partir de um objeto `Vehicle`
   - `DriverDetailModal` renderiza 5 seções (Dados Pessoais, CNH, GR, Certificados, Veículo Associado) com links para uploads
@@ -92,3 +110,13 @@ O `Layout.tsx` renderiza:
   - Container externo usa `flex items-start justify-center` para iniciar no topo da viewport em telas pequenas
   - Links de arquivo (`FileField`) exibem "Visualizar 🔗" em laranja ou "Não enviado" em cinza
   - Acionado por botão Eye (`<Eye />` icon) nas tabelas de Vehicles, Drivers e Workshops
+
+## Users.tsx — Gestão de Drivers (2026-03-14)
+
+**Padrão de permissões e criação:**
+- Role 'Driver' **não pode ser criado** via Users.tsx (filtrado em `creatableRoles()`)
+- Role 'Driver' **não aparece na lista** de usuários (filtrado em `fetchUsers()`)
+- **Drivers são criados exclusivamente via DriverForm** (módulo Cadastros > Motoristas), que:
+  1. Cria a conta de usuário (auth + profile) via Edge Function `create-user`
+  2. Insere driver record com `profile_id` linkando ao novo user
+  3. Garante que toda conta Driver tem um driver record associado
