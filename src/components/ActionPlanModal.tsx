@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { X, Camera, Loader2, CheckCircle, UserCheck, XCircle } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { X, Camera, Loader2, CheckCircle, UserCheck, XCircle, Paperclip, FileText, UploadCloud } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { actionPlanToRow, actionStatusLabel, actionStatusColor } from '../lib/actionPlanMappers';
 import type { ActionPlan } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
+import { uploadActionPlanEvidence } from '../lib/storageHelpers';
 
 interface Props {
   plan: ActionPlan;
@@ -23,15 +24,30 @@ const ROLE_RANK: Record<string, number> = {
 };
 
 export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
-  const { user } = useAuth();
+  const { user, currentClient } = useAuth();
   const rank = ROLE_RANK[user?.role ?? ''] ?? 0;
   const isAnalystPlus = rank >= 4;
   const isAssistantPlus = rank >= 3;
 
-  const [evidenceUrl, setEvidenceUrl] = useState(plan.conclusionEvidenceUrl ?? '');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [evidencePreview, setEvidencePreview] = useState<string | null>(null);
   const [notes, setNotes] = useState(plan.completionNotes ?? '');
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError('');
+    setEvidenceFile(file);
+    if (file.type.startsWith('image/')) {
+      setEvidencePreview(URL.createObjectURL(file));
+    } else {
+      setEvidencePreview(null);
+    }
+  };
 
   const update = async (patch: Parameters<typeof actionPlanToRow>[0]) => {
     setSaving(true);
@@ -53,12 +69,26 @@ export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
   const handleClaim = () =>
     update({ status: 'in_progress', claimedBy: user?.id, claimedAt: new Date().toISOString() });
 
-  const handleSubmitConclusion = () => {
-    update({
-      status: 'awaiting_conclusion',
-      conclusionEvidenceUrl: evidenceUrl.trim() || undefined,
-      completionNotes: notes.trim() || undefined,
-    });
+  const handleSubmitConclusion = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      let uploadedUrl: string | undefined = plan.conclusionEvidenceUrl;
+      if (evidenceFile) {
+        setUploading(true);
+        uploadedUrl = await uploadActionPlanEvidence(currentClient.id, plan.id, evidenceFile);
+        setUploading(false);
+      }
+      await update({
+        status: 'awaiting_conclusion',
+        conclusionEvidenceUrl: uploadedUrl || undefined,
+        completionNotes: notes.trim() || undefined,
+      });
+    } catch (err: unknown) {
+      setUploading(false);
+      setSaving(false);
+      setError(err instanceof Error ? err.message : 'Erro ao enviar evidência');
+    }
   };
 
   const handleApprove = () =>
@@ -166,13 +196,25 @@ export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
               <p className="text-xs font-semibold text-orange-600 uppercase tracking-wider">Conclusão enviada — aguardando aprovação</p>
               {plan.completionNotes && <p className="text-sm text-zinc-700">{plan.completionNotes}</p>}
               {plan.conclusionEvidenceUrl && (
-                <div className="flex items-center gap-2">
-                  <img src={plan.conclusionEvidenceUrl} alt="evidência" className="h-20 w-20 rounded-lg object-cover" />
-                  <a href={plan.conclusionEvidenceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-orange-500 hover:underline flex items-center gap-1">
-                    <Camera className="h-3 w-3" />
-                    Ampliar
+                plan.conclusionEvidenceUrl.toLowerCase().includes('.pdf') ? (
+                  <a
+                    href={plan.conclusionEvidenceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm text-orange-600 hover:bg-orange-50"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                    Visualizar evidência (PDF)
                   </a>
-                </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <img src={plan.conclusionEvidenceUrl} alt="evidência" className="h-20 w-20 rounded-lg object-cover" />
+                    <a href={plan.conclusionEvidenceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-orange-500 hover:underline flex items-center gap-1">
+                      <Camera className="h-3 w-3" />
+                      Ampliar
+                    </a>
+                  </div>
+                )
               )}
             </div>
           )}
@@ -209,16 +251,50 @@ export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
           {canConclude && (
             <div className="rounded-xl border border-zinc-200 p-4 space-y-3">
               <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Marcar como concluída</h3>
+
+              {/* Evidence file upload */}
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">URL da evidência (foto/link)</label>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                  Evidência <span className="text-zinc-400 font-normal">(opcional — foto, PDF, NF)</span>
+                </label>
                 <input
-                  type="text"
-                  value={evidenceUrl}
-                  onChange={e => setEvidenceUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  onChange={handleFileChange}
+                  className="hidden"
                 />
+                {!evidenceFile ? (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 w-full rounded-lg border-2 border-dashed border-zinc-300 px-4 py-3 text-sm text-zinc-500 hover:border-orange-400 hover:text-orange-500 transition-colors"
+                  >
+                    <UploadCloud className="h-4 w-4" />
+                    Selecionar arquivo (imagem ou PDF, máx. 10MB)
+                  </button>
+                ) : (
+                  <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 flex items-center gap-3">
+                    {evidencePreview ? (
+                      <img src={evidencePreview} alt="preview" className="h-12 w-12 rounded object-cover flex-shrink-0" />
+                    ) : (
+                      <FileText className="h-8 w-8 text-orange-400 flex-shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-zinc-800 truncate">{evidenceFile.name}</p>
+                      <p className="text-xs text-zinc-400">{(evidenceFile.size / 1024).toFixed(0)} KB</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setEvidenceFile(null); setEvidencePreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                      className="p-1 rounded hover:bg-zinc-200 text-zinc-400"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-zinc-700 mb-1">Notas de conclusão</label>
                 <textarea
@@ -231,11 +307,11 @@ export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
               </div>
               <button
                 onClick={handleSubmitConclusion}
-                disabled={saving}
+                disabled={saving || uploading}
                 className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 disabled:opacity-50"
               >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-                Enviar para aprovação
+                {(saving || uploading) ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                {uploading ? 'Enviando arquivo...' : 'Enviar para aprovação'}
               </button>
             </div>
           )}

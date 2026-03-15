@@ -38,18 +38,41 @@ export default function ActionPlans() {
         assigned_by_profile:profiles!assigned_by(name),
         claimed_by_profile:profiles!claimed_by(name),
         completed_by_profile:profiles!completed_by(name),
-        checklist_items!checklist_response_id(title),
-        checklist_templates(name)
+        checklist_responses!checklist_response_id(checklist_items(title)),
+        checklists!checklist_id(checklist_templates(name))
       `);
 
     if (currentClient?.id) {
       query = query.eq('client_id', currentClient.id);
     }
 
-    const { data } = await query.order('created_at', { ascending: false });
+    const { data, error: fetchError } = await query.order('created_at', { ascending: false });
+    if (fetchError) console.error('ActionPlans fetch error:', fetchError);
+
+    // Collect profile IDs where PostgREST join returned null (columns without FK constraints)
+    const missingIds = new Set<string>();
+    (data ?? []).forEach((r: Record<string, unknown>) => {
+      if (r.claimed_by && !r.claimed_by_profile) missingIds.add(r.claimed_by as string);
+      if (r.completed_by && !r.completed_by_profile) missingIds.add(r.completed_by as string);
+    });
+
+    let profileMap: Record<string, string> = {};
+    if (missingIds.size > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .in('id', [...missingIds]);
+      (profiles ?? []).forEach((p: { id: string; name: string }) => { profileMap[p.id] = p.name; });
+    }
 
     const mapped = (data ?? []).map(r => {
       const row = r as ActionPlanRow & { profiles: { name: string } | null };
+      if (row.claimed_by && !row.claimed_by_profile && profileMap[row.claimed_by]) {
+        row.claimed_by_profile = { name: profileMap[row.claimed_by] };
+      }
+      if (row.completed_by && !row.completed_by_profile && profileMap[row.completed_by]) {
+        row.completed_by_profile = { name: profileMap[row.completed_by] };
+      }
       return actionPlanFromRow({ ...row });
     });
     setPlans(mapped);

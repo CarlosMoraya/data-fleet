@@ -174,3 +174,35 @@ export async function deleteDriverDocument(url: string): Promise<void> {
   const { error } = await supabase.storage.from(DRIVER_BUCKET).remove([path]);
   if (error) console.warn('Aviso: não foi possível deletar o documento do Storage.', error.message);
 }
+
+// ─────────────────────────────────────────────────────────────
+// Action Plan Evidence
+// Bucket: vehicle-documents (reutiliza bucket existente)
+// Path: {clientId}/action-plans/{planId}/evidence.{ext}
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Uploads an action plan evidence file (image or PDF) to Supabase Storage.
+ * Images are compressed before upload. PDFs are sent as-is.
+ * Returns the public URL of the uploaded file.
+ */
+export async function uploadActionPlanEvidence(
+  clientId: string,
+  planId: string,
+  file: File,
+): Promise<string> {
+  validateFile(file);
+
+  const prepared = await prepareFile(file);
+  const ext = prepared.type === 'application/pdf' ? 'pdf' : 'jpg';
+  const path = `${clientId}/action-plans/${planId}/evidence.${ext}`;
+
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, prepared, { upsert: true, contentType: prepared.type });
+
+  if (error) throw new Error(`Erro ao enviar evidência: ${error.message}`);
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}

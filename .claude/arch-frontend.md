@@ -24,7 +24,7 @@ src/
 │   ├── WorkshopDetailModal.tsx # Modal read-only de detalhes da oficina (5 seções, sem uploads)
 │   ├── ChecklistTemplateForm.tsx # Modal 3-step: metadados (categoria + contexto) → ações → itens; nome auto-gerado como "Checklist [Categoria] [Contexto]"
 │   ├── ChecklistDetailModal.tsx  # Modal read-only com respostas, fotos, score de conformidade
-│   ├── ActionPlanModal.tsx       # Modal de gestão de ação (status, O.S., notas de conclusão)
+│   ├── ActionPlanModal.tsx       # Modal de gestão de ação (status, notas de conclusão, upload de evidência — imagem/PDF via uploadActionPlanEvidence)
 │   └── CameraCapture.tsx         # Captura de foto via câmera (getUserMedia + GPS + compressão)
 ├── context/
 │   └── AuthContext.tsx   # Auth + client context → useAuth() hook

@@ -38,8 +38,8 @@ export interface ActionPlanRow {
   assigned_by_profile?: { name: string } | null;
   claimed_by_profile?: { name: string } | null;
   completed_by_profile?: { name: string } | null;
-  checklist_items?: { title: string } | null;
-  checklist_templates?: { name: string } | null;
+  checklist_responses?: { checklist_items: { title: string } | null } | null;
+  checklists?: { checklist_templates: { name: string } | null } | null;
 }
 
 // ─── fromRow converter ────────────────────────────────────────────────────────
@@ -76,8 +76,8 @@ export function actionPlanFromRow(row: ActionPlanRow): ActionPlan {
     longitude: row.longitude ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    itemTitle: row.checklist_items?.title ?? undefined,
-    templateName: row.checklist_templates?.name ?? undefined,
+    itemTitle: row.checklist_responses?.checklist_items?.title ?? undefined,
+    templateName: row.checklists?.checklist_templates?.name ?? undefined,
   };
 }
 
