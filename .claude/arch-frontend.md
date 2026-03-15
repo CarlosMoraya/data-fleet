@@ -22,7 +22,7 @@ src/
 │   ├── VehicleDetailModal.tsx  # Modal read-only de detalhes do veículo (8 seções, links de uploads)
 │   ├── DriverDetailModal.tsx   # Modal read-only de detalhes do motorista (5 seções, links de uploads)
 │   ├── WorkshopDetailModal.tsx # Modal read-only de detalhes da oficina (5 seções, sem uploads)
-│   ├── ChecklistTemplateForm.tsx # Modal 3-step: metadados → ações → itens (sugestões ou livre)
+│   ├── ChecklistTemplateForm.tsx # Modal 3-step: metadados (categoria + contexto) → ações → itens; nome auto-gerado como "Checklist [Categoria] [Contexto]"
 │   ├── ChecklistDetailModal.tsx  # Modal read-only com respostas, fotos, score de conformidade
 │   ├── ActionPlanModal.tsx       # Modal de gestão de ação (status, O.S., notas de conclusão)
 │   └── CameraCapture.tsx         # Captura de foto via câmera (getUserMedia + GPS + compressão)
@@ -49,9 +49,9 @@ src/
 │   ├── Vehicles.tsx     # CRUD de veículos (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → VehicleDetailModal
 │   ├── Drivers.tsx      # CRUD de motoristas (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → DriverDetailModal
 │   ├── Workshops.tsx    # CRUD de oficinas (Fleet Assistant+ acessa, Fleet Analyst+ edita, Manager+ deleta ou Fleet Analyst com flag) + botão Eye → WorkshopDetailModal
-│   ├── Checklists.tsx   # Página de checklists: Driver vê veículo+templates Livre+histórico; Assistant+ vê tabela do tenant; Admin Master pode excluir. **Lookup de veículo via drivers.profile_id → vehicles.driver_id** (2026-03-14)
-│   ├── ChecklistFill.tsx # Tela fullscreen de preenchimento (OK/Problema/N/A, câmera, observação, auto-save, finalização com ações)
-│   ├── ChecklistTemplates.tsx # CRUD de templates (draft/published/deprecated, versionamento, filtro por categoria)
+│   ├── Checklists.tsx   # Página de checklists: Driver vê todos os templates publicados da categoria do seu veículo; Auditor seleciona veículo no dropdown e vê apenas templates de Auditoria; Assistant+ vê tabela do tenant. Histórico com busca e filtro de status. **Lookup de veículo via drivers.profile_id → vehicles.driver_id**
+│   ├── ChecklistFill.tsx # Tela fullscreen de preenchimento (OK/Problema/N/A, câmera, observação, auto-save, finalização com ações). Contexto Entrada/Saída de Oficina: seleção obrigatória de oficina antes dos itens. Contexto Segurança: badge ⚠ em itens com canBlockVehicle
+│   ├── ChecklistTemplates.tsx # CRUD de templates (draft/published/deprecated, versionamento, filtro dual por categoria + contexto)
 │   ├── ActionPlans.tsx  # Painel Fleet Assistant+ — tabela de ações, filtros por status, modal de gestão
 │   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+); **não cria/lista Driver role** (drivers criados via DriverForm)
 │   ├── Settings.tsx     # Configurações de campos obrigatórios: Veículo + Motorista (Manager+)

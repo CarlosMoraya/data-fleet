@@ -14,6 +14,15 @@ export interface ActionPlanRow {
   observed_issue: string | null;
   photo_url: string | null;
   status: string;
+  // v2 fields
+  name: string | null;
+  responsible_id: string | null;
+  due_date: string | null;
+  assigned_by: string | null;
+  claimed_by: string | null;
+  claimed_at: string | null;
+  conclusion_evidence_url: string | null;
+  // completion
   work_order_number: string | null;
   completion_notes: string | null;
   completed_by: string | null;
@@ -25,6 +34,9 @@ export interface ActionPlanRow {
   // join fields
   vehicles?: { license_plate: string } | null;
   profiles?: { name: string } | null;
+  responsible_profile?: { name: string } | null;
+  assigned_by_profile?: { name: string } | null;
+  claimed_by_profile?: { name: string } | null;
   completed_by_profile?: { name: string } | null;
   checklist_items?: { title: string } | null;
   checklist_templates?: { name: string } | null;
@@ -46,7 +58,16 @@ export function actionPlanFromRow(row: ActionPlanRow): ActionPlan {
     observedIssue: row.observed_issue ?? undefined,
     photoUrl: row.photo_url ?? undefined,
     status: row.status as ActionPlanStatus,
-    workOrderNumber: row.work_order_number ?? undefined,
+    name: row.name ?? undefined,
+    responsibleId: row.responsible_id ?? undefined,
+    responsibleName: row.responsible_profile?.name ?? undefined,
+    dueDate: row.due_date ?? undefined,
+    assignedBy: row.assigned_by ?? undefined,
+    assignedByName: row.assigned_by_profile?.name ?? undefined,
+    claimedBy: row.claimed_by ?? undefined,
+    claimedByName: row.claimed_by_profile?.name ?? undefined,
+    claimedAt: row.claimed_at ?? undefined,
+    conclusionEvidenceUrl: row.conclusion_evidence_url ?? undefined,
     completionNotes: row.completion_notes ?? undefined,
     completedBy: row.completed_by ?? undefined,
     completedByName: row.completed_by_profile?.name ?? undefined,
@@ -73,7 +94,13 @@ export function actionPlanToRow(a: Partial<ActionPlan>): Partial<ActionPlanRow> 
   if (a.observedIssue !== undefined)         row.observed_issue = a.observedIssue ? normalizeTrim(a.observedIssue) : null;
   if (a.photoUrl !== undefined)              row.photo_url = a.photoUrl ?? null;
   if (a.status !== undefined)                row.status = a.status;
-  if (a.workOrderNumber !== undefined)       row.work_order_number = a.workOrderNumber ? normalizeTrim(a.workOrderNumber) : null;
+  if (a.name !== undefined)                  row.name = a.name ? normalizeTrim(a.name) : null;
+  if (a.responsibleId !== undefined)         row.responsible_id = a.responsibleId ?? null;
+  if (a.dueDate !== undefined)               row.due_date = a.dueDate ?? null;
+  if (a.assignedBy !== undefined)            row.assigned_by = a.assignedBy ?? null;
+  if (a.claimedBy !== undefined)             row.claimed_by = a.claimedBy ?? null;
+  if (a.claimedAt !== undefined)             row.claimed_at = a.claimedAt ?? null;
+  if (a.conclusionEvidenceUrl !== undefined) row.conclusion_evidence_url = a.conclusionEvidenceUrl ?? null;
   if (a.completionNotes !== undefined)       row.completion_notes = a.completionNotes ? normalizeTrim(a.completionNotes) : null;
   if (a.completedBy !== undefined)           row.completed_by = a.completedBy ?? null;
   if (a.completedAt !== undefined)           row.completed_at = a.completedAt ?? null;
@@ -88,6 +115,7 @@ export function actionStatusLabel(status: ActionPlanStatus): string {
   const labels: Record<ActionPlanStatus, string> = {
     pending: 'Pendente',
     in_progress: 'Em Andamento',
+    awaiting_conclusion: 'Aguardando Aprovação',
     completed: 'Concluída',
     cancelled: 'Cancelada',
   };
@@ -98,6 +126,7 @@ export function actionStatusColor(status: ActionPlanStatus): string {
   const colors: Record<ActionPlanStatus, string> = {
     pending: 'bg-yellow-100 text-yellow-800',
     in_progress: 'bg-blue-100 text-blue-800',
+    awaiting_conclusion: 'bg-orange-100 text-orange-800',
     completed: 'bg-green-100 text-green-800',
     cancelled: 'bg-zinc-100 text-zinc-600',
   };

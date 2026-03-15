@@ -3,7 +3,7 @@ import { Plus, Edit2, CheckCircle, XCircle, RefreshCw, Trash2, FileStack } from 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { templateFromRow, type ChecklistTemplateRow } from '../lib/checklistTemplateMappers';
-import type { ChecklistTemplate, TemplateCategory, TemplateStatus } from '../types';
+import type { ChecklistTemplate, TemplateCategory, TemplateStatus, ChecklistContext } from '../types';
 import ChecklistTemplateForm from '../components/ChecklistTemplateForm';
 import { cn } from '../lib/utils';
 
@@ -31,6 +31,7 @@ export default function ChecklistTemplates() {
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState<TemplateCategory | 'Todos'>('Todos');
+  const [filterContext, setFilterContext] = useState<ChecklistContext | 'Todos'>('Todos');
 
   const [showForm, setShowForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ChecklistTemplate | null>(null);
@@ -40,6 +41,7 @@ export default function ChecklistTemplates() {
     template: ChecklistTemplate;
   } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const isManager = ['Manager', 'Director', 'Admin Master'].includes(user?.role ?? '');
   const isAdminMaster = user?.role === 'Admin Master';
@@ -59,13 +61,14 @@ export default function ChecklistTemplates() {
   useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
 
   const filtered = templates.filter(t => {
-    if (filterCategory === 'Todos') return true;
-    if (filterCategory === 'Livre') return t.isFreeForm;
-    return !t.isFreeForm && t.vehicleCategory === filterCategory;
+    if (filterCategory !== 'Todos' && t.vehicleCategory !== filterCategory) return false;
+    if (filterContext !== 'Todos' && t.context !== filterContext) return false;
+    return true;
   });
 
   const handlePublish = async (t: ChecklistTemplate) => {
     setActionLoading(true);
+    setActionError(null);
     try {
       // Insert version record
       await supabase.from('checklist_template_versions').insert({
@@ -74,11 +77,25 @@ export default function ChecklistTemplates() {
         published_by: user?.id ?? null,
       });
       // Update template status
-      await supabase.from('checklist_templates').update({ status: 'published', updated_at: new Date().toISOString() }).eq('id', t.id);
+      const { error: updateError } = await supabase
+        .from('checklist_templates')
+        .update({ status: 'published', updated_at: new Date().toISOString() })
+        .eq('id', t.id);
+
+      if (updateError) {
+        const isDuplicate = updateError.code === '23P01' || updateError.message.includes('unique_published_category');
+        if (isDuplicate) {
+          setActionError(`Já existe um template publicado para "${t.vehicleCategory} — ${t.context}". Descontinue-o antes de publicar este.`);
+        } else {
+          setActionError('Erro ao publicar template. Tente novamente.');
+        }
+        return;
+      }
+
+      setConfirmAction(null);
       await fetchTemplates();
     } finally {
       setActionLoading(false);
-      setConfirmAction(null);
     }
   };
 
@@ -202,24 +219,36 @@ export default function ChecklistTemplates() {
         )}
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2 flex-wrap">
-        {(['Todos', 'Leve', 'Médio', 'Pesado', 'Elétrico', 'Livre'] as const).map(cat => (
-          <button
-            key={cat}
-            onClick={() => setFilterCategory(cat)}
-            className={cn(
-              'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
-              filterCategory === cat
-                ? cat === 'Livre'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-orange-500 text-white'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
-            )}
-          >
-            {cat}
-          </button>
-        ))}
+      {/* Filters */}
+      <div className="space-y-2">
+        <div className="flex gap-2 flex-wrap">
+          {(['Todos', 'Leve', 'Médio', 'Pesado', 'Elétrico'] as const).map(cat => (
+            <button
+              key={cat}
+              onClick={() => setFilterCategory(cat)}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+                filterCategory === cat ? 'bg-orange-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
+              )}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {(['Todos', 'Rotina', 'Auditoria', 'Reboque', 'Entrada em Oficina', 'Saída de Oficina', 'Segurança'] as const).map(ctx => (
+            <button
+              key={ctx}
+              onClick={() => setFilterContext(ctx)}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                filterContext === ctx ? 'bg-zinc-700 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
+              )}
+            >
+              {ctx}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Table */}
@@ -244,7 +273,7 @@ export default function ChecklistTemplates() {
             <table className="min-w-full divide-y divide-zinc-100">
               <thead>
                 <tr className="bg-zinc-50">
-                  {['Nome', 'Categoria', 'Status', 'Versão', 'Ações'].map(h => (
+                  {['Nome', 'Contexto', 'Categoria', 'Status', 'Versão', 'Ações'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                       {h}
                     </th>
@@ -261,13 +290,10 @@ export default function ChecklistTemplates() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {t.isFreeForm ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                          Livre
-                        </span>
-                      ) : (
-                        <span className="text-sm text-zinc-700">{CATEGORY_LABEL[t.vehicleCategory ?? ''] ?? t.vehicleCategory}</span>
-                      )}
+                      <span className="text-sm text-zinc-700">{t.context}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-zinc-700">{CATEGORY_LABEL[t.vehicleCategory] ?? t.vehicleCategory}</span>
                     </td>
                     <td className="px-4 py-3">
                       <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', STATUS_COLOR[t.status])}>
@@ -357,21 +383,26 @@ export default function ChecklistTemplates() {
             <h3 className="text-lg font-semibold text-zinc-900">{CONFIRM_TEXTS[confirmAction.type].title}</h3>
             <p className="text-sm text-zinc-600">{CONFIRM_TEXTS[confirmAction.type].body}</p>
             <p className="text-sm font-medium text-zinc-900">Template: <span className="text-orange-600">{confirmAction.template.name}</span></p>
+            {actionError && (
+              <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{actionError}</p>
+            )}
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setConfirmAction(null)}
+                onClick={() => { setConfirmAction(null); setActionError(null); }}
                 className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900"
                 disabled={actionLoading}
               >
                 Cancelar
               </button>
-              <button
-                onClick={executeConfirm}
-                disabled={actionLoading}
-                className={cn('px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50', CONFIRM_TEXTS[confirmAction.type].color)}
-              >
-                {actionLoading ? 'Aguarde...' : CONFIRM_TEXTS[confirmAction.type].confirm}
-              </button>
+              {!actionError && (
+                <button
+                  onClick={executeConfirm}
+                  disabled={actionLoading}
+                  className={cn('px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50', CONFIRM_TEXTS[confirmAction.type].color)}
+                >
+                  {actionLoading ? 'Aguarde...' : CONFIRM_TEXTS[confirmAction.type].confirm}
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -3,11 +3,13 @@ export type Role = 'Driver' | 'Yard Auditor' | 'Fleet Assistant' | 'Fleet Analys
 // ─── Checklist types ──────────────────────────────────────────────────────────
 
 export type VehicleCategory = 'Leve' | 'Médio' | 'Pesado' | 'Elétrico';
-export type TemplateCategory = VehicleCategory | 'Livre';
+export type TemplateCategory = VehicleCategory;
+export type ChecklistContext = 'Rotina' | 'Auditoria' | 'Reboque' | 'Entrada em Oficina' | 'Saída de Oficina' | 'Segurança';
+export const WORKSHOP_CONTEXTS: ChecklistContext[] = ['Entrada em Oficina', 'Saída de Oficina'];
 export type TemplateStatus = 'draft' | 'published' | 'deprecated';
 export type ChecklistStatus = 'in_progress' | 'completed';
 export type ResponseStatus = 'ok' | 'issue' | 'skipped' | 'not_applicable';
-export type ActionPlanStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type ActionPlanStatus = 'pending' | 'in_progress' | 'awaiting_conclusion' | 'completed' | 'cancelled';
 
 export interface ChecklistItemSuggestion {
   id: string;
@@ -23,14 +25,12 @@ export interface ChecklistItemSuggestion {
 export interface ChecklistTemplate {
   id: string;
   clientId: string;
-  vehicleCategory?: VehicleCategory; // null quando isFreeForm = true
-  isFreeForm: boolean;
+  vehicleCategory: VehicleCategory;
+  context: ChecklistContext;
   name: string;
   description?: string;
   currentVersion: number;
   status: TemplateStatus;
-  allowDriverActions: boolean;
-  allowAuditorActions: boolean;
   createdBy?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -52,6 +52,7 @@ export interface ChecklistItem {
   description?: string;
   isMandatory: boolean;
   requirePhotoIfIssue: boolean;
+  canBlockVehicle: boolean;
   defaultAction?: string;
   orderNumber: number;
 }
@@ -61,8 +62,9 @@ export interface Checklist {
   clientId: string;
   templateId: string;
   templateName?: string; // from join
+  templateContext?: ChecklistContext; // from join
   versionNumber: number;
-  vehicleId?: string; // nullable — null para checklists Livre sem veículo
+  vehicleId?: string;
   vehicleLicensePlate?: string; // from join
   filledBy: string;
   filledByName?: string; // from join
@@ -73,6 +75,8 @@ export interface Checklist {
   longitude?: number;
   deviceInfo?: string;
   notes?: string;
+  workshopId?: string;
+  workshopName?: string; // from join
 }
 
 export interface ChecklistResponse {
@@ -99,7 +103,18 @@ export interface ActionPlan {
   observedIssue?: string;
   photoUrl?: string;
   status: ActionPlanStatus;
-  workOrderNumber?: string;
+  // v2 fields
+  name?: string;
+  responsibleId?: string;
+  responsibleName?: string; // from join
+  dueDate?: string;
+  assignedBy?: string;
+  assignedByName?: string; // from join
+  claimedBy?: string;
+  claimedByName?: string; // from join
+  claimedAt?: string;
+  conclusionEvidenceUrl?: string;
+  // completion
   completionNotes?: string;
   completedBy?: string;
   completedByName?: string; // from join

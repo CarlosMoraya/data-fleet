@@ -1,4 +1,4 @@
-import type { Checklist, ChecklistResponse, ChecklistStatus, ResponseStatus } from '../types';
+import type { Checklist, ChecklistResponse, ChecklistStatus, ResponseStatus, ChecklistContext } from '../types';
 import { normalizeTrim } from './inputHelpers';
 
 // ─── Row types (snake_case from Supabase) ─────────────────────────────────────
@@ -17,10 +17,12 @@ export interface ChecklistRow {
   longitude: number | null;
   device_info: string | null;
   notes: string | null;
+  workshop_id: string | null;
   // join fields
-  checklist_templates?: { name: string } | null;
+  checklist_templates?: { name: string; context: string } | null;
   vehicles?: { license_plate: string } | null;
   profiles?: { name: string } | null;
+  workshops?: { name: string } | null;
 }
 
 export interface ChecklistResponseRow {
@@ -43,6 +45,7 @@ export function checklistFromRow(row: ChecklistRow): Checklist {
     clientId: row.client_id,
     templateId: row.template_id,
     templateName: row.checklist_templates?.name ?? undefined,
+    templateContext: row.checklist_templates?.context as ChecklistContext | undefined ?? undefined,
     versionNumber: row.version_number,
     vehicleId: row.vehicle_id ?? undefined,
     vehicleLicensePlate: row.vehicles?.license_plate ?? undefined,
@@ -55,6 +58,8 @@ export function checklistFromRow(row: ChecklistRow): Checklist {
     longitude: row.longitude ?? undefined,
     deviceInfo: row.device_info ?? undefined,
     notes: row.notes ?? undefined,
+    workshopId: row.workshop_id ?? undefined,
+    workshopName: row.workshops?.name ?? undefined,
   };
 }
 
@@ -86,6 +91,7 @@ export function checklistToRow(c: Partial<Checklist>): Partial<ChecklistRow> {
   if (c.longitude !== undefined)     row.longitude = c.longitude ?? null;
   if (c.deviceInfo !== undefined)    row.device_info = c.deviceInfo ?? null;
   if (c.notes !== undefined)         row.notes = c.notes ? normalizeTrim(c.notes) : null;
+  if (c.workshopId !== undefined)    row.workshop_id = c.workshopId ?? null;
   return row;
 }
 

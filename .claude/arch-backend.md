@@ -24,12 +24,12 @@
 - `driver_field_settings` — configurações dinâmicas de campos obrigatórios de motorista por cliente
 - `workshops` — oficinas parceiras (CRUD com RLS, CNPJ único por cliente, sem uploads)
 
-### Tabelas de Checklists (criadas em `create_checklist_tables.sql`)
+### Tabelas de Checklists (criadas em `create_checklist_tables.sql` + migrations adicionais)
 - `checklist_item_suggestions` — banco global de sugestões por categoria de veículo (Leve/Médio/Pesado/Elétrico). Sem `client_id`. Seed com ~45 itens pré-populados. SELECT para qualquer autenticado.
-- `checklist_templates` — templates por cliente com ciclo `draft → published → deprecated`. Colunas: `is_free_form` (bool), `vehicle_category` (nullable para templates Livre), `current_version`, `allow_driver_actions`, `allow_auditor_actions`. Constraint: apenas 1 published por (client, category) para templates não-livres. INSERT/UPDATE: Manager+.
+- `checklist_templates` — templates por cliente com ciclo `draft → published → deprecated`. Colunas: `context` TEXT NOT NULL DEFAULT 'Rotina' CHECK IN ('Rotina','Auditoria','Reboque','Entrada em Oficina','Saída de Oficina','Segurança'), `vehicle_category` NOT NULL, `current_version`, `allow_driver_actions`, `allow_auditor_actions`. EXCLUDE constraint `unique_published_category_context` via btree garante 1 published por (client, category, context). INSERT/UPDATE: Manager+. Nome do template gerado automaticamente como `"Checklist [Categoria] [Contexto]"`.
 - `checklist_template_versions` — snapshots imutáveis ao publicar. UNIQUE (template_id, version_number).
-- `checklist_items` — itens por (template_id, version_number). Durante draft, itens editáveis livremente. Publicado: snapshot congelado.
-- `checklists` — instâncias preenchidas. `vehicle_id` nullable (NULL para templates Livre). `status` IN ('in_progress','completed'). DELETE: APENAS Admin Master.
+- `checklist_items` — itens por (template_id, version_number). Coluna `can_block_vehicle BOOLEAN NOT NULL DEFAULT false` — ativado em templates de Segurança. Durante draft, itens editáveis livremente. Publicado: snapshot congelado.
+- `checklists` — instâncias preenchidas. `vehicle_id` obrigatório. `workshop_id UUID NULL FK → workshops(id) ON DELETE SET NULL` — preenchido nos contextos Entrada/Saída de Oficina. `status` IN ('in_progress','completed'). DELETE: APENAS Admin Master.
 - `checklist_responses` — respostas por item (ok/issue/skipped/not_applicable). CASCADE delete do checklist pai. UNIQUE (checklist_id, item_id).
 - `action_plans` — ações geradas automaticamente para itens 'issue'. Campos: `suggested_action`, `observed_issue`, `photo_url`, `status` (pending/in_progress/completed/cancelled), `work_order_number`. DELETE: APENAS Admin Master.
 

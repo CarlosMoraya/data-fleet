@@ -69,6 +69,27 @@ serve(async (req: Request) => {
       const { user_id } = body;
       if (!user_id) return json({ error: "user_id é obrigatório." }, 400);
 
+      // Buscar perfil do target para validar hierarquia
+      const { data: targetProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("role, client_id")
+        .eq("id", user_id)
+        .single();
+
+      if (!targetProfile) return json({ error: "Usuário não encontrado." }, 404);
+
+      const targetRank = ROLE_RANK[targetProfile.role] ?? 0;
+
+      // Caller deve ter rank estritamente maior que o target
+      if (callerRank <= targetRank) {
+        return json({ error: "Você não tem permissão para excluir este usuário." }, 403);
+      }
+
+      // Multi-tenancy: Admin Master pode deletar de qualquer cliente; outros só do próprio
+      if (callerProfile.role !== "Admin Master" && targetProfile.client_id !== callerProfile.client_id) {
+        return json({ error: "Você não tem permissão para excluir usuários de outro cliente." }, 403);
+      }
+
       // Deletar perfil
       await supabaseAdmin.from("profiles").delete().eq("id", user_id);
       // Deletar conta auth

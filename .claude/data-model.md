@@ -213,6 +213,59 @@ interface Workshop {
 }
 ```
 
+### Checklist Types
+```ts
+type ChecklistContext = 'Rotina' | 'Auditoria' | 'Reboque' | 'Entrada em Oficina' | 'Saída de Oficina' | 'Segurança';
+const WORKSHOP_CONTEXTS: ChecklistContext[] = ['Entrada em Oficina', 'Saída de Oficina']; // exigem seleção de oficina
+
+interface ChecklistTemplate {
+  id: string;
+  clientId: string;
+  vehicleCategory: VehicleCategory; // obrigatório
+  context: ChecklistContext;         // obrigatório
+  name: string;                      // gerado automaticamente: "Checklist [Categoria] [Contexto]"
+  description?: string;
+  currentVersion: number;
+  status: 'draft' | 'published' | 'deprecated';
+  allowDriverActions: boolean;
+  allowAuditorActions: boolean;
+}
+
+interface ChecklistItem {
+  id: string;
+  templateId: string;
+  versionNumber: number;
+  title: string;
+  description?: string;
+  isMandatory: boolean;
+  requirePhotoIfIssue: boolean;
+  canBlockVehicle: boolean; // toggle por item, visível apenas em contexto Segurança
+  defaultAction?: string;
+  orderNumber: number;
+}
+
+interface Checklist {
+  id: string;
+  clientId: string;
+  templateId: string;
+  templateName?: string;           // from join
+  templateContext?: ChecklistContext; // from join
+  versionNumber: number;
+  vehicleId?: string;
+  vehicleLicensePlate?: string;   // from join
+  filledBy: string;
+  filledByName?: string;          // from join
+  startedAt: string;
+  completedAt?: string;
+  status: 'in_progress' | 'completed';
+  workshopId?: string;            // preenchido nos contextos Entrada/Saída de Oficina
+  workshopName?: string;          // from join
+  latitude?: number;
+  longitude?: number;
+  notes?: string;
+}
+```
+
 ## Multi-Tenancy
 
 - **Padrão**: toda entidade tem `clientId` (TS) / `client_id` (Supabase)
@@ -244,10 +297,10 @@ Tabelas ativas:
 - `workshops` (id UUID PK, client_id FK → clients, name, cnpj — UNIQUE(client_id, cnpj), phone, email, contact_person, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_zip, specialties TEXT[], notes, active, created_at, updated_at) com RLS policies
 
 Tabelas de checklists (ativas):
-- `checklist_item_suggestions` (seed ~45 itens globais)
-- `checklist_templates` (is_free_form, vehicle_category nullable, status draft/published/deprecated)
+- `checklist_item_suggestions` (seed ~45 itens globais por categoria)
+- `checklist_templates` (`context` TEXT NOT NULL CHECK IN ('Rotina','Auditoria','Reboque','Entrada em Oficina','Saída de Oficina','Segurança'), `vehicle_category` NOT NULL, status draft/published/deprecated; EXCLUDE constraint `unique_published_category_context` garante 1 publicado por client+category+context)
 - `checklist_template_versions` (snapshots imutáveis)
-- `checklist_items` (por template_id + version_number)
-- `checklists` (vehicle_id nullable para templates Livre; DELETE Admin Master only)
+- `checklist_items` (`can_block_vehicle` BOOLEAN NOT NULL DEFAULT false — usado em contexto Segurança)
+- `checklists` (`workshop_id UUID NULL FK → workshops(id)` — preenchido nos contextos Entrada/Saída de Oficina; DELETE Admin Master only)
 - `checklist_responses` (status ok/issue/skipped/not_applicable; CASCADE)
 - `action_plans` (pending/in_progress/completed/cancelled; work_order_number; DELETE Admin Master only)

@@ -183,12 +183,21 @@ export default function Drivers() {
       .from('drivers')
       .delete()
       .eq('id', driver.id);
+
     if (deleteError) {
       setError('Erro ao excluir motorista. Tente novamente.');
-    } else {
-      await fetchDrivers();
-      await fetchDriverVehicleMap();
+      return;
     }
+
+    // Delete associated user account (profile + auth.users)
+    if (driver.profileId) {
+      await supabase.functions.invoke('create-user', {
+        body: { action: 'delete', user_id: driver.profileId },
+      });
+    }
+
+    await fetchDrivers();
+    await fetchDriverVehicleMap();
   };
 
   const filteredDrivers = drivers.filter(d => {
