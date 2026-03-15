@@ -113,15 +113,35 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     sessionStorage.setItem('vehicleFormData', JSON.stringify(formData));
   }, [formData]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
+  const CATEGORY_TYPES_MAP = {
+    'Leve': ['Moto', 'Passeio', 'Utilitário'],
+    'Médio': ['Van', 'Vuc', 'Toco'],
+    'Pesado': ['Truck', 'Cavalo'],
+    'Elétrico': ['Passeio', 'Utilitário'] // Adicionado por coerência com os tipos existentes
+  } as const;
 
-    if (type === 'checkbox') {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type: inputType } = e.target;
+
+    if (inputType === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
       setFormData(prev => ({ ...prev, [name]: checked }));
     } else if (name === 'driverId') {
-      // '' significa "Nenhum motorista" → null no banco
       setFormData(prev => ({ ...prev, driverId: value || undefined }));
+    } else if (name === 'category') {
+      const newCategory = value as keyof typeof CATEGORY_TYPES_MAP | '';
+      setFormData(prev => {
+        const newData = { ...prev, [name]: value };
+        // Se mudou para uma categoria que tem tipos definidos e o tipo atual não é compatível,
+        // seleciona o primeiro tipo da nova categoria.
+        if (newCategory && CATEGORY_TYPES_MAP[newCategory]) {
+          const allowedTypes = CATEGORY_TYPES_MAP[newCategory];
+          if (!prev.type || !allowedTypes.includes(prev.type as any)) {
+            newData.type = allowedTypes[0] as any;
+          }
+        }
+        return newData;
+      });
     } else {
       const filter = FIELD_FILTERS[name];
       const filtered = filter ? filter(value) : value;
@@ -431,14 +451,22 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Tipo<span className="text-red-500 ml-0.5">*</span></label>
                   <select name="type" value={formData.type || 'Passeio'} onChange={handleChange} className={inputClass}>
-                    <option value="Passeio">Passeio</option>
-                    <option value="Utilitário">Utilitário</option>
-                    <option value="Van">Van</option>
-                    <option value="Moto">Moto</option>
-                    <option value="Vuc">Vuc</option>
-                    <option value="Toco">Toco</option>
-                    <option value="Truck">Truck</option>
-                    <option value="Cavalo">Cavalo</option>
+                    {formData.category && CATEGORY_TYPES_MAP[formData.category as keyof typeof CATEGORY_TYPES_MAP] ? (
+                      CATEGORY_TYPES_MAP[formData.category as keyof typeof CATEGORY_TYPES_MAP].map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Passeio">Passeio</option>
+                        <option value="Utilitário">Utilitário</option>
+                        <option value="Van">Van</option>
+                        <option value="Moto">Moto</option>
+                        <option value="Vuc">Vuc</option>
+                        <option value="Toco">Toco</option>
+                        <option value="Truck">Truck</option>
+                        <option value="Cavalo">Cavalo</option>
+                      </>
+                    )}
                   </select>
                 </div>
                 <div>
