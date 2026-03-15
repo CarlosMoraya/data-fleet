@@ -73,7 +73,7 @@ interface Vehicle {
   color: string;
 
   // Operacional
-  acquisition: 'Owned' | 'Rented';
+  acquisition: 'Owned' | 'Rented' | 'Agregado';
   acquisitionDate?: string;
   fipePrice: number;
   tracker: string;
@@ -236,7 +236,7 @@ interface Workshop {
 Tabelas ativas:
 - `profiles` (id UUID PK → auth.users, name, email, role, client_id FK → clients, can_delete_vehicles, can_delete_drivers, can_delete_workshops)
 - `clients` (id UUID PK, name, logo_url)
-- `vehicles` (id UUID PK, client_id FK → clients, brand, model, crlv_upload, renavam, chassi, etc. + check constraints atualizados)
+- `vehicles` (id UUID PK, client_id FK → clients, brand, model, crlv_upload, renavam, chassi, etc. + check constraints atualizados para incluir 'Agregado' na aquisição)
 - `vehicle_field_settings` (client_id PK/FK → clients, renavam_optional, chassi_optional, e demais flags de configurabilidade)
 - `vehicles` — adicionado: `driver_id UUID NULL FK → drivers(id) ON DELETE SET NULL` + `UNIQUE INDEX idx_vehicles_driver_unique WHERE driver_id IS NOT NULL` (garante 1:1)
 - `drivers` (id UUID PK, client_id FK, **profile_id UUID UNIQUE FK → profiles(id)**, name, cpf — UNIQUE(client_id, cpf), issue_date, expiration_date, cnh_upload, registration_number, category, renach, gr_upload, gr_expiration_date, certificate1_upload, course_name1, certificate2_upload, course_name2, certificate3_upload, course_name3) + INDEX idx_drivers_profile_id

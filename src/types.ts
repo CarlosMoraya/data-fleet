@@ -154,7 +154,7 @@ export interface Vehicle {
   model: string;
   year: number;
   color: string;
-  acquisition: 'Owned' | 'Rented';
+  acquisition: 'Owned' | 'Rented' | 'Agregado';
   fipePrice: number;
   tracker: string;
   antt: string;

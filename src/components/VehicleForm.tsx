@@ -310,6 +310,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                   <select name="acquisition" value={formData.acquisition || 'Owned'} onChange={handleChange} className={inputClass}>
                     <option value="Owned">Próprio</option>
                     <option value="Rented">Locado</option>
+                    <option value="Agregado">Agregado</option>
                   </select>
                 </div>
                 <div>

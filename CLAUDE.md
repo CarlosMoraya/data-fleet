@@ -82,6 +82,7 @@ Para detalhes completos, consulte os módulos em `.claude/`.
   - Geração automática de Plano de Ação para itens não conformes
   - Painel de Ação para Fleet Assistant+ com gestão de status e O.S.
   - Exclusão de checklists exclusiva para Admin Master (trilha de auditoria)
+- **Cadastro de Veículos**: Adicionada a modalidade de aquisição "Agregado" no `VehicleForm.tsx` e atualizada a restrição `CHECK` no banco de dados (`vehicles_acquisition_check`), permitindo maior flexibilidade na gestão da frota.
 - **Layout de Configurações**: Refatorada a página `Settings.tsx` para utilizar uma interface de abas (Tabs), separando as configurações de campos obrigatórios de Veículos e Motoristas para melhor usabilidade, seguindo o padrão visual de `Cadastros.tsx`.
 - **Auto-Sync**: Atualizados manuais em `.claude/` (Frontend, Backend, Data Model) com as novas funcionalidades de Checklists.
 - **Filtros e Multi-tenancy (Admin Master)**: Implementado Seletor Global de Clientes no `Topbar` exclusivo para Admin Master, permitindo visão consolidada ("Todos os Clientes"). Removidos filtros locais redundantes e sincronizadas as páginas (`AdminUsers`, `AdminClients`, `Vehicles`, `Drivers`, etc.) para respeitar exclusivamente o contexto global de cliente. **Corrigidas permissões RLS em `drivers` e `driver_field_settings` para garantir acesso total de escrita ao Admin Master.** Adicionados atalhos rápidos de "Marcar Todos / Desmarcar Todos" em `Settings.tsx` para Veículos e Motoristas, corrigindo também bloqueios de Select RLS (`fix_admin_master_settings_permissions.sql`).
