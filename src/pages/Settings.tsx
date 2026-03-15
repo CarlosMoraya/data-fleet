@@ -18,11 +18,15 @@ import {
   DriverFieldSettingsRow,
 } from '../lib/driverFieldSettingsMappers';
 import { Loader2, Truck, UserCircle } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 const ROLES_CAN_MANAGE = ['Manager', 'Director', 'Admin Master'];
 
+type TabType = 'vehicles' | 'drivers';
+
 export default function Settings() {
   const { currentClient, user } = useAuth();
+  const [activeTab, setActiveTab] = useState<TabType>('vehicles');
 
   // Vehicle field settings state
   const [settings, setSettings] = useState<VehicleFieldSettings | null>(null);
@@ -205,6 +209,11 @@ export default function Settings() {
     return acc;
   }, {} as Record<string, typeof DRIVER_CONFIGURABLE_FIELDS>);
 
+  const tabs = [
+    { id: 'vehicles', name: 'Veículos', icon: Truck },
+    { id: 'drivers', name: 'Motoristas', icon: UserCircle },
+  ];
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
@@ -212,188 +221,217 @@ export default function Settings() {
         <p className="text-sm text-zinc-500 mt-1">Gerencie as configurações do sistema para este cliente.</p>
       </div>
 
-      {/* ─── Card: Campos Obrigatórios do Veículo ─── */}
-      <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Truck className="h-5 w-5 text-zinc-400" />
-            <div>
-              <h2 className="text-lg font-medium text-zinc-900">Campos Obrigatórios do Veículo</h2>
-              <p className="text-sm text-zinc-500">Controle quais campos são obrigatórios no cadastro de veículos.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => handleToggleAllVehicles(false)}
-              className="text-xs px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium transition-colors border border-orange-200"
-            >
-              Marcar Todos
-            </button>
-            <button
-              onClick={() => handleToggleAllVehicles(true)}
-              className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-50 text-zinc-700 hover:bg-zinc-100 font-medium transition-colors border border-zinc-200"
-            >
-              Desmarcar Todos
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mx-6 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="mx-6 mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            Configurações de veículos salvas com sucesso.
-          </div>
-        )}
-
-        <div className="divide-y divide-zinc-100">
-          {Object.entries(vehicleSections).map(([sectionName, fields]) => (
-            <div key={sectionName} className="px-6 py-4">
-              <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-3">{sectionName}</h3>
-              {sectionName === 'Campos Condicionais' && (
-                <p className="text-xs text-zinc-400 mb-3">Estes campos só são exigidos quando a condição correspondente está ativa no formulário.</p>
-              )}
-              <div className="space-y-3">
-                {fields.map(field => {
-                  const isOptional = settings ? (settings[field.key] as boolean) : false;
-                  return (
-                    <div key={field.key} className="flex items-center justify-between py-1">
-                      <div>
-                        <span className="text-sm text-zinc-800">{field.label}</span>
-                        {field.note && <span className="ml-2 text-xs text-zinc-400">({field.note})</span>}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleToggle(field.key)}
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
-                          !isOptional ? 'bg-orange-500' : 'bg-zinc-200'
-                        }`}
-                        role="switch"
-                        aria-checked={!isOptional}
-                        aria-label={`${field.label} obrigatório`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            !isOptional ? 'translate-x-5' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 flex items-center justify-between">
-          <p className="text-xs text-zinc-400">
-            <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-1 align-middle" /> Obrigatório
-            <span className="inline-block w-3 h-3 rounded-full bg-zinc-200 ml-3 mr-1 align-middle" /> Opcional
-          </p>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50"
-          >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            {saving ? 'Salvando...' : 'Salvar'}
-          </button>
-        </div>
+      {/* Bar de abas */}
+      <div className="border-b border-zinc-200">
+        <nav className="-mb-px flex gap-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabType)}
+                className={cn(
+                  isActive
+                    ? 'border-orange-500 text-orange-600 font-medium'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300',
+                  'flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm transition-colors cursor-pointer'
+                )}
+              >
+                <Icon className={cn("h-4 w-4", isActive ? "text-orange-500" : "text-zinc-400")} />
+                {tab.name}
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
-      {/* ─── Card: Campos Obrigatórios do Motorista ─── */}
-      <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <UserCircle className="h-5 w-5 text-zinc-400" />
-            <div>
-              <h2 className="text-lg font-medium text-zinc-900">Campos Obrigatórios do Motorista</h2>
-              <p className="text-sm text-zinc-500">Controle quais campos são obrigatórios no cadastro de motoristas.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => handleToggleAllDrivers(false)}
-              className="text-xs px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium transition-colors border border-orange-200"
-            >
-              Marcar Todos
-            </button>
-            <button
-              onClick={() => handleToggleAllDrivers(true)}
-              className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-50 text-zinc-700 hover:bg-zinc-100 font-medium transition-colors border border-zinc-200"
-            >
-              Desmarcar Todos
-            </button>
-          </div>
-        </div>
-
-        {driverError && (
-          <div className="mx-6 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {driverError}
-          </div>
-        )}
-        {driverSuccess && (
-          <div className="mx-6 mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            Configurações de motoristas salvas com sucesso.
-          </div>
-        )}
-
-        <div className="divide-y divide-zinc-100">
-          {Object.entries(driverSections).map(([sectionName, fields]) => (
-            <div key={sectionName} className="px-6 py-4">
-              <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-3">{sectionName}</h3>
-              <div className="space-y-3">
-                {fields.map(field => {
-                  const isOptional = driverSettings ? (driverSettings[field.key] as boolean) : false;
-                  return (
-                    <div key={field.key} className="flex items-center justify-between py-1">
-                      <div>
-                        <span className="text-sm text-zinc-800">{field.label}</span>
-                        {field.note && <span className="ml-2 text-xs text-zinc-400">({field.note})</span>}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDriverToggle(field.key)}
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
-                          !isOptional ? 'bg-orange-500' : 'bg-zinc-200'
-                        }`}
-                        role="switch"
-                        aria-checked={!isOptional}
-                        aria-label={`${field.label} obrigatório`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            !isOptional ? 'translate-x-5' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  );
-                })}
+      {activeTab === 'vehicles' && (
+        /* ─── Card: Campos Obrigatórios do Veículo ─── */
+        <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden animate-in fade-in duration-300">
+          <div className="px-6 py-4 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Truck className="h-5 w-5 text-zinc-400" />
+              <div>
+                <h2 className="text-lg font-medium text-zinc-900">Campos Obrigatórios do Veículo</h2>
+                <p className="text-sm text-zinc-500">Controle quais campos são obrigatórios no cadastro de veículos.</p>
               </div>
             </div>
-          ))}
-        </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => handleToggleAllVehicles(false)}
+                className="text-xs px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium transition-colors border border-orange-200 cursor-pointer"
+              >
+                Marcar Todos
+              </button>
+              <button
+                onClick={() => handleToggleAllVehicles(true)}
+                className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-50 text-zinc-700 hover:bg-zinc-100 font-medium transition-colors border border-zinc-200 cursor-pointer"
+              >
+                Desmarcar Todos
+              </button>
+            </div>
+          </div>
 
-        <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 flex items-center justify-between">
-          <p className="text-xs text-zinc-400">
-            <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-1 align-middle" /> Obrigatório
-            <span className="inline-block w-3 h-3 rounded-full bg-zinc-200 ml-3 mr-1 align-middle" /> Opcional
-          </p>
-          <button
-            onClick={handleDriverSave}
-            disabled={driverSaving}
-            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50"
-          >
-            {driverSaving && <Loader2 className="h-4 w-4 animate-spin" />}
-            {driverSaving ? 'Salvando...' : 'Salvar'}
-          </button>
+          {error && (
+            <div className="mx-6 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="mx-6 mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              Configurações de veículos salvas com sucesso.
+            </div>
+          )}
+
+          <div className="divide-y divide-zinc-100">
+            {Object.entries(vehicleSections).map(([sectionName, fields]) => (
+              <div key={sectionName} className="px-6 py-4">
+                <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-3">{sectionName}</h3>
+                {sectionName === 'Campos Condicionais' && (
+                  <p className="text-xs text-zinc-400 mb-3">Estes campos só são exigidos quando a condição correspondente está ativa no formulário.</p>
+                )}
+                <div className="space-y-3">
+                  {fields.map(field => {
+                    const isOptional = settings ? (settings[field.key] as boolean) : false;
+                    return (
+                      <div key={field.key} className="flex items-center justify-between py-1">
+                        <div>
+                          <span className="text-sm text-zinc-800">{field.label}</span>
+                          {field.note && <span className="ml-2 text-xs text-zinc-400">({field.note})</span>}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleToggle(field.key)}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                            !isOptional ? 'bg-orange-500' : 'bg-zinc-200'
+                          }`}
+                          role="switch"
+                          aria-checked={!isOptional}
+                          aria-label={`${field.label} obrigatório`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              !isOptional ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 flex items-center justify-between">
+            <p className="text-xs text-zinc-400">
+              <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-1 align-middle" /> Obrigatório
+              <span className="inline-block w-3 h-3 rounded-full bg-zinc-200 ml-3 mr-1 align-middle" /> Opcional
+            </p>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {saving ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {activeTab === 'drivers' && (
+        /* ─── Card: Campos Obrigatórios do Motorista ─── */
+        <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden animate-in fade-in duration-300">
+          <div className="px-6 py-4 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <UserCircle className="h-5 w-5 text-zinc-400" />
+              <div>
+                <h2 className="text-lg font-medium text-zinc-900">Campos Obrigatórios do Motorista</h2>
+                <p className="text-sm text-zinc-500">Controle quais campos são obrigatórios no cadastro de motoristas.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => handleToggleAllDrivers(false)}
+                className="text-xs px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium transition-colors border border-orange-200 cursor-pointer"
+              >
+                Marcar Todos
+              </button>
+              <button
+                onClick={() => handleToggleAllDrivers(true)}
+                className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-50 text-zinc-700 hover:bg-zinc-100 font-medium transition-colors border border-zinc-200 cursor-pointer"
+              >
+                Desmarcar Todos
+              </button>
+            </div>
+          </div>
+
+          {driverError && (
+            <div className="mx-6 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {driverError}
+            </div>
+          )}
+          {driverSuccess && (
+            <div className="mx-6 mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              Configurações de motoristas salvas com sucesso.
+            </div>
+          )}
+
+          <div className="divide-y divide-zinc-100">
+            {Object.entries(driverSections).map(([sectionName, fields]) => (
+              <div key={sectionName} className="px-6 py-4">
+                <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-3">{sectionName}</h3>
+                <div className="space-y-3">
+                  {fields.map(field => {
+                    const isOptional = driverSettings ? (driverSettings[field.key] as boolean) : false;
+                    return (
+                      <div key={field.key} className="flex items-center justify-between py-1">
+                        <div>
+                          <span className="text-sm text-zinc-800">{field.label}</span>
+                          {field.note && <span className="ml-2 text-xs text-zinc-400">({field.note})</span>}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDriverToggle(field.key)}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                            !isOptional ? 'bg-orange-500' : 'bg-zinc-200'
+                          }`}
+                          role="switch"
+                          aria-checked={!isOptional}
+                          aria-label={`${field.label} obrigatório`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              !isOptional ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 flex items-center justify-between">
+            <p className="text-xs text-zinc-400">
+              <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-1 align-middle" /> Obrigatório
+              <span className="inline-block w-3 h-3 rounded-full bg-zinc-200 ml-3 mr-1 align-middle" /> Opcional
+            </p>
+            <button
+              onClick={handleDriverSave}
+              disabled={driverSaving}
+              className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {driverSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {driverSaving ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

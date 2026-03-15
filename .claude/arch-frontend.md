@@ -101,7 +101,7 @@ O `Layout.tsx` renderiza:
 - **Tabelas**: renderizadas com map sobre array local (`useState`), ações inline (edit/delete)
 - **Client switcher**: ComboBox no Topbar, visível apenas para Manager/Director/Admin Master
 - **Gráficos**: `Recharts` (BarChart, PieChart) no Dashboard, filtrados por `currentClient.id`
-- **Navegação em abas**: `Cadastros.tsx` renderiza `<NavLink>` com estilo ativo (border-b-2 orange), cada aba renderiza seu módulo via `<Outlet />`
+- **Navegação em abas**: `Cadastros.tsx` e `Settings.tsx` utilizam navegação por abas com estilo ativo (border-b-2 orange). `Cadastros` utiliza sub-rotas via `<Outlet />`, enquanto `Settings` utiliza estado local (`activeTab`) para alternar as seções.
 - **Sidebar**: item único "Cadastros" (`FolderOpen` icon) → `/cadastros`, substitui items individuais de Veículos/Motoristas/Usuários. Novos itens: "Plano de Ação" (`ClipboardList`) para Fleet Assistant+; "Templates" (`FileStack`) para Fleet Analyst+
 - **Modais de detalhe (read-only)**:
   - `VehicleDetailModal` renderiza 8 seções (Identificação, Propriedade, Equipamentos, Adicionais, Motorista, Documentos com links, Garantia, Seguro/Manutenção) a partir de um objeto `Vehicle`
