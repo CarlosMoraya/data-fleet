@@ -36,7 +36,7 @@
 ### Storage Buckets
 - `vehicle-documents` — CRLV, inspeção sanitária, GR para veículos + evidências de planos de ação (`{client_id}/action-plans/{plan_id}/evidence.{ext}`)
 - `driver-documents` — CNH, GR, certificados para motoristas
-- `checklist-photos` — fotos capturadas via câmera durante checklists. Path: `{client_id}/{checklist_id}/{item_id}/{timestamp}.jpg`
+- `checklist-photos` — fotos capturadas via câmera durante checklists. Path: `{client_id}/{checklist_id}/{item_id}/{timestamp}.jpg`. Políticas via `create_checklist_photos_bucket.sql`: SELECT público; INSERT/UPDATE para qualquer autenticado do tenant (Driver, Auditor, etc.); DELETE apenas Fleet Analyst+
 
 ### Migrations Ativas
 - `create_drivers_tables.sql` — tabelas `drivers` e `driver_field_settings`
