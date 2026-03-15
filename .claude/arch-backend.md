@@ -31,10 +31,10 @@
 - `checklist_items` — itens por (template_id, version_number). Coluna `can_block_vehicle BOOLEAN NOT NULL DEFAULT false` — ativado em templates de Segurança. Durante draft, itens editáveis livremente. Publicado: snapshot congelado.
 - `checklists` — instâncias preenchidas. `vehicle_id` obrigatório. `workshop_id UUID NULL FK → workshops(id) ON DELETE SET NULL` — preenchido nos contextos Entrada/Saída de Oficina. `status` IN ('in_progress','completed'). DELETE: APENAS Admin Master.
 - `checklist_responses` — respostas por item (ok/issue/skipped/not_applicable). CASCADE delete do checklist pai. UNIQUE (checklist_id, item_id).
-- `action_plans` — ações geradas automaticamente para itens 'issue'. Campos: `suggested_action`, `observed_issue`, `photo_url`, `status` (pending/in_progress/completed/cancelled), `work_order_number`. DELETE: APENAS Admin Master.
+- `action_plans` — ações geradas automaticamente para itens 'issue'. Campos v1: `suggested_action`, `observed_issue`, `photo_url`, `status` (pending/in_progress/awaiting_conclusion/completed/cancelled), `work_order_number`. Campos v2 (`add_action_plan_v2.sql`): `name`, `responsible_id`, `due_date`, `assigned_by`, `claimed_by`, `claimed_at`, `conclusion_evidence_url`. INSERT: Fleet Analyst+ do tenant ou Admin Master. DELETE: APENAS Admin Master.
 
 ### Storage Buckets
-- `vehicle-documents` — CRLV, inspeção sanitária, GR para veículos
+- `vehicle-documents` — CRLV, inspeção sanitária, GR para veículos + evidências de planos de ação (`{client_id}/action-plans/{plan_id}/evidence.{ext}`)
 - `driver-documents` — CNH, GR, certificados para motoristas
 - `checklist-photos` — fotos capturadas via câmera durante checklists. Path: `{client_id}/{checklist_id}/{item_id}/{timestamp}.jpg`
 
@@ -52,7 +52,7 @@
 `id`, `client_id`, `type` (Passeio a Cavalo), `energy_source`, `cooling_equipment`, `semi_reboque`, `placa_semi_reboque`, `fuel_type`, `tank_capacity`, `avg_consumption`, `cooling_brand`, `license_plate`, `renavam`, `chassi`, `detran_uf`, `brand`, `model`, `year`, `color`, `acquisition`, `acquisition_date`, `fipe_price`, `tracker`, `antt`, `owner`, `status`, `autonomy`, `tag`, `crlv_upload`, `sanitary_inspection_upload`, `gr_upload`, `gr_expiration_date`, `spare_key`, `vehicle_manual`, `category`, `created_at`, `updated_at`
 
 RLS vehicles:
-- SELECT: Fleet Assistant (rank 3)+ do próprio tenant + Admin Master (cross-tenant)
+- SELECT: Fleet Assistant (rank 3)+ do próprio tenant + Admin Master (cross-tenant) + Driver (somente veículo atribuído via `driver_id`) + Yard Auditor (todos do próprio tenant — policy `vehicles_select_auditor` via `fix_vehicles_auditor_rls.sql`)
 - INSERT/UPDATE: Fleet Analyst (rank 4)+ do próprio tenant + Admin Master
 - DELETE: Manager(5)+ OU Fleet Analyst(4) com `can_delete_vehicles = true`
 - Unique index em `(client_id, license_plate)`
