@@ -32,6 +32,14 @@ export default defineConfig({
       testMatch: /alexandre\.setup\.ts/,
     },
     {
+      name: 'setup-carlos',
+      testMatch: /carlos\.setup\.ts/,
+    },
+    {
+      name: 'setup-jorge',
+      testMatch: /jorge\.setup\.ts/,
+    },
+    {
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
@@ -47,7 +55,7 @@ export default defineConfig({
         storageState: 'e2e/.auth/mariana.json',
       },
       dependencies: ['setup-mariana'],
-      testMatch: /tenant-users(-analyst.*)?\.spec\.ts/,
+      testMatch: [/tenant-users(-analyst.*)?\.spec\.ts/, /audit-admin-tenant\.spec\.ts/],
       testIgnore: /seed/,
     },
     {
@@ -57,7 +65,7 @@ export default defineConfig({
         storageState: 'e2e/.auth/pedro.json',
       },
       dependencies: ['setup-pedro'],
-      testMatch: /tenant-users-assistant.*\.spec\.ts/,
+      testMatch: [/tenant-users-assistant.*\.spec\.ts/, /audit-admin-tenant\.spec\.ts/],
       testIgnore: /seed/,
     },
     {
@@ -76,8 +84,26 @@ export default defineConfig({
         storageState: 'e2e/.auth/alexandre.json',
       },
       dependencies: ['setup-alexandre'],
-      testMatch: /tenant-users-manager.*\.spec\.ts/,
+      testMatch: [/tenant-users-manager.*\.spec\.ts/, /audit-admin-tenant\.spec\.ts/],
       testIgnore: /seed/,
+    },
+    {
+      name: 'auditor',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/carlos.json',
+      },
+      dependencies: ['setup-carlos'],
+      testMatch: /auditor-flow\.spec\.ts/,
+    },
+    {
+      name: 'driver',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/jorge.json',
+      },
+      dependencies: ['setup-jorge'],
+      testMatch: /driver-flow\.spec\.ts/,
     },
   ],
   webServer: {

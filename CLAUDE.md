@@ -111,3 +111,12 @@ Para detalhes completos, consulte os módulos em `.claude/`.
   - **Bucket `checklist-photos` sem políticas de storage**: Upload por Driver/Auditor falhava silenciosamente e URLs ficavam inacessíveis para Fleet Assistant+. Criada migration `create_checklist_photos_bucket.sql` que: cria o bucket como público (via `INSERT INTO storage.buckets ... public = true`), adiciona policy SELECT pública (URLs sempre acessíveis), INSERT/UPDATE para qualquer autenticado do tenant (scoped por `client_id` no path) e DELETE restrito a Fleet Analyst+. O modal `ChecklistDetailModal.tsx` já exibia fotos (linhas 141-154) — o fix foi exclusivamente de infraestrutura de storage.
 - **Visibilidade Yard Auditor em Checklists (2026-03-15)**:
   - **Bug RLS — Yard Auditor não via veículos**: Política RLS `vehicles_select_tenant` exigia `rank >= Fleet Assistant (rank 3)`, bloqueando Yard Auditor (rank 2). Política complementar `vehicles_select_own_driver` usava lookup via `drivers.profile_id`, mas Yard Auditors não têm registro em `drivers` (são auditores, não drivers). Resultado: dropdown de veículos vazio → templates de Auditoria nunca carregavam. Corrigido com nova policy `vehicles_select_auditor` via migration `fix_vehicles_auditor_rls.sql` — permite Yard Auditor ver todos os veículos do próprio tenant. Templates de Auditoria já eram visíveis (policy `templates_select_driver` já incluía Yard Auditor).
+
+- **Auditoria Técnica Completa (2026-03-15)**: Execução de suíte E2E em todos os 6 perfis de usuário (Admin Master, Gerente, Analista, Assistente, Auditor e Motorista). 
+  - **Resultados**: 100% de aprovação nos fluxos críticos.
+  - **Correções**: Estabilização de seletores Playwright (case-insensitivity e strict mode) e refatoração de specs administrativos para suportar execução multi-projeto paralela.
+  1. **Admin Master**: Validado CRUD de Clientes/Veículos e Seletor Global.
+  2. **Auditor (Carlos)**: Confirmado redirecionamento para `/checklists` e bloqueio de áreas `/cadastros`.
+  3. **Motorista (Jorge)**: Validado preenchimento de Checklist via `Meu Veículo` e restrição de Auditoria.
+  4. **Analista/Assistente (Mariana/Pedro)**: Validada gestão de Planos de Ação e restrições de exclusão (Pedro).
+  5. **Gerente (Alexandre)**: Validado acesso total às Configurações de campos obrigatórios.

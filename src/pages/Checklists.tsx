@@ -366,6 +366,14 @@ export default function Checklists() {
                 <Play className="h-4 w-4" />
                 Continuar
               </button>
+              <button
+                onClick={() => setConfirmDelete(openChecklist)}
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 border border-red-200 text-red-600 text-sm font-medium rounded-xl hover:bg-red-50"
+                title="Cancelar checklist em andamento"
+              >
+                <Trash2 className="h-4 w-4" />
+                Cancelar
+              </button>
             </div>
           )}
 
