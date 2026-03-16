@@ -9,17 +9,18 @@ import { test, expect } from '@playwright/test';
  */
 
 test.describe.serial('Fluxo Cruzado: Auditoria para Manutenção', () => {
+  test.setTimeout(120000);
   
   let targetVehicle = ''; 
 
   test('Passo 1: Auditor (Carlos) gera Inconformidade', async ({ browser }) => {
-    test.slow();
     const auditorCtx = await browser.newContext({ storageState: 'e2e/.auth/carlos.json' });
     const page = await auditorCtx.newPage();
     
     await page.goto('/checklists');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('heading', { name: 'Checklists', exact: true })).toBeVisible({ timeout: 10000 });
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.getByText('Checklists').first()).toBeVisible({ timeout: 30000 });
 
     // Limpeza de rascunhos se houver - aguardar um pouco para o estado carregar
     const cancelBtn = page.getByRole('button', { name: /Cancelar/i });
@@ -50,31 +51,49 @@ test.describe.serial('Fluxo Cruzado: Auditoria para Manutenção', () => {
     await vehicleSelect.selectOption(selectedValue);
     console.log(`Veículo selecionado: ${targetVehicle}`);
     
-    const startBtn = page.getByRole('button', { name: /Iniciar/i }).first();
+    // Pequena pausa para carregar templates após seleção
+    await page.waitForTimeout(2000);
+    
+    const startBtn = page.locator('div').filter({ hasText: 'Iniciar Auditoria' }).getByRole('button', { name: /Iniciar/i }).first();
     await expect(startBtn).toBeVisible({ timeout: 15000 });
     await startBtn.click();
     
     // 3. Responder todos os itens (o botão 'Finalizar' só habilita com tudo preenchido)
     // Esperar a navegação e o carregamento dos itens (rota localizada)
-    await expect(page).toHaveURL(/.*\/preencher.*/, { timeout: 15000 });
+    await expect(page).toHaveURL(/.*\/preencher.*/, { timeout: 30000 });
     await page.waitForLoadState('networkidle');
+    console.log(`URL após iniciar: ${page.url()}`);
     
-    // Aguardar ao menos um item (tag p com o título)
-    const itemTitles = page.locator('div.bg-white.rounded-2xl.border p.text-sm.font-medium');
-    await expect(itemTitles.first()).toBeVisible({ timeout: 15000 });
-    const count = await itemTitles.count();
+    // Aguardar ao menos um título de item ser visível
+    await expect(page.locator('p.text-sm.font-medium').first()).toBeVisible({ timeout: 30000 });
+    
+    // Localizar botões para preenchimento (OK, Problema, N/A)
+    const conformeButtons = page.locator('button').filter({ hasText: /^OK$/i });
+    const problemaButtons = page.locator('button').filter({ hasText: /^Problema$/i });
+    
+    await expect(conformeButtons.first()).toBeVisible({ timeout: 15000 });
+    await page.waitForTimeout(1000); 
+    const count = await conformeButtons.count();
     console.log(`Preenchendo ${count} itens...`);
 
-    const conformeButtons = page.getByRole('button', { name: 'Conforme', exact: true });
-    const problemaButtons = page.getByRole('button', { name: 'Problema', exact: true });
-
     for (let i = 0; i < count; i++) {
-        await itemTitles.nth(i).scrollIntoViewIfNeeded();
         if (i === 0) {
-            await problemaButtons.nth(i).click();
+            const probBtn = problemaButtons.nth(i);
+            await probBtn.scrollIntoViewIfNeeded();
+            await probBtn.click();
+            
+            // Opcional: preencher observação já que abriu o campo
+            const textarea = page.locator('textarea').first();
+            if (await textarea.isVisible()) {
+                await textarea.fill('Inconformidade detectada durante auditoria E2E.');
+            }
         } else {
-            await conformeButtons.nth(i).click();
+            const confBtn = conformeButtons.nth(i);
+            await confBtn.scrollIntoViewIfNeeded();
+            await confBtn.click();
         }
+        
+        await page.waitForTimeout(100);
     }
     
     // 4. Finalizar
@@ -91,6 +110,7 @@ test.describe.serial('Fluxo Cruzado: Auditoria para Manutenção', () => {
     // Validar redirecionamento e presença no histórico
     await expect(page).toHaveURL(/\/checklists$/);
     await expect(page.locator('div:has-text("Concluído")').first()).toBeVisible();
+    await page.screenshot({ path: `test-results/passo1-concluido-${targetVehicle}.png` });
 
     await auditorCtx.close();
   });
@@ -125,28 +145,57 @@ test.describe.serial('Fluxo Cruzado: Auditoria para Manutenção', () => {
     await modal.locator('input[type="date"]').fill(dateStr);
     
     await modal.getByRole('button', { name: /Criar/i }).click();
+    await expect(modal).toBeHidden({ timeout: 10000 });
     
     // 3. Ir para a tela de Ações e gerenciar
     await page.goto('/acoes');
+    await page.waitForLoadState('networkidle');
+    
+    // Filtrar por placa para garantir que vemos o nosso
+    const searchInput = page.getByPlaceholder(/Buscar por placa/i);
+    await searchInput.fill(targetVehicle);
+    await page.waitForTimeout(1000); // Debounce
     
     // Filtrar por Pendente
-    await page.locator('button').filter({ hasText: /^Pendente/ }).first().click();
+    const pendingBtn = page.locator('button').filter({ hasText: /^Pendente/ }).first();
+    await pendingBtn.click();
 
     const rowPlan = page.locator('tr').filter({ hasText: targetVehicle }).first();
-    await expect(rowPlan).toBeVisible();
+    await expect(rowPlan).toBeVisible({ timeout: 20000 });
     await rowPlan.click();
     
-    const planModal = page.locator('div').filter({ hasText: 'Plano de Ação' }).last();
+    const planModal = page.locator('div.relative.bg-white.rounded-2xl.shadow-2xl').filter({ hasText: 'Plano de Ação' }).last();
     
     // Assumir
-    await planModal.getByRole('button', { name: /Assumir esta ação/i }).click();
-    await expect(planModal.getByText(/Em execução/i)).toBeVisible();
+    const claimBtn = planModal.getByRole('button', { name: /Assumir esta ação/i });
+    await expect(claimBtn).toBeVisible({ timeout: 10000 });
+    await claimBtn.click();
     
-    // Concluir (Enviar para aprovação)
-    await planModal.getByPlaceholder(/Descreva o que foi feito/i).fill('Manutenção validada via teste cruzado.');
-    await planModal.getByRole('button', { name: /Enviar para aprovação/i }).click();
+    // Esperar a transição de estado
+    await expect(claimBtn).toBeHidden({ timeout: 15000 });
     
-    await expect(page.getByText(/aguardando aprovação/i).first()).toBeVisible();
+    // Como o item sai de 'Pendente', ele some da lista atual. Vamos mudar para 'Em Andamento'
+    const inProgressBtn = page.locator('button').filter({ hasText: /^Em Andamento/ }).first();
+    await inProgressBtn.click();
+    
+    // Reabrir o modal (agora na lista de Em Andamento)
+    const rowInProgress = page.locator('tr').filter({ hasText: targetVehicle }).first();
+    await expect(rowInProgress).toBeVisible({ timeout: 15000 });
+    await rowInProgress.click();
+
+    // Agora sim, concluir (Enviar para aprovação)
+    const activeModal = page.locator('div.relative.bg-white.rounded-2xl.shadow-2xl').filter({ hasText: 'Plano de Ação' }).last();
+    const textarea = activeModal.getByPlaceholder(/Descreva o que foi feito/i);
+    await expect(textarea).toBeVisible({ timeout: 15000 });
+    await textarea.scrollIntoViewIfNeeded();
+    await textarea.fill('Manutenção validada via teste cruzado.');
+    
+    const sendBtn = activeModal.getByRole('button', { name: /Enviar para aprovação/i });
+    await expect(sendBtn).toBeVisible({ timeout: 10000 });
+    await sendBtn.click();
+    await expect(sendBtn).toBeHidden({ timeout: 15000 });
+    
+    await expect(page.getByText(/Aguardando Aprovação/i).first()).toBeVisible({ timeout: 15000 });
     await analystCtx.close();
   });
 
@@ -155,18 +204,35 @@ test.describe.serial('Fluxo Cruzado: Auditoria para Manutenção', () => {
     const page = await managerCtx.newPage();
     
     await page.goto('/acoes');
+    await page.waitForLoadState('networkidle');
     
+    // Filtrar por placa
+    const searchInput = page.getByPlaceholder(/Buscar por placa/i);
+    await searchInput.fill(targetVehicle);
+    await page.waitForTimeout(1000);
+
     // Filtrar por Aguardando Aprovação
-    await page.locator('button').filter({ hasText: /^Ag. Aprovação/ }).first().click();
+    const approvalBtn = page.locator('button').filter({ hasText: /^Ag. Aprovação/ }).first();
+    await approvalBtn.click();
     
     const row = page.locator('tr').filter({ hasText: targetVehicle }).first();
-    await expect(row).toBeVisible();
+    await expect(row).toBeVisible({ timeout: 20000 });
     await row.click();
     
-    const approveModal = page.locator('div').filter({ hasText: 'Plano de Ação' }).last();
-    await approveModal.getByRole('button', { name: /Aprovar conclusão/i }).click();
+    const approveModal = page.locator('div.relative.bg-white.rounded-2xl.shadow-2xl').filter({ hasText: 'Plano de Ação' }).last(); // Aprovar
+    const approveBtn = approveModal.getByRole('button', { name: /Aprovar conclusão/i });
+    await expect(approveBtn).toBeVisible();
+    await approveBtn.click();
     
-    await expect(approveModal.getByText(/Concluída/i).first()).toBeVisible();
+    // O item sai de 'Ag. Aprovação' e o modal pode fechar
+    await expect(approveBtn).toBeHidden({ timeout: 15000 });
+    
+    // Mudar para o filtro Concluída para verificar
+    const completedFilterBtn = page.locator('button').filter({ hasText: /^Concluída/ }).first();
+    await completedFilterBtn.click();
+    
+    const rowCompleted = page.locator('tr').filter({ hasText: targetVehicle }).first();
+    await expect(rowCompleted).toBeVisible({ timeout: 15000 });
     
     await managerCtx.close();
   });

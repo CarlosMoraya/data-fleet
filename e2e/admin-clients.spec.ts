@@ -4,8 +4,24 @@ const TEST_CLIENT_NAME = `Teste E2E ${Date.now()}`;
 const EDITED_NAME = `${TEST_CLIENT_NAME} Editado`;
 
 test.describe.serial('Admin → Clientes', () => {
-  test('página carrega e exibe tabela de clientes', async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     await page.goto('/admin/clients');
+    const topSelect = page.locator('header select');
+    // Espera o carregamento inicial da aplicação (AuthContext)
+    await page.waitForTimeout(2000);
+    await expect(topSelect).toBeVisible({ timeout: 15000 });
+    
+    // Tenta selecionar até que o valor mude de fato
+    await expect(async () => {
+      await topSelect.selectOption('');
+      await expect(topSelect).toHaveValue('');
+    }).toPass({ timeout: 5000 });
+    
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000); 
+  });
+
+  test('página carrega e exibe tabela de clientes', async ({ page }) => {
     await expect(page.locator('h1', { hasText: 'Clientes' })).toBeVisible();
     await expect(page.locator('table')).toBeVisible();
   });
@@ -18,7 +34,6 @@ test.describe.serial('Admin → Clientes', () => {
   });
 
   test('cria novo cliente', async ({ page }) => {
-    await page.goto('/admin/clients');
     await page.click('button:has-text("Novo Cliente")');
 
     // Modal abre
@@ -32,7 +47,6 @@ test.describe.serial('Admin → Clientes', () => {
   });
 
   test('edita cliente existente', async ({ page }) => {
-    await page.goto('/admin/clients');
     await expect(page.locator('table').getByText(TEST_CLIENT_NAME)).toBeVisible({ timeout: 8000 });
 
     // Clica no botão de editar da linha do cliente criado
@@ -55,7 +69,6 @@ test.describe.serial('Admin → Clientes', () => {
   });
 
   test('busca filtra clientes por nome', async ({ page }) => {
-    await page.goto('/admin/clients');
     await page.fill('input[placeholder="Buscar por nome..."]', EDITED_NAME);
 
     // Apenas o cliente editado deve aparecer
@@ -67,7 +80,6 @@ test.describe.serial('Admin → Clientes', () => {
   });
 
   test('exclui cliente', async ({ page }) => {
-    await page.goto('/admin/clients');
     await expect(page.locator('table').getByText(EDITED_NAME)).toBeVisible({ timeout: 8000 });
 
     const row = page.locator('tr').filter({ hasText: EDITED_NAME });

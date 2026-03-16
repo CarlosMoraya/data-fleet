@@ -30,11 +30,8 @@ test.describe('Admin Master — Auditoria Sistemática', () => {
       await page.goto('/');
       await page.waitForLoadState('domcontentloaded');
       
-      // Tentar clicar no botão que contém o texto "Sair" de forma mais direta
-      await page.locator('button:has-text("Sair")').click({ timeout: 10000 }).catch(() => {
-        // Fallback para clicar no último botão da página (costuma ser o logout no sidebar)
-        return page.locator('button').last().click();
-      });
+      // Tentar clicar no botão que contém o texto "Logout"
+      await page.getByRole('button', { name: /Logout/i }).click({ timeout: 10000 });
       
       await expect(page).toHaveURL(/.*login.*/, { timeout: 20000 });
       
@@ -50,11 +47,16 @@ test.describe('Admin Master — Auditoria Sistemática', () => {
       await expect(page.getByRole('heading', { name: 'Clientes' })).toBeVisible();
       
       // IMPORTANTE: Garantir que "Todos os Clientes" está selecionado no Topbar
-      // Caso contrário, o novo cliente não aparecerá na lista devido ao filtro no Frontend
       const topbarSelect = page.locator('header select');
-      if (await topbarSelect.isVisible()) {
-        await topbarSelect.selectOption(''); // "" é "Todos os Clientes"
-      }
+      await page.waitForTimeout(2000);
+      await expect(topbarSelect).toBeVisible({ timeout: 15000 });
+      
+      await expect(async () => {
+        await topbarSelect.selectOption('');
+        await expect(topbarSelect).toHaveValue('');
+      }).toPass({ timeout: 5000 });
+      
+      await page.waitForTimeout(1000);
       
       // Criar cliente teste
       const clientName = `Audit Client ${Date.now()}`;

@@ -115,8 +115,23 @@ Para detalhes completos, consulte os módulos em `.claude/`.
 - **Auditoria Técnica Completa (2026-03-15)**: Execução de suíte E2E em todos os 6 perfis de usuário (Admin Master, Gerente, Analista, Assistente, Auditor e Motorista). 
   - **Resultados**: 100% de aprovação nos fluxos críticos.
   - **Correções**: Estabilização de seletores Playwright (case-insensitivity e strict mode) e refatoração de specs administrativos para suportar execução multi-projeto paralela.
-  1. **Admin Master**: Validado CRUD de Clientes/Veículos e Seletor Global.
-  2. **Auditor (Carlos)**: Confirmado redirecionamento para `/checklists` e bloqueio de áreas `/cadastros`.
-  3. **Motorista (Jorge)**: Validado preenchimento de Checklist via `Meu Veículo` e restrição de Auditoria.
-  4. **Analista/Assistente (Mariana/Pedro)**: Validada gestão de Planos de Ação e restrições de exclusão (Pedro).
-  5. **Gerente (Alexandre)**: Validado acesso total às Configurações de campos obrigatórios.
+  - [x] Admin Master: CRUD Clientes completo (Estabilizado)
+  - [x] Admin Master: CRUD Usuários completo (Estabilizado)
+  - [x] Fluxo Cruzado: Manutenção Corretiva (Passo 1-3 validado)
+  - [x] Logout: Correção de redirecionamento (Aguardando signOut)
+  - [x] Auditor (Carlos): Confirmado redirecionamento para `/checklists` e bloqueio de áreas `/cadastros`.
+  - [x] Motorista (Jorge): Validado preenchimento de Checklist via `Meu Veículo` e restrição de Auditoria.
+  - [x] Analista/Assistente (Mariana/Pedro): Validada gestão de Planos de Ação e restrições de exclusão (Pedro).
+  - [x] Gerente (Alexandre): Validado acesso total às Configurações de campos obrigatórios.
+
+- **Fluxos Cruzados (Cross-Profile) — Auditoria para Manutenção (2026-03-16)**: 
+  - Validado ciclo completo com sucesso: **Auditor (Carlos)** reporta inconformidade → **Analista (Mariana)** cria, executa e conclui Plano de Ação → **Gerente (Alexandre)** aprova.
+  - Estabilização crítica (`cross-profile-flows.spec.ts`):
+    - `e2e/admin-clients.spec.ts`: CRUD de clientes (Estabilizado com `beforeEach` para reset de filtro global).
+    - `e2e/admin-users.spec.ts`: CRUD de usuários (Estabilizado com `beforeEach` para reset de filtro global).
+    - `e2e/audit-admin-master.spec.ts`: Auditoria master (Logout fixado).
+    - `e2e/cross-profile-flows.spec.ts`: Fluxo corretiva (Carlos -> Mariana -> Alexandre).
+    - Corrigido alinhamento de status mappers (ex: "Em Andamento" vs "Em execução").
+    - Implementada lógica de reabertura de modal após transições de status (movimentação entre abas 'Pendente' e 'Em Andamento').
+    - Adicionada filtragem por placa (`searchInput`) para evitar colisão de dados durante os testes.
+    - Implementada limpeza robusta de rascunhos antes do início de novos ciclos.
