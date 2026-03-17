@@ -137,3 +137,24 @@ Para detalhes completos, consulte os módulos em `.claude/`.
     - Implementada limpeza robusta de rascunhos antes do início de novos ciclos.
 
 - **Campo Exercício CRLV (2026-03-16)**: Adicionado campo `crlvYear` (ano do exercício do CRLV) em `VehicleForm.tsx`, `Vehicle` interface, `VehicleRow` e `vehicleMappers`. Coluna `crlv_year` adicionada à tabela `vehicles` no Supabase. Storage de uploads já utiliza `upsert: true` para garantir sobrescrita de arquivos anteriores (eliminando "lixo" do bucket).
+
+- **Embarcadores + Unidades Operacionais (2026-03-17)**:
+  - **Backend**: Criada migration `create_shippers_and_operational_units.sql` (110 linhas) com 2 novas tabelas:
+    - `shippers` (id, client_id, name, cnpj unique per client, phone, email, contact_person, notes, active, created_at) com RLS (Fleet Assistant+ read/write, Manager+ delete)
+    - `operational_units` (id, client_id, shipper_id FK RESTRICT, name, code unique per client, city, state, notes, active, created_at) com RLS idêntica; FK RESTRICT garante não deletar embarcador com unidades vinculadas
+  - **Vehicle**: Adicionadas FK columns `shipper_id` e `operational_unit_id` (ambas nullable, ON DELETE SET NULL) com índices
+  - **Frontend - Componentes/Mappers**:
+    - `ShipperForm.tsx` (modal com 5 campos: name, cnpj, phone, email, contactPerson, notes, active)
+    - `OperationalUnitForm.tsx` (modal com shipperId required + name, code, city, state, notes, active)
+    - `shipperMappers.ts` e `operationalUnitMappers.ts` (padrão camelCase ↔ snake_case, reutiliza formatCNPJ)
+  - **Frontend - Páginas**:
+    - `Shippers.tsx` (CRUD completo, busca por nome/CNPJ, Fleet Assistant+ read, Fleet Analyst+ edit, Manager+ delete)
+    - `OperationalUnits.tsx` (CRUD com shipper name join, busca por nome/code/shipper, FK error handling amigável)
+  - **Frontend - Integração VehicleForm**:
+    - Nova seção "Logística" com 2 dropdowns em cascata: Embarcador → Unidade Operacional
+    - Seleção de unidade filtra por embarcador selecionado; unidade resets ao trocar embarcador
+    - Ambos aceitam "Nenhum" (veículo fora de operação)
+  - **Frontend - Routing**: Adicionadas rotas `/cadastros/embarcadores` e `/cadastros/unidades-operacionais` + abas em `Cadastros.tsx`
+  - **Testes E2E**: `shippers-operational-units.spec.ts` com 16 test cases validando CRUD com 3 perfis (Pedro/Mariana/Alexandre), cascading dropdown, FK RESTRICT
+  - **Validação Manual**: ✅ 100% passed — todos os 16 cenários de teste manual validados com sucesso, dados deixados no DB para testes futuros
+  - **Auto-Sync**: Atualizados `arch-frontend.md`, `arch-backend.md`, `data-model.md`, `testing.md`
