@@ -27,10 +27,23 @@ interface AvailableDriver {
   cpf: string;
 }
 
+interface AvailableShipper {
+  id: string;
+  name: string;
+}
+
+interface AvailableOperationalUnit {
+  id: string;
+  name: string;
+  shipperId: string;
+}
+
 interface VehicleFormProps {
   vehicle: Vehicle | null;
   fieldSettings: VehicleFieldSettings | null;
   availableDrivers: AvailableDriver[];
+  availableShippers: AvailableShipper[];
+  availableOperationalUnits: AvailableOperationalUnit[];
   onClose: () => void;
   onSave: (vehicle: Partial<Vehicle>, files: VehicleFormFiles) => Promise<void>;
 }
@@ -66,7 +79,7 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
   firstRevisionMaxKm: filterDigitsOnly,
 };
 
-export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, onClose, onSave }: VehicleFormProps) {
+export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, availableShippers, availableOperationalUnits, onClose, onSave }: VehicleFormProps) {
   const [formData, setFormData] = useState<Partial<Vehicle>>(() => {
     try {
       const savedData = sessionStorage.getItem('vehicleFormData');
@@ -132,6 +145,10 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
       setFormData(prev => ({ ...prev, [name]: checked }));
     } else if (name === 'driverId') {
       setFormData(prev => ({ ...prev, driverId: value || undefined }));
+    } else if (name === 'shipperId') {
+      setFormData(prev => ({ ...prev, shipperId: value || undefined, operationalUnitId: undefined }));
+    } else if (name === 'operationalUnitId') {
+      setFormData(prev => ({ ...prev, operationalUnitId: value || undefined }));
     } else if (name === 'category') {
       const newCategory = value as keyof typeof CATEGORY_TYPES_MAP | '';
       setFormData(prev => {
@@ -726,6 +743,47 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                   <p className="mt-1 text-xs text-zinc-400">
                     Apenas motoristas sem veículo atribuído são listados. Selecione "Nenhum motorista" para desassociar.
                   </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Logística */}
+            <div>
+              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Logística</h3>
+              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700">Embarcador</label>
+                  <select
+                    name="shipperId"
+                    value={formData.shipperId || ''}
+                    onChange={handleChange}
+                    className={inputClass}
+                  >
+                    <option value="">Nenhum embarcador</option>
+                    {availableShippers.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700">Unidade Operacional</label>
+                  <select
+                    name="operationalUnitId"
+                    value={formData.operationalUnitId || ''}
+                    onChange={handleChange}
+                    disabled={!formData.shipperId}
+                    className={`${inputClass} disabled:bg-zinc-50 disabled:text-zinc-400`}
+                  >
+                    <option value="">Nenhuma unidade</option>
+                    {availableOperationalUnits
+                      .filter(u => u.shipperId === formData.shipperId)
+                      .map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                  </select>
+                  {!formData.shipperId && (
+                    <p className="mt-1 text-xs text-zinc-400">Selecione um embarcador primeiro.</p>
+                  )}
                 </div>
               </div>
             </div>

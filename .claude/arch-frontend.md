@@ -16,8 +16,10 @@ src/
 │   ├── Layout.tsx       # Shell: Sidebar + Topbar + Outlet
 │   ├── Sidebar.tsx      # Menu lateral com navegação
 │   ├── Topbar.tsx       # Barra superior (client switcher, user info)
-│   ├── VehicleForm.tsx  # Formulário multi-step para veículos (prop: availableDrivers)
+│   ├── VehicleForm.tsx  # Formulário multi-step para veículos (props: availableDrivers, availableShippers, availableOperationalUnits)
 │   ├── DriverForm.tsx   # Formulário para motoristas (CNH, GR, certificados + email/senha ao criar, cria usuário via Edge Function)
+│   ├── ShipperForm.tsx  # Formulário modal para embarcadores (name, cnpj, phone, email, contactPerson, notes, active)
+│   ├── OperationalUnitForm.tsx # Formulário modal para unidades operacionais (shipperId required, name, code, city, state, notes, active)
 │   ├── WorkshopForm.tsx # Formulário modal para oficinas (sem uploads, 3 seções)
 │   ├── VehicleDetailModal.tsx  # Modal read-only de detalhes do veículo (8 seções, links de uploads)
 │   ├── DriverDetailModal.tsx   # Modal read-only de detalhes do motorista (5 seções, links de uploads)
@@ -31,7 +33,9 @@ src/
 ├── lib/
 │   ├── supabase.ts      # Supabase client (VITE_SUPABASE_URL + ANON_KEY)
 │   ├── utils.ts         # cn() helper (clsx + tailwind-merge)
-│   ├── vehicleMappers.ts  # Mapper camelCase (TS) ↔ snake_case (Supabase) para Vehicle
+│   ├── vehicleMappers.ts  # Mapper camelCase (TS) ↔ snake_case (Supabase) para Vehicle (agora com shipper_id e operational_unit_id)
+│   ├── shipperMappers.ts  # Mapper camelCase (TS) ↔ snake_case (Supabase) para Shipper (re-exporta formatCNPJ)
+│   ├── operationalUnitMappers.ts # Mapper camelCase (TS) ↔ snake_case (Supabase) para OperationalUnit (normaliza code/state uppercase)
 │   ├── driverMappers.ts   # Mapper camelCase (TS) ↔ snake_case (Supabase) para Driver
 │   ├── workshopMappers.ts # Mapper camelCase (TS) ↔ snake_case (Supabase) + formatCNPJ() + WORKSHOP_SPECIALTIES
 │   ├── fieldSettingsMappers.ts  # Mapper + CONFIGURABLE_FIELDS + isFieldRequired() para Veículo
@@ -45,8 +49,10 @@ src/
 ├── pages/
 │   ├── Login.tsx        # Login com email/senha (Supabase Auth)
 │   ├── Dashboard.tsx    # KPIs + gráficos (ainda mock data)
-│   ├── Cadastros.tsx    # Layout wrapper com abas (Veículos, Motoristas, Oficinas, Usuários) + <Outlet />
-│   ├── Vehicles.tsx     # CRUD de veículos (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → VehicleDetailModal
+│   ├── Cadastros.tsx    # Layout wrapper com abas (Veículos, Motoristas, Embarcadores, Unidades Operacionais, Oficinas, Usuários) + <Outlet />
+│   ├── Vehicles.tsx     # CRUD de veículos (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → VehicleDetailModal + carrega availableShippers/Units para VehicleForm
+│   ├── Shippers.tsx     # CRUD de embarcadores (Fleet Assistant+ acessa, Fleet Analyst+ edita, Manager+ deleta) + busca por nome/CNPJ
+│   ├── OperationalUnits.tsx # CRUD de unidades operacionais (Fleet Assistant+ acessa, Fleet Analyst+ edita, Manager+ deleta) + busca por nome/código/embarcador + FK restrict validation
 │   ├── Drivers.tsx      # CRUD de motoristas (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → DriverDetailModal
 │   ├── Workshops.tsx    # CRUD de oficinas (Fleet Assistant+ acessa, Fleet Analyst+ edita, Manager+ deleta ou Fleet Analyst com flag) + botão Eye → WorkshopDetailModal
 │   ├── Checklists.tsx   # Página de checklists: Driver vê todos os templates publicados da categoria do seu veículo; Auditor seleciona veículo no dropdown e vê apenas templates de Auditoria; Assistant+ vê tabela do tenant. Histórico com busca e filtro de status. **Lookup de veículo via drivers.profile_id → vehicles.driver_id**
@@ -66,14 +72,14 @@ src/
 
 - Rotas protegidas aninhadas sob `<Layout>` (`/`)
 - Não há route guard real — fluxo de login é UI-driven
-- **Nested routes under `/cadastros`**: `/cadastros/veiculos`, `/cadastros/motoristas`, `/cadastros/oficinas`, `/cadastros/usuarios`
+- **Nested routes under `/cadastros`**: `/cadastros/veiculos`, `/cadastros/embarcadores`, `/cadastros/unidades-operacionais`, `/cadastros/motoristas`, `/cadastros/oficinas`, `/cadastros/usuarios`
 - **Route Guards por role**:
   - Driver/Yard Auditor → redirect `/` para `/checklists`
   - Admin Master → acesso a `/admin/*`
   - Fleet Assistant+ → acesso a `/cadastros/*` (abas visíveis)
   - Manager+ → acesso a `/settings`
 - **Backward compatibility**: `/vehicles` → `/cadastros/veiculos`, `/drivers` → `/cadastros/motoristas`, `/users` → `/cadastros/usuarios`
-- **Rotas disponíveis**: `/`, `/cadastros/*`, `/checklists`, `/checklists/preencher/:checklistId`, `/checklist-templates`, `/acoes`, `/settings`, `/admin/clients`, `/admin/users`
+- **Rotas disponíveis**: `/`, `/cadastros/veiculos`, `/cadastros/embarcadores`, `/cadastros/unidades-operacionais`, `/cadastros/motoristas`, `/cadastros/oficinas`, `/cadastros/usuarios`, `/checklists`, `/checklists/preencher/:checklistId`, `/checklist-templates`, `/acoes`, `/settings`, `/admin/clients`, `/admin/users`
 
 ## Layout Shell
 
@@ -103,6 +109,11 @@ O `Layout.tsx` renderiza:
 - **Gráficos**: `Recharts` (BarChart, PieChart) no Dashboard, filtrados por `currentClient.id`
 - **Navegação em abas**: `Cadastros.tsx` e `Settings.tsx` utilizam navegação por abas com estilo ativo (border-b-2 orange). `Cadastros` utiliza sub-rotas via `<Outlet />`, enquanto `Settings` utiliza estado local (`activeTab`) para alternar as seções.
 - **Sidebar**: item único "Cadastros" (`FolderOpen` icon) → `/cadastros`, substitui items individuais de Veículos/Motoristas/Usuários. Novos itens: "Plano de Ação" (`ClipboardList`) para Fleet Assistant+; "Templates" (`FileStack`) para Fleet Analyst+
+- **Integração Embarcadores + Veículos**: Seção "Logística" em VehicleForm com 2 dropdowns em cascata:
+  - Dropdown 1: Embarcador (lista de shippers ativos, "Nenhum embarcador" option)
+  - Dropdown 2: Unidade Operacional (filtrada por embarcador selecionado, disabled até selecionar embarcador)
+  - Ao trocar embarcador: unidade é resetada, lista é recalculada
+  - Padrão identico a VehicleForm com disponibleDrivers
 - **Modais de detalhe (read-only)**:
   - `VehicleDetailModal` renderiza 8 seções (Identificação, Propriedade, Equipamentos, Adicionais, Motorista, Documentos com links, Garantia, Seguro/Manutenção) a partir de um objeto `Vehicle`
   - `DriverDetailModal` renderiza 5 seções (Dados Pessoais, CNH, GR, Certificados, Veículo Associado) com links para uploads

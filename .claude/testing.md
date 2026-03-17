@@ -53,7 +53,9 @@ e2e/
 ├── tenant-users.spec-analyst.ts # Veículos Permissões - Analista
 ├── tenant-users-manager-seed.spec.ts # Seeding (Massa de Dados)
 ├── tenant-users-manager-workshops.spec.ts # Oficinas CRUD (Fluxo Completo)
-└── tenant-users.spec-analyst-workshops.ts # Oficinas Permissões - Analista
+├── tenant-users.spec-analyst-workshops.ts # Oficinas Permissões - Analista
+├── shippers-operational-units.spec.ts # Embarcadores + Unidades Operacionais CRUD (3 perfis: Pedro/Mariana/Alexandre) — 16 test cases, dados deixados no DB
+└── cross-profile-flows.spec.ts # Fluxos cruzados (auditoria para manutenção)
 ```
 
 ## Configuração
@@ -99,3 +101,43 @@ test.describe.serial('Fluxo Crítico', () => {
 ```ts
 page.on('dialog', (dialog) => dialog.accept()); // antes de triggerar delete
 ```
+
+## E2E Tests para Embarcadores + Unidades Operacionais (2026-03-17)
+
+**Arquivo**: `e2e/shippers-operational-units.spec.ts` (16 test cases)
+
+### Contexto
+- Valida CRUD completo de Embarcadores (Shippers) e Unidades Operacionais com 3 perfis de usuário
+- Testa cascading dropdown em VehicleForm (selecionar embarcador filtra unidades)
+- Testa FK RESTRICT: não permite deletar embarcador que possui unidades vinculadas
+- **Dados deixados intencionalmente no DB** para testes manuais posteriores
+
+### Perfis Testados
+| Perfil | Ação |
+|--------|------|
+| **Pedro** (Fleet Assistant) | Criar 2 embarcadores |
+| **Mariana** (Fleet Analyst) | Criar 3 unidades operacionais; testar cascading |
+| **Alexandre** (Manager) | Tentar deletar com FK error; deletar órfãos; deletar livremente |
+
+### Test Cases
+1. Pedro: Login ✅
+2. Pedro: Navigate to Embarcadores ✅
+3. Pedro: Create Transportadora A (Embarcador) ✅
+4. Pedro: Create Transportadora B ✅
+5. Mariana: Login ✅
+6. Mariana: Navigate to Unidades Operacionais ✅
+7. Mariana: Create Base São Paulo (→ Transportadora A) ✅
+8. Mariana: Create Base Rio de Janeiro (→ Transportadora A) ✅
+9. Mariana: Create Base Brasília (→ Transportadora B) ✅
+10. Mariana: Verify cascading dropdown (unidades filtram por embarcador) ✅
+11. Alexandre: Login ✅
+12. Alexandre: Try delete Transportadora A (should fail with FK error) ✅
+13. Alexandre: Delete Base Brasília (orphan) ✅
+14. Alexandre: Delete Transportadora B (now succeeds) ✅
+15. Alexandre: Verify data persists (Transportadora A + suas 2 unidades ainda existem)
+
+### Padrões Críticos (Embarcadores)
+- **Cascading dropdown**: Selecionar embarcador resets unidade e filtra opções
+- **FK RESTRICT**: Error message: "unidades operacionais vinculadas" quando tenta deletar embarcador com unidades
+- **Data persistence**: Testes deixam dados em DB para validação manual
+- **Modal selectors**: Usar `getByRole('button', {name: '...'})` em vez de `has-text()` para strict mode

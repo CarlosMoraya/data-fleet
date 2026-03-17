@@ -20,6 +20,16 @@ const TABS = [
     roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'],
   },
   {
+    name: 'Embarcadores',
+    to: '/cadastros/embarcadores',
+    roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'],
+  },
+  {
+    name: 'Unid. Operacionais',
+    to: '/cadastros/unidades-operacionais',
+    roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'],
+  },
+  {
     name: 'Usuários',
     to: '/cadastros/usuarios',
     roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'],

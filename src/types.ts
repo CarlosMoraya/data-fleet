@@ -197,6 +197,10 @@ export interface Vehicle {
   // Associação motorista (1:1)
   driverId?: string;    // FK → drivers.id (nullable)
   driverName?: string;  // Nome do motorista (vem do JOIN, não persistido diretamente)
+  shipperId?: string;              // FK → shippers.id (nullable)
+  shipperName?: string;            // from JOIN
+  operationalUnitId?: string;      // FK → operational_units.id (nullable)
+  operationalUnitName?: string;    // from JOIN
 
   // Garantia & Revisões
   warranty?: boolean;
@@ -258,6 +262,31 @@ export interface Workshop {
   addressState?: string;
   addressZip?: string;
   specialties?: string[];
+  notes?: string;
+  active: boolean;
+}
+
+export interface Shipper {
+  id: string;
+  clientId: string;
+  name: string;
+  cnpj?: string;
+  phone?: string;
+  email?: string;
+  contactPerson?: string;
+  notes?: string;
+  active: boolean;
+}
+
+export interface OperationalUnit {
+  id: string;
+  clientId: string;
+  shipperId: string;       // FK obrigatória → Shipper
+  shipperName?: string;    // from JOIN
+  name: string;
+  code?: string;
+  city?: string;
+  state?: string;
   notes?: string;
   active: boolean;
 }

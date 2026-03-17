@@ -44,6 +44,8 @@ export interface VehicleRow {
   gr_expiration_date: string | null;
   category: string | null;
   driver_id: string | null;
+  shipper_id: string | null;
+  operational_unit_id: string | null;
   pbt: number | null;
   cmt: number | null;
   eixos: number | null;
@@ -98,6 +100,10 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
     category: row.category as Vehicle['category'] ?? undefined,
     driverId: row.driver_id ?? undefined,
     driverName: (row as VehicleRow & { drivers?: { name: string } }).drivers?.name ?? undefined,
+    shipperId: row.shipper_id ?? undefined,
+    shipperName: (row as VehicleRow & { shippers?: { name: string } }).shippers?.name ?? undefined,
+    operationalUnitId: row.operational_unit_id ?? undefined,
+    operationalUnitName: (row as VehicleRow & { operational_units?: { name: string } }).operational_units?.name ?? undefined,
     pbt: row.pbt ?? undefined,
     cmt: row.cmt ?? undefined,
     eixos: row.eixos ?? undefined,
@@ -151,6 +157,8 @@ export function vehicleToRow(vehicle: Partial<Vehicle>, clientId: string): Omit<
     gr_expiration_date: vehicle.grExpirationDate ?? null,
     category: vehicle.category ?? null,
     driver_id: vehicle.driverId ?? null,
+    shipper_id: vehicle.shipperId ?? null,
+    operational_unit_id: vehicle.operationalUnitId ?? null,
     pbt: vehicle.pbt != null ? commaToFloat(vehicle.pbt) : null,
     cmt: vehicle.cmt != null ? commaToFloat(vehicle.cmt) : null,
     eixos: vehicle.eixos != null ? parseInt(String(vehicle.eixos), 10) : null,

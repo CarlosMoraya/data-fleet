@@ -82,7 +82,7 @@ interface Vehicle {
   status: 'Available' | 'Maintenance' | 'In Use';
   autonomy: number;
   tag?: string;
-  
+
   // Documentos (URLs)
   crlvUpload?: string;
   sanitaryInspectionUpload?: string;
@@ -102,6 +102,45 @@ interface Vehicle {
   // Associação motorista (1:1)
   driverId?: string;    // FK → drivers.id (nullable)
   driverName?: string;  // Nome do motorista (vem do JOIN, não persistido diretamente)
+
+  // Associação logística (N:1 embarcador, N:1 unidade operacional)
+  shipperId?: string;           // FK → shippers.id (nullable) — veículo pode estar fora de operação
+  shipperName?: string;         // Nome do embarcador (vem do JOIN, não persistido diretamente)
+  operationalUnitId?: string;   // FK → operational_units.id (nullable) — depende de shipperId
+  operationalUnitName?: string; // Nome da unidade (vem do JOIN, não persistido diretamente)
+}
+```
+
+### Shipper
+```ts
+interface Shipper {
+  id: string;
+  clientId: string;
+  name: string;              // Obrigatório
+  cnpj?: string;             // CNPJ único por cliente (armazenar somente dígitos)
+  phone?: string;
+  email?: string;
+  contactPerson?: string;
+  notes?: string;
+  active: boolean;
+  createdAt?: string;
+}
+```
+
+### OperationalUnit
+```ts
+interface OperationalUnit {
+  id: string;
+  clientId: string;
+  shipperId: string;         // FK obrigatória (RESTRICT on delete)
+  shipperName?: string;      // Nome do embarcador (vem do JOIN, não persistido diretamente)
+  name: string;              // Obrigatório
+  code?: string;             // Código único por cliente
+  city?: string;
+  state?: string;            // UF (2 chars, normalizado uppercase)
+  notes?: string;
+  active: boolean;
+  createdAt?: string;
 }
 ```
 
@@ -289,9 +328,10 @@ interface Checklist {
 Tabelas ativas:
 - `profiles` (id UUID PK → auth.users, name, email, role, client_id FK → clients, can_delete_vehicles, can_delete_drivers, can_delete_workshops)
 - `clients` (id UUID PK, name, logo_url)
-- `vehicles` (id UUID PK, client_id FK → clients, brand, model, crlv_upload, renavam, chassi, etc. + check constraints atualizados para incluir 'Agregado' na aquisição)
+- `vehicles` (id UUID PK, client_id FK → clients, brand, model, crlv_upload, renavam, chassi, etc. + check constraints atualizados para incluir 'Agregado' na aquisição; adicionado `driver_id UUID NULL FK → drivers(id) ON DELETE SET NULL` + `UNIQUE INDEX idx_vehicles_driver_unique WHERE driver_id IS NOT NULL` (garante 1:1); adicionado `shipper_id UUID NULL FK → shippers(id) ON DELETE SET NULL` e `operational_unit_id UUID NULL FK → operational_units(id) ON DELETE SET NULL`)
 - `vehicle_field_settings` (client_id PK/FK → clients, renavam_optional, chassi_optional, e demais flags de configurabilidade)
-- `vehicles` — adicionado: `driver_id UUID NULL FK → drivers(id) ON DELETE SET NULL` + `UNIQUE INDEX idx_vehicles_driver_unique WHERE driver_id IS NOT NULL` (garante 1:1)
+- `shippers` (id UUID PK, client_id FK → clients, name NOT NULL, cnpj — UNIQUE(client_id, cnpj) nullable, phone, email, contact_person, notes, active, created_at) com RLS policies + índices
+- `operational_units` (id UUID PK, client_id FK → clients, shipper_id UUID NOT NULL FK → shippers(id) ON DELETE RESTRICT, name NOT NULL, code, city, state, notes, active, created_at) com RLS policies + partial unique index `(client_id, code) WHERE code IS NOT NULL`
 - `drivers` (id UUID PK, client_id FK, **profile_id UUID UNIQUE FK → profiles(id)**, name, cpf — UNIQUE(client_id, cpf), issue_date, expiration_date, cnh_upload, registration_number, category, renach, gr_upload, gr_expiration_date, certificate1_upload, course_name1, certificate2_upload, course_name2, certificate3_upload, course_name3) + INDEX idx_drivers_profile_id
 - `driver_field_settings` (client_id PK/FK → clients, issue_date_optional, cnh_upload_optional, e demais flags)
 - `workshops` (id UUID PK, client_id FK → clients, name, cnpj — UNIQUE(client_id, cnpj), phone, email, contact_person, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_zip, specialties TEXT[], notes, active, created_at, updated_at) com RLS policies

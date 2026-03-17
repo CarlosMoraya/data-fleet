@@ -16,6 +16,17 @@ interface AvailableDriver {
   cpf: string;
 }
 
+interface AvailableShipper {
+  id: string;
+  name: string;
+}
+
+interface AvailableOperationalUnit {
+  id: string;
+  name: string;
+  shipperId: string;
+}
+
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
 const ROLES_CAN_EDIT = ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
@@ -40,6 +51,8 @@ export default function Vehicles() {
   });
   const [fieldSettings, setFieldSettings] = useState<VehicleFieldSettings | null>(null);
   const [availableDrivers, setAvailableDrivers] = useState<AvailableDriver[]>([]);
+  const [availableShippers, setAvailableShippers] = useState<AvailableShipper[]>([]);
+  const [availableOperationalUnits, setAvailableOperationalUnits] = useState<AvailableOperationalUnit[]>([]);
   const [viewingVehicle, setViewingVehicle] = useState<Vehicle | null>(null);
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
@@ -54,7 +67,7 @@ export default function Vehicles() {
   const fetchVehicles = useCallback(async () => {
     setLoading(true);
     setError(null);
-    let query = supabase.from('vehicles').select('*, drivers(name)');
+    let query = supabase.from('vehicles').select('*, drivers(name), shippers(name), operational_units(name)');
     
     if (currentClient?.id) {
       query = query.eq('client_id', currentClient.id);
@@ -106,10 +119,35 @@ export default function Vehicles() {
     setFieldSettings(data ? fieldSettingsFromRow(data as VehicleFieldSettingsRow) : defaultFieldSettings(currentClient.id));
   }, [currentClient?.id]);
 
+  const fetchAvailableShippersAndUnits = useCallback(async () => {
+    let shippersQuery = supabase.from('shippers').select('id, name').eq('active', true);
+    let unitsQuery = supabase.from('operational_units').select('id, name, shipper_id').eq('active', true);
+
+    if (currentClient?.id) {
+      shippersQuery = shippersQuery.eq('client_id', currentClient.id);
+      unitsQuery = unitsQuery.eq('client_id', currentClient.id);
+    }
+
+    const [{ data: shippersData }, { data: unitsData }] = await Promise.all([
+      shippersQuery.order('name'),
+      unitsQuery.order('name'),
+    ]);
+
+    setAvailableShippers((shippersData ?? []) as AvailableShipper[]);
+    setAvailableOperationalUnits(
+      (unitsData ?? []).map((u: { id: string; name: string; shipper_id: string }) => ({
+        id: u.id,
+        name: u.name,
+        shipperId: u.shipper_id,
+      }))
+    );
+  }, [currentClient?.id]);
+
   useEffect(() => {
     fetchVehicles();
     fetchFieldSettings();
-  }, [fetchVehicles, fetchFieldSettings]);
+    fetchAvailableShippersAndUnits();
+  }, [fetchVehicles, fetchFieldSettings, fetchAvailableShippersAndUnits]);
 
   useEffect(() => {
     if (isFormOpen) {
@@ -378,6 +416,8 @@ export default function Vehicles() {
           vehicle={editingVehicle}
           fieldSettings={fieldSettings}
           availableDrivers={availableDrivers}
+          availableShippers={availableShippers}
+          availableOperationalUnits={availableOperationalUnits}
           onClose={() => {
             setIsFormOpen(false);
             setEditingVehicle(null);

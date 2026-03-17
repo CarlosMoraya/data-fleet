@@ -22,6 +22,8 @@ import AdminUsers from './pages/AdminUsers';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
 import Cadastros from './pages/Cadastros';
+import Shippers from './pages/Shippers';
+import OperationalUnits from './pages/OperationalUnits';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -44,6 +46,8 @@ export default function App() {
               <Route path="veiculos" element={<Vehicles />} />
               <Route path="motoristas" element={<Drivers />} />
               <Route path="oficinas" element={<Workshops />} />
+              <Route path="embarcadores" element={<Shippers />} />
+              <Route path="unidades-operacionais" element={<OperationalUnits />} />
               <Route path="usuarios" element={<Users />} />
             </Route>
             {/* Redirects para compatibilidade com rotas antigas */}

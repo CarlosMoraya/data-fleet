@@ -18,8 +18,10 @@
 ### Tabelas existentes
 - `profiles` — dados do usuário (vinculado a auth.users, can_delete_vehicles, can_delete_drivers, can_delete_workshops flags)
 - `clients` — tenants/empresas (id, name, logo_url)
-- `vehicles` — veículos da frota (CRUD completo com RLS); coluna `driver_id UUID NULL FK → drivers(id) ON DELETE SET NULL` + índice único parcial `WHERE driver_id IS NOT NULL` garante associação 1:1 motorista×veículo
+- `vehicles` — veículos da frota (CRUD completo com RLS); coluna `driver_id UUID NULL FK → drivers(id) ON DELETE SET NULL` + índice único parcial `WHERE driver_id IS NOT NULL` garante associação 1:1 motorista×veículo; **NOVO**: `shipper_id UUID NULL FK → shippers(id) ON DELETE SET NULL` + `operational_unit_id UUID NULL FK → operational_units(id) ON DELETE SET NULL`
 - `vehicle_field_settings` — configurações dinâmicas de campos obrigatórios de veículo por cliente
+- `shippers` — embarcadores (CRUD com RLS, CNPJ único por cliente, 6 campos opcionais); FK RESTRICT (não permite deletar se houver unidades vinculadas)
+- `operational_units` — unidades operacionais (CRUD com RLS, code único por cliente); FK obrigatória para shipper (RESTRICT on delete)
 - `drivers` — motoristas (CRUD com RLS, CPF único por cliente, 5 uploads de documento)
 - `driver_field_settings` — configurações dinâmicas de campos obrigatórios de motorista por cliente
 - `workshops` — oficinas parceiras (CRUD com RLS, CNPJ único por cliente, sem uploads)
@@ -38,9 +40,23 @@
 - `driver-documents` — CNH, GR, certificados para motoristas
 - `checklist-photos` — fotos capturadas via câmera durante checklists. Path: `{client_id}/{checklist_id}/{item_id}/{timestamp}.jpg`. Políticas via `create_checklist_photos_bucket.sql`: SELECT público; INSERT/UPDATE para qualquer autenticado do tenant (Driver, Auditor, etc.); DELETE apenas Fleet Analyst+
 
+### Tabela `shippers` RLS:
+- SELECT: Fleet Assistant (rank 3)+ do próprio tenant + Admin Master
+- INSERT/UPDATE: Fleet Assistant (rank 3)+ do próprio tenant + Admin Master
+- DELETE: Manager (rank 5)+ OU Fleet Analyst (rank 4) com `can_delete_shippers = true` (se aplicável)
+- Unique constraint: `(client_id, cnpj)` com CNPJ nullable
+
+### Tabela `operational_units` RLS:
+- SELECT: Fleet Assistant (rank 3)+ do próprio tenant + Admin Master
+- INSERT/UPDATE: Fleet Assistant (rank 3)+ do próprio tenant + Admin Master
+- DELETE: Manager (rank 5)+ OU Fleet Analyst (rank 4) com `can_delete_operational_units = true` (se aplicável)
+- FK constraint: `shipper_id` com `ON DELETE RESTRICT` — não permite deletar embarcador com unidades vinculadas
+- Unique partial index: `(client_id, code)` WHERE code IS NOT NULL
+
 ### Migrations Ativas
 - `create_drivers_tables.sql` — tabelas `drivers` e `driver_field_settings`
 - `add_driver_profile_link.sql` — adiciona coluna `profile_id UUID UNIQUE FK → profiles(id)` + INDEX `idx_drivers_profile_id` na tabela `drivers` para ligar cada motorista a seu perfil de usuário do sistema (2026-03-14)
+- `create_shippers_and_operational_units.sql` — tabelas `shippers` e `operational_units` com RLS policies, FK columns em `vehicles` (2026-03-17)
 
 ### RLS — Padrões de Checklists
 - `checklists` SELECT: Driver/Auditor vê os próprios; Fleet Assistant+ vê todo o tenant; Admin Master vê tudo
