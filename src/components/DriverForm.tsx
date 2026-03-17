@@ -11,6 +11,7 @@ import {
   filterCPF,
   filterCNHCategory,
 } from '../lib/inputHelpers';
+import { extractCnhData, ExtractionStatus, ExtractionResult } from '../lib/documentOcr';
 
 interface DriverFormFiles {
   cnh: File | null;
@@ -57,6 +58,8 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCnhFile, setSelectedCnhFile] = useState<File | null>(null);
+  const [cnhExtractionStatus, setCnhExtractionStatus] = useState<ExtractionStatus>('idle');
+  const [cnhExtractionResult, setCnhExtractionResult] = useState<ExtractionResult<Driver> | null>(null);
   const [selectedGRFile, setSelectedGRFile] = useState<File | null>(null);
   const [selectedCert1File, setSelectedCert1File] = useState<File | null>(null);
   const [selectedCert2File, setSelectedCert2File] = useState<File | null>(null);
@@ -101,7 +104,47 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
       }
     };
 
-  const handleCnhFileChange = makeFileHandler(setSelectedCnhFile);
+  const handleCnhFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    if (!file) {
+      setSelectedCnhFile(null);
+      return;
+    }
+    try {
+      validateFile(file);
+      setSelectedCnhFile(file);
+      setError(null);
+      setCnhExtractionStatus('extracting');
+      setCnhExtractionResult(null);
+      const result = await extractCnhData(file);
+      setCnhExtractionResult(result);
+      if (result.fieldCount === 0) {
+        setCnhExtractionStatus('failed');
+      } else if (result.fieldCount < result.totalFields) {
+        setCnhExtractionStatus('partial');
+      } else {
+        setCnhExtractionStatus('success');
+      }
+      if (result.fieldCount > 0) {
+        setFormData(prev => {
+          const merged = { ...prev };
+          for (const [key, value] of Object.entries(result.data)) {
+            if (value != null && value !== '') {
+              // Em criação: preenche tudo. Em edição: só preenche campos vazios.
+              if (!driver || !prev[key as keyof Driver]) {
+                (merged as Record<string, unknown>)[key] = value;
+              }
+            }
+          }
+          return merged;
+        });
+      }
+    } catch (err: unknown) {
+      setSelectedCnhFile(null);
+      setError((err as Error).message);
+      e.target.value = '';
+    }
+  };
   const handleGRFileChange = makeFileHandler(setSelectedGRFile);
   const handleCert1FileChange = makeFileHandler(setSelectedCert1File);
   const handleCert2FileChange = makeFileHandler(setSelectedCert2File);
@@ -405,6 +448,34 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     Formatos aceitos: PDF, JPG, PNG, WEBP. Máximo 10MB.
                     {formData.cnhUpload ? ' Selecionar um novo arquivo irá substituir o atual.' : ''}
                   </p>
+                  {cnhExtractionStatus === 'extracting' && (
+                    <div className="mt-2 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                      <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                      Extraindo dados do documento…
+                    </div>
+                  )}
+                  {cnhExtractionStatus === 'success' && cnhExtractionResult && (
+                    <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                      {cnhExtractionResult.fieldCount} campos preenchidos automaticamente via{' '}
+                      {cnhExtractionResult.method === 'regex' ? 'leitura direta' : 'IA'}. Confira os valores e ajuste se necessário.
+                    </div>
+                  )}
+                  {cnhExtractionStatus === 'partial' && cnhExtractionResult && (
+                    <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                      {cnhExtractionResult.fieldCount}/{cnhExtractionResult.totalFields} campos extraídos via{' '}
+                      {cnhExtractionResult.method === 'regex' ? 'leitura direta' : 'IA'}.
+                      {cnhExtractionResult.warnings.length > 0 && (
+                        <span className="block mt-0.5 text-xs">
+                          Não encontrados: {cnhExtractionResult.warnings.join(', ')}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {cnhExtractionStatus === 'failed' && (
+                    <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      Não foi possível extrair dados do documento. Preencha os campos manualmente.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

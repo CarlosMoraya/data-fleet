@@ -11,6 +11,7 @@ import {
   filterAlpha,
   filterAlphanumeric,
 } from '../lib/inputHelpers';
+import { extractCrlvData, ExtractionStatus, ExtractionResult } from '../lib/documentOcr';
 
 interface VehicleFormFiles {
   crlv: File | null;
@@ -51,6 +52,7 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
   fipePrice: filterNumericComma,
   tracker: filterText,
   antt: filterDigitsOnly,
+  crlvYear: filterDigitsOnly,
   autonomy: filterNumericComma,
   fuelType: filterText,
   tankCapacity: filterNumericComma,
@@ -91,6 +93,8 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCrlvFile, setSelectedCrlvFile] = useState<File | null>(null);
+  const [crlvExtractionStatus, setCrlvExtractionStatus] = useState<ExtractionStatus>('idle');
+  const [crlvExtractionResult, setCrlvExtractionResult] = useState<ExtractionResult<Vehicle> | null>(null);
   const [selectedSanitaryFile, setSelectedSanitaryFile] = useState<File | null>(null);
   const [selectedGRFile, setSelectedGRFile] = useState<File | null>(null);
   const [selectedInsurancePolicyFile, setSelectedInsurancePolicyFile] = useState<File | null>(null);
@@ -167,7 +171,47 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
       }
     };
 
-  const handleCrlvFileChange = makeFileHandler(setSelectedCrlvFile);
+  const handleCrlvFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    if (!file) {
+      setSelectedCrlvFile(null);
+      return;
+    }
+    try {
+      validateFile(file);
+      setSelectedCrlvFile(file);
+      setError(null);
+      setCrlvExtractionStatus('extracting');
+      setCrlvExtractionResult(null);
+      const result = await extractCrlvData(file);
+      setCrlvExtractionResult(result);
+      if (result.fieldCount === 0) {
+        setCrlvExtractionStatus('failed');
+      } else if (result.fieldCount < result.totalFields) {
+        setCrlvExtractionStatus('partial');
+      } else {
+        setCrlvExtractionStatus('success');
+      }
+      if (result.fieldCount > 0) {
+        setFormData(prev => {
+          const merged = { ...prev };
+          for (const [key, value] of Object.entries(result.data)) {
+            if (value != null && value !== '') {
+              // Em criação: preenche tudo. Em edição: só preenche campos vazios.
+              if (!vehicle || !prev[key as keyof Vehicle]) {
+                (merged as Record<string, unknown>)[key] = value;
+              }
+            }
+          }
+          return merged;
+        });
+      }
+    } catch (err: unknown) {
+      setSelectedCrlvFile(null);
+      setError((err as Error).message);
+      e.target.value = '';
+    }
+  };
   const handleSanitaryFileChange = makeFileHandler(setSelectedSanitaryFile);
   const handleGRFileChange = makeFileHandler(setSelectedGRFile);
   const handleInsurancePolicyFileChange = makeFileHandler(setSelectedInsurancePolicyFile);
@@ -362,6 +406,11 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                   <input type="text" name="tag" required={req('tag')} value={formData.tag || ''} onChange={handleChange} className={inputClass} placeholder="Código do dispositivo" />
                 </div>
 
+                <div>
+                  <Label name="crlvYear">Exercício CRLV</Label>
+                  <input type="text" name="crlvYear" required={req('crlvYear')} inputMode="numeric" maxLength={4} placeholder="Ex: 2025" value={formData.crlvYear || ''} onChange={handleChange} className={inputClass} />
+                </div>
+
                 {/* CRLV Upload */}
                 <div className="sm:col-span-2">
                   <Label name="crlvUpload">CRLV — Documento do Veículo</Label>
@@ -377,6 +426,34 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                     Formatos aceitos: PDF, JPG, PNG, WEBP. Máximo 10MB.
                     {formData.crlvUpload ? ' Selecionar um novo arquivo irá substituir o atual.' : ''}
                   </p>
+                  {crlvExtractionStatus === 'extracting' && (
+                    <div className="mt-2 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                      <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                      Extraindo dados do documento…
+                    </div>
+                  )}
+                  {crlvExtractionStatus === 'success' && crlvExtractionResult && (
+                    <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                      {crlvExtractionResult.fieldCount} campos preenchidos automaticamente via{' '}
+                      {crlvExtractionResult.method === 'regex' ? 'leitura direta' : 'IA'}. Confira os valores e ajuste se necessário.
+                    </div>
+                  )}
+                  {crlvExtractionStatus === 'partial' && crlvExtractionResult && (
+                    <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                      {crlvExtractionResult.fieldCount}/{crlvExtractionResult.totalFields} campos extraídos via{' '}
+                      {crlvExtractionResult.method === 'regex' ? 'leitura direta' : 'IA'}.
+                      {crlvExtractionResult.warnings.length > 0 && (
+                        <span className="block mt-0.5 text-xs">
+                          Não encontrados: {crlvExtractionResult.warnings.join(', ')}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {crlvExtractionStatus === 'failed' && (
+                    <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      Não foi possível extrair dados do documento. Preencha os campos manualmente.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

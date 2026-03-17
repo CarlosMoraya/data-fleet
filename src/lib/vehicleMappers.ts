@@ -35,6 +35,7 @@ export interface VehicleRow {
   autonomy: number;
   acquisition_date: string | null;
   crlv_upload: string | null;
+  crlv_year: string | null;
   tag: string | null;
   sanitary_inspection_upload: string | null;
   spare_key: boolean;
@@ -87,6 +88,7 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
     autonomy: row.autonomy,
     acquisitionDate: row.acquisition_date ?? undefined,
     crlvUpload: row.crlv_upload ?? undefined,
+    crlvYear: row.crlv_year ?? undefined,
     tag: row.tag ?? undefined,
     sanitaryInspectionUpload: row.sanitary_inspection_upload ?? undefined,
     spareKey: row.spare_key,
@@ -140,6 +142,7 @@ export function vehicleToRow(vehicle: Partial<Vehicle>, clientId: string): Omit<
     autonomy: commaToFloat(vehicle.autonomy),
     acquisition_date: vehicle.acquisitionDate ?? null,
     crlv_upload: vehicle.crlvUpload ?? null,
+    crlv_year: vehicle.crlvYear ? normalizeTrim(vehicle.crlvYear) : null,
     tag: vehicle.tag ? normalizeTrim(vehicle.tag) : null,
     sanitary_inspection_upload: vehicle.sanitaryInspectionUpload ?? null,
     spare_key: vehicle.spareKey ?? false,

@@ -177,6 +177,7 @@ export interface Vehicle {
   autonomy: number;
   acquisitionDate?: string;
   crlvUpload?: string;
+  crlvYear?: string;
   status?: 'Available' | 'In Use' | 'Maintenance';
 
   // New fields

@@ -135,3 +135,5 @@ Para detalhes completos, consulte os módulos em `.claude/`.
     - Implementada lógica de reabertura de modal após transições de status (movimentação entre abas 'Pendente' e 'Em Andamento').
     - Adicionada filtragem por placa (`searchInput`) para evitar colisão de dados durante os testes.
     - Implementada limpeza robusta de rascunhos antes do início de novos ciclos.
+
+- **Campo Exercício CRLV (2026-03-16)**: Adicionado campo `crlvYear` (ano do exercício do CRLV) em `VehicleForm.tsx`, `Vehicle` interface, `VehicleRow` e `vehicleMappers`. Coluna `crlv_year` adicionada à tabela `vehicles` no Supabase. Storage de uploads já utiliza `upsert: true` para garantir sobrescrita de arquivos anteriores (eliminando "lixo" do bucket).

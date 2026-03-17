@@ -16,6 +16,7 @@ import Checklists from './pages/Checklists';
 import ChecklistFill from './pages/ChecklistFill';
 import ChecklistTemplates from './pages/ChecklistTemplates';
 import ActionPlans from './pages/ActionPlans';
+import Maintenance from './pages/Maintenance';
 import AdminClients from './pages/AdminClients';
 import AdminUsers from './pages/AdminUsers';
 import Users from './pages/Users';
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="checklists/preencher/:checklistId" element={<ChecklistFill />} />
             <Route path="checklist-templates" element={<ChecklistTemplates />} />
             <Route path="acoes" element={<ActionPlans />} />
+            <Route path="manutencao" element={<Maintenance />} />
             <Route path="settings" element={<Settings />} />
             <Route path="admin/clients" element={<AdminClients />} />
             <Route path="admin/users" element={<AdminUsers />} />
