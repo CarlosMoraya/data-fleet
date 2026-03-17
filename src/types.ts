@@ -1,4 +1,4 @@
-export type Role = 'Driver' | 'Yard Auditor' | 'Fleet Assistant' | 'Fleet Analyst' | 'Manager' | 'Director' | 'Admin Master';
+export type Role = 'Driver' | 'Yard Auditor' | 'Fleet Assistant' | 'Fleet Analyst' | 'Supervisor' | 'Manager' | 'Coordinator' | 'Director' | 'Admin Master';
 
 // ─── Checklist types ──────────────────────────────────────────────────────────
 
@@ -137,6 +137,7 @@ export interface User {
   canDeleteVehicles: boolean;
   canDeleteDrivers: boolean;
   canDeleteWorkshops: boolean;
+  budgetApprovalLimit: number;
 }
 
 export interface Client {
@@ -214,6 +215,9 @@ export interface Vehicle {
   insurancePolicyUpload?: string;
   hasMaintenanceContract?: boolean;
   maintenanceContractUpload?: string;
+
+  // Finalidade
+  vehicleUsage?: 'Operação' | 'Uso Administrativo' | 'Uso por Lideranças' | 'Outros';
 }
 
 export interface Driver {
@@ -367,4 +371,7 @@ export interface VehicleFieldSettings {
   // Seguro & Contrato
   insurancePolicyUploadOptional: boolean;
   maintenanceContractUploadOptional: boolean;
+
+  // Finalidade
+  vehicleUsageOptional: boolean;
 }

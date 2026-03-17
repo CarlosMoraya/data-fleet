@@ -11,14 +11,16 @@ const ROLE_RANK: Record<Role, number> = {
   'Yard Auditor': 2,
   'Fleet Assistant': 3,
   'Fleet Analyst': 4,
+  'Supervisor': 4,
   'Manager': 5,
+  'Coordinator': 5,
   'Director': 6,
   'Admin Master': 7,
 };
 
 const ALL_ROLES: Role[] = [
   'Driver', 'Yard Auditor', 'Fleet Assistant',
-  'Fleet Analyst', 'Manager', 'Director', 'Admin Master',
+  'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master',
 ];
 
 const ROLE_COLORS: Record<Role, string> = {
@@ -26,7 +28,9 @@ const ROLE_COLORS: Record<Role, string> = {
   'Yard Auditor':    'bg-amber-100 text-amber-700',
   'Fleet Assistant': 'bg-blue-100 text-blue-700',
   'Fleet Analyst':   'bg-indigo-100 text-indigo-700',
+  'Supervisor':      'bg-violet-100 text-violet-700',
   'Manager':         'bg-green-100 text-green-700',
+  'Coordinator':     'bg-emerald-100 text-emerald-700',
   'Director':        'bg-purple-100 text-purple-700',
   'Admin Master':    'bg-orange-100 text-orange-700',
 };
@@ -45,6 +49,7 @@ interface UserRow {
   can_delete_vehicles: boolean;
   can_delete_drivers: boolean;
   can_delete_workshops: boolean;
+  budget_approval_limit: number;
   created_at: string;
 }
 
@@ -77,9 +82,10 @@ interface CreateForm {
   canDeleteVehicles: boolean;
   canDeleteDrivers: boolean;
   canDeleteWorkshops: boolean;
+  budgetLimit: string;
 }
 
-const CAN_MANAGE_PERMISSIONS: Role[] = ['Manager', 'Director', 'Admin Master'];
+const CAN_MANAGE_PERMISSIONS: Role[] = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 
 function CreateUserModal({
   open,
@@ -96,13 +102,13 @@ function CreateUserModal({
 }) {
   const canManagePermissions = CAN_MANAGE_PERMISSIONS.includes(currentUserRole);
   const defaultRole = availableRoles[availableRoles.length - 1] ?? 'Driver';
-  const [form, setForm] = useState<CreateForm>({ name: '', email: '', password: '', role: defaultRole, canDeleteVehicles: false, canDeleteDrivers: false, canDeleteWorkshops: false });
+  const [form, setForm] = useState<CreateForm>({ name: '', email: '', password: '', role: defaultRole, canDeleteVehicles: false, canDeleteDrivers: false, canDeleteWorkshops: false, budgetLimit: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (open) {
-      setForm({ name: '', email: '', password: '', role: availableRoles[availableRoles.length - 1] ?? 'Driver', canDeleteVehicles: false, canDeleteDrivers: false, canDeleteWorkshops: false });
+      setForm({ name: '', email: '', password: '', role: availableRoles[availableRoles.length - 1] ?? 'Driver', canDeleteVehicles: false, canDeleteDrivers: false, canDeleteWorkshops: false, budgetLimit: '' });
       setError('');
     }
   }, [open, availableRoles]);
@@ -129,6 +135,20 @@ function CreateUserModal({
         const msg = typeof data === 'object' && data?.error ? data.error : fnError.message;
         throw new Error(msg);
       }
+
+      // Update budget approval limit if provided
+      if (canManagePermissions && form.budgetLimit) {
+        const budgetLimit = parseFloat(form.budgetLimit) || 0;
+        const profileId = typeof data === 'object' && data?.profileId ? data.profileId : null;
+        if (profileId) {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ budget_approval_limit: budgetLimit })
+            .eq('id', profileId);
+          if (updateError) throw new Error(updateError.message);
+        }
+      }
+
       onCreated();
       onClose();
     } catch (err: any) {
@@ -245,6 +265,24 @@ function CreateUserModal({
             </div>
           )}
 
+          {canManagePermissions && (
+            <div>
+              <label className="block text-sm font-medium text-zinc-700">Limite de Aprovação de Orçamentos</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.budgetLimit}
+                onChange={(e) => setForm((f) => ({ ...f, budgetLimit: e.target.value }))}
+                placeholder="R$ 0,00"
+                className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <p className="text-xs text-zinc-500 mt-1">
+                Defina o valor máximo que este usuário pode aprovar. Use 0 para não permitir aprovações.
+              </p>
+            </div>
+          )}
+
           {error && (
             <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
           )}
@@ -289,6 +327,7 @@ function EditUserModal({
   const [canDeleteVehicles, setCanDeleteVehicles] = useState(false);
   const [canDeleteDrivers, setCanDeleteDrivers] = useState(false);
   const [canDeleteWorkshops, setCanDeleteWorkshops] = useState(false);
+  const [budgetLimit, setBudgetLimit] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -298,6 +337,7 @@ function EditUserModal({
       setCanDeleteVehicles(user.can_delete_vehicles);
       setCanDeleteDrivers(user.can_delete_drivers);
       setCanDeleteWorkshops(user.can_delete_workshops);
+      setBudgetLimit(user.budget_approval_limit ? user.budget_approval_limit.toString() : '');
     }
     setError('');
   }, [user, open]);
@@ -314,6 +354,7 @@ function EditUserModal({
         updates.can_delete_vehicles = canDeleteVehicles;
         updates.can_delete_drivers = canDeleteDrivers;
         updates.can_delete_workshops = canDeleteWorkshops;
+        updates.budget_approval_limit = parseFloat(budgetLimit) || 0;
       }
       const { error: dbError } = await supabase
         .from('profiles')
@@ -411,6 +452,24 @@ function EditUserModal({
             </div>
           )}
 
+          {canManagePermissions && (
+            <div>
+              <label className="block text-sm font-medium text-zinc-700">Limite de Aprovação de Orçamentos</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={budgetLimit}
+                onChange={(e) => setBudgetLimit(e.target.value)}
+                placeholder="R$ 0,00"
+                className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <p className="text-xs text-zinc-500 mt-1">
+                Defina o valor máximo que este usuário pode aprovar. Use 0 para não permitir aprovações.
+              </p>
+            </div>
+          )}
+
           {error && (
             <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
           )}
@@ -456,7 +515,7 @@ export default function Users() {
     setLoading(true);
     let query = supabase
       .from('profiles')
-      .select('id, name, role, can_delete_vehicles, can_delete_drivers, can_delete_workshops, created_at');
+      .select('id, name, role, can_delete_vehicles, can_delete_drivers, can_delete_workshops, budget_approval_limit, created_at');
 
     if (currentClient?.id) {
       query = query.eq('client_id', currentClient.id);

@@ -8,7 +8,7 @@ import { capitalizeWords } from '../lib/inputHelpers';
 
 const ALL_ROLES: Role[] = [
   'Driver', 'Yard Auditor', 'Fleet Assistant',
-  'Fleet Analyst', 'Manager', 'Director', 'Admin Master',
+  'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master',
 ];
 
 const ROLE_COLORS: Record<Role, string> = {
@@ -16,7 +16,9 @@ const ROLE_COLORS: Record<Role, string> = {
   'Yard Auditor':    'bg-amber-100 text-amber-700',
   'Fleet Assistant': 'bg-blue-100 text-blue-700',
   'Fleet Analyst':   'bg-indigo-100 text-indigo-700',
+  'Supervisor':      'bg-violet-100 text-violet-700',
   'Manager':         'bg-green-100 text-green-700',
+  'Coordinator':     'bg-emerald-100 text-emerald-700',
   'Director':        'bg-purple-100 text-purple-700',
   'Admin Master':    'bg-orange-100 text-orange-700',
 };

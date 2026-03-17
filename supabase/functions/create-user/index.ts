@@ -18,7 +18,9 @@ const ROLE_RANK: Record<string, number> = {
   "Yard Auditor": 2,
   "Fleet Assistant": 3,
   "Fleet Analyst": 4,
+  "Supervisor": 4,
   "Manager": 5,
+  "Coordinator": 5,
   "Director": 6,
   "Admin Master": 7,
 };

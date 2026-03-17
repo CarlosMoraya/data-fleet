@@ -31,13 +31,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   };
 
   const navItems = [
-    { name: 'Dashboard', to: '/', icon: LayoutDashboard, roles: ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
-    { name: 'Cadastros', to: '/cadastros', icon: FolderOpen, roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
-    { name: 'Checklists', to: '/checklists', icon: ClipboardCheck, roles: ['Driver', 'Yard Auditor', 'Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
-    { name: 'Plano de Ação', to: '/acoes', icon: ClipboardList, roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
-    { name: 'Manutenção', to: '/manutencao', icon: Wrench, roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
-    { name: 'Templates', to: '/checklist-templates', icon: FileStack, roles: ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'] },
-    { name: 'Configurações', to: '/settings', icon: Settings, roles: ['Manager', 'Director', 'Admin Master'] },
+    { name: 'Dashboard', to: '/', icon: LayoutDashboard, roles: ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
+    { name: 'Cadastros', to: '/cadastros', icon: FolderOpen, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
+    { name: 'Checklists', to: '/checklists', icon: ClipboardCheck, roles: ['Driver', 'Yard Auditor', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
+    { name: 'Plano de Ação', to: '/acoes', icon: ClipboardList, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
+    { name: 'Manutenção', to: '/manutencao', icon: Wrench, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
+    { name: 'Templates', to: '/checklist-templates', icon: FileStack, roles: ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
+    { name: 'Configurações', to: '/settings', icon: Settings, roles: ['Manager', 'Coordinator', 'Director', 'Admin Master'] },
   ];
 
   const visibleNavItems = navItems.filter(item => item.roles.includes(user?.role || ''));

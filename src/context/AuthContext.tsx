@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (userId: string, email: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, name, role, client_id, can_delete_vehicles, can_delete_drivers, can_delete_workshops, clients(id, name, logo_url)')
+      .select('id, name, role, client_id, can_delete_vehicles, can_delete_drivers, can_delete_workshops, budget_approval_limit, clients(id, name, logo_url)')
       .eq('id', userId)
       .single();
 
@@ -47,10 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         canDeleteVehicles: profile.can_delete_vehicles ?? false,
         canDeleteDrivers: profile.can_delete_drivers ?? false,
         canDeleteWorkshops: profile.can_delete_workshops ?? false,
+        budgetApprovalLimit: profile.budget_approval_limit ?? 0,
       });
       setCurrentClient(client ?? null);
 
-      if (['Admin Master', 'Director', 'Manager'].includes(profile.role)) {
+      if (['Admin Master', 'Director', 'Manager', 'Coordinator'].includes(profile.role)) {
         const { data: clients } = await supabase.from('clients').select('id, name, logo_url');
         if (clients) setAllClients(clients.map((c: any) => ({ id: c.id, name: c.name, logoUrl: c.logo_url ?? undefined })));
       }
@@ -109,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canSwitchClient =
     allClients.length > 1 &&
     (user?.role === 'Manager' ||
+      user?.role === 'Coordinator' ||
       user?.role === 'Director' ||
       user?.role === 'Admin Master');
 

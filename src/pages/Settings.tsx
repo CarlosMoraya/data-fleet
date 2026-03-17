@@ -20,7 +20,7 @@ import {
 import { Loader2, Truck, UserCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-const ROLES_CAN_MANAGE = ['Manager', 'Director', 'Admin Master'];
+const ROLES_CAN_MANAGE = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 
 type TabType = 'vehicles' | 'drivers';
 
