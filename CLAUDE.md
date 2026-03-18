@@ -115,3 +115,15 @@ Para detalhes completos, consulte os módulos em `.claude/`.
     - Refatorado `OperationalUnits.tsx` para usar **React Query** (`useQuery`, `useMutation`), melhorando a performance e o tratamento de erros de integridade referencial (FK).
     - Adicionado suporte a **aria-modal** e **roles de diálogo** nos formulários de cadastro para maior acessibilidade e facilidade de teste.
     - Corrigido fluxo de seleção em cascata (Embarcador → Unidade) no `VehicleForm.tsx`. Sincronizado para garantir que o dropdown de unidades seja filtrado e limpo corretamente ao trocar o embarcador.
+
+- **Testes E2E — Integração Agendamento → Manutenção e Dual OS (2026-03-18)**:
+    - **Novo arquivo**: `e2e/tenant-users-assistant-maintenance.spec.ts` — 7 testes seriais cobrindo o fluxo completo sob o perfil Fleet Assistant (Pedro).
+    - **Cobertura**:
+      1. Seed: cria agendamento com primeiro veículo/oficina disponíveis.
+      2. Navegação: botão "Gerar OS" (`ClipboardList`) em `/agendamentos` navega para `/manutencao` e abre form automaticamente.
+      3. Prefill: `vehicleId`, `workshopId`, `entryDate`, `type` e `status` pré-preenchidos do agendamento.
+      4. OS Interna read-only: verifica ausência de `input[name="os"]` e presença de "Será gerada automaticamente".
+      5. Salvar via prefill: OS Interna gerada com padrão `OS-AAMM-XXXX`; OS da Oficina persistida.
+      6. Editar: OS Interna mostra valor real read-only; `input[name="workshopOs"]` tem o valor salvo.
+      7. Fluxo manual: "+ Nova Manutenção" também exibe OS Interna read-only.
+    - **Padrão**: `sessionStorage.clear()` removido (causava `SecurityError` em Playwright serial tests); `goto` antes de `evaluate` quando necessário.
