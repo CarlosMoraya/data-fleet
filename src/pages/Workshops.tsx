@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Workshop } from '../types';
@@ -7,6 +7,7 @@ import WorkshopForm from '../components/WorkshopForm';
 import WorkshopDetailModal from '../components/WorkshopDetailModal';
 import { supabase } from '../lib/supabase';
 import { workshopFromRow, workshopToRow, formatCNPJ, WorkshopRow } from '../lib/workshopMappers';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -26,9 +27,7 @@ function formatPhone(phone: string): string {
 
 export default function Workshops() {
   const { currentClient, user } = useAuth();
-  const [workshops, setWorkshops] = useState<Workshop[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(() => {
     return sessionStorage.getItem('workshopFormOpen') === 'true';
@@ -50,79 +49,88 @@ export default function Workshops() {
     ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') ||
     ((user?.role === 'Fleet Analyst' || user?.role === 'Supervisor') && user?.canDeleteWorkshops === true);
 
+  // Queries
+  const { data: workshops = [], isLoading: loadingWorkshops, isError: workshopsError } = useQuery({
+    queryKey: ['workshops', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase.from('workshops').select('*');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query.order('name');
+      if (error) throw error;
+      return (data as WorkshopRow[]).map(workshopFromRow);
+    },
+    enabled: !!user
+  });
+
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
     return <Navigate to="/checklists" replace />;
   }
 
-  const fetchWorkshops = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    let query = supabase.from('workshops').select('*');
-    if (currentClient?.id) {
-      query = query.eq('client_id', currentClient.id);
-    }
-    const { data, error: fetchError } = await query.order('name');
+  const saveMutation = useMutation({
+    mutationFn: async (workshop: Partial<Workshop>) => {
+      if (!currentClient?.id) throw new Error('Sessão inválida');
+      const row = workshopToRow(workshop, currentClient.id);
 
-    if (fetchError) {
-      setError('Erro ao carregar oficinas. Tente novamente.');
-    } else {
-      setWorkshops((data as WorkshopRow[]).map(workshopFromRow));
-    }
-    setLoading(false);
-  }, [currentClient?.id]);
-
-  useEffect(() => {
-    fetchWorkshops();
-  }, [fetchWorkshops]);
+      if (editingWorkshop) {
+        const { error: updateError } = await supabase
+          .from('workshops')
+          .update(row)
+          .eq('id', editingWorkshop.id);
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('workshops')
+          .insert(row);
+        if (insertError) throw insertError;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workshops', currentClient?.id] });
+      setIsFormOpen(false);
+      setEditingWorkshop(null);
+      sessionStorage.removeItem('workshopFormOpen');
+      sessionStorage.removeItem('workshopFormEditing');
+      sessionStorage.removeItem('workshopFormData');
+    },
+  });
 
   const handleSave = async (workshop: Partial<Workshop>): Promise<void> => {
-    if (!currentClient?.id) return;
-    const row = workshopToRow(workshop, currentClient.id);
-
-    if (editingWorkshop) {
-      const { error: updateError } = await supabase
-        .from('workshops')
-        .update(row)
-        .eq('id', editingWorkshop.id);
-      if (updateError) throw updateError;
-    } else {
-      const { error: insertError } = await supabase
-        .from('workshops')
-        .insert(row);
-      if (insertError) throw insertError;
-    }
-
-    await fetchWorkshops();
-    setIsFormOpen(false);
-    setEditingWorkshop(null);
-    sessionStorage.removeItem('workshopFormOpen');
-    sessionStorage.removeItem('workshopFormEditing');
-    sessionStorage.removeItem('workshopFormData');
+    await saveMutation.mutateAsync(workshop);
   };
+
+  const deleteMutation = useMutation({
+    mutationFn: async (workshop: Workshop) => {
+      const { error: deleteError } = await supabase
+        .from('workshops')
+        .delete()
+        .eq('id', workshop.id);
+      if (deleteError) throw deleteError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workshops', currentClient?.id] });
+    },
+    onError: () => {
+      alert('Erro ao excluir oficina. Tente novamente.');
+    },
+  });
 
   const handleDelete = async (workshop: Workshop) => {
     if (!window.confirm(`Excluir a oficina "${workshop.name}"? Esta ação não pode ser desfeita.`)) return;
-
-    const { error: deleteError } = await supabase
-      .from('workshops')
-      .delete()
-      .eq('id', workshop.id);
-
-    if (deleteError) {
-      setError('Erro ao excluir oficina. Tente novamente.');
-    } else {
-      await fetchWorkshops();
-    }
+    deleteMutation.mutate(workshop);
   };
 
-  const filteredWorkshops = workshops.filter((w) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      w.name.toLowerCase().includes(q) ||
-      w.cnpj.includes(q.replace(/\D/g, ''))
-    );
-  });
+  const filteredWorkshops = useMemo(() => {
+    return workshops.filter((w) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        w.name.toLowerCase().includes(q) ||
+        w.cnpj.includes(q.replace(/\D/g, ''))
+      );
+    });
+  }, [workshops, search]);
 
   return (
     <div className="space-y-6">
@@ -162,14 +170,14 @@ export default function Workshops() {
         />
       </div>
 
-      {error && (
+      {workshopsError && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erro ao carregar oficinas. Tente novamente.
         </div>
       )}
 
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        {loading ? (
+        {loadingWorkshops ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-orange-500" />
           </div>

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Pencil, Trash2, Plus, Search, X, Upload } from 'lucide-react';
+import { Pencil, Trash2, Plus, Search, X, Upload, Loader2 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { capitalizeWords } from '../lib/inputHelpers';
 
 interface ClientRow {
@@ -47,6 +48,7 @@ function ClientFormModal({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     setForm(initial);
@@ -181,9 +183,9 @@ function ClientFormModal({
             <button
               type="submit"
               disabled={saving || uploading}
-              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60"
+              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center min-w-[100px]"
             >
-              {saving ? 'Salvando...' : 'Salvar'}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : 'Salvar'}
             </button>
           </div>
         </form>
@@ -194,8 +196,7 @@ function ClientFormModal({
 
 export default function AdminClients() {
   const { user, currentClient } = useAuth();
-  const [clients, setClients] = useState<ClientRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ClientRow | null>(null);
@@ -204,25 +205,25 @@ export default function AdminClients() {
     return <Navigate to="/" replace />;
   }
 
-  const fetchClients = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('clients')
-      .select('id, name, logo_url, created_at')
-      .order('name');
-    if (data) setClients(data);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchClients();
-  }, []);
-
-  const filtered = clients.filter((c) => {
-    const matchSearch = c.name.toLowerCase().includes(search.toLowerCase());
-    const matchGlobalClient = currentClient ? c.id === currentClient.id : true;
-    return matchSearch && matchGlobalClient;
+  const { data: clients = [], isLoading: loading } = useQuery({
+    queryKey: ['admin-clients'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name, logo_url, created_at')
+        .order('name');
+      if (error) throw error;
+      return data as ClientRow[];
+    }
   });
+
+  const filtered = useMemo(() => {
+    return clients.filter((c) => {
+      const matchSearch = c.name.toLowerCase().includes(search.toLowerCase());
+      const matchGlobalClient = currentClient ? c.id === currentClient.id : true;
+      return matchSearch && matchGlobalClient;
+    });
+  }, [clients, search, currentClient]);
 
   const openCreate = () => {
     setEditing(null);
@@ -234,27 +235,47 @@ export default function AdminClients() {
     setModalOpen(true);
   };
 
-  const handleSave = async (form: FormData) => {
-    const payload = {
-      name: capitalizeWords(form.name),
-      logo_url: form.logo_url.trim() || null,
-    };
+  const saveMutation = useMutation({
+    mutationFn: async (form: FormData) => {
+      const payload = {
+        name: capitalizeWords(form.name),
+        logo_url: form.logo_url.trim() || null,
+      };
 
-    if (editing) {
-      const { data, error } = await supabase.from('clients').update(payload).eq('id', editing.id).select();
-      if (error) throw new Error(error.message);
-      if (!data || data.length === 0) throw new Error('Nenhuma linha atualizada — verifique a política RLS de UPDATE.');
-    } else {
-      const { error } = await supabase.from('clients').insert(payload);
-      if (error) throw new Error(error.message);
+      if (editing) {
+        const { data, error } = await supabase.from('clients').update(payload).eq('id', editing.id).select();
+        if (error) throw new Error(error.message);
+        if (!data || data.length === 0) throw new Error('Nenhuma linha atualizada — verifique a política RLS de UPDATE.');
+      } else {
+        const { error } = await supabase.from('clients').insert(payload);
+        if (error) throw new Error(error.message);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-clients'] });
     }
-    await fetchClients();
+  });
+
+  const handleSave = async (form: FormData) => {
+    await saveMutation.mutateAsync(form);
   };
 
-  const handleDelete = async (client: ClientRow) => {
+  const deleteMutation = useMutation({
+    mutationFn: async (client: ClientRow) => {
+      const { error } = await supabase.from('clients').delete().eq('id', client.id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-clients'] });
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Erro ao deletar cliente.');
+    }
+  });
+
+  const handleDelete = (client: ClientRow) => {
     if (!window.confirm(`Excluir o cliente "${client.name}"? Esta ação não pode ser desfeita.`)) return;
-    await supabase.from('clients').delete().eq('id', client.id);
-    await fetchClients();
+    deleteMutation.mutate(client);
   };
 
   const formInitial: FormData = editing

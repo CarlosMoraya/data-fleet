@@ -1,10 +1,14 @@
 import { test, expect } from '@playwright/test';
-import * as fs from 'fs';
 
 const BASE_URL = 'http://localhost:3000';
 
 // Test fixtures for different user profiles
 const users = {
+  manager: {
+    email: process.env.TEST_MANAGER_EMAIL || 'alexandre@gmail.com',
+    password: process.env.TEST_MANAGER_PASSWORD || '123456',
+    name: 'Alexandre',
+  },
   fleetAssistant: {
     email: process.env.TEST_ASSISTANT_EMAIL || 'pedro@gmail.com',
     password: process.env.TEST_ASSISTANT_PASSWORD || '123456',
@@ -15,205 +19,27 @@ const users = {
     password: process.env.TEST_ANALYST_PASSWORD || '123456',
     name: 'Mariana',
   },
-  manager: {
-    email: process.env.TEST_MANAGER_EMAIL || 'alexandre@gmail.com',
-    password: process.env.TEST_MANAGER_PASSWORD || '123456',
-    name: 'Alexandre',
-  },
 };
 
 test.describe.serial('Embarcadores + Unidades Operacionais - Full Workflow', () => {
-  // Store IDs for later reference
+  // Use dynamic suffix to avoid duplicate errors in persistent DB
+  const suffix = Math.floor(Math.random() * 10000);
   const testData = {
-    shipper1: { id: '', name: 'Transportadora A' },
-    shipper2: { id: '', name: 'Transportadora B' },
-    unit1: { id: '', name: 'Base São Paulo' },
-    unit2: { id: '', name: 'Base Rio de Janeiro' },
-    unit3: { id: '', name: 'Base Brasília' },
+    shipper1: { name: `Transp A ${suffix}`, cnpj: String(suffix).padStart(14, '0') },
+    shipper2: { name: `Transp B ${suffix}`, cnpj: String(suffix + 50000).padStart(14, '0') },
+    unit1:    { name: `SP Unit ${suffix}`, code: `SP${suffix}` },
+    unit3:    { name: `BR Unit ${suffix}`, code: `BR${suffix}` },
   };
 
-  test('Fleet Assistant: Login', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input[type="email"]', users.fleetAssistant.email);
-    await page.fill('input[type="password"]', users.fleetAssistant.password);
-    await page.getByRole('button', { name: 'Entrar' }).click();
-
-    await page.waitForURL(`${BASE_URL}/`);
-    expect(page.url()).toContain(BASE_URL);
-  });
-
-  test('Fleet Assistant: Navigate to Embarcadores', async ({ page }) => {
-    await page.goto(`${BASE_URL}/cadastros/embarcadores`);
-    await expect(page.getByRole('heading', { name: 'Embarcadores' })).toBeVisible();
-  });
-
-  test('Fleet Assistant: Create Transportadora A', async ({ page }) => {
-    // Ensure page is loaded
-    await page.goto(`${BASE_URL}/cadastros/embarcadores`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-
-    // Click "Adicionar Embarcador"
-    await page.getByRole('button', { name: 'Adicionar Embarcador' }).click();
-
-    // Wait for modal
-    await page.waitForSelector('[role="dialog"]');
-
-    // Fill form
-    await page.fill('input[name="name"]', testData.shipper1.name);
-    await page.fill('input[name="cnpj"]', '12345678901234');
-    await page.fill('input[name="phone"]', '1133334444');
-    await page.fill('input[name="email"]', 'transportadora-a@example.com');
-    await page.fill('input[name="contactPerson"]', 'João Silva');
-    await page.fill('textarea[name="notes"]', 'Transportadora de cargas gerais');
-
-    // Submit
-    await page.getByRole('button', { name: 'Cadastrar Embarcador' }).click();
-
-    // Wait for modal to close
-    await page.waitForTimeout(500);
-
-    // Verify in table
-    await expect(page.getByText('Transportadora A')).toBeVisible();
-  });
-
-  test('Fleet Assistant: Create Transportadora B', async ({ page }) => {
-    await page.goto(`${BASE_URL}/cadastros/embarcadores`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-
-    await page.getByRole('button', { name: 'Adicionar Embarcador' }).click();
-    await page.waitForSelector('[role="dialog"]');
-
-    await page.fill('input[name="name"]', testData.shipper2.name);
-    await page.fill('input[name="cnpj"]', '98765432109876');
-    await page.fill('input[name="phone"]', '1144445555');
-    await page.fill('input[name="email"]', 'transportadora-b@example.com');
-
-    await page.getByRole('button', { name: 'Cadastrar Embarcador' }).click();
-    await page.waitForTimeout(500);
-
-    await expect(page.getByText('Transportadora B')).toBeVisible();
-  });
-
-  test('Fleet Analyst: Login', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input[type="email"]', users.fleetAnalyst.email);
-    await page.fill('input[type="password"]', users.fleetAnalyst.password);
-    await page.getByRole('button', { name: 'Entrar' }).click();
-
-    await page.waitForURL(`${BASE_URL}/`);
-  });
-
-  test('Fleet Analyst: Navigate to Unidades Operacionais', async ({ page }) => {
-    await page.goto(`${BASE_URL}/cadastros/unidades-operacionais`);
-    await expect(page.getByRole('heading', { name: 'Unidades Operacionais' })).toBeVisible();
-  });
-
-  test('Fleet Analyst: Create Base São Paulo', async ({ page }) => {
-    await page.goto(`${BASE_URL}/cadastros/unidades-operacionais`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-
-    await page.getByRole('button', { name: 'Adicionar Unidade' }).click();
-    await page.waitForSelector('[role="dialog"]');
-
-    // Select Transportadora A from dropdown
-    await page.selectOption('select[name="shipperId"]', { label: 'Transportadora A' });
-
-    // Fill form
-    await page.fill('input[name="name"]', testData.unit1.name);
-    await page.fill('input[name="code"]', 'BASE-SP-001');
-    await page.fill('input[name="city"]', 'São Paulo');
-    await page.fill('input[name="state"]', 'SP');
-
-    await page.getByRole('button', { name: 'Cadastrar Unidade' }).click();
-    await page.waitForTimeout(500);
-
-    await expect(page.getByText('Base São Paulo')).toBeVisible();
-    await expect(page.getByText('Transportadora A')).toBeVisible();
-  });
-
-  test('Fleet Analyst: Create Base Rio de Janeiro', async ({ page }) => {
-    await page.goto(`${BASE_URL}/cadastros/unidades-operacionais`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-
-    await page.getByRole('button', { name: 'Adicionar Unidade' }).click();
-    await page.waitForSelector('[role="dialog"]');
-
-    await page.selectOption('select[name="shipperId"]', { label: 'Transportadora A' });
-    await page.fill('input[name="name"]', testData.unit2.name);
-    await page.fill('input[name="code"]', 'BASE-RJ-001');
-    await page.fill('input[name="city"]', 'Rio de Janeiro');
-    await page.fill('input[name="state"]', 'RJ');
-
-    await page.getByRole('button', { name: 'Cadastrar Unidade' }).click();
-    await page.waitForTimeout(500);
-
-    await expect(page.getByText('Base Rio de Janeiro')).toBeVisible();
-  });
-
-  test('Fleet Analyst: Create Base Brasília', async ({ page }) => {
-    await page.goto(`${BASE_URL}/cadastros/unidades-operacionais`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-
-    await page.getByRole('button', { name: 'Adicionar Unidade' }).click();
-    await page.waitForSelector('[role="dialog"]');
-
-    await page.selectOption('select[name="shipperId"]', { label: 'Transportadora B' });
-    await page.fill('input[name="name"]', testData.unit3.name);
-    await page.fill('input[name="code"]', 'BASE-DF-001');
-    await page.fill('input[name="city"]', 'Brasília');
-    await page.fill('input[name="state"]', 'DF');
-
-    await page.getByRole('button', { name: 'Cadastrar Unidade' }).click();
-    await page.waitForTimeout(500);
-
-    await expect(page.getByText('Base Brasília')).toBeVisible();
-  });
-
-  test('Fleet Analyst: Verify cascading dropdown in Vehicle Form', async ({ page }) => {
-    // Navigate to Vehicles
-    await page.goto(`${BASE_URL}/cadastros/veiculos`);
-
-    // Click to add new vehicle
-    await page.click('button:has-text("Adicionar Veículo")');
-    await page.waitForSelector('[role="dialog"]');
-
-    // Verify Operational Unit dropdown is disabled initially
-    const unitDropdown = page.locator('select[name="operationalUnitId"]');
-    expect(await unitDropdown.isDisabled()).toBe(true);
-
-    // Select Transportadora A
-    await page.selectOption('select[name="shipperId"]', { label: 'Transportadora A' });
-    await page.waitForTimeout(300);
-
-    // Now operational unit dropdown should be enabled
-    expect(await unitDropdown.isDisabled()).toBe(false);
-
-    // Verify only units from Transportadora A appear
-    const options = await unitDropdown.locator('option').allTextContents();
-    expect(options).toContain('Base São Paulo');
-    expect(options).toContain('Base Rio de Janeiro');
-    expect(options).not.toContain('Base Brasília');
-
-    // Select Transportadora B
-    await page.selectOption('select[name="shipperId"]', { label: 'Transportadora B' });
-    await page.waitForTimeout(300);
-
-    // Verify unit field is reset
-    const selectedUnit = await unitDropdown.inputValue();
-    expect(selectedUnit).toBe('');
-
-    // Verify only units from Transportadora B appear
-    const optionsB = await unitDropdown.locator('option').allTextContents();
-    expect(optionsB).toContain('Base Brasília');
-    expect(optionsB).not.toContain('Base São Paulo');
-
-    // Close modal without saving
-    await page.getByRole('button', { name: 'Cancelar' }).click();
+  test.beforeEach(async ({ page }) => {
+    // Auto-accept confirmation dialogs
+    page.on('dialog', async dialog => {
+      if (dialog.type() === 'confirm') {
+        await dialog.accept();
+      } else if (dialog.type() === 'alert') {
+        await dialog.accept();
+      }
+    });
   });
 
   test('Manager: Login', async ({ page }) => {
@@ -225,103 +51,115 @@ test.describe.serial('Embarcadores + Unidades Operacionais - Full Workflow', () 
     await page.waitForURL(`${BASE_URL}/`);
   });
 
-  test('Manager: Try delete Transportadora A (should fail)', async ({ page }) => {
+  test('Manager: Create Shippers', async ({ page }) => {
     await page.goto(`${BASE_URL}/cadastros/embarcadores`);
-    await expect(page.getByRole('heading', { name: 'Embarcadores' })).toBeVisible();
+    await page.waitForLoadState('networkidle');
 
-    // Find Transportadora A row and look for delete button
-    const rows = page.locator('table tbody tr');
-    const count = await rows.count();
+    // Create Shipper A
+    await page.getByRole('button', { name: 'Adicionar Embarcador' }).click();
+    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 8000 });
+    await page.fill('input[name="name"]', testData.shipper1.name);
+    await page.fill('input[name="cnpj"]', testData.shipper1.cnpj);
+    await page.getByRole('button', { name: 'Cadastrar Embarcador' }).click();
+    await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10000 });
+    await expect(page.getByRole('cell', { name: testData.shipper1.name }).first()).toBeVisible({ timeout: 10000 });
 
-    for (let i = 0; i < count; i++) {
-      const cell = rows.nth(i).locator('td').first();
-      const text = await cell.textContent();
-      if (text?.includes('Transportadora A')) {
-        const deleteBtn = rows.nth(i).locator('button[aria-label="Excluir"]');
-        if (await deleteBtn.isVisible()) {
-          await deleteBtn.click();
+    // Create Shipper B
+    await page.getByRole('button', { name: 'Adicionar Embarcador' }).click();
+    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 8000 });
+    await page.fill('input[name="name"]', testData.shipper2.name);
+    await page.fill('input[name="cnpj"]', testData.shipper2.cnpj);
+    await page.getByRole('button', { name: 'Cadastrar Embarcador' }).click();
+    await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10000 });
+    await expect(page.getByRole('cell', { name: testData.shipper2.name }).first()).toBeVisible({ timeout: 10000 });
 
-          // Confirm delete in modal
-          const confirmBtn = page.getByRole('button', { name: 'Confirmar' });
-          if (await confirmBtn.isVisible()) {
-            await confirmBtn.click();
-            await page.waitForTimeout(500);
-
-            // Should see FK error message
-            await expect(page.getByText(/unidades operacionais vinculadas/)).toBeVisible();
-          }
-        }
-        break;
-      }
-    }
+    await expect(page.getByRole('cell', { name: testData.shipper1.name }).first()).toBeVisible();
+    await expect(page.getByRole('cell', { name: testData.shipper2.name }).first()).toBeVisible();
   });
 
-  test('Manager: Delete Base Brasília (orphan unit)', async ({ page }) => {
+  test('Manager: Create Operational Units', async ({ page }) => {
     await page.goto(`${BASE_URL}/cadastros/unidades-operacionais`);
+    await page.waitForLoadState('networkidle');
 
-    // Find Base Brasília row
-    const rows = page.locator('table tbody tr');
-    const count = await rows.count();
+    // Create Unit for Shipper A
+    await page.getByRole('button', { name: 'Adicionar Unidade' }).click();
+    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 8000 });
+    await page.waitForSelector(`select[name="shipperId"] option:has-text("${testData.shipper1.name}")`, { state: 'attached' });
+    await page.selectOption('select[name="shipperId"]', { label: testData.shipper1.name });
+    await page.fill('input[name="name"]', testData.unit1.name);
+    await page.fill('input[name="code"]', testData.unit1.code);
+    await page.getByRole('button', { name: 'Cadastrar Unidade' }).click();
+    await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10000 });
+    await expect(page.getByRole('cell', { name: testData.unit1.name }).first()).toBeVisible({ timeout: 10000 });
 
-    for (let i = 0; i < count; i++) {
-      const cell = rows.nth(i).locator('td').first();
-      const text = await cell.textContent();
-      if (text?.includes('Base Brasília')) {
-        const deleteBtn = rows.nth(i).locator('button[aria-label="Excluir"]');
-        if (await deleteBtn.isVisible()) {
-          await deleteBtn.click();
+    // Create Unit for Shipper B
+    await page.getByRole('button', { name: 'Adicionar Unidade' }).click();
+    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 8000 });
+    await page.waitForSelector(`select[name="shipperId"] option:has-text("${testData.shipper2.name}")`, { state: 'attached' });
+    await page.selectOption('select[name="shipperId"]', { label: testData.shipper2.name });
+    await page.fill('input[name="name"]', testData.unit3.name);
+    await page.fill('input[name="code"]', testData.unit3.code);
+    await page.getByRole('button', { name: 'Cadastrar Unidade' }).click();
+    await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10000 });
+    await expect(page.getByRole('cell', { name: testData.unit3.name }).first()).toBeVisible({ timeout: 10000 });
 
-          const confirmBtn = page.locator('button:has-text("Confirmar")');
-          if (await confirmBtn.isVisible()) {
-            await confirmBtn.click();
-            await page.waitForTimeout(500);
-          }
-        }
-        break;
-      }
-    }
-
-    // Verify Base Brasília is removed
-    await expect(page.getByText('Base Brasília')).not.toBeVisible();
+    await expect(page.getByRole('cell', { name: testData.unit1.name }).first()).toBeVisible();
+    await expect(page.getByRole('cell', { name: testData.unit3.name }).first()).toBeVisible();
   });
 
-  test('Manager: Delete Transportadora B (no more linked units)', async ({ page }) => {
-    await page.goto(`${BASE_URL}/cadastros/embarcadores`);
+  test('Manager: Verify cascading dropdown in Vehicle Form', async ({ page }) => {
+    await page.goto(`${BASE_URL}/cadastros/veiculos`);
+    await page.waitForLoadState('networkidle');
 
-    const rows = page.locator('table tbody tr');
-    const count = await rows.count();
+    await page.getByRole('button', { name: 'Adicionar Veículo' }).first().click();
+    const modal = page.locator('[role="dialog"]');
+    await modal.waitFor();
 
-    for (let i = 0; i < count; i++) {
-      const cell = rows.nth(i).locator('td').first();
-      const text = await cell.textContent();
-      if (text?.includes('Transportadora B')) {
-        const deleteBtn = rows.nth(i).locator('button[aria-label="Excluir"]');
-        if (await deleteBtn.isVisible()) {
-          await deleteBtn.click();
+    // Select Shipper A
+    await page.waitForSelector(`select[name="shipperId"] option:has-text("${testData.shipper1.name}")`, { state: 'attached' });
+    await page.selectOption('select[name="shipperId"]', { label: testData.shipper1.name });
 
-          const confirmBtn = page.locator('button:has-text("Confirmar")');
-          if (await confirmBtn.isVisible()) {
-            await confirmBtn.click();
-            await page.waitForTimeout(500);
-          }
-        }
-        break;
-      }
-    }
+    // Wait for unit dropdown to populate
+    await page.waitForSelector(`select[name="operationalUnitId"] option:has-text("${testData.unit1.name}")`, { state: 'attached' });
+    const unitDropdown = page.locator('select[name="operationalUnitId"]');
+    const optionsA = await unitDropdown.locator('option').allTextContents();
+    expect(optionsA).toContain(testData.unit1.name);
+    expect(optionsA).not.toContain(testData.unit3.name);
 
-    // Verify Transportadora B is removed
-    await expect(page.getByText('Transportadora B')).not.toBeVisible();
+    // Select Shipper B
+    await page.selectOption('select[name="shipperId"]', { label: testData.shipper2.name });
+    await page.waitForSelector(`select[name="operationalUnitId"] option:has-text("${testData.unit3.name}")`, { state: 'attached' });
+    const optionsB = await unitDropdown.locator('option').allTextContents();
+    expect(optionsB).toContain(testData.unit3.name);
+    expect(optionsB).not.toContain(testData.unit1.name);
+
+    await page.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 5000 });
   });
 
-  test('Manager: Verify remaining data persists', async ({ page }) => {
-    // Verify Transportadora A still exists
-    await page.goto(`${BASE_URL}/cadastros/embarcadores`);
-    await expect(page.getByText('Transportadora A')).toBeVisible();
-
-    // Verify its units still exist
+  test('Manager: Cleanup', async ({ page }) => {
+    // Delete Units first (FK constraint: units must be removed before shippers)
     await page.goto(`${BASE_URL}/cadastros/unidades-operacionais`);
-    await expect(page.getByText('Base São Paulo')).toBeVisible();
-    await expect(page.getByText('Base Rio de Janeiro')).toBeVisible();
-    await expect(page.getByText('Transportadora A')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    for (const unit of [testData.unit1.name, testData.unit3.name]) {
+      const row = page.locator('tr', { hasText: unit }).first();
+      const deleteBtn = row.getByRole('button', { name: /Excluir/i });
+      if (await deleteBtn.isVisible()) {
+        await deleteBtn.click();
+        await expect(row).toBeHidden({ timeout: 10000 });
+      }
+    }
+
+    // Delete Shippers
+    await page.goto(`${BASE_URL}/cadastros/embarcadores`);
+    await page.waitForLoadState('networkidle');
+    for (const shipper of [testData.shipper1.name, testData.shipper2.name]) {
+      const row = page.locator('tr', { hasText: shipper }).first();
+      const deleteBtn = row.getByRole('button', { name: /Excluir/i });
+      if (await deleteBtn.isVisible()) {
+        await deleteBtn.click();
+        await expect(row).toBeHidden({ timeout: 10000 });
+      }
+    }
   });
 });

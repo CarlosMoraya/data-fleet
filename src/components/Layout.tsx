@@ -3,10 +3,14 @@ import { Outlet, Navigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import { useAuth } from '../context/AuthContext';
+import { useIdleTimeout } from '../hooks/useIdleTimeout';
 
 export default function Layout() {
   const { user, loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Ativa o timeout de inatividade (60 minutos por padrão)
+  useIdleTimeout();
 
   if (loading) {
     return (

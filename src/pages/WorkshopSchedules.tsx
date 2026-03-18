@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   CalendarClock,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { WorkshopSchedule } from '../types';
 import {
   WorkshopScheduleRow,
@@ -94,54 +95,51 @@ export default function WorkshopSchedules() {
 
 function DriverView() {
   const { user, currentClient } = useAuth();
-  const [schedules, setSchedules] = useState<WorkshopSchedule[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showHistory, setShowHistory] = useState(false);
 
-  const fetchSchedules = useCallback(async () => {
-    if (!currentClient?.id || !user?.id) return;
-    setLoading(true);
+  const { data: driverVehicle } = useQuery({
+    queryKey: ['driverVehicle', user?.id, currentClient?.id],
+    queryFn: async () => {
+      // Resolve veículo do motorista via profile_id → driver → vehicle
+      const { data: driverRec } = await supabase
+        .from('drivers')
+        .select('id, client_id')
+        .eq('profile_id', user!.id)
+        .eq('client_id', currentClient!.id)
+        .maybeSingle();
 
-    // Resolve veículo do motorista via profile_id → driver → vehicle
-    const { data: driverRec } = await supabase
-      .from('drivers')
-      .select('id, client_id')
-      .eq('profile_id', user.id)
-      .eq('client_id', currentClient.id)
-      .maybeSingle();
+      if (!driverRec) return null;
 
-    if (!driverRec) {
-      setLoading(false);
-      return;
-    }
+      const { data: vehicleData } = await supabase
+        .from('vehicles')
+        .select('id')
+        .eq('driver_id', driverRec.id)
+        .eq('client_id', driverRec.client_id)
+        .maybeSingle();
 
-    const { data: vehicleData } = await supabase
-      .from('vehicles')
-      .select('id')
-      .eq('driver_id', driverRec.id)
-      .eq('client_id', driverRec.client_id)
-      .maybeSingle();
+      return vehicleData?.id ?? null;
+    },
+    enabled: !!user?.id && !!currentClient?.id
+  });
 
-    if (!vehicleData) {
-      setLoading(false);
-      return;
-    }
+  const { data: schedules = [], isLoading } = useQuery({
+    queryKey: ['workshopSchedules', driverVehicle],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('workshop_schedules')
+        .select(
+          '*, vehicles(license_plate), workshops(name, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_zip), profiles!created_by(name)'
+        )
+        .eq('vehicle_id', driverVehicle)
+        .order('scheduled_date', { ascending: true });
 
-    const { data } = await supabase
-      .from('workshop_schedules')
-      .select(
-        '*, vehicles(license_plate), workshops(name, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_zip), profiles!created_by(name)'
-      )
-      .eq('vehicle_id', vehicleData.id)
-      .order('scheduled_date', { ascending: true });
+      return (data ?? []).map((r) => scheduleFromRow(r as WorkshopScheduleRow));
+    },
+    enabled: !!driverVehicle
+  });
 
-    setSchedules((data ?? []).map((r) => scheduleFromRow(r as WorkshopScheduleRow)));
-    setLoading(false);
-  }, [user?.id, currentClient?.id]);
-
-  useEffect(() => { fetchSchedules(); }, [fetchSchedules]);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
@@ -246,10 +244,8 @@ const DriverScheduleCard: React.FC<{ schedule: WorkshopSchedule; dimmed?: boolea
 
 function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isAssistantPlus: boolean }) {
   const { user, currentClient } = useAuth();
+  const queryClient = useQueryClient();
 
-  const [schedules, setSchedules] = useState<WorkshopSchedule[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [isFormOpen, setIsFormOpen] = useState(() => sessionStorage.getItem('scheduleFormOpen') === 'true');
@@ -260,88 +256,89 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
     } catch { return null; }
   });
 
-  const fetchSchedules = useCallback(async () => {
-    if (!currentClient?.id) return;
-    setLoading(true);
-    setError(null);
+  const { data: schedules = [], isLoading, error } = useQuery({
+    queryKey: ['workshopSchedules', currentClient?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('workshop_schedules')
+        .select(
+          '*, vehicles(license_plate), workshops(name, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_zip), profiles!created_by(name)'
+        )
+        .eq('client_id', currentClient!.id)
+        .order('scheduled_date', { ascending: false });
 
-    const { data, error: fetchErr } = await supabase
-      .from('workshop_schedules')
-      .select(
-        '*, vehicles(license_plate), workshops(name, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_zip), profiles!created_by(name)'
-      )
-      .eq('client_id', currentClient.id)
-      .order('scheduled_date', { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((r) => scheduleFromRow(r as WorkshopScheduleRow));
+    },
+    enabled: !!currentClient?.id
+  });
 
-    if (fetchErr) {
-      setError('Erro ao carregar agendamentos. Tente novamente.');
-    } else {
-      setSchedules((data ?? []).map((r) => scheduleFromRow(r as WorkshopScheduleRow)));
+  const saveMutation = useMutation({
+    mutationFn: async (data: Partial<WorkshopSchedule>) => {
+      if (!currentClient?.id || !user?.id) return;
+
+      if (editingSchedule) {
+        const { error: err } = await supabase
+          .from('workshop_schedules')
+          .update({
+            vehicle_id: data.vehicleId,
+            workshop_id: data.workshopId,
+            scheduled_date: data.scheduledDate,
+            notes: data.notes?.trim() || null,
+          })
+          .eq('id', editingSchedule.id);
+        if (err) throw err;
+      } else {
+        const row = scheduleToRow(data, currentClient.id, user.id);
+        const { error: err } = await supabase.from('workshop_schedules').insert(row);
+        if (err) throw err;
+      }
+    },
+    onSuccess: () => {
+      sessionStorage.removeItem('scheduleFormOpen');
+      sessionStorage.removeItem('scheduleFormEditing');
+      sessionStorage.removeItem('scheduleFormData');
+      setIsFormOpen(false);
+      setEditingSchedule(null);
+      queryClient.invalidateQueries({ queryKey: ['workshopSchedules'] });
     }
-    setLoading(false);
-  }, [currentClient?.id]);
+  });
 
-  useEffect(() => { fetchSchedules(); }, [fetchSchedules]);
-
-  const handleSave = async (data: Partial<WorkshopSchedule>) => {
-    if (!currentClient?.id || !user?.id) return;
-
-    if (editingSchedule) {
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status, completedAt }: { id: string, status: 'completed' | 'cancelled', completedAt?: string }) => {
       const { error: err } = await supabase
         .from('workshop_schedules')
-        .update({
-          vehicle_id: data.vehicleId,
-          workshop_id: data.workshopId,
-          scheduled_date: data.scheduledDate,
-          notes: data.notes?.trim() || null,
-        })
-        .eq('id', editingSchedule.id);
+        .update({ status, completed_at: completedAt })
+        .eq('id', id);
       if (err) throw err;
-    } else {
-      const row = scheduleToRow(data, currentClient.id, user.id);
-      const { error: err } = await supabase.from('workshop_schedules').insert(row);
-      if (err) throw err;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workshopSchedules'] });
     }
-
-    sessionStorage.removeItem('scheduleFormOpen');
-    sessionStorage.removeItem('scheduleFormEditing');
-    sessionStorage.removeItem('scheduleFormData');
-    setIsFormOpen(false);
-    setEditingSchedule(null);
-    await fetchSchedules();
-  };
-
-  const handleComplete = async (id: string) => {
-    const { error: err } = await supabase
-      .from('workshop_schedules')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', id);
-    if (!err) await fetchSchedules();
-  };
-
-  const handleCancel = async (id: string) => {
-    const { error: err } = await supabase
-      .from('workshop_schedules')
-      .update({ status: 'cancelled' })
-      .eq('id', id);
-    if (!err) await fetchSchedules();
-  };
-
-  const handleDelete = async (id: string) => {
-    const { error: err } = await supabase
-      .from('workshop_schedules')
-      .delete()
-      .eq('id', id);
-    if (!err) await fetchSchedules();
-  };
-
-  const filtered = schedules.filter((s) => {
-    const matchesSearch =
-      (s.vehicleLicensePlate ?? '').toLowerCase().includes(search.toLowerCase()) ||
-      (s.workshopName ?? '').toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
-    return matchesSearch && matchesStatus;
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error: err } = await supabase
+        .from('workshop_schedules')
+        .delete()
+        .eq('id', id);
+      if (err) throw err;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workshopSchedules'] });
+    }
+  });
+
+  const filtered = useMemo(() => {
+    return schedules.filter((s) => {
+      const matchesSearch =
+        (s.vehicleLicensePlate ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (s.workshopName ?? '').toLowerCase().includes(search.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [schedules, search, statusFilter]);
 
   const statusTabs: { key: StatusFilter; label: string }[] = [
     { key: 'all', label: 'Todos' },
@@ -413,12 +410,12 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
       </div>
 
       {/* Conteúdo */}
-      {loading ? (
+      {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">Erro ao carregar agendamentos.</div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 py-16 text-center">
           <CalendarClock className="h-10 w-10 text-zinc-300 mb-3" />
@@ -456,9 +453,9 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
                     setEditingSchedule(s);
                     setIsFormOpen(true);
                   }}
-                  onComplete={() => handleComplete(s.id)}
-                  onCancel={() => handleCancel(s.id)}
-                  onDelete={() => handleDelete(s.id)}
+                  onComplete={() => updateStatusMutation.mutate({ id: s.id, status: 'completed', completedAt: new Date().toISOString() })}
+                  onCancel={() => updateStatusMutation.mutate({ id: s.id, status: 'cancelled' })}
+                  onDelete={() => deleteMutation.mutate(s.id)}
                 />
               ))}
             </tbody>
@@ -477,7 +474,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
             setIsFormOpen(false);
             setEditingSchedule(null);
           }}
-          onSave={handleSave}
+          onSave={(data) => saveMutation.mutateAsync(data)}
         />
       )}
     </div>

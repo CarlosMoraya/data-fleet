@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Driver, DriverFieldSettings } from '../types';
@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import { driverFromRow, driverToRow, DriverRow } from '../lib/driverMappers';
 import { uploadDriverDocument, deleteDriverDocument } from '../lib/storageHelpers';
 import { driverFieldSettingsFromRow, defaultDriverFieldSettings, DriverFieldSettingsRow } from '../lib/driverFieldSettingsMappers';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -23,9 +24,7 @@ function formatCPF(cpf: string): string {
 
 export default function Drivers() {
   const { currentClient, user } = useAuth();
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(() => {
     return sessionStorage.getItem('driverFormOpen') === 'true';
@@ -38,69 +37,62 @@ export default function Drivers() {
       return null;
     }
   });
-  const [fieldSettings, setFieldSettings] = useState<DriverFieldSettings | null>(null);
-  // Mapa driver_id → placa do veículo associado
-  const [driverVehicleMap, setDriverVehicleMap] = useState<Record<string, string>>({});
   const [viewingDriver, setViewingDriver] = useState<Driver | null>(null);
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
   const canDelete = ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') || ((user?.role === 'Fleet Analyst' || user?.role === 'Supervisor') && user?.canDeleteDrivers === true);
 
+  // Queries
+  const { data: drivers = [], isLoading: loadingDrivers, isError: driversError } = useQuery({
+    queryKey: ['drivers', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase.from('drivers').select('*');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query.order('name');
+      if (error) throw error;
+      return (data as DriverRow[]).map(driverFromRow);
+    },
+    enabled: !!user
+  });
+
+  const { data: fieldSettings } = useQuery({
+    queryKey: ['driverFieldSettings', currentClient?.id],
+    queryFn: async () => {
+      if (!currentClient?.id) return null;
+      const { data } = await supabase
+        .from('driver_field_settings')
+        .select('*')
+        .eq('client_id', currentClient.id)
+        .maybeSingle();
+      return data ? driverFieldSettingsFromRow(data as DriverFieldSettingsRow) : defaultDriverFieldSettings(currentClient.id);
+    },
+    enabled: !!currentClient?.id
+  });
+
+  const { data: driverVehicleMap = {} } = useQuery({
+    queryKey: ['driverVehicleMap', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase.from('vehicles').select('driver_id, license_plate').not('driver_id', 'is', null);
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data } = await query;
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((row: { driver_id: string; license_plate: string }) => {
+        map[row.driver_id] = row.license_plate;
+      });
+      return map;
+    },
+    enabled: !!user
+  });
+
   // Redirect Drivers and Yard Auditors
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
     return <Navigate to="/checklists" replace />;
   }
-
-  const fetchDrivers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    let query = supabase.from('drivers').select('*');
-    if (currentClient?.id) {
-      query = query.eq('client_id', currentClient.id);
-    }
-    const { data, error: fetchError } = await query.order('name');
-
-    if (fetchError) {
-      setError('Erro ao carregar motoristas. Tente novamente.');
-    } else {
-      setDrivers((data as DriverRow[]).map(driverFromRow));
-    }
-    setLoading(false);
-  }, [currentClient?.id]);
-
-  const fetchDriverVehicleMap = useCallback(async () => {
-    let query = supabase.from('vehicles').select('driver_id, license_plate').not('driver_id', 'is', null);
-    if (currentClient?.id) {
-      query = query.eq('client_id', currentClient.id);
-    }
-    const { data } = await query;
-
-    const map: Record<string, string> = {};
-    (data ?? []).forEach((row: { driver_id: string; license_plate: string }) => {
-      map[row.driver_id] = row.license_plate;
-    });
-    setDriverVehicleMap(map);
-  }, [currentClient?.id]);
-
-  const fetchFieldSettings = useCallback(async () => {
-    if (!currentClient?.id) {
-      setFieldSettings(null);
-      return;
-    }
-    const { data } = await supabase
-      .from('driver_field_settings')
-      .select('*')
-      .eq('client_id', currentClient.id)
-      .maybeSingle();
-    setFieldSettings(data ? driverFieldSettingsFromRow(data as DriverFieldSettingsRow) : defaultDriverFieldSettings(currentClient.id));
-  }, [currentClient?.id]);
-
-  useEffect(() => {
-    fetchDrivers();
-    fetchFieldSettings();
-    fetchDriverVehicleMap();
-  }, [fetchDrivers, fetchFieldSettings, fetchDriverVehicleMap]);
 
   const handleSave = async (
     driver: Partial<Driver>,
@@ -160,8 +152,9 @@ export default function Drivers() {
       }
     }
 
-    await fetchDrivers();
-    await fetchDriverVehicleMap();
+    queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] });
+    queryClient.invalidateQueries({ queryKey: ['driverVehicleMap', currentClient?.id] });
+    
     setIsFormOpen(false);
     setEditingDriver(null);
     sessionStorage.removeItem('driverFormOpen');
@@ -172,42 +165,46 @@ export default function Drivers() {
   const handleDelete = async (driver: Driver) => {
     if (!window.confirm(`Excluir o motorista ${driver.name}? Esta ação não pode ser desfeita.`)) return;
 
-    // Delete documents from Storage first
-    if (driver.cnhUpload) await deleteDriverDocument(driver.cnhUpload);
-    if (driver.grUpload) await deleteDriverDocument(driver.grUpload);
-    if (driver.certificate1Upload) await deleteDriverDocument(driver.certificate1Upload);
-    if (driver.certificate2Upload) await deleteDriverDocument(driver.certificate2Upload);
-    if (driver.certificate3Upload) await deleteDriverDocument(driver.certificate3Upload);
+    try {
+      // Delete documents from Storage first
+      if (driver.cnhUpload) await deleteDriverDocument(driver.cnhUpload);
+      if (driver.grUpload) await deleteDriverDocument(driver.grUpload);
+      if (driver.certificate1Upload) await deleteDriverDocument(driver.certificate1Upload);
+      if (driver.certificate2Upload) await deleteDriverDocument(driver.certificate2Upload);
+      if (driver.certificate3Upload) await deleteDriverDocument(driver.certificate3Upload);
 
-    const { error: deleteError } = await supabase
-      .from('drivers')
-      .delete()
-      .eq('id', driver.id);
+      const { error: deleteError } = await supabase
+        .from('drivers')
+        .delete()
+        .eq('id', driver.id);
 
-    if (deleteError) {
-      setError('Erro ao excluir motorista. Tente novamente.');
-      return;
+      if (deleteError) throw deleteError;
+
+      // Delete associated user account (profile + auth.users)
+      if (driver.profileId) {
+        await supabase.functions.invoke('create-user', {
+          body: { action: 'delete', user_id: driver.profileId },
+        });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] });
+      queryClient.invalidateQueries({ queryKey: ['driverVehicleMap', currentClient?.id] });
+    } catch (err) {
+      console.error('Erro ao excluir motorista:', err);
+      alert('Erro ao excluir motorista. Tente novamente.');
     }
-
-    // Delete associated user account (profile + auth.users)
-    if (driver.profileId) {
-      await supabase.functions.invoke('create-user', {
-        body: { action: 'delete', user_id: driver.profileId },
-      });
-    }
-
-    await fetchDrivers();
-    await fetchDriverVehicleMap();
   };
 
-  const filteredDrivers = drivers.filter(d => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      d.name.toLowerCase().includes(q) ||
-      d.cpf.includes(q.replace(/\D/g, ''))
-    );
-  });
+  const filteredDrivers = useMemo(() => {
+    return drivers.filter(d => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        d.name.toLowerCase().includes(q) ||
+        d.cpf.includes(q.replace(/\D/g, ''))
+      );
+    });
+  }, [drivers, search]);
 
   return (
     <div className="space-y-6">
@@ -247,14 +244,14 @@ export default function Drivers() {
         />
       </div>
 
-      {error && (
+      {driversError && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erro ao carregar motoristas. Tente novamente.
         </div>
       )}
 
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        {loading ? (
+        {loadingDrivers ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-orange-500" />
           </div>
@@ -370,7 +367,7 @@ export default function Drivers() {
       {isFormOpen && (
         <DriverForm
           driver={editingDriver}
-          fieldSettings={fieldSettings}
+          fieldSettings={fieldSettings || null}
           clientId={currentClient?.id ?? ''}
           onClose={() => {
             setIsFormOpen(false);

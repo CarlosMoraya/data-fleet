@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ClipboardList, Loader2, Search } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -6,6 +6,7 @@ import { actionPlanFromRow, actionStatusLabel, actionStatusColor, type ActionPla
 import type { ActionPlan, ActionPlanStatus } from '../types';
 import ActionPlanModal from '../components/ActionPlanModal';
 import { cn } from '../lib/utils';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const ALL_STATUSES: (ActionPlanStatus | 'all')[] = ['all', 'pending', 'in_progress', 'awaiting_conclusion', 'completed', 'cancelled'];
 const STATUS_TAB_LABEL: Record<string, string> = {
@@ -19,85 +20,84 @@ const STATUS_TAB_LABEL: Record<string, string> = {
 
 export default function ActionPlans() {
   const { currentClient } = useAuth();
+  const queryClient = useQueryClient();
 
-  const [plans, setPlans] = useState<ActionPlan[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActionPlanStatus | 'all'>('pending');
   const [search, setSearch] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<ActionPlan | null>(null);
 
-  const fetchPlans = useCallback(async () => {
-    setLoading(true);
-    let query = supabase
-      .from('action_plans')
-      .select(`
-        *,
-        vehicles(license_plate),
-        profiles!reported_by(name),
-        responsible_profile:profiles!responsible_id(name),
-        assigned_by_profile:profiles!assigned_by(name),
-        claimed_by_profile:profiles!claimed_by(name),
-        completed_by_profile:profiles!completed_by(name),
-        checklist_responses!checklist_response_id(checklist_items(title)),
-        checklists!checklist_id(checklist_templates(name))
-      `);
+  const { data: plans = [], isLoading } = useQuery({
+    queryKey: ['actionPlans', currentClient?.id],
+    queryFn: async () => {
+      const { data, error: fetchError } = await supabase
+        .from('action_plans')
+        .select(`
+          *,
+          vehicles(license_plate),
+          profiles!reported_by(name),
+          responsible_profile:profiles!responsible_id(name),
+          assigned_by_profile:profiles!assigned_by(name),
+          claimed_by_profile:profiles!claimed_by(name),
+          completed_by_profile:profiles!completed_by(name),
+          checklist_responses!checklist_response_id(checklist_items(title)),
+          checklists!checklist_id(checklist_templates(name))
+        `)
+        .eq('client_id', currentClient!.id)
+        .order('created_at', { ascending: false });
 
-    if (currentClient?.id) {
-      query = query.eq('client_id', currentClient.id);
-    }
+      if (fetchError) throw fetchError;
 
-    const { data, error: fetchError } = await query.order('created_at', { ascending: false });
-    if (fetchError) console.error('ActionPlans fetch error:', fetchError);
+      // Handle profiles where PostgREST join might fail (Edge cases/Legacy data)
+      const missingIds = new Set<string>();
+      (data ?? []).forEach((r: any) => {
+        if (r.claimed_by && !r.claimed_by_profile) missingIds.add(r.claimed_by);
+        if (r.completed_by && !r.completed_by_profile) missingIds.add(r.completed_by);
+      });
 
-    // Collect profile IDs where PostgREST join returned null (columns without FK constraints)
-    const missingIds = new Set<string>();
-    (data ?? []).forEach((r: Record<string, unknown>) => {
-      if (r.claimed_by && !r.claimed_by_profile) missingIds.add(r.claimed_by as string);
-      if (r.completed_by && !r.completed_by_profile) missingIds.add(r.completed_by as string);
-    });
-
-    let profileMap: Record<string, string> = {};
-    if (missingIds.size > 0) {
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, name')
-        .in('id', [...missingIds]);
-      (profiles ?? []).forEach((p: { id: string; name: string }) => { profileMap[p.id] = p.name; });
-    }
-
-    const mapped = (data ?? []).map(r => {
-      const row = r as ActionPlanRow & { profiles: { name: string } | null };
-      if (row.claimed_by && !row.claimed_by_profile && profileMap[row.claimed_by]) {
-        row.claimed_by_profile = { name: profileMap[row.claimed_by] };
+      let profileMap: Record<string, string> = {};
+      if (missingIds.size > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .in('id', Array.from(missingIds));
+        (profiles ?? []).forEach((p: { id: string; name: string }) => { profileMap[p.id] = p.name; });
       }
-      if (row.completed_by && !row.completed_by_profile && profileMap[row.completed_by]) {
-        row.completed_by_profile = { name: profileMap[row.completed_by] };
-      }
-      return actionPlanFromRow({ ...row });
-    });
-    setPlans(mapped);
-    setLoading(false);
-  }, [currentClient?.id]);
 
-  useEffect(() => { fetchPlans(); }, [fetchPlans]);
-
-  const counts = ALL_STATUSES.reduce((acc, s) => {
-    acc[s] = s === 'all' ? plans.length : plans.filter(p => p.status === s).length;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const filtered = plans.filter(p => {
-    const matchTab = activeTab === 'all' || p.status === activeTab;
-    const q = search.toLowerCase();
-    const matchSearch = !q || (
-      (p.vehicleLicensePlate ?? '').toLowerCase().includes(q) ||
-      (p.suggestedAction ?? '').toLowerCase().includes(q) ||
-      (p.itemTitle ?? '').toLowerCase().includes(q) ||
-      (p.name ?? '').toLowerCase().includes(q) ||
-      (p.responsibleName ?? '').toLowerCase().includes(q)
-    );
-    return matchTab && matchSearch;
+      return (data ?? []).map(r => {
+        const row = { ...r };
+        if (row.claimed_by && !row.claimed_by_profile && profileMap[row.claimed_by]) {
+          row.claimed_by_profile = { name: profileMap[row.claimed_by] };
+        }
+        if (row.completed_by && !row.completed_by_profile && profileMap[row.completed_by]) {
+          row.completed_by_profile = { name: profileMap[row.completed_by] };
+        }
+        return actionPlanFromRow(row as ActionPlanRow);
+      });
+    },
+    enabled: !!currentClient?.id
   });
+
+  const counts = useMemo(() => {
+    return ALL_STATUSES.reduce((acc, s) => {
+      acc[s] = s === 'all' ? plans.length : plans.filter(p => p.status === s).length;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [plans]);
+
+  const filtered = useMemo(() => {
+    return plans.filter(p => {
+      const matchTab = activeTab === 'all' || p.status === activeTab;
+      const q = search.toLowerCase();
+      const matchSearch = !q || (
+        (p.vehicleLicensePlate ?? '').toLowerCase().includes(q) ||
+        (p.suggestedAction ?? '').toLowerCase().includes(q) ||
+        (p.itemTitle ?? '').toLowerCase().includes(q) ||
+        (p.name ?? '').toLowerCase().includes(q) ||
+        (p.responsibleName ?? '').toLowerCase().includes(q)
+      );
+      return matchTab && matchSearch;
+    });
+  }, [plans, activeTab, search]);
 
   const formatDate = (iso?: string) =>
     iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
@@ -169,7 +169,7 @@ export default function ActionPlans() {
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-16 text-zinc-400">
             <Loader2 className="h-6 w-6 animate-spin mr-2" />
             <span className="text-sm">Carregando ações...</span>
@@ -235,7 +235,10 @@ export default function ActionPlans() {
         <ActionPlanModal
           plan={selectedPlan}
           onClose={() => setSelectedPlan(null)}
-          onSaved={() => { setSelectedPlan(null); fetchPlans(); }}
+          onSaved={() => { 
+            setSelectedPlan(null); 
+            queryClient.invalidateQueries({ queryKey: ['actionPlans', currentClient?.id] });
+          }}
         />
       )}
     </div>

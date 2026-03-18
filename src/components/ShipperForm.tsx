@@ -104,7 +104,7 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true">
       <div className="relative flex w-full max-w-xl flex-col rounded-2xl bg-white shadow-xl max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 flex-shrink-0">

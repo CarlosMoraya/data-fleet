@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
-import { Wrench, Search, Eye, CheckCircle2 } from 'lucide-react';
+import React from 'react';
+import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit } from 'lucide-react';
 import { cn } from '../lib/utils';
 import MaintenanceDetailModal from '../components/MaintenanceDetailModal';
+import MaintenanceForm from '../components/MaintenanceForm';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
+import { maintenanceFromRow, MaintenanceOrderRow } from '../lib/maintenanceMappers';
+import { useAuth } from '../context/AuthContext';
 
 export type MaintenanceStatus = 'Aguardando orçamento' | 'Orçamento aprovado' | 'Serviço em execução' | 'Concluído';
 export type MaintenanceType = 'Preventiva' | 'Preditiva' | 'Corretiva';
@@ -11,6 +16,8 @@ export interface MaintenanceOrder {
   os: string;
   licensePlate: string;
   workshop: string;
+  vehicleId: string;
+  workshopId: string;
   entryDate: string;
   expectedExitDate: string;
   type: MaintenanceType;
@@ -23,163 +30,6 @@ export interface MaintenanceOrder {
   createdAt: string;
   notes?: string;
 }
-
-const MOCK_ORDERS: MaintenanceOrder[] = [
-  {
-    id: '1', os: 'OS-2026-001', licensePlate: 'ABC-1234', workshop: 'Oficina Central Ltda',
-    entryDate: '2026-03-01', expectedExitDate: '2026-03-10', type: 'Corretiva',
-    status: 'Serviço em execução', description: 'Troca de motor completo após falha no bloco',
-    mechanicName: 'José Carlos', estimatedCost: 12500, approvedCost: 11800,
-    createdBy: 'Alexandre Souza', createdAt: '2026-03-01', notes: 'Aguardar peça importada',
-  },
-  {
-    id: '2', os: 'OS-2026-002', licensePlate: 'DEF-5678', workshop: 'AutoTruck Serviços',
-    entryDate: '2026-03-05', expectedExitDate: '2026-03-12', type: 'Preventiva',
-    status: 'Orçamento aprovado', description: 'Revisão dos 60.000 km — óleo, filtros, correias',
-    mechanicName: 'Marcos Oliveira', estimatedCost: 1800, approvedCost: 1800,
-    createdBy: 'Mariana Lima', createdAt: '2026-03-05',
-  },
-  {
-    id: '3', os: 'OS-2026-003', licensePlate: 'GHI-9012', workshop: 'Mega Frotas Service',
-    entryDate: '2026-03-08', expectedExitDate: '2026-03-15', type: 'Corretiva',
-    status: 'Aguardando orçamento', description: 'Falha no sistema de freios ABS — sensor e atuador',
-    mechanicName: 'Ricardo Alves', estimatedCost: 3200,
-    createdBy: 'Pedro Santos', createdAt: '2026-03-08', notes: 'Veículo parado, prioridade alta',
-  },
-  {
-    id: '4', os: 'OS-2026-004', licensePlate: 'JKL-3456', workshop: 'Oficina Central Ltda',
-    entryDate: '2026-03-02', expectedExitDate: '2026-03-07', type: 'Preventiva',
-    status: 'Concluído', description: 'Troca de pneus traseiros e balanceamento',
-    mechanicName: 'José Carlos', estimatedCost: 2400, approvedCost: 2350,
-    createdBy: 'Alexandre Souza', createdAt: '2026-03-02',
-  },
-  {
-    id: '5', os: 'OS-2026-005', licensePlate: 'MNO-7890', workshop: 'RR Diesel Mecânica',
-    entryDate: '2026-03-10', expectedExitDate: '2026-03-18', type: 'Preditiva',
-    status: 'Aguardando orçamento', description: 'Análise de vibração anormal na transmissão',
-    mechanicName: 'Fernanda Costa', estimatedCost: 5500,
-    createdBy: 'Mariana Lima', createdAt: '2026-03-10', notes: 'Diagnóstico eletrônico necessário',
-  },
-  {
-    id: '6', os: 'OS-2026-006', licensePlate: 'PQR-1234', workshop: 'AutoTruck Serviços',
-    entryDate: '2026-03-03', expectedExitDate: '2026-03-11', type: 'Corretiva',
-    status: 'Serviço em execução', description: 'Reparo na caixa de câmbio — trocas de sincronizadores',
-    mechanicName: 'Marcos Oliveira', estimatedCost: 7800, approvedCost: 8100,
-    createdBy: 'Pedro Santos', createdAt: '2026-03-03',
-  },
-  {
-    id: '7', os: 'OS-2026-007', licensePlate: 'STU-5678', workshop: 'Mega Frotas Service',
-    entryDate: '2026-03-07', expectedExitDate: '2026-03-14', type: 'Preventiva',
-    status: 'Serviço em execução', description: 'Revisão geral — suspensão, alinhamento e geometria',
-    mechanicName: 'Luiz Henrique', estimatedCost: 3100, approvedCost: 3100,
-    createdBy: 'Alexandre Souza', createdAt: '2026-03-07',
-  },
-  {
-    id: '8', os: 'OS-2026-008', licensePlate: 'VWX-9012', workshop: 'RR Diesel Mecânica',
-    entryDate: '2026-03-12', expectedExitDate: '2026-03-20', type: 'Corretiva',
-    status: 'Aguardando orçamento', description: 'Quebra de mola dianteira direita em campo',
-    mechanicName: 'Fernanda Costa', estimatedCost: 1900,
-    createdBy: 'Mariana Lima', createdAt: '2026-03-12', notes: 'Veículo rebocado até a oficina',
-  },
-  {
-    id: '9', os: 'OS-2026-009', licensePlate: 'YZA-3456', workshop: 'Oficina Central Ltda',
-    entryDate: '2026-03-01', expectedExitDate: '2026-03-05', type: 'Preventiva',
-    status: 'Concluído', description: 'Troca de filtro de ar e fluido de freio',
-    mechanicName: 'José Carlos', estimatedCost: 450, approvedCost: 450,
-    createdBy: 'Pedro Santos', createdAt: '2026-03-01',
-  },
-  {
-    id: '10', os: 'OS-2026-010', licensePlate: 'BCD-7890', workshop: 'AutoTruck Serviços',
-    entryDate: '2026-03-09', expectedExitDate: '2026-03-17', type: 'Preditiva',
-    status: 'Orçamento aprovado', description: 'Inspeção termográfica no sistema elétrico',
-    mechanicName: 'Ricardo Alves', estimatedCost: 2200, approvedCost: 2200,
-    createdBy: 'Alexandre Souza', createdAt: '2026-03-09', notes: 'Hotspot identificado no alternador',
-  },
-  {
-    id: '11', os: 'OS-2026-011', licensePlate: 'EFG-1234', workshop: 'Mega Frotas Service',
-    entryDate: '2026-03-04', expectedExitDate: '2026-03-09', type: 'Corretiva',
-    status: 'Concluído', description: 'Substituição do radiador — superaquecimento recorrente',
-    mechanicName: 'Luiz Henrique', estimatedCost: 4200, approvedCost: 4050,
-    createdBy: 'Mariana Lima', createdAt: '2026-03-04',
-  },
-  {
-    id: '12', os: 'OS-2026-012', licensePlate: 'HIJ-5678', workshop: 'RR Diesel Mecânica',
-    entryDate: '2026-03-11', expectedExitDate: '2026-03-19', type: 'Preventiva',
-    status: 'Aguardando orçamento', description: 'Revisão dos 90.000 km — velas, bobinas e correia dentada',
-    mechanicName: 'Fernanda Costa', estimatedCost: 2800,
-    createdBy: 'Pedro Santos', createdAt: '2026-03-11',
-  },
-  {
-    id: '13', os: 'OS-2026-013', licensePlate: 'KLM-9012', workshop: 'Oficina Central Ltda',
-    entryDate: '2026-03-06', expectedExitDate: '2026-03-13', type: 'Corretiva',
-    status: 'Orçamento aprovado', description: 'Troca de embreagem completa',
-    mechanicName: 'José Carlos', estimatedCost: 6500, approvedCost: 6500,
-    createdBy: 'Alexandre Souza', createdAt: '2026-03-06', notes: 'Aguardando kit de embreagem',
-  },
-  {
-    id: '14', os: 'OS-2026-014', licensePlate: 'NOP-3456', workshop: 'AutoTruck Serviços',
-    entryDate: '2026-03-13', expectedExitDate: '2026-03-21', type: 'Preditiva',
-    status: 'Aguardando orçamento', description: 'Análise de óleo — desgaste prematuro identificado',
-    mechanicName: 'Marcos Oliveira', estimatedCost: 900,
-    createdBy: 'Mariana Lima', createdAt: '2026-03-13',
-  },
-  {
-    id: '15', os: 'OS-2026-015', licensePlate: 'QRS-7890', workshop: 'Mega Frotas Service',
-    entryDate: '2026-03-02', expectedExitDate: '2026-03-06', type: 'Corretiva',
-    status: 'Concluído', description: 'Substituição do alternador queimado',
-    mechanicName: 'Luiz Henrique', estimatedCost: 1600, approvedCost: 1600,
-    createdBy: 'Pedro Santos', createdAt: '2026-03-02',
-  },
-  {
-    id: '16', os: 'OS-2026-016', licensePlate: 'TUV-1234', workshop: 'RR Diesel Mecânica',
-    entryDate: '2026-03-10', expectedExitDate: '2026-03-16', type: 'Preventiva',
-    status: 'Serviço em execução', description: 'Lubrificação geral e inspeção do chassi',
-    mechanicName: 'Ricardo Alves', estimatedCost: 650, approvedCost: 650,
-    createdBy: 'Alexandre Souza', createdAt: '2026-03-10',
-  },
-  {
-    id: '17', os: 'OS-2026-017', licensePlate: 'WXY-5678', workshop: 'Oficina Central Ltda',
-    entryDate: '2026-03-14', expectedExitDate: '2026-03-22', type: 'Corretiva',
-    status: 'Aguardando orçamento', description: 'Falha no injetor — perda de potência significativa',
-    mechanicName: 'José Carlos', estimatedCost: 4800,
-    createdBy: 'Mariana Lima', createdAt: '2026-03-14', notes: 'Veículo em teste de bancada',
-  },
-  {
-    id: '18', os: 'OS-2026-018', licensePlate: 'ZAB-9012', workshop: 'AutoTruck Serviços',
-    entryDate: '2026-03-08', expectedExitDate: '2026-03-15', type: 'Preditiva',
-    status: 'Concluído', description: 'Análise vibratória — substituição de rolamento de roda',
-    mechanicName: 'Marcos Oliveira', estimatedCost: 1100, approvedCost: 1050,
-    createdBy: 'Pedro Santos', createdAt: '2026-03-08',
-  },
-  {
-    id: '19', os: 'OS-2026-019', licensePlate: 'CDE-3456', workshop: 'Mega Frotas Service',
-    entryDate: '2026-03-15', expectedExitDate: '2026-03-24', type: 'Corretiva',
-    status: 'Aguardando orçamento', description: 'Vazamento de óleo no motor — retentores e juntas',
-    mechanicName: 'Luiz Henrique', estimatedCost: 2600,
-    createdBy: 'Alexandre Souza', createdAt: '2026-03-15',
-  },
-  {
-    id: '20', os: 'OS-2026-020', licensePlate: 'FGH-7890', workshop: 'RR Diesel Mecânica',
-    entryDate: '2026-03-05', expectedExitDate: '2026-03-12', type: 'Preventiva',
-    status: 'Concluído', description: 'Calibragem de bicos injetores e limpeza do sistema',
-    mechanicName: 'Fernanda Costa', estimatedCost: 980, approvedCost: 980,
-    createdBy: 'Mariana Lima', createdAt: '2026-03-05',
-  },
-  {
-    id: '21', os: 'OS-2026-021', licensePlate: 'IJK-1234', workshop: 'Oficina Central Ltda',
-    entryDate: '2026-03-12', expectedExitDate: '2026-03-19', type: 'Corretiva',
-    status: 'Orçamento aprovado', description: 'Substituição de compressor do ar condicionado',
-    mechanicName: 'José Carlos', estimatedCost: 3400, approvedCost: 3400,
-    createdBy: 'Pedro Santos', createdAt: '2026-03-12', notes: 'Motorista relatou cheiro de queimado',
-  },
-  {
-    id: '22', os: 'OS-2026-022', licensePlate: 'LMN-5678', workshop: 'AutoTruck Serviços',
-    entryDate: '2026-03-16', expectedExitDate: '2026-03-25', type: 'Preditiva',
-    status: 'Aguardando orçamento', description: 'Monitoramento de temperatura do turbo — sinais de falha iminente',
-    mechanicName: 'Ricardo Alves', estimatedCost: 8500,
-    createdBy: 'Alexandre Souza', createdAt: '2026-03-16',
-  },
-];
 
 type StatusFilter = MaintenanceStatus | 'all';
 
@@ -213,41 +63,140 @@ function formatDate(iso: string) {
 }
 
 export default function Maintenance() {
-  const [orders, setOrders] = useState<MaintenanceOrder[]>(MOCK_ORDERS);
-  const [activeTab, setActiveTab] = useState<StatusFilter>('all');
-  const [search, setSearch] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<MaintenanceOrder | null>(null);
+  const { currentClient, profile } = useAuth();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = React.useState<StatusFilter>('all');
+  const [search, setSearch] = React.useState('');
+  const [selectedOrder, setSelectedOrder] = React.useState<MaintenanceOrder | null>(null);
+  
+  const [isFormOpen, setIsFormOpen] = React.useState(false);
+  const [orderToEdit, setOrderToEdit] = React.useState<MaintenanceOrder | null>(null);
 
-  const counts = {
-    all: orders.length,
-    'Aguardando orçamento': orders.filter(o => o.status === 'Aguardando orçamento').length,
-    'Orçamento aprovado':   orders.filter(o => o.status === 'Orçamento aprovado').length,
-    'Serviço em execução':  orders.filter(o => o.status === 'Serviço em execução').length,
-    'Concluído':            orders.filter(o => o.status === 'Concluído').length,
-    corretiva:              orders.filter(o => o.type === 'Corretiva').length,
-    preventiva:             orders.filter(o => o.type === 'Preventiva').length,
-  };
+  const { data: orders = [], isLoading } = useQuery({
+    queryKey: ['maintenanceOrders', currentClient?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('maintenance_orders')
+        .select(`
+          *,
+          vehicles (license_plate),
+          workshops (name),
+          profiles (name)
+        `)
+        .order('created_at', { ascending: false });
 
-  const filtered = orders.filter(o => {
-    const matchTab = activeTab === 'all' || o.status === activeTab;
-    const matchSearch = !search || o.licensePlate.toLowerCase().includes(search.toLowerCase());
-    return matchTab && matchSearch;
+      if (error) throw error;
+      return (data as MaintenanceOrderRow[]).map(maintenanceFromRow);
+    },
+    enabled: !!currentClient?.id,
   });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: MaintenanceStatus }) => {
+      const { error } = await supabase
+        .from('maintenance_orders')
+        .update({ status, actual_exit_date: status === 'Concluído' ? new Date().toISOString() : null })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: Partial<MaintenanceOrder>) => {
+      if (!currentClient || !profile) throw new Error('Sessão inválida');
+
+      let osNumber = data.os;
+      if (!osNumber) {
+        // Format OS-YYMM-XXXX
+        const d = new Date();
+        const yy = d.getFullYear().toString().slice(-2);
+        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+        const rand = Math.floor(1000 + Math.random() * 9000);
+        osNumber = `OS-${yy}${mm}-${rand}`;
+      }
+
+      const payload: any = {
+        client_id: currentClient.id,
+        vehicle_id: data.vehicleId,
+        workshop_id: data.workshopId,
+        entry_date: data.entryDate,
+        expected_exit_date: data.expectedExitDate || null,
+        type: data.type,
+        status: data.status,
+        description: data.description || null,
+        mechanic_name: data.mechanicName || null,
+        estimated_cost: data.estimatedCost || 0,
+        approved_cost: data.approvedCost || null,
+        notes: data.notes || null,
+        os_number: osNumber,
+      };
+
+      if (data.id) {
+        const { error } = await supabase.from('maintenance_orders').update(payload).eq('id', data.id);
+        if (error) throw error;
+      } else {
+        payload.created_by_id = profile.id;
+        const { error } = await supabase.from('maintenance_orders').insert([payload]);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
+      setIsFormOpen(false);
+      setOrderToEdit(null);
+    },
+  });
+
+  const counts = React.useMemo(() => {
+    return {
+      all: orders.length,
+      'Aguardando orçamento': orders.filter(o => o.status === 'Aguardando orçamento').length,
+      'Orçamento aprovado':   orders.filter(o => o.status === 'Orçamento aprovado').length,
+      'Serviço em execução':  orders.filter(o => o.status === 'Serviço em execução').length,
+      'Concluído':            orders.filter(o => o.status === 'Concluído').length,
+      corretiva:              orders.filter(o => o.type === 'Corretiva').length,
+      preventiva:             orders.filter(o => o.type === 'Preventiva').length,
+    };
+  }, [orders]);
+
+  const filtered = React.useMemo(() => {
+    return orders.filter(o => {
+      const matchTab = activeTab === 'all' || o.status === activeTab;
+      const matchSearch = !search || o.licensePlate.toLowerCase().includes(search.toLowerCase()) || o.os.toLowerCase().includes(search.toLowerCase());
+      return matchTab && matchSearch;
+    });
+  }, [orders, activeTab, search]);
 
   const handleComplete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'Concluído' } : o));
+    updateStatusMutation.mutate({ id, status: 'Concluído' });
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
-          <Wrench className="h-6 w-6 text-orange-500" />
-          Manutenção
-        </h1>
-        <p className="text-sm text-zinc-500 mt-1">Acompanhe as ordens de serviço e o status dos veículos em manutenção</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
+            <Wrench className="h-6 w-6 text-orange-500" />
+            Manutenção
+          </h1>
+          <p className="text-sm text-zinc-500 mt-1">Acompanhe as ordens de serviço e o status dos veículos em manutenção</p>
+        </div>
+        
+        <button
+          onClick={() => {
+            setOrderToEdit(null);
+            setIsFormOpen(true);
+          }}
+          className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 sm:py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors shadow-sm"
+        >
+          <Plus className="h-4 w-4" />
+          Nova Manutenção
+        </button>
       </div>
 
       {/* Summary cards */}
@@ -327,8 +276,15 @@ export default function Maintenance() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
-        {filtered.length === 0 ? (
+      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden min-h-[400px] relative">
+        {isLoading ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm z-10">
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+              <p className="text-sm text-zinc-500">Carregando manutenções...</p>
+            </div>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-zinc-400">
             <Wrench className="h-12 w-12 mx-auto mb-3 opacity-30" />
             <p className="text-sm">Nenhuma ordem de serviço encontrada.</p>
@@ -391,6 +347,19 @@ export default function Maintenance() {
                           </button>
                           {o.status !== 'Concluído' && (
                             <button
+                              onClick={() => {
+                                setOrderToEdit(o);
+                                setIsFormOpen(true);
+                              }}
+                              title="Editar"
+                              className="p-1.5 rounded-lg text-zinc-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                          )}
+
+                          {o.status !== 'Concluído' && (
+                            <button
                               onClick={(e) => handleComplete(o.id, e)}
                               title="Marcar como Concluído"
                               className="p-1.5 rounded-lg text-zinc-400 hover:text-green-600 hover:bg-green-50 transition-colors"
@@ -413,6 +382,17 @@ export default function Maintenance() {
         <MaintenanceDetailModal
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
+        />
+      )}
+
+      {isFormOpen && (
+        <MaintenanceForm
+          order={orderToEdit}
+          onClose={() => {
+            setIsFormOpen(false);
+            setOrderToEdit(null);
+          }}
+          onSave={async (data) => saveMutation.mutateAsync(data)}
         />
       )}
     </div>

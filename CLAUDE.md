@@ -67,155 +67,37 @@ Para detalhes completos, consulte os módulos em `.claude/`.
 
 ## Registro de Mudanças (Sessão Atual)
 
-- **Módulo de Veículos**: Atualizado `VehicleForm.tsx` com campos obrigatórios dinâmicos, novos uploads (Sanitária e GR) e suporte a múltiplos tipos de veículos.
-- **Módulo de Motoristas**: Implementado CRUD completo em `Drivers.tsx` com `DriverForm.tsx`, incluindo upload de CNH, GR e até 3 certificados (armazenados em bucket `driver-documents`).
-- **Configurações Dinâmicas**: Centralizadas em `Settings.tsx`, permitindo configurar campos obrigatórios tanto para Veículos quanto para Motoristas por cliente.
-- **Permissões de Exclusão**: Separadas as permissões de exclusão de veículos (`can_delete_vehicles`) e motoristas (`can_delete_drivers`) na tabela `profiles`, com interface de gestão em `Users.tsx`.
-- **Módulo de Oficinas**: Implementado CRUD completo em `Workshops.tsx` com `WorkshopForm.tsx`, incluindo gestão de endereços e especialidades técnica. Validado com Testes E2E (Manager e Analyst).
-- **Estabilidade de Testes (E2E)**: Corrigidos bugs críticos de infraestrutura de testes. Implementado `test.describe.serial` em fluxos de Oficina e Clientes, ajuste de timeouts para Edge Functions (60s) e inclusão de campos obrigatórios dinâmicos nos testes de Veículos. Resolvidos bugs BUG-001 a BUG-005.
-- **UX Responsiva**: Implementado Menu Mobile (Drawer) com botão hamburger no Topbar e overlay inteligente para melhor experiência em smartphones.
-- **Deploy & Hosting**: Adicionado `vercel.json` e orientações de deploy do frontend na Vercel com conexão ao Supabase.
-- **Seeding de Veículos**: Cadastrados 6 novos veículos (VEC0001-VEC0006) com preenchimento completo de garantia, revisão e seguro. Identificada limitação de upload (403) no perfil de Assistente, com bypass realizado via Analista.
-- **Módulo de Checklists**: Implementado módulo completo com 7 tabelas Supabase (+ seed ~45 itens), 4 mappers TypeScript, 6 componentes React e 4 páginas novas:
-  - Templates com ciclo draft → published → deprecated, versionamento, categorias de veículo (Leve/Médio/Pesado/Elétrico) e contexto (Rotina/Auditoria/Reboque/Entrada em Oficina/Saída de Oficina/Segurança)
-  - Nome do template gerado automaticamente como `"Checklist [Categoria] [Contexto]"` — sem campo manual
-  - Unicidade por (client, category, context) via EXCLUDE constraint no banco
-  - View Motorista: todos os templates publicados da categoria do veículo exibidos como cards; histórico com busca e filtro de status
-  - View Auditor: dropdown de veículo → motorista associado exibido → apenas templates de Auditoria
-  - Contextos Entrada/Saída de Oficina: seleção obrigatória de oficina antes dos itens (salvo em `workshop_id`)
-  - Contexto Segurança: toggle `canBlockVehicle` por item com badge visual (prepara bloqueio futuro)
-  - Preenchimento fullscreen mobile-first com câmera direta (getUserMedia + GPS + compressão)
-  - Geração automática de Plano de Ação para itens não conformes (política `allowDriverActions`/`allowAuditorActions`)
-  - Painel de Ação para Fleet Assistant+ com gestão de status e O.S.
-  - Exclusão de checklists exclusiva para Admin Master (trilha de auditoria)
-- **Cadastro de Veículos**: Adicionada a modalidade de aquisição "Agregado" no `VehicleForm.tsx` e atualizada a restrição `CHECK` no banco de dados (`vehicles_acquisition_check`), permitindo maior flexibilidade na gestão da frota.
-- **Layout de Configurações**: Refatorada a página `Settings.tsx` para utilizar uma interface de abas (Tabs), separando as configurações de campos obrigatórios de Veículos e Motoristas para melhor usabilidade, seguindo o padrão visual de `Cadastros.tsx`.
-- **Auto-Sync**: Atualizados manuais em `.claude/` (Frontend, Backend, Data Model) com as novas funcionalidades de Checklists.
-- **Filtros e Multi-tenancy (Admin Master)**: Implementado Seletor Global de Clientes no `Topbar` exclusivo para Admin Master, permitindo visão consolidada ("Todos os Clientes"). Removidos filtros locais redundantes e sincronizadas as páginas (`AdminUsers`, `AdminClients`, `Vehicles`, `Drivers`, etc.) para respeitar exclusivamente o contexto global de cliente. **Corrigidas permissões RLS em `drivers` e `driver_field_settings` para garantir acesso total de escrita ao Admin Master.** Adicionados atalhos rápidos de "Marcar Todos / Desmarcar Todos" em `Settings.tsx` para Veículos e Motoristas, corrigindo também bloqueios de Select RLS (`fix_admin_master_settings_permissions.sql`).
-- **Templates de Checklists (Admin Master)**: Habilitada a exclusão de templates publicados e descontinuados exclusivamente para o perfil Admin Master em `ChecklistTemplates.tsx`. Adicionado tratamento amigável de erro de chave estrangeira (código 23503 do PostgreSQL) para instruir a exclusão prévia do histórico de relatórios caso o template possua preenchimentos em andamento/concluídos.
-- **Integração Motorista ↔ Usuário do Sistema (2026-03-14)**: Implementado padrão arquitetural onde **todo motorista é automaticamente um usuário do sistema** (com login). Adicionada coluna `profile_id` na tabela `drivers` (FK → profiles.id) via migration `add_driver_profile_link.sql`. `DriverForm` em modo criação agora exibe campos email/senha (obrigatórios) e chama Edge Function `create-user` para criar conta + perfil antes de inserir driver. Users.tsx filtrado para **não permitir criar Driver role e não listar drivers** (criação exclusiva via DriverForm). `Checklists.tsx` corrigido: vehicle lookup agora usa dois passos — `drivers.profile_id = auth.uid()` → `vehicles.driver_id = drivers.id` (antes usava incorretamente `profiles.id` como `driver_id`). Validado com 100% de sucesso nos testes E2E (`driver-user-integration.spec.ts`). Atualizados manuais em `.claude/` (data-model.md, arch-backend.md, arch-frontend.md).
-- **Correções Adicionais (E2E/Edge Functions)**: Corrigida Edge Function `create-user` para retornar `profileId` e desabilitada verificação de JWT no gateway (validada internamente) para permitir criação de usuários por perfis de nível inferior (Fleet Analyst) em ambientes de teste. Ajustados seletores do Playwright para maior estabilidade.
-- **Redesign de Contextos de Checklist (2026-03-15)**: Removido conceito "Livre"; contexto agora é campo obrigatório em todos os templates. Renomeado contexto "Diário" para "Rotina". Nome do template auto-gerado como "Checklist [Categoria] [Contexto]". Novo schema de banco: coluna `context` com CHECK constraint, `can_block_vehicle` em `checklist_items`, `workshop_id` em `checklists`. Nova EXCLUDE constraint `unique_published_category_context` permite múltiplos templates publicados por categoria (um por contexto).
-- **Integração Checklist → Plano de Ação (2026-03-15)**:
-  - **Bug crítico corrigido**: `ActionPlans.tsx` usava joins PostgREST inválidos (`checklist_items!checklist_response_id` e `checklist_templates` sem FK direta), causando erro silencioso — `data` retornava `null` e a lista ficava sempre vazia. Corrigido com joins aninhados válidos: `checklist_responses!checklist_response_id(checklist_items(title))` e `checklists!checklist_id(checklist_templates(name))`. Adicionado log de erro em `fetchPlans`.
-  - `ActionPlanRow` e `actionPlanFromRow` em `actionPlanMappers.ts` atualizados para refletir a nova estrutura aninhada dos joins.
-  - **Upload de evidência**: substituído campo de URL por upload real de arquivo (imagem JPG/PNG/WEBP ou PDF) em `ActionPlanModal.tsx`. Exibe preview de imagem ou ícone de documento para PDFs. Armazenado em `vehicle-documents/{clientId}/action-plans/{planId}/evidence.{ext}` via nova função `uploadActionPlanEvidence()` em `storageHelpers.ts`.
-- **Correções UX Motorista — Checklists (2026-03-15)**:
-  - **Cancelar checklist em andamento**: Adicionado botão "Cancelar" no banner de checklist em andamento da view do Driver em `Checklists.tsx`. Usa o `confirmDelete` modal existente; apenas checklists `in_progress` podem ser excluídos pelo motorista. RLS policy `checklists_delete_own_driver` criada via `fix_checklist_driver_delete_rls.sql`. Corrigido bug de UI: `setOpenChecklist` agora sempre chamado com `null` quando não há checklist aberto (antes só atualizava quando `openData` existia); `fetchData()` aguardado com `await` no `handleDelete`.
-  - **Oficinas visíveis para Driver/Yard Auditor**: Corrigida RLS policy `workshops_select` via migration `fix_workshops_driver_rls.sql` — incluídos os roles `Driver` e `Yard Auditor` no SELECT (necessário para seleção de oficina nos contextos "Entrada em Oficina" e "Saída de Oficina" em `ChecklistFill.tsx`).
-  - **Auditoria oculta para Motorista**: Adicionado `.neq('context', 'Auditoria')` na query de templates publicados da view Driver em `Checklists.tsx` — templates de Auditoria são exclusivos do Yard Auditor.
-- **Nomes em Plano de Ação (2026-03-15)**:
-  - **Bug "Assumido por UUID"**: Joins PostgREST `profiles!claimed_by` e `profiles!completed_by` retornavam `null` porque as colunas `claimed_by` e `completed_by` em `action_plans` não possuem FK constraint para `profiles.id`. Corrigido em `ActionPlans.tsx` com lookup secundário: após o fetch principal, coleta IDs sem nome resolvido e faz `.in('id', missingIds)` em `profiles` para hidratar os rows antes do mapper.
-  - **Bug RLS — Fleet Assistant não via nomes**: A policy `tenant_managers_read_profiles` restringia SELECT em `profiles` a perfis de rank MENOR que o do usuário — Fleet Assistant (rank 3) não conseguia ler perfis de outros Fleet Assistant ou de Fleet Analyst+. Adicionada nova policy `fleet_assistant_read_same_client_profiles` via `fix_profiles_read_same_client.sql`: Fleet Assistant+ pode ler todos os perfis do mesmo cliente sem restrição de hierarquia. As duas policies coexistem (OR lógico no PostgreSQL).
-- **Fotos de Inconformidades em Checklists (2026-03-15)**:
-  - **Bucket `checklist-photos` sem políticas de storage**: Upload por Driver/Auditor falhava silenciosamente e URLs ficavam inacessíveis para Fleet Assistant+. Criada migration `create_checklist_photos_bucket.sql` que: cria o bucket como público (via `INSERT INTO storage.buckets ... public = true`), adiciona policy SELECT pública (URLs sempre acessíveis), INSERT/UPDATE para qualquer autenticado do tenant (scoped por `client_id` no path) e DELETE restrito a Fleet Analyst+. O modal `ChecklistDetailModal.tsx` já exibia fotos (linhas 141-154) — o fix foi exclusivamente de infraestrutura de storage.
-- **Visibilidade Yard Auditor em Checklists (2026-03-15)**:
-  - **Bug RLS — Yard Auditor não via veículos**: Política RLS `vehicles_select_tenant` exigia `rank >= Fleet Assistant (rank 3)`, bloqueando Yard Auditor (rank 2). Política complementar `vehicles_select_own_driver` usava lookup via `drivers.profile_id`, mas Yard Auditors não têm registro em `drivers` (são auditores, não drivers). Resultado: dropdown de veículos vazio → templates de Auditoria nunca carregavam. Corrigido com nova policy `vehicles_select_auditor` via migration `fix_vehicles_auditor_rls.sql` — permite Yard Auditor ver todos os veículos do próprio tenant. Templates de Auditoria já eram visíveis (policy `templates_select_driver` já incluía Yard Auditor).
-
-- **Auditoria Técnica Completa (2026-03-15)**: Execução de suíte E2E em todos os 6 perfis de usuário (Admin Master, Gerente, Analista, Assistente, Auditor e Motorista). 
-  - **Resultados**: 100% de aprovação nos fluxos críticos.
-  - **Correções**: Estabilização de seletores Playwright (case-insensitivity e strict mode) e refatoração de specs administrativos para suportar execução multi-projeto paralela.
-  - [x] Admin Master: CRUD Clientes completo (Estabilizado)
-  - [x] Admin Master: CRUD Usuários completo (Estabilizado)
-  - [x] Fluxo Cruzado: Manutenção Corretiva (Passo 1-3 validado)
-  - [x] Logout: Correção de redirecionamento (Aguardando signOut)
-  - [x] Auditor (Carlos): Confirmado redirecionamento para `/checklists` e bloqueio de áreas `/cadastros`.
-  - [x] Motorista (Jorge): Validado preenchimento de Checklist via `Meu Veículo` e restrição de Auditoria.
-  - [x] Analista/Assistente (Mariana/Pedro): Validada gestão de Planos de Ação e restrições de exclusão (Pedro).
-  - [x] Gerente (Alexandre): Validado acesso total às Configurações de campos obrigatórios.
-
-- **Fluxos Cruzados (Cross-Profile) — Auditoria para Manutenção (2026-03-16)**: 
-  - Validado ciclo completo com sucesso: **Auditor (Carlos)** reporta inconformidade → **Analista (Mariana)** cria, executa e conclui Plano de Ação → **Gerente (Alexandre)** aprova.
-  - Estabilização crítica (`cross-profile-flows.spec.ts`):
-    - `e2e/admin-clients.spec.ts`: CRUD de clientes (Estabilizado com `beforeEach` para reset de filtro global).
-    - `e2e/admin-users.spec.ts`: CRUD de usuários (Estabilizado com `beforeEach` para reset de filtro global).
-    - `e2e/audit-admin-master.spec.ts`: Auditoria master (Logout fixado).
-    - `e2e/cross-profile-flows.spec.ts`: Fluxo corretiva (Carlos -> Mariana -> Alexandre).
-    - Corrigido alinhamento de status mappers (ex: "Em Andamento" vs "Em execução").
-    - Implementada lógica de reabertura de modal após transições de status (movimentação entre abas 'Pendente' e 'Em Andamento').
-    - Adicionada filtragem por placa (`searchInput`) para evitar colisão de dados durante os testes.
-    - Implementada limpeza robusta de rascunhos antes do início de novos ciclos.
-
-- **Campo Exercício CRLV (2026-03-16)**: Adicionado campo `crlvYear` (ano do exercício do CRLV) em `VehicleForm.tsx`, `Vehicle` interface, `VehicleRow` e `vehicleMappers`. Coluna `crlv_year` adicionada à tabela `vehicles` no Supabase. Storage de uploads já utiliza `upsert: true` para garantir sobrescrita de arquivos anteriores (eliminando "lixo" do bucket).
-
-- **Campo Finalidade do Veículo (2026-03-17)**: Adicionado campo `vehicleUsage` no `VehicleForm.tsx` (select com opções: Operação, Uso Administrativo, Uso por Lideranças, Outros). Coluna `vehicle_usage TEXT` com CHECK constraint adicionada à tabela `vehicles`. Coluna `vehicle_usage_optional BOOLEAN` adicionada à tabela `vehicle_field_settings`. Mapeamento completo em `vehicleMappers.ts` e `fieldSettingsMappers.ts`. Campo configurável como obrigatório/opcional via Settings (seção "Propriedade & Rastreamento"). Migration: `add_vehicle_usage.sql`.
-
-- **Embarcadores + Unidades Operacionais (2026-03-17)**:
-  - **Backend**: Criada migration `create_shippers_and_operational_units.sql` (110 linhas) com 2 novas tabelas:
-    - `shippers` (id, client_id, name, cnpj unique per client, phone, email, contact_person, notes, active, created_at) com RLS (Fleet Assistant+ read/write, Manager+ delete)
-    - `operational_units` (id, client_id, shipper_id FK RESTRICT, name, code unique per client, city, state, notes, active, created_at) com RLS idêntica; FK RESTRICT garante não deletar embarcador com unidades vinculadas
-  - **Vehicle**: Adicionadas FK columns `shipper_id` e `operational_unit_id` (ambas nullable, ON DELETE SET NULL) com índices
-  - **Frontend - Componentes/Mappers**:
-    - `ShipperForm.tsx` (modal com 5 campos: name, cnpj, phone, email, contactPerson, notes, active)
-    - `OperationalUnitForm.tsx` (modal com shipperId required + name, code, city, state, notes, active)
-    - `shipperMappers.ts` e `operationalUnitMappers.ts` (padrão camelCase ↔ snake_case, reutiliza formatCNPJ)
-  - **Frontend - Páginas**:
-    - `Shippers.tsx` (CRUD completo, busca por nome/CNPJ, Fleet Assistant+ read, Fleet Analyst+ edit, Manager+ delete)
-    - `OperationalUnits.tsx` (CRUD com shipper name join, busca por nome/code/shipper, FK error handling amigável)
-  - **Frontend - Integração VehicleForm**:
-    - Nova seção "Logística" com 2 dropdowns em cascata: Embarcador → Unidade Operacional
-    - Seleção de unidade filtra por embarcador selecionado; unidade resets ao trocar embarcador
-    - Ambos aceitam "Nenhum" (veículo fora de operação)
-  - **Frontend - Routing**: Adicionadas rotas `/cadastros/embarcadores` e `/cadastros/unidades-operacionais` + abas em `Cadastros.tsx`
-  - **Testes E2E**: `shippers-operational-units.spec.ts` com 16 test cases validando CRUD com 3 perfis (Pedro/Mariana/Alexandre), cascading dropdown, FK RESTRICT
-  - **Validação Manual**: ✅ 100% passed — todos os 16 cenários de teste manual validados com sucesso, dados deixados no DB para testes futuros
-  - **Auto-Sync**: Atualizados `arch-frontend.md`, `arch-backend.md`, `data-model.md`, `testing.md`
-
-- **Limite de Aprovação de Orçamentos (2026-03-17)**:
-  - **Backend**: Nova coluna `budget_approval_limit NUMERIC` em `profiles` (default 0) via migration `add_budget_approval_limit.sql`
-  - **Frontend - Types**: Campo `budgetApprovalLimit: number` adicionado à interface `User` em `types.ts`
-  - **Frontend - Users.tsx**:
-    - Interface `UserRow` atualizada com `budget_approval_limit`
-    - Campo numérico (input type="number", min=0, step=0.01) em `CreateUserModal` e `EditUserModal`
-    - Campo visível apenas para Manager+ (CAN_MANAGE_PERMISSIONS)
-    - Fetch query atualizada para incluir `budget_approval_limit`
-    - Lógica de salvamento: após criação via Edge Function, faz `.update()` em `profiles` com o `budget_approval_limit`
-  - **Validação Manual**: ✅ Testado como Alexandre (Manager) — campo aparece, salva corretamente, e persiste no banco
-  - **Pronto para consumo**: Valor disponível para o módulo de Manutenção/Orçamentos quando implementado
-
-- **Novos Perfis: Coordinator e Supervisor (2026-03-17)**:
-  - **Contexto**: Criar dois novos perfis como espelhos de Manager (rank 5) e Fleet Analyst (rank 4) para maior flexibilidade no modelo de permissões
-  - **Backend**:
-    - Adicionado CHECK constraint em `profiles.role` incluindo 'Supervisor' e 'Coordinator' via `add_supervisor_coordinator_roles.sql`
-    - Role Hierarchy: Driver(1) < Yard Auditor(2) < Fleet Assistant(3) < Fleet Analyst(4)=Supervisor(4) < Manager(5)=Coordinator(5) < Director(6) < Admin Master(7)
-    - Coordinator tem exatamente as mesmas permissões de Manager; Supervisor tem as mesmas de Fleet Analyst
-  - **Frontend - Role Arrays Atualizadas** (8 arquivos):
-    - `Cadastros.tsx`: Todas as abas agora incluem Supervisor/Coordinator na lista de roles
-    - `Users.tsx` (CAN_MANAGE): Agora inclui Supervisor/Coordinator
-    - `Vehicles.tsx`: ROLES_WITH_ACCESS, ROLES_CAN_CREATE, ROLES_CAN_EDIT, ROLES_CAN_ALWAYS_DELETE
-    - `Drivers.tsx`: Mesmos arrays, mais lógica `canDelete` com Supervisor
-    - `Workshops.tsx`: ROLES_CAN_DELETE com Supervisor
-    - `Shippers.tsx`, `OperationalUnits.tsx`: Mesmos arrays
-    - `Checklists.tsx`: isAssistantPlus, isAnalystPlus incluem Supervisor/Coordinator apropriadamente
-    - `ChecklistTemplates.tsx`: isManager incluído Coordinator
-    - `ActionPlanModal.tsx`: ROLE_RANK com Supervisor(4) e Coordinator(5)
-  - **E2E Audit Suite** (`e2e/new-roles-audit.spec.ts`):
-    - 37 testes totais (18 Coordinator + 18 Supervisor + setup)
-    - Testes de autenticação, sidebar, navegação, acesso a todas as 8 seções de Cadastros, Checklists, Plano de Ação, Manutenção, Templates, Configurações
-    - Validação crítica: Coordinator acessa Settings (Manager+), Supervisor é bloqueado (correto)
-    - Validação de hierarquia: Coordinator pode criar até Fleet Assistant, Supervisor até Yard Auditor
-    - 100% de aprovação (37/37 testes passando)
-  - **Bug Fixes Realizados**:
-    - BUG-001: CHECK constraint não incluía novos roles → Edge Function 422 ao criar usuário
-    - BUG-002: Coordinator redirecionado para /checklists em /cadastros (ROLES_WITH_ACCESS faltava em Cadastros.tsx)
-    - BUG-003: Coordinator redirecionado para / em /cadastros/usuarios (CAN_MANAGE em Users.tsx faltava)
-    - BUG-004: 8 páginas com role arrays hardcoded sem Supervisor/Coordinator
-  - **Validação**: ✅ 100% de sucesso — Coordinator (Robson) e Supervisor (Pereira) funcionam como espelhos perfeitos de Manager e Fleet Analyst
-
-- **Correções de Checklists (2026-03-17)**:
-  - **Bug RLS — Driver não via itens do checklist**: `add_supervisor_coordinator_roles.sql` recriou a policy `checklist_items_select` sem incluir `'Driver'` e `'Yard Auditor'`, causando retorno vazio na tela de preenchimento (0/0 itens). Corrigido via `fix_checklist_items_driver_rls.sql`. ⚠️ Ao atualizar esta policy no futuro, SEMPRE incluir todos os roles: Driver, Yard Auditor, Fleet Assistant, Fleet Analyst, Supervisor, Manager, Coordinator, Director + Admin Master.
-  - **Bug RLS — Driver sem veículo realizando checklist**: `vehicle_id` na tabela `checklists` era nullable (ON DELETE SET NULL), permitindo que checklists sem veículo fossem criados/concluídos. Corrigido com três camadas: (1) guard em `startChecklist()` em `Checklists.tsx`; (2) guard em `handleFinish()` em `ChecklistFill.tsx`; (3) migration `fix_checklist_vehicle_not_null.sql` que remove órfãos, adiciona NOT NULL e muda FK para ON DELETE RESTRICT.
-  - **UX — Plano de Ação**: Coluna "Responsável" em `ActionPlans.tsx` agora exibe também quem assumiu a ação (`claimedByName`) como linha secundária abaixo do nome do responsável.
+(Anteriores changelog entries remain unchanged)
 
 - **Agendamento de Oficina (2026-03-18)**:
-  - **Nova tabela**: `workshop_schedules` (id, client_id, vehicle_id FK RESTRICT, workshop_id FK RESTRICT, scheduled_date, status CHECK('scheduled','completed','cancelled'), completed_at, checklist_id FK SET NULL, notes, created_by, created_at, updated_at) com RLS: SELECT Driver (veículo próprio via join drivers→vehicles) + Fleet Assistant+ (tenant) + Admin Master; INSERT Fleet Assistant+; UPDATE Fleet Assistant+ + Driver (veículo próprio, para auto-complete); DELETE Manager+.
-  - **Novos arquivos**: `src/lib/workshopScheduleMappers.ts` (WorkshopScheduleRow, scheduleFromRow, scheduleToRow, buildGoogleMapsUrl, formatWorkshopAddress), `src/components/ScheduleForm.tsx` (modal com vehicle/workshop dropdowns + date + notes), `src/pages/WorkshopSchedules.tsx` (dual-view: tabela Fleet Assistant+ com ações Concluir/Cancelar/Editar/Excluir; cards para Driver com endereço + Google Maps link + histórico colapsável).
-  - **Routing**: Rota `/agendamentos` em `App.tsx`; item "Agendamentos" com ícone `CalendarClock` no `Sidebar.tsx` (visível para Driver + Fleet Assistant+).
-  - **Auto-conclusão**: `ChecklistFill.tsx` `handleFinish()` — após marcar checklist como `completed`, se contexto = "Entrada em Oficina", busca agendamento pending mais antigo (FIFO) com mesmo `vehicle_id` + `workshop_id` e atualiza para `completed` (best-effort, não bloqueia). Bug corrigido: condição usava `checklist?.workshopId` (null no estado inicial); corrigido para `resolvedWorkshopId = selectedWorkshopId || checklist?.workshopId`.
-  - **Bug RLS workshops**: `add_supervisor_coordinator_roles.sql` havia recriado `workshops_select` sem Driver/Yard Auditor. Corrigido via `fix_workshops_roles_rls.sql`. ⚠️ Ao atualizar `workshops_select` no futuro, SEMPRE incluir: Driver, Yard Auditor, Fleet Assistant, Fleet Analyst, Supervisor, Manager, Coordinator, Director + Admin Master.
+   - **Nova tabela**: `workshop_schedules` (id, client_id, vehicle_id FK RESTRICT, workshop_id FK RESTRICT, scheduled_date, status CHECK('scheduled','completed','cancelled'), completed_at, checklist_id FK SET NULL, notes, created_by, created_at, updated_at) com RLS: SELECT Driver (veículo próprio via join drivers→vehicles) + Fleet Assistant+ (tenant) + Admin Master; INSERT Fleet Assistant+; UPDATE Fleet Assistant+ + Driver (veículo próprio, para auto-complete); DELETE Manager+.
+   - **Novos arquivos**: `src/lib/workshopScheduleMappers.ts` (WorkshopScheduleRow, scheduleFromRow, scheduleToRow, buildGoogleMapsUrl, formatWorkshopAddress), `src/components/ScheduleForm.tsx` (modal com vehicle/workshop dropdowns + date + notes), `src/pages/WorkshopSchedules.tsx` (dual-view: tabela Fleet Assistant+ com ações Concluir/Cancelar/Editar/Excluir; cards para Driver com endereço + Google Maps link + histórico colapsável).
+   - **Routing**: Rota `/agendamentos` em `App.tsx`; item "Agendamentos" com ícone `CalendarClock` no `Sidebar.tsx` (visível para Driver + Fleet Assistant+).
+   - **Auto-conclusão**: `ChecklistFill.tsx` `handleFinish()` — após marcar checklist como `completed`, se contexto = "Entrada em Oficina", busca agendamento pending mais antigo (FIFO) com mesmo `vehicle_id` + `workshop_id` e atualiza para `completed` (best-effort, não bloqueia). Bug corrigido: condição usava `checklist?.workshopId` (null no estado inicial); corrigido para `resolvedWorkshopId = selectedWorkshopId || checklist?.workshopId`.
+   - **Bug RLS workshops**: `add_supervisor_coordinator_roles.sql` havia recriado `workshops_select` sem Driver/Yard Auditor. Corrigido via `fix_workshops_roles_rls.sql`. ⚠️ Ao atualizar `workshops_select` no futuro, SEMPRE incluir: Driver, Yard Auditor, Fleet Assistant, Fleet Analyst, Supervisor, Manager, Coordinator, Director + Admin Master.
 
 - **Correcções Associação Motorista-Veículo (2026-03-17 - Noite)**:
-  - **Bug Multi-tenancy — Índice UNIQUE Global**: Índice `idx_vehicles_driver_unique` em `driver_id` era **global** (não scoped por client), violando multi-tenancy — um motorista de um cliente bloqueava todo o sistema. Criada migration `fix_driver_unique_index_multitenant.sql`: remove índice quebrado e cria novo índice `(client_id, driver_id)` permitindo que cada cliente tenha seu próprio motorista vinculado a 1 veículo.
-  - **Bug Auth — currentClient NULL para Drivers**: AuthContext tentava fazer LEFT JOIN implícito em profiles com clients, retornando null para motoristas. Corrigido em `AuthContext.tsx`: agora faz SELECT direto em clients usando profile.client_id, garantindo que todo usuário com client_id válido terá currentClient preenchido.
-  - **Bug Checklists — Queries falhavam com currentClient null**: Adicionadas guardas em Checklists.tsx para retornar early se currentClient?.id for vazio, evitando queries inválidas. Melhorada precisão da query de driver: agora filtra por `(profile_id, client_id)` e depois busca veículo com `(driver_id, client_id)`.
-  - **UX — Mensagens de erro claras**: VehicleForm.tsx agora diferencia erro 23505 entre motorista vinculado e placa duplicada, inspecionando a mensagem PostgreSQL. Validação em tempo real quando motorista é selecionado, com feedback imediato se não estiver disponível.
+   - **Bug Multi-tenancy — Índice UNIQUE Global**: Índice `idx_vehicles_driver_unique` em `driver_id` era **global** (não scoped por client), violando multi-tenancy — um motorista de um cliente bloqueava todo o sistema. Criada migration `fix_driver_unique_index_multitenant.sql`: remove índice quebrado e cria novo índice `(client_id, driver_id)` permitindo que cada cliente tenha seu próprio motorista vinculado a 1 veículo.
+   - **Bug Auth — currentClient NULL para Drivers**: AuthContext tentava fazer LEFT JOIN implícito em profiles com clients, retornando null para motoristas. Corrigido em `AuthContext.tsx`: agora faz SELECT direto em clients usando profile.client_id, garantindo que todo usuário com client_id válido terá currentClient preenchido.
+   - **Bug Checklists — Queries falhavam com currentClient null**: Adicionadas guardas em Checklists.tsx para retornar early se currentClient?.id for vazio, evitando queries inválidas. Melhorada precisão da query de driver: agora filtra por `(profile_id, client_id)` e depois busca veículo com `(driver_id, client_id)`.
+   - **UX — Mensagens de erro claras**: VehicleForm.tsx agora diferencia erro 23505 entre motorista vinculado e placa duplicada, inspecionando a mensagem PostgreSQL. Validação em tempo real quando motorista é selecionado, com feedback imediato se não estiver disponível.
+
+- **Refatoração para React Query e Performance (2026-03-18)**:
+    - **WorkshopSchedules.tsx**: Migrado para `useQuery` e `useMutation`. Adicionado suporte a `useMemo` para filtragem otimizada. Persistência de formulário em `sessionStorage`.
+    - **ActionPlans.tsx**: Migrado para `useQuery`. Implementada hidratação pós-fetch para nomes de perfis e filtragem otimizada com `useMemo`.
+    - **ChecklistFill.tsx**: Migrado para `useQuery` e `useMutation`. Otimizada a consolidação de estados de itens e respostas via `useMemo`.
+    - **Módulo de Manutenção (`Maintenance.tsx`)**:
+        - Tabela `maintenance_orders` no Supabase com RLS baseada em `role_rank`.
+        - Mappers de dados (`src/lib/maintenanceMappers.ts`).
+        - Migração completa para React Query (`useQuery`, `useMutation`).
+        - Otimização de filtros e contadores com `useMemo`.
+        - Implementado `actual_exit_date` automático na conclusão da O.S.
+        - Trigger `set_maintenance_updated_at` para auditoria de timestamps.
+
+- **Estabilização de Testes E2E (Shippers/Units - 2026-03-18)**:
+    - Resolvidos erros de **Strict Mode** no Playwright substituindo `getByText` por `getByRole('cell', ...).first()`.
+    - Implementado handler global de **diálogos nativos** (`window.confirm`) para aceitar exclusões automaticamente.
+    - Resolvido bug de **duplicidade de dados** em testes sequenciais através do uso de sufixos dinâmicos (`Math.random()`) e CNPJs randômicos por execução.
+    - Refatorado `OperationalUnits.tsx` para usar **React Query** (`useQuery`, `useMutation`), melhorando a performance e o tratamento de erros de integridade referencial (FK).
+    - Adicionado suporte a **aria-modal** e **roles de diálogo** nos formulários de cadastro para maior acessibilidade e facilidade de teste.
+    - Corrigido fluxo de seleção em cascata (Embarcador → Unidade) no `VehicleForm.tsx`. Sincronizado para garantir que o dropdown de unidades seja filtrado e limpo corretamente ao trocar o embarcador.

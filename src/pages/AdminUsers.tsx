@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Pencil, Trash2, Plus, Search, X } from 'lucide-react';
+import { Pencil, Trash2, Plus, Search, X, Loader2 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Role } from '../types';
 import { capitalizeWords } from '../lib/inputHelpers';
 
@@ -83,6 +84,25 @@ function CreateUserModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const queryClient = useQueryClient();
+
+  const createMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      const { error: fnError } = await supabase.functions.invoke('create-user', {
+        body: payload
+      });
+      if (fnError) throw new Error(fnError.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      onCreated();
+      onClose();
+    },
+    onError: (err: any) => {
+      setError(err.message ?? 'Erro ao criar usuário.');
+    }
+  });
+
   useEffect(() => {
     if (open) { setForm(emptyCreate); setError(''); }
   }, [open]);
@@ -91,26 +111,14 @@ function CreateUserModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     setError('');
-    try {
-      const { error: fnError } = await supabase.functions.invoke('create-user', {
-        body: {
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
-          name: capitalizeWords(form.name),
-          role: form.role,
-          client_id: form.client_id,
-        },
-      });
-      if (fnError) throw new Error(fnError.message);
-      onCreated();
-      onClose();
-    } catch (err: any) {
-      setError(err.message ?? 'Erro ao criar usuário.');
-    } finally {
-      setSaving(false);
-    }
+    createMutation.mutate({
+      email: form.email.trim().toLowerCase(),
+      password: form.password,
+      name: capitalizeWords(form.name),
+      role: form.role,
+      client_id: form.client_id,
+    });
   };
 
   const set = (key: keyof CreateForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -187,10 +195,10 @@ function CreateUserModal({
               Cancelar
             </button>
             <button
-              type="submit" disabled={saving}
-              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60"
+              type="submit" disabled={createMutation.isPending}
+              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center min-w-[120px]"
             >
-              {saving ? 'Criando...' : 'Criar Usuário'}
+              {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : 'Criar Usuário'}
             </button>
           </div>
         </form>
@@ -224,6 +232,26 @@ function EditUserModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const queryClient = useQueryClient();
+  const editMutation = useMutation({
+    mutationFn: async (updates: any) => {
+      if (!user) return;
+      const { error: dbError } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id);
+      if (dbError) throw new Error(dbError.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      onSaved();
+      onClose();
+    },
+    onError: (err: any) => {
+      setError(err.message ?? 'Erro ao salvar.');
+    }
+  });
+
   useEffect(() => {
     if (user) setForm({ name: user.name, role: user.role, client_id: user.client_id });
     setError('');
@@ -233,21 +261,12 @@ function EditUserModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     setError('');
-    try {
-      const { error: dbError } = await supabase
-        .from('profiles')
-        .update({ name: capitalizeWords(form.name), role: form.role, client_id: form.client_id })
-        .eq('id', user.id);
-      if (dbError) throw new Error(dbError.message);
-      onSaved();
-      onClose();
-    } catch (err: any) {
-      setError(err.message ?? 'Erro ao salvar.');
-    } finally {
-      setSaving(false);
-    }
+    editMutation.mutate({
+      name: capitalizeWords(form.name),
+      role: form.role,
+      client_id: form.client_id
+    });
   };
 
   const set = (key: keyof EditForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -304,10 +323,10 @@ function EditUserModal({
               Cancelar
             </button>
             <button
-              type="submit" disabled={saving}
-              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60"
+              type="submit" disabled={editMutation.isPending}
+              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center min-w-[120px]"
             >
-              {saving ? 'Salvando...' : 'Salvar'}
+              {editMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : 'Salvar'}
             </button>
           </div>
         </form>
@@ -320,59 +339,68 @@ function EditUserModal({
 
 export default function AdminUsers() {
   const { user, currentClient, switchClient } = useAuth();
-  const [users, setUsers] = useState<UserRow[]>([]);
-  const [clients, setClients] = useState<ClientOption[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
 
   if (user?.role !== 'Admin Master') return <Navigate to="/" replace />;
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, name, role, client_id, created_at, clients(name)')
-      .order('name');
-
-    if (data) {
-      setUsers(
-        data.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          role: p.role as Role,
-          client_id: p.client_id,
-          client_name: (Array.isArray(p.clients) ? p.clients[0] : p.clients)?.name ?? '—',
-          created_at: p.created_at,
-        }))
-      );
+  const { data: users = [], isLoading: loading } = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, name, role, client_id, created_at, clients(name)')
+        .order('name');
+      if (error) throw error;
+      return (data || []).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        role: p.role as Role,
+        client_id: p.client_id,
+        client_name: (Array.isArray(p.clients) ? p.clients[0] : p.clients)?.name ?? '—',
+        created_at: p.created_at,
+      }));
     }
-    setLoading(false);
-  };
-
-  const fetchClients = async () => {
-    const { data } = await supabase.from('clients').select('id, name').order('name');
-    if (data) setClients(data);
-  };
-
-  useEffect(() => {
-    fetchUsers();
-    fetchClients();
-  }, []);
-
-  const filtered = users.filter((u) => {
-    const matchSearch = u.name.toLowerCase().includes(search.toLowerCase());
-    const matchClient = currentClient?.id ? u.client_id === currentClient.id : true;
-    return matchSearch && matchClient;
   });
 
-  const handleDelete = async (u: UserRow) => {
-    if (!window.confirm(`Excluir o usuário "${u.name}"? Esta ação não pode ser desfeita.`)) return;
-    await supabase.functions.invoke('create-user', {
-      body: { action: 'delete', user_id: u.id },
+  const { data: clients = [] } = useQuery({
+    queryKey: ['admin-clients-options'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('clients').select('id, name').order('name');
+      if (error) throw error;
+      return data as ClientOption[];
+    }
+  });
+
+  const filtered = useMemo(() => {
+    return users.filter((u) => {
+      const matchSearch = u.name.toLowerCase().includes(search.toLowerCase());
+      const matchClient = currentClient?.id ? u.client_id === currentClient.id : true;
+      return matchSearch && matchClient;
     });
-    await fetchUsers();
+  }, [users, search, currentClient]);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: { action: 'delete', user_id: userId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Erro ao deletar usuário.');
+    }
+  });
+
+  const handleDelete = (u: UserRow) => {
+    if (!window.confirm(`Excluir o usuário "${u.name}"? Esta ação não pode ser desfeita.`)) return;
+    deleteMutation.mutate(u.id);
   };
 
   return (
@@ -469,7 +497,7 @@ export default function AdminUsers() {
         open={createOpen}
         clients={clients}
         onClose={() => setCreateOpen(false)}
-        onCreated={fetchUsers}
+        onCreated={() => {}} // invalidation handled internally
       />
 
       <EditUserModal
@@ -477,7 +505,7 @@ export default function AdminUsers() {
         user={editingUser}
         clients={clients}
         onClose={() => setEditingUser(null)}
-        onSaved={fetchUsers}
+        onSaved={() => {}} // invalidation handled internally
       />
     </div>
   );

@@ -1,7 +1,8 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { MOCK_VEHICLES } from '../constants';
-import { Truck, AlertTriangle, Wrench } from 'lucide-react';
+import { Truck, AlertTriangle, Wrench, Loader2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
 import {
   BarChart,
   Bar,
@@ -19,29 +20,50 @@ import {
 export default function Dashboard() {
   const { currentClient } = useAuth();
   
-  const clientVehicles = MOCK_VEHICLES.filter(v => v.clientId === currentClient?.id);
-  
-  const totalVehicles = clientVehicles.length;
-  const inMaintenance = clientVehicles.filter(v => v.status === 'Maintenance').length;
+  const { data: vehicles = [], isLoading } = useQuery({
+    queryKey: ['dashboard-vehicles', currentClient?.id],
+    queryFn: async () => {
+      if (!currentClient?.id) return [];
+      const { data, error } = await supabase
+        .from('vehicles')
+        .select('*')
+        .eq('client_id', currentClient.id);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentClient?.id
+  });
+
+  const totalVehicles = vehicles.length;
+  const inMaintenance = vehicles.filter(v => v.status === 'Em Manutenção').length;
   const activeAlerts = Math.floor(Math.random() * 10); // Mock alerts
 
   // Chart Data
   const categoryData = [
-    { name: 'Passeio', count: clientVehicles.filter(v => v.type === 'Passeio').length },
-    { name: 'Utilitário', count: clientVehicles.filter(v => v.type === 'Utilitário').length },
-    { name: 'Van', count: clientVehicles.filter(v => v.type === 'Van').length },
-    { name: 'Moto', count: clientVehicles.filter(v => v.type === 'Moto').length },
-    { name: 'Vuc', count: clientVehicles.filter(v => v.type === 'Vuc').length },
-    { name: 'Toco', count: clientVehicles.filter(v => v.type === 'Toco').length },
-    { name: 'Truck', count: clientVehicles.filter(v => v.type === 'Truck').length },
-    { name: 'Cavalo', count: clientVehicles.filter(v => v.type === 'Cavalo').length },
+    { name: 'Passeio', count: vehicles.filter(v => v.type === 'Passeio').length },
+    { name: 'Utilitário', count: vehicles.filter(v => v.type === 'Utilitário').length },
+    { name: 'Van', count: vehicles.filter(v => v.type === 'Van').length },
+    { name: 'Moto', count: vehicles.filter(v => v.type === 'Moto').length },
+    { name: 'Vuc', count: vehicles.filter(v => v.type === 'Vuc').length },
+    { name: 'Toco', count: vehicles.filter(v => v.type === 'Toco').length },
+    { name: 'Truck', count: vehicles.filter(v => v.type === 'Truck').length },
+    { name: 'Cavalo', count: vehicles.filter(v => v.type === 'Cavalo').length },
   ];
 
   const statusData = [
-    { name: 'Available', value: clientVehicles.filter(v => v.status === 'Available').length },
-    { name: 'In Use', value: clientVehicles.filter(v => v.status === 'In Use').length },
+    { name: 'Available', value: vehicles.filter(v => v.status === 'Available').length },
+    { name: 'In Use', value: vehicles.filter(v => v.status === 'In Use').length },
     { name: 'Maintenance', value: inMaintenance },
   ];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b'];
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { OperationalUnit } from '../types';
@@ -6,6 +6,7 @@ import { Plus, Search, Edit2, Trash2, Building2, MapPin } from 'lucide-react';
 import OperationalUnitForm from '../components/OperationalUnitForm';
 import { supabase } from '../lib/supabase';
 import { operationalUnitFromRow, operationalUnitToRow, OperationalUnitRow } from '../lib/operationalUnitMappers';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -19,10 +20,7 @@ interface AvailableShipper {
 
 export default function OperationalUnits() {
   const { currentClient, user } = useAuth();
-  const [units, setUnits] = useState<OperationalUnit[]>([]);
-  const [availableShippers, setAvailableShippers] = useState<AvailableShipper[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(() => {
     return sessionStorage.getItem('operationalUnitFormOpen') === 'true';
@@ -40,100 +38,114 @@ export default function OperationalUnits() {
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
   const canDelete = ROLES_CAN_DELETE.includes(user?.role || '');
 
+  // Queries
+  const { data: units = [], isLoading: loadingUnits, isError: unitsError } = useQuery({
+    queryKey: ['operationalUnits', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from('operational_units')
+        .select('*, shippers(name)');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query.order('name');
+      if (error) throw error;
+      return (data as OperationalUnitRow[]).map(operationalUnitFromRow);
+    },
+    enabled: !!user
+  });
+
+  const { data: availableShippers = [] } = useQuery<AvailableShipper[]>({
+    queryKey: ['availableShippers', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from('shippers')
+        .select('id, name')
+        .eq('active', true);
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query.order('name');
+      if (error) throw error;
+      return data as AvailableShipper[];
+    },
+    enabled: !!user
+  });
+
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
     return <Navigate to="/checklists" replace />;
   }
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    // Fetch unidades + join shippers
-    let unitsQuery = supabase
-      .from('operational_units')
-      .select('*, shippers(name)');
-    if (currentClient?.id) {
-      unitsQuery = unitsQuery.eq('client_id', currentClient.id);
+  const saveMutation = useMutation({
+    mutationFn: async (unit: Partial<OperationalUnit>) => {
+      if (!currentClient?.id) return;
+      const row = operationalUnitToRow(unit, currentClient.id);
+      if (editingUnit) {
+        const { error } = await supabase
+          .from('operational_units')
+          .update(row)
+          .eq('id', editingUnit.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('operational_units')
+          .insert(row);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operationalUnits', currentClient?.id] });
+      setIsFormOpen(false);
+      setEditingUnit(null);
+      sessionStorage.removeItem('operationalUnitFormOpen');
+      sessionStorage.removeItem('operationalUnitFormEditing');
+      sessionStorage.removeItem('operationalUnitFormData');
+    },
+    onError: (err: any) => {
+      console.error('Erro ao salvar unidade operacional:', err);
     }
-    const { data: unitsData, error: unitsError } = await unitsQuery.order('name');
-
-    // Fetch embarcadores ativos para o formulário
-    let shippersQuery = supabase
-      .from('shippers')
-      .select('id, name')
-      .eq('active', true);
-    if (currentClient?.id) {
-      shippersQuery = shippersQuery.eq('client_id', currentClient.id);
-    }
-    const { data: shippersData } = await shippersQuery.order('name');
-
-    if (unitsError) {
-      setError('Erro ao carregar unidades operacionais. Tente novamente.');
-    } else {
-      setUnits((unitsData as OperationalUnitRow[]).map(operationalUnitFromRow));
-    }
-
-    setAvailableShippers((shippersData ?? []) as AvailableShipper[]);
-    setLoading(false);
-  }, [currentClient?.id]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  });
 
   const handleSave = async (unit: Partial<OperationalUnit>): Promise<void> => {
-    if (!currentClient?.id) return;
-    const row = operationalUnitToRow(unit, currentClient.id);
-
-    if (editingUnit) {
-      const { error: updateError } = await supabase
-        .from('operational_units')
-        .update(row)
-        .eq('id', editingUnit.id);
-      if (updateError) throw updateError;
-    } else {
-      const { error: insertError } = await supabase
-        .from('operational_units')
-        .insert(row);
-      if (insertError) throw insertError;
-    }
-
-    await fetchData();
-    setIsFormOpen(false);
-    setEditingUnit(null);
-    sessionStorage.removeItem('operationalUnitFormOpen');
-    sessionStorage.removeItem('operationalUnitFormEditing');
-    sessionStorage.removeItem('operationalUnitFormData');
+    await saveMutation.mutateAsync(unit);
   };
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('operational_units')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operationalUnits', currentClient?.id] });
+    },
+    onError: (err: any) => {
+      if (err.code === '23503') {
+        alert('Esta unidade está vinculada a veículos. Desvincule os veículos antes de excluir.');
+      } else {
+        alert('Erro ao excluir unidade. Tente novamente.');
+      }
+    }
+  });
 
   const handleDelete = async (unit: OperationalUnit) => {
     if (!window.confirm(`Excluir a unidade "${unit.name}"? Esta ação não pode ser desfeita.`)) return;
-
-    const { error: deleteError } = await supabase
-      .from('operational_units')
-      .delete()
-      .eq('id', unit.id);
-
-    if (deleteError) {
-      if (deleteError.code === '23503') {
-        setError('Esta unidade está vinculada a veículos. Desvincule os veículos antes de excluir.');
-      } else {
-        setError('Erro ao excluir unidade. Tente novamente.');
-      }
-    } else {
-      await fetchData();
-    }
+    deleteMutation.mutate(unit.id);
   };
 
-  const filteredUnits = units.filter((u) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      u.name.toLowerCase().includes(q) ||
-      (u.code ?? '').toLowerCase().includes(q) ||
-      (u.shipperName ?? '').toLowerCase().includes(q)
-    );
-  });
+  const filteredUnits = useMemo(() => {
+    return units.filter((u) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        u.name.toLowerCase().includes(q) ||
+        (u.code ?? '').toLowerCase().includes(q) ||
+        (u.shipperName ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [units, search]);
 
   return (
     <div className="space-y-6">
@@ -173,14 +185,14 @@ export default function OperationalUnits() {
         />
       </div>
 
-      {error && (
+      {unitsError && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erro ao carregar unidades operacionais. Tente novamente.
         </div>
       )}
 
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        {loading ? (
+        {loadingUnits ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-indigo-500" />
           </div>

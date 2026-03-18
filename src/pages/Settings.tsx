@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { VehicleFieldSettings, DriverFieldSettings } from '../types';
@@ -18,6 +18,7 @@ import {
   DriverFieldSettingsRow,
 } from '../lib/driverFieldSettingsMappers';
 import { Loader2, Truck, UserCircle } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
 
 const ROLES_CAN_MANAGE = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -31,65 +32,80 @@ export default function Settings() {
   // Vehicle field settings state
   const [settings, setSettings] = useState<VehicleFieldSettings | null>(null);
   const [isNew, setIsNew] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Driver field settings state
   const [driverSettings, setDriverSettings] = useState<DriverFieldSettings | null>(null);
   const [isDriverNew, setIsDriverNew] = useState(false);
-  const [driverSaving, setDriverSaving] = useState(false);
   const [driverSuccess, setDriverSuccess] = useState(false);
   const [driverError, setDriverError] = useState<string | null>(null);
-
-  const [loading, setLoading] = useState(true);
 
   if (user && !ROLES_CAN_MANAGE.includes(user.role)) {
     return <Navigate to="/" replace />;
   }
 
-  const fetchSettings = useCallback(async () => {
-    if (!currentClient?.id) return;
-    const { data, error: fetchError } = await supabase
-      .from('vehicle_field_settings')
-      .select('*')
-      .eq('client_id', currentClient.id)
-      .maybeSingle();
+  const queryClient = useQueryClient();
 
-    if (fetchError) {
-      setError('Erro ao carregar configurações de veículos.');
-    } else if (data) {
-      setSettings(fieldSettingsFromRow(data as VehicleFieldSettingsRow));
-      setIsNew(false);
-    } else {
-      setSettings(defaultFieldSettings(currentClient.id));
-      setIsNew(true);
-    }
-  }, [currentClient?.id]);
+  const vehicleSettingsQuery = useQuery({
+    queryKey: ['vehicleSettings', currentClient?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vehicle_field_settings')
+        .select('*')
+        .eq('client_id', currentClient?.id)
+        .maybeSingle();
 
-  const fetchDriverSettings = useCallback(async () => {
-    if (!currentClient?.id) return;
-    const { data, error: fetchError } = await supabase
-      .from('driver_field_settings')
-      .select('*')
-      .eq('client_id', currentClient.id)
-      .maybeSingle();
+      if (error) throw error;
+      return data as VehicleFieldSettingsRow | null;
+    },
+    enabled: !!currentClient?.id
+  });
 
-    if (fetchError) {
-      setDriverError('Erro ao carregar configurações de motoristas.');
-    } else if (data) {
-      setDriverSettings(driverFieldSettingsFromRow(data as DriverFieldSettingsRow));
-      setIsDriverNew(false);
-    } else {
-      setDriverSettings(defaultDriverFieldSettings(currentClient.id));
-      setIsDriverNew(true);
-    }
-  }, [currentClient?.id]);
+  const driverSettingsQuery = useQuery({
+    queryKey: ['driverSettings', currentClient?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('driver_field_settings')
+        .select('*')
+        .eq('client_id', currentClient?.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data as DriverFieldSettingsRow | null;
+    },
+    enabled: !!currentClient?.id
+  });
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([fetchSettings(), fetchDriverSettings()]).finally(() => setLoading(false));
-  }, [fetchSettings, fetchDriverSettings]);
+    if (vehicleSettingsQuery.isSuccess && currentClient?.id) {
+      if (vehicleSettingsQuery.data) {
+        setSettings(fieldSettingsFromRow(vehicleSettingsQuery.data));
+        setIsNew(false);
+      } else {
+        setSettings(defaultFieldSettings(currentClient.id));
+        setIsNew(true);
+      }
+    }
+    if (vehicleSettingsQuery.isError) {
+      setError('Erro ao carregar configurações de veículos.');
+    }
+  }, [vehicleSettingsQuery.data, vehicleSettingsQuery.isSuccess, vehicleSettingsQuery.isError, currentClient?.id]);
+
+  useEffect(() => {
+    if (driverSettingsQuery.isSuccess && currentClient?.id) {
+      if (driverSettingsQuery.data) {
+        setDriverSettings(driverFieldSettingsFromRow(driverSettingsQuery.data));
+        setIsDriverNew(false);
+      } else {
+        setDriverSettings(defaultDriverFieldSettings(currentClient.id));
+        setIsDriverNew(true);
+      }
+    }
+    if (driverSettingsQuery.isError) {
+      setDriverError('Erro ao carregar configurações de motoristas.');
+    }
+  }, [driverSettingsQuery.data, driverSettingsQuery.isSuccess, driverSettingsQuery.isError, currentClient?.id]);
 
   const handleToggle = (key: keyof VehicleFieldSettings) => {
     if (!settings) return;
@@ -123,71 +139,65 @@ export default function Settings() {
     setDriverSuccess(false);
   };
 
-  const handleSave = async () => {
-    if (!settings || !currentClient?.id) return;
-    setSaving(true);
+  const saveVehicleMutation = useMutation({
+    mutationFn: async () => {
+      if (!settings || !currentClient?.id) return;
+      const row = fieldSettingsToRow(settings, currentClient.id);
+      
+      if (isNew) {
+        const { error } = await supabase.from('vehicle_field_settings').insert(row);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('vehicle_field_settings').update(row).eq('client_id', currentClient.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      setIsNew(false);
+      setSuccess(true);
+      queryClient.invalidateQueries({ queryKey: ['vehicleSettings', currentClient?.id] });
+    },
+    onError: () => {
+      setError('Erro ao salvar configurações.');
+    }
+  });
+
+  const handleSave = () => {
     setError(null);
     setSuccess(false);
-
-    const row = fieldSettingsToRow(settings, currentClient.id);
-
-    if (isNew) {
-      const { error: insertError } = await supabase
-        .from('vehicle_field_settings')
-        .insert(row);
-      if (insertError) {
-        setError('Erro ao salvar configurações.');
-      } else {
-        setIsNew(false);
-        setSuccess(true);
-      }
-    } else {
-      const { error: updateError } = await supabase
-        .from('vehicle_field_settings')
-        .update(row)
-        .eq('client_id', currentClient.id);
-      if (updateError) {
-        setError('Erro ao salvar configurações.');
-      } else {
-        setSuccess(true);
-      }
-    }
-    setSaving(false);
+    saveVehicleMutation.mutate();
   };
 
-  const handleDriverSave = async () => {
-    if (!driverSettings || !currentClient?.id) return;
-    setDriverSaving(true);
+  const saveDriverMutation = useMutation({
+    mutationFn: async () => {
+      if (!driverSettings || !currentClient?.id) return;
+      const row = driverFieldSettingsToRow(driverSettings, currentClient.id);
+      
+      if (isDriverNew) {
+        const { error } = await supabase.from('driver_field_settings').insert(row);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('driver_field_settings').update(row).eq('client_id', currentClient.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      setIsDriverNew(false);
+      setDriverSuccess(true);
+      queryClient.invalidateQueries({ queryKey: ['driverSettings', currentClient?.id] });
+    },
+    onError: () => {
+      setDriverError('Erro ao salvar configurações.');
+    }
+  });
+
+  const handleDriverSave = () => {
     setDriverError(null);
     setDriverSuccess(false);
-
-    const row = driverFieldSettingsToRow(driverSettings, currentClient.id);
-
-    if (isDriverNew) {
-      const { error: insertError } = await supabase
-        .from('driver_field_settings')
-        .insert(row);
-      if (insertError) {
-        setDriverError('Erro ao salvar configurações.');
-      } else {
-        setIsDriverNew(false);
-        setDriverSuccess(true);
-      }
-    } else {
-      const { error: updateError } = await supabase
-        .from('driver_field_settings')
-        .update(row)
-        .eq('client_id', currentClient.id);
-      if (updateError) {
-        setDriverError('Erro ao salvar configurações.');
-      } else {
-        setDriverSuccess(true);
-      }
-    }
-    setDriverSaving(false);
+    saveDriverMutation.mutate();
   };
 
-  if (loading) {
+  if (vehicleSettingsQuery.isLoading || driverSettingsQuery.isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
@@ -331,11 +341,11 @@ export default function Settings() {
             </p>
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saveVehicleMutation.isPending}
               className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
             >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {saving ? 'Salvando...' : 'Salvar'}
+              {saveVehicleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {saveVehicleMutation.isPending ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
         </div>
@@ -423,11 +433,11 @@ export default function Settings() {
             </p>
             <button
               onClick={handleDriverSave}
-              disabled={driverSaving}
+              disabled={saveDriverMutation.isPending}
               className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
             >
-              {driverSaving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {driverSaving ? 'Salvando...' : 'Salvar'}
+              {saveDriverMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {saveDriverMutation.isPending ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
         </div>

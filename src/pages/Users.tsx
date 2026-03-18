@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Pencil, Trash2, Plus, Search, X } from 'lucide-react';
+import { Pencil, Trash2, Plus, Search, X, Loader2 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Role } from '../types';
 import { capitalizeWords } from '../lib/inputHelpers';
 
@@ -106,37 +107,19 @@ function CreateUserModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (open) {
-      setForm({ name: '', email: '', password: '', role: availableRoles[availableRoles.length - 1] ?? 'Driver', canDeleteVehicles: false, canDeleteDrivers: false, canDeleteWorkshops: false, budgetLimit: '' });
-      setError('');
-    }
-  }, [open, availableRoles]);
+  const { currentClient } = useAuth();
+  const queryClient = useQueryClient();
 
-  if (!open) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError('');
-    try {
+  const createMutation = useMutation({
+    mutationFn: async (payload: any) => {
       const { data, error: fnError } = await supabase.functions.invoke('create-user', {
-        body: {
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
-          name: capitalizeWords(form.name),
-          role: form.role,
-          can_delete_vehicles: form.canDeleteVehicles,
-          can_delete_drivers: form.canDeleteDrivers,
-          can_delete_workshops: form.canDeleteWorkshops,
-        },
+        body: payload,
       });
       if (fnError) {
         const msg = typeof data === 'object' && data?.error ? data.error : fnError.message;
         throw new Error(msg);
       }
 
-      // Update budget approval limit if provided
       if (canManagePermissions && form.budgetLimit) {
         const budgetLimit = parseFloat(form.budgetLimit) || 0;
         const profileId = typeof data === 'object' && data?.profileId ? data.profileId : null;
@@ -148,14 +131,38 @@ function CreateUserModal({
           if (updateError) throw new Error(updateError.message);
         }
       }
-
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users', currentClient?.id] });
       onCreated();
       onClose();
-    } catch (err: any) {
+    },
+    onError: (err: any) => {
       setError(err.message ?? 'Erro ao criar usuário.');
-    } finally {
-      setSaving(false);
     }
+  });
+
+  useEffect(() => {
+    if (open) {
+      setForm({ name: '', email: '', password: '', role: availableRoles[availableRoles.length - 1] ?? 'Driver', canDeleteVehicles: false, canDeleteDrivers: false, canDeleteWorkshops: false, budgetLimit: '' });
+      setError('');
+    }
+  }, [open, availableRoles]);
+
+  if (!open) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    createMutation.mutate({
+      email: form.email.trim().toLowerCase(),
+      password: form.password,
+      name: capitalizeWords(form.name),
+      role: form.role,
+      can_delete_vehicles: form.canDeleteVehicles,
+      can_delete_drivers: form.canDeleteDrivers,
+      can_delete_workshops: form.canDeleteWorkshops,
+    });
   };
 
   const set = (key: keyof CreateForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -295,10 +302,10 @@ function CreateUserModal({
               Cancelar
             </button>
             <button
-              type="submit" disabled={saving}
-              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60"
+              type="submit" disabled={createMutation.isPending}
+              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center min-w-[120px]"
             >
-              {saving ? 'Criando...' : 'Criar Usuário'}
+              {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : 'Criar Usuário'}
             </button>
           </div>
         </form>
@@ -322,14 +329,34 @@ function EditUserModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { currentClient } = useAuth();
+  const queryClient = useQueryClient();
   const canManagePermissions = CAN_MANAGE_PERMISSIONS.includes(currentUserRole);
   const [name, setName] = useState('');
   const [canDeleteVehicles, setCanDeleteVehicles] = useState(false);
   const [canDeleteDrivers, setCanDeleteDrivers] = useState(false);
   const [canDeleteWorkshops, setCanDeleteWorkshops] = useState(false);
   const [budgetLimit, setBudgetLimit] = useState('');
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const editMutation = useMutation({
+    mutationFn: async (updates: Record<string, unknown>) => {
+      if (!user) return;
+      const { error: dbError } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id);
+      if (dbError) throw new Error(dbError.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users', currentClient?.id] });
+      onSaved();
+      onClose();
+    },
+    onError: (err: any) => {
+      setError(err.message ?? 'Erro ao salvar.');
+    }
+  });
 
   useEffect(() => {
     if (user) {
@@ -346,28 +373,15 @@ function EditUserModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     setError('');
-    try {
-      const updates: Record<string, unknown> = { name: capitalizeWords(name) };
-      if (canManagePermissions) {
-        updates.can_delete_vehicles = canDeleteVehicles;
-        updates.can_delete_drivers = canDeleteDrivers;
-        updates.can_delete_workshops = canDeleteWorkshops;
-        updates.budget_approval_limit = parseFloat(budgetLimit) || 0;
-      }
-      const { error: dbError } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id);
-      if (dbError) throw new Error(dbError.message);
-      onSaved();
-      onClose();
-    } catch (err: any) {
-      setError(err.message ?? 'Erro ao salvar.');
-    } finally {
-      setSaving(false);
+    const updates: Record<string, unknown> = { name: capitalizeWords(name) };
+    if (canManagePermissions) {
+      updates.can_delete_vehicles = canDeleteVehicles;
+      updates.can_delete_drivers = canDeleteDrivers;
+      updates.can_delete_workshops = canDeleteWorkshops;
+      updates.budget_approval_limit = parseFloat(budgetLimit) || 0;
     }
+    editMutation.mutate(updates);
   };
 
   return (
@@ -482,10 +496,10 @@ function EditUserModal({
               Cancelar
             </button>
             <button
-              type="submit" disabled={saving}
-              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60"
+              type="submit" disabled={editMutation.isPending}
+              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center min-w-[120px]"
             >
-              {saving ? 'Salvando...' : 'Salvar'}
+              {editMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : 'Salvar'}
             </button>
           </div>
         </form>
@@ -500,8 +514,7 @@ const CAN_MANAGE: Role[] = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'M
 
 export default function Users() {
   const { user, currentClient } = useAuth();
-  const [users, setUsers] = useState<UserRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
@@ -511,43 +524,50 @@ export default function Users() {
   const myRank = ROLE_RANK[user.role];
   const available = creatableRoles(user.role);
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    let query = supabase
-      .from('profiles')
-      .select('id, name, role, can_delete_vehicles, can_delete_drivers, can_delete_workshops, budget_approval_limit, created_at');
+  const { data: users = [], isLoading: loading } = useQuery({
+    queryKey: ['users', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from('profiles')
+        .select('id, name, role, can_delete_vehicles, can_delete_drivers, can_delete_workshops, budget_approval_limit, created_at');
 
-    if (currentClient?.id) {
-      query = query.eq('client_id', currentClient.id);
-    }
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
 
-    const { data } = await query.order('name');
-
-    if (data) {
-      // Filtrar: papéis abaixo do logado, excluindo Driver (gerenciados em Cadastros > Motoristas)
-      setUsers(
-        (data as UserRow[]).filter(
-          (u) => ROLE_RANK[u.role] < myRank && u.id !== user.id && u.role !== 'Driver'
-        )
+      const { data, error } = await query.order('name');
+      if (error) throw error;
+      
+      return (data as UserRow[]).filter(
+        (u) => ROLE_RANK[u.role] < myRank && u.id !== user.id && u.role !== 'Driver'
       );
+    },
+    enabled: !!currentClient?.id || !currentClient, // allows fetching if user has no client but is probably master
+  });
+
+  const filtered = useMemo(() => {
+    return users.filter((u) => u.name.toLowerCase().includes(search.toLowerCase()));
+  }, [users, search]);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: { action: 'delete', user_id: userId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users', currentClient?.id] });
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Erro ao deletar usuário.');
     }
-    setLoading(false);
-  };
+  });
 
-  useEffect(() => {
-    fetchUsers();
-  }, [currentClient?.id]);
-
-  const filtered = users.filter((u) =>
-    u.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const handleDelete = async (u: UserRow) => {
+  const handleDelete = (u: UserRow) => {
     if (!window.confirm(`Excluir o usuário "${u.name}"? Esta ação não pode ser desfeita.`)) return;
-    await supabase.functions.invoke('create-user', {
-      body: { action: 'delete', user_id: u.id },
-    });
-    await fetchUsers();
+    deleteMutation.mutate(u.id);
   };
 
   return (
@@ -646,7 +666,7 @@ export default function Users() {
         availableRoles={available}
         currentUserRole={user.role}
         onClose={() => setCreateOpen(false)}
-        onCreated={fetchUsers}
+        onCreated={() => {}} // queryClient handles invalidation in the modal itself
       />
 
       <EditUserModal
@@ -654,7 +674,7 @@ export default function Users() {
         user={editingUser}
         currentUserRole={user.role}
         onClose={() => setEditingUser(null)}
-        onSaved={fetchUsers}
+        onSaved={() => {}} // queryClient handles invalidation in the modal itself
       />
     </div>
   );

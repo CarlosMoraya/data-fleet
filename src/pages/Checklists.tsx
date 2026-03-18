@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -9,6 +9,7 @@ import type { Checklist, ChecklistTemplate } from '../types';
 import ChecklistDetailModal from '../components/ChecklistDetailModal';
 import CreateActionPlanModal from '../components/CreateActionPlanModal';
 import { cn } from '../lib/utils';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const STATUS_LABEL: Record<string, string> = { in_progress: 'Em andamento', completed: 'Concluído' };
 const STATUS_COLOR: Record<string, string> = {
@@ -19,6 +20,7 @@ const STATUS_COLOR: Record<string, string> = {
 export default function Checklists() {
   const { user, currentClient } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const isDriver = user?.role === 'Driver';
   const isAuditor = user?.role === 'Yard Auditor';
@@ -27,63 +29,22 @@ export default function Checklists() {
   const isAnalystPlus = ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'].includes(user?.role ?? '');
   const isAdminMaster = user?.role === 'Admin Master';
 
-  // Driver state
-  const [vehicleInfo, setVehicleInfo] = useState<{ id: string; plate: string; category: string | null } | null>(null);
-  const [publishedTemplates, setPublishedTemplates] = useState<ChecklistTemplate[]>([]);
-  const [openChecklist, setOpenChecklist] = useState<Checklist | null>(null);
-
-  // Auditor state
-  type VehicleOption = { id: string; plate: string; category: string | null; driverName: string | null };
-  const [vehicles, setVehicles] = useState<VehicleOption[]>([]);
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
-  const [auditorTemplates, setAuditorTemplates] = useState<ChecklistTemplate[]>([]);
-
-  // History/list
-  const [checklists, setChecklists] = useState<Checklist[]>([]);
+  // State for search/filters
   const [historySearch, setHistorySearch] = useState('');
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'in_progress' | 'completed'>('all');
-  const [loading, setLoading] = useState(true);
-  const [starting, setStarting] = useState<string | null>(null);
+  const [onlyWithIssues, setOnlyWithIssues] = useState(false);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
 
+  // Local UI state
+  const [starting, setStarting] = useState<string | null>(null);
   const [viewChecklist, setViewChecklist] = useState<Checklist | null>(null);
   const [createPlanChecklist, setCreatePlanChecklist] = useState<Checklist | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Checklist | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
-  // IDs of completed checklists that have at least one 'issue' response
-  const [issueChecklistIds, setIssueChecklistIds] = useState<Set<string>>(new Set());
-  const [onlyWithIssues, setOnlyWithIssues] = useState(false);
-
-  // Load Auditor templates when vehicle selection changes
-  useEffect(() => {
-    if (!isAuditor || !selectedVehicleId) {
-      setAuditorTemplates([]);
-      return;
-    }
-    const selected = vehicles.find(v => v.id === selectedVehicleId);
-    if (!selected?.category) { setAuditorTemplates([]); return; }
-    (async () => {
-      const { data } = await supabase
-        .from('checklist_templates')
-        .select('*')
-        .eq('client_id', currentClient.id)
-        .eq('vehicle_category', selected.category)
-        .eq('context', 'Auditoria')
-        .eq('status', 'published');
-      setAuditorTemplates((data ?? []).map(r => templateFromRow(r as ChecklistTemplateRow)));
-    })();
-  }, [selectedVehicleId, isAuditor, vehicles, currentClient.id]);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-
-    if (!currentClient?.id) {
-      setLoading(false);
-      return;
-    }
-
-    if (isDriver) {
-      // Find driver record by profile_id and current client
+  // ── Queries for Driver ────────────────────────────────────────────────────
+  const { data: vehicleInfo, isLoading: loadingVehicleInfo } = useQuery({
+    queryKey: ['driverVehicle', user?.id, currentClient?.id],
+    queryFn: async () => {
       const { data: driverRec } = await supabase
         .from('drivers')
         .select('id, client_id')
@@ -91,128 +52,141 @@ export default function Checklists() {
         .eq('client_id', currentClient!.id)
         .maybeSingle();
 
-      if (driverRec) {
-        // Get vehicle associated with this driver
-        const { data: vehicleData } = await supabase
-          .from('vehicles')
-          .select('id, license_plate, category')
-          .eq('driver_id', driverRec.id)
-          .eq('client_id', driverRec.client_id)
-          .maybeSingle();
+      if (!driverRec) return null;
 
-        if (vehicleData) {
-          setVehicleInfo({ id: vehicleData.id, plate: vehicleData.license_plate, category: vehicleData.category });
-          if (vehicleData.category) {
-            // Load ALL published templates for this category (excluding Audit context)
-            const { data: tplData } = await supabase
-              .from('checklist_templates')
-              .select('*')
-              .eq('client_id', currentClient!.id)
-              .eq('vehicle_category', vehicleData.category)
-              .eq('status', 'published')
-              .neq('context', 'Auditoria')
-              .order('context');
-            setPublishedTemplates((tplData ?? []).map(r => templateFromRow(r as ChecklistTemplateRow)));
-          }
-        }
-      }
-
-      // Open checklist
-      const { data: openData } = await supabase
-        .from('checklists')
-        .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context)')
-        .eq('filled_by', user!.id)
-        .eq('status', 'in_progress')
-        .order('started_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      setOpenChecklist(openData ? checklistFromRow(openData as ChecklistRow) : null);
-
-      // History
-      const { data: histData } = await supabase
-        .from('checklists')
-        .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context)')
-        .eq('filled_by', user!.id)
-        .order('started_at', { ascending: false })
-        .limit(50);
-      setChecklists((histData ?? []).map(r => checklistFromRow(r as ChecklistRow)));
-
-    } else if (isAuditor) {
-      // Load all vehicles with their assigned driver name
       const { data: vehicleData } = await supabase
         .from('vehicles')
-        .select('id, license_plate, category, driver_id, drivers(profiles(name))')
-        .eq('client_id', currentClient.id)
-        .order('license_plate');
-      setVehicles(
-        (vehicleData ?? []).map((v: Record<string, unknown>) => ({
-          id: v.id as string,
-          plate: v.license_plate as string,
-          category: v.category as string | null,
-          driverName: ((v.drivers as Record<string, unknown> | null)?.profiles as Record<string, unknown> | null)?.name as string | null ?? null,
-        })),
-      );
-
-      // Open checklist
-      const { data: openData } = await supabase
-        .from('checklists')
-        .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context)')
-        .eq('filled_by', user!.id)
-        .eq('status', 'in_progress')
-        .order('started_at', { ascending: false })
-        .limit(1)
+        .select('id, license_plate, category')
+        .eq('driver_id', driverRec.id)
+        .eq('client_id', driverRec.client_id)
         .maybeSingle();
-      setOpenChecklist(openData ? checklistFromRow(openData as ChecklistRow) : null);
 
-      // Auditor history
-      const { data: histData } = await supabase
-        .from('checklists')
-        .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context)')
-        .eq('filled_by', user!.id)
-        .order('started_at', { ascending: false })
-        .limit(50);
-      setChecklists((histData ?? []).map(r => checklistFromRow(r as ChecklistRow)));
+      return vehicleData ? { id: vehicleData.id, plate: vehicleData.license_plate, category: vehicleData.category } : null;
+    },
+    enabled: isDriver && !!user?.id && !!currentClient?.id
+  });
 
-    } else if (isAssistantPlus) {
+  const { data: publishedTemplates = [] } = useQuery({
+    queryKey: ['publishedTemplates', vehicleInfo?.category, currentClient?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('checklist_templates')
+        .select('*')
+        .eq('client_id', currentClient!.id)
+        .eq('vehicle_category', vehicleInfo!.category!)
+        .eq('status', 'published')
+        .neq('context', 'Auditoria')
+        .order('context');
+      return (data ?? []).map(r => templateFromRow(r as ChecklistTemplateRow));
+    },
+    enabled: isDriver && !!vehicleInfo?.category && !!currentClient?.id
+  });
+
+  // ── Queries for Auditor ───────────────────────────────────────────────────
+  const { data: auditorVehicles = [] } = useQuery({
+    queryKey: ['auditorVehicles', currentClient?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('vehicles')
+        .select('id, license_plate, category, driver_id, drivers(profiles(name))')
+        .eq('client_id', currentClient!.id)
+        .order('license_plate');
+      
+      return (data ?? []).map((v: any) => ({
+        id: v.id,
+        plate: v.license_plate,
+        category: v.category,
+        driverName: v.drivers?.profiles?.name ?? null,
+      }));
+    },
+    enabled: isAuditor && !!currentClient?.id
+  });
+
+  const selectedAuditorVehicle = useMemo(() => 
+    auditorVehicles.find(v => v.id === selectedVehicleId),
+    [auditorVehicles, selectedVehicleId]
+  );
+
+  const { data: auditorTemplates = [] } = useQuery({
+    queryKey: ['auditorTemplates', selectedAuditorVehicle?.category, currentClient?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('checklist_templates')
+        .select('*')
+        .eq('client_id', currentClient!.id)
+        .eq('vehicle_category', selectedAuditorVehicle!.category!)
+        .eq('context', 'Auditoria')
+        .eq('status', 'published');
+      return (data ?? []).map(r => templateFromRow(r as ChecklistTemplateRow));
+    },
+    enabled: isAuditor && !!selectedAuditorVehicle?.category && !!currentClient?.id
+  });
+
+  // ── Shared Queries (Driver/Auditor/History) ────────────────────────────────
+  const { data: openChecklist } = useQuery({
+    queryKey: ['openChecklist', user?.id, currentClient?.id],
+    queryFn: async () => {
       const { data } = await supabase
         .from('checklists')
         .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context)')
-        .eq('client_id', currentClient.id)
+        .eq('client_id', currentClient!.id)
+        .eq('filled_by', user!.id)
+        .eq('status', 'in_progress')
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data ? checklistFromRow(data as ChecklistRow) : null;
+    },
+    enabled: isDriverOrAuditor && !!user?.id && !!currentClient?.id
+  });
+
+  const { data: checklists = [], isLoading: loadingChecklists } = useQuery({
+    queryKey: ['checklists', currentClient?.id, isDriverOrAuditor ? user?.id : 'all'],
+    queryFn: async () => {
+      let query = supabase
+        .from('checklists')
+        .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context)')
+        .eq('client_id', currentClient!.id)
         .order('started_at', { ascending: false });
-      const rows = (data ?? []).map(r => checklistFromRow(r as ChecklistRow));
-      setChecklists(rows);
 
-      // Fetch which checklists have at least one issue response
-      if (rows.length > 0) {
-        const ids = rows.map(r => r.id);
-        const { data: issueData } = await supabase
-          .from('checklist_responses')
-          .select('checklist_id')
-          .in('checklist_id', ids)
-          .eq('status', 'issue');
-        setIssueChecklistIds(new Set((issueData ?? []).map((r: { checklist_id: string }) => r.checklist_id)));
+      if (isDriverOrAuditor) {
+        query = query.eq('filled_by', user!.id).limit(50);
       }
-    }
 
-    setLoading(false);
-  }, [user, currentClient.id, isDriver, isAuditor, isAssistantPlus]);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []).map(r => checklistFromRow(r as ChecklistRow));
+    },
+    enabled: !!currentClient?.id
+  });
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Query for issues (inconformidades) - mainly for Assistant+
+  const { data: issueChecklistIds = new Set<string>() } = useQuery({
+    queryKey: ['checklistIssues', currentClient?.id],
+    queryFn: async () => {
+      if (!isAssistantPlus || checklists.length === 0) return new Set<string>();
+      
+      const ids = checklists.map(r => r.id);
+      const { data } = await supabase
+        .from('checklist_responses')
+        .select('checklist_id')
+        .in('checklist_id', ids)
+        .eq('status', 'issue');
+      
+      return new Set((data ?? []).map((r: any) => r.checklist_id));
+    },
+    enabled: isAssistantPlus && checklists.length > 0
+  });
 
-  const startChecklist = async (template: ChecklistTemplate, vehicleId?: string) => {
-    if (!vehicleId) {
-      console.error('Tentativa de iniciar checklist sem veículo associado.');
-      return;
-    }
-    setStarting(template.id);
-    try {
+  const startMutation = useMutation({
+    mutationFn: async ({ template, vehicleId }: { template: ChecklistTemplate; vehicleId: string }) => {
       const { data, error } = await supabase
         .from('checklists')
         .insert({
-          client_id: currentClient.id,
+          client_id: currentClient!.id,
           template_id: template.id,
           version_number: template.currentVersion,
-          vehicle_id: vehicleId ?? null,
+          vehicle_id: vehicleId,
           filled_by: user!.id,
           status: 'in_progress',
           device_info: navigator.userAgent,
@@ -220,38 +194,60 @@ export default function Checklists() {
         .select()
         .single();
       if (error) throw error;
-      navigate(`/checklists/preencher/${data.id}`);
-    } catch (err) {
-      console.error(err);
-    } finally {
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['openChecklist', user?.id, currentClient?.id] });
+      queryClient.invalidateQueries({ queryKey: ['checklists', currentClient?.id] });
       setStarting(null);
-    }
+      navigate(`/checklists/preencher/${data.id}`);
+    },
+    onError: (err) => {
+      console.error(err);
+      setStarting(null);
+    },
+  });
+
+  const startChecklist = (template: ChecklistTemplate, vehicleId?: string) => {
+    if (!vehicleId) return;
+    setStarting(template.id);
+    startMutation.mutate({ template, vehicleId });
   };
 
-  const handleDelete = async () => {
+  const deleteMutation = useMutation({
+    mutationFn: async (checklist: Checklist) => {
+      const { error } = await supabase.from('checklists').delete().eq('id', checklist.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checklists', currentClient?.id] });
+      queryClient.invalidateQueries({ queryKey: ['openChecklist', user?.id, currentClient?.id] });
+      setConfirmDelete(null);
+    },
+  });
+
+  const handleDelete = () => {
     if (!confirmDelete) return;
-    setDeleting(true);
-    await supabase.from('checklists').delete().eq('id', confirmDelete.id);
-    setConfirmDelete(null);
-    setDeleting(false);
-    await fetchData();
+    deleteMutation.mutate(confirmDelete);
   };
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
-  const filteredHistory = checklists.filter(c => {
-    if (historyStatusFilter !== 'all' && c.status !== historyStatusFilter) return false;
-    if (historySearch.trim()) {
-      const q = historySearch.toLowerCase();
-      if (!(c.templateName ?? '').toLowerCase().includes(q) && !(c.templateContext ?? '').toLowerCase().includes(q)) return false;
-    }
-    return true;
-  });
+  const filteredHistory = useMemo(() => {
+    return checklists.filter(c => {
+      if (historyStatusFilter !== 'all' && c.status !== historyStatusFilter) return false;
+      if (historySearch.trim()) {
+        const q = historySearch.toLowerCase();
+        if (!(c.templateName ?? '').toLowerCase().includes(q) && !(c.templateContext ?? '').toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [checklists, historyStatusFilter, historySearch]);
 
-  const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
+  const isLoading = loadingVehicleInfo || loadingChecklists;
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
@@ -345,7 +341,6 @@ export default function Checklists() {
             )}
           </div>
 
-          {/* History */}
           <HistoryCard
             checklists={filteredHistory}
             historySearch={historySearch}
@@ -403,24 +398,24 @@ export default function Checklists() {
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
               >
                 <option value="">— Selecione um veículo —</option>
-                {vehicles.map(v => (
+                {auditorVehicles.map(v => (
                   <option key={v.id} value={v.id}>{v.plate}{v.category ? ` (${v.category})` : ''}</option>
                 ))}
               </select>
             </div>
 
-            {selectedVehicle && (
+            {selectedAuditorVehicle && (
               <div className="flex items-center gap-2 rounded-lg bg-zinc-50 border border-zinc-100 px-3 py-2">
                 <User className="h-4 w-4 text-zinc-400 flex-shrink-0" />
                 <span className="text-sm text-zinc-700">
-                  Motorista: <strong>{selectedVehicle.driverName ?? 'Sem motorista'}</strong>
+                  Motorista: <strong>{selectedAuditorVehicle.driverName ?? 'Sem motorista'}</strong>
                 </span>
               </div>
             )}
 
             {selectedVehicleId && auditorTemplates.length === 0 && (
               <p className="text-sm text-zinc-400 italic text-center py-2">
-                Nenhum template de Auditoria publicado para {selectedVehicle?.category ?? 'esta categoria'}.
+                Nenhum template de Auditoria publicado para {selectedAuditorVehicle?.category ?? 'esta categoria'}.
               </p>
             )}
 
@@ -446,7 +441,6 @@ export default function Checklists() {
             )}
           </div>
 
-          {/* History */}
           <HistoryCard
             checklists={filteredHistory}
             historySearch={historySearch}
@@ -462,7 +456,6 @@ export default function Checklists() {
       {/* ── Fleet Assistant+ view ─────────────────────────────── */}
       {isAssistantPlus && (
         <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
-          {/* Filter bar */}
           <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-100">
             <button
               onClick={() => setOnlyWithIssues(false)}
@@ -569,7 +562,10 @@ export default function Checklists() {
         <CreateActionPlanModal
           checklist={createPlanChecklist}
           onClose={() => setCreatePlanChecklist(null)}
-          onCreated={() => { setCreatePlanChecklist(null); }}
+          onCreated={() => { 
+            setCreatePlanChecklist(null);
+            queryClient.invalidateQueries({ queryKey: ['checklists', currentClient?.id] });
+          }}
         />
       )}
 
@@ -584,15 +580,15 @@ export default function Checklists() {
               Template: <span className="text-orange-600">{confirmDelete.templateName}</span>
             </p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setConfirmDelete(null)} disabled={deleting} className="px-4 py-2 text-sm text-zinc-600">
+              <button onClick={() => setConfirmDelete(null)} disabled={deleteMutation.isPending} className="px-4 py-2 text-sm text-zinc-600">
                 Cancelar
               </button>
               <button
                 onClick={handleDelete}
-                disabled={deleting}
+                disabled={deleteMutation.isPending}
                 className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
-                {deleting ? 'Excluindo...' : 'Excluir permanentemente'}
+                {deleteMutation.isPending ? 'Excluindo...' : 'Excluir permanentemente'}
               </button>
             </div>
           </div>

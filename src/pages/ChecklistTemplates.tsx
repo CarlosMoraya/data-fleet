@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus, Edit2, CheckCircle, XCircle, RefreshCw, Trash2, FileStack } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -6,6 +6,7 @@ import { templateFromRow, type ChecklistTemplateRow } from '../lib/checklistTemp
 import type { ChecklistTemplate, TemplateCategory, TemplateStatus, ChecklistContext } from '../types';
 import ChecklistTemplateForm from '../components/ChecklistTemplateForm';
 import { cn } from '../lib/utils';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const STATUS_LABEL: Record<TemplateStatus, string> = {
   draft: 'Rascunho',
@@ -28,8 +29,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 export default function ChecklistTemplates() {
   const { user, currentClient } = useAuth();
-  const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [filterCategory, setFilterCategory] = useState<TemplateCategory | 'Todos'>('Todos');
   const [filterContext, setFilterContext] = useState<ChecklistContext | 'Todos'>('Todos');
 
@@ -40,134 +40,102 @@ export default function ChecklistTemplates() {
     type: 'publish' | 'deprecate' | 'delete' | 'new-version';
     template: ChecklistTemplate;
   } | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const isManager = ['Manager', 'Coordinator', 'Director', 'Admin Master'].includes(user?.role ?? '');
   const isAdminMaster = user?.role === 'Admin Master';
   const canCreate = isManager;
 
-  const fetchTemplates = useCallback(async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('checklist_templates')
-      .select('*')
-      .eq('client_id', currentClient.id)
-      .order('created_at', { ascending: false });
-    setTemplates((data ?? []).map(r => templateFromRow(r as ChecklistTemplateRow)));
-    setLoading(false);
-  }, [currentClient.id]);
-
-  useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
-
-  const filtered = templates.filter(t => {
-    if (filterCategory !== 'Todos' && t.vehicleCategory !== filterCategory) return false;
-    if (filterContext !== 'Todos' && t.context !== filterContext) return false;
-    return true;
+  const { data: templates = [], isLoading: loadingTemplates, isError: templatesError } = useQuery({
+    queryKey: ['checklistTemplates', currentClient?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('checklist_templates')
+        .select('*')
+        .eq('client_id', currentClient.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return (data ?? []).map(r => templateFromRow(r as ChecklistTemplateRow));
+    },
+    enabled: !!currentClient?.id
   });
 
-  const handlePublish = async (t: ChecklistTemplate) => {
-    setActionLoading(true);
-    setActionError(null);
-    try {
-      // Insert version record
-      await supabase.from('checklist_template_versions').insert({
-        template_id: t.id,
-        version_number: t.currentVersion,
-        published_by: user?.id ?? null,
-      });
-      // Update template status
-      const { error: updateError } = await supabase
-        .from('checklist_templates')
-        .update({ status: 'published', updated_at: new Date().toISOString() })
-        .eq('id', t.id);
+  const filtered = useMemo(() => {
+    return templates.filter(t => {
+      if (filterCategory !== 'Todos' && t.vehicleCategory !== filterCategory) return false;
+      if (filterContext !== 'Todos' && t.context !== filterContext) return false;
+      return true;
+    });
+  }, [templates, filterCategory, filterContext]);
 
-      if (updateError) {
-        const isDuplicate = updateError.code === '23P01' || updateError.message.includes('unique_published_category');
-        if (isDuplicate) {
-          setActionError(`Já existe um template publicado para "${t.vehicleCategory} — ${t.context}". Descontinue-o antes de publicar este.`);
-        } else {
-          setActionError('Erro ao publicar template. Tente novamente.');
+  const templateActionMutation = useMutation({
+    mutationFn: async ({ type, template: t }: { type: 'publish' | 'deprecate' | 'delete' | 'new-version'; template: ChecklistTemplate }) => {
+      if (type === 'publish') {
+        await supabase.from('checklist_template_versions').insert({
+          template_id: t.id,
+          version_number: t.currentVersion,
+          published_by: user?.id ?? null,
+        });
+        const { error: updateError } = await supabase
+          .from('checklist_templates')
+          .update({ status: 'published', updated_at: new Date().toISOString() })
+          .eq('id', t.id);
+
+        if (updateError) {
+          const isDuplicate = updateError.code === '23P01' || updateError.message.includes('unique_published_category');
+          if (isDuplicate) {
+            setActionError(`Já existe um template publicado para "${t.vehicleCategory} — ${t.context}". Descontinue-o antes de publicar este.`);
+            return; // Don't close modal — user sees error
+          }
+          throw updateError;
         }
-        return;
+      } else if (type === 'deprecate') {
+        const { error } = await supabase.from('checklist_templates').update({ status: 'deprecated', updated_at: new Date().toISOString() }).eq('id', t.id);
+        if (error) throw error;
+      } else if (type === 'new-version') {
+        const newVersion = t.currentVersion + 1;
+        const { error } = await supabase.from('checklist_templates').update({
+          status: 'draft',
+          current_version: newVersion,
+          updated_at: new Date().toISOString(),
+        }).eq('id', t.id);
+        if (error) throw error;
+
+        const { data: oldItems } = await supabase
+          .from('checklist_items')
+          .select('*')
+          .eq('template_id', t.id)
+          .eq('version_number', t.currentVersion);
+
+        if (oldItems && oldItems.length > 0) {
+          await supabase.from('checklist_items').insert(
+            oldItems.map(({ id: _id, ...rest }: Record<string, unknown>) => ({ ...rest, version_number: newVersion })),
+          );
+        }
+      } else if (type === 'delete') {
+        const { error } = await supabase.from('checklist_templates').delete().eq('id', t.id);
+        if (error) throw error;
       }
-
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checklistTemplates', currentClient?.id] });
       setConfirmAction(null);
-      await fetchTemplates();
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDeprecate = async (t: ChecklistTemplate) => {
-    setActionLoading(true);
-    try {
-      await supabase.from('checklist_templates').update({ status: 'deprecated', updated_at: new Date().toISOString() }).eq('id', t.id);
-      await fetchTemplates();
-    } finally {
-      setActionLoading(false);
-      setConfirmAction(null);
-    }
-  };
-
-  const handleNewVersion = async (t: ChecklistTemplate) => {
-    setActionLoading(true);
-    try {
-      const newVersion = t.currentVersion + 1;
-
-      // Update template to new version + draft
-      await supabase.from('checklist_templates').update({
-        status: 'draft',
-        current_version: newVersion,
-        updated_at: new Date().toISOString(),
-      }).eq('id', t.id);
-
-      // Copy items from current version to new version
-      const { data: oldItems } = await supabase
-        .from('checklist_items')
-        .select('*')
-        .eq('template_id', t.id)
-        .eq('version_number', t.currentVersion);
-
-      if (oldItems && oldItems.length > 0) {
-        await supabase.from('checklist_items').insert(
-          oldItems.map(({ id: _id, ...rest }: Record<string, unknown>) => ({ ...rest, version_number: newVersion })),
-        );
-      }
-
-      await fetchTemplates();
-    } finally {
-      setActionLoading(false);
-      setConfirmAction(null);
-    }
-  };
-
-  const handleDelete = async (t: ChecklistTemplate) => {
-    setActionLoading(true);
-    try {
-      const { error } = await supabase.from('checklist_templates').delete().eq('id', t.id);
-      if (error) throw error;
-      await fetchTemplates();
-      setConfirmAction(null);
-    } catch (err: any) {
+    },
+    onError: (err: any) => {
       console.error(err);
       if (err.code === '23503') {
         alert('Não é possível excluir este template pois existem relatórios/checklists preenchidos vinculados a ele.\n\nExclua primeiro o histórico de checklists deste modelo na aba Checklists.');
-      } else {
-        alert('Erro ao excluir template: ' + (err.message || 'Erro desconhecido.'));
+      } else if (!actionError) {
+        alert('Erro ao executar ação: ' + (err.message || 'Erro desconhecido.'));
       }
-    } finally {
-      setActionLoading(false);
-    }
-  };
+    },
+  });
 
-  const executeConfirm = async () => {
+  const executeConfirm = () => {
     if (!confirmAction) return;
-    const { type, template } = confirmAction;
-    if (type === 'publish') await handlePublish(template);
-    else if (type === 'deprecate') await handleDeprecate(template);
-    else if (type === 'new-version') await handleNewVersion(template);
-    else if (type === 'delete') await handleDelete(template);
+    setActionError(null);
+    templateActionMutation.mutate(confirmAction);
   };
 
   const CONFIRM_TEXTS: Record<string, { title: string; body: string; confirm: string; color: string }> = {
@@ -251,9 +219,15 @@ export default function ChecklistTemplates() {
         </div>
       </div>
 
+      {templatesError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Erro ao carregar templates de checklist. Tente novamente.
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
-        {loading ? (
+        {loadingTemplates ? (
           <div className="text-center py-16 text-zinc-400 text-sm">Carregando templates...</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-zinc-400">
@@ -372,7 +346,7 @@ export default function ChecklistTemplates() {
         <ChecklistTemplateForm
           template={editingTemplate}
           onClose={() => setShowForm(false)}
-          onSaved={() => { setShowForm(false); fetchTemplates(); }}
+          onSaved={() => { setShowForm(false); queryClient.invalidateQueries({ queryKey: ['checklistTemplates', currentClient?.id] }); }}
         />
       )}
 
@@ -390,17 +364,17 @@ export default function ChecklistTemplates() {
               <button
                 onClick={() => { setConfirmAction(null); setActionError(null); }}
                 className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900"
-                disabled={actionLoading}
+                disabled={templateActionMutation.isPending}
               >
                 Cancelar
               </button>
               {!actionError && (
                 <button
                   onClick={executeConfirm}
-                  disabled={actionLoading}
+                  disabled={templateActionMutation.isPending}
                   className={cn('px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50', CONFIRM_TEXTS[confirmAction.type].color)}
                 >
-                  {actionLoading ? 'Aguarde...' : CONFIRM_TEXTS[confirmAction.type].confirm}
+                  {templateActionMutation.isPending ? 'Aguarde...' : CONFIRM_TEXTS[confirmAction.type].confirm}
                 </button>
               )}
             </div>

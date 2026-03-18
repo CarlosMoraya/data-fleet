@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { Vehicle, VehicleFieldSettings } from '../types';
 import { Plus, Search, Filter, Edit2, Trash2, Truck, User, Eye } from 'lucide-react';
@@ -34,9 +35,7 @@ const ROLES_CAN_ALWAYS_DELETE = ['Manager', 'Coordinator', 'Director', 'Admin Ma
 
 export default function Vehicles() {
   const { currentClient, user } = useAuth();
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(() => {
     return sessionStorage.getItem('vehicleFormOpen') === 'true';
@@ -49,10 +48,7 @@ export default function Vehicles() {
       return null;
     }
   });
-  const [fieldSettings, setFieldSettings] = useState<VehicleFieldSettings | null>(null);
-  const [availableDrivers, setAvailableDrivers] = useState<AvailableDriver[]>([]);
-  const [availableShippers, setAvailableShippers] = useState<AvailableShipper[]>([]);
-  const [availableOperationalUnits, setAvailableOperationalUnits] = useState<AvailableOperationalUnit[]>([]);
+
   const [viewingVehicle, setViewingVehicle] = useState<Vehicle | null>(null);
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
@@ -64,215 +60,224 @@ export default function Vehicles() {
     return <Navigate to="/checklists" replace />;
   }
 
-  const fetchVehicles = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    let query = supabase.from('vehicles').select('*, drivers(name), shippers(name), operational_units(name)');
-    
-    if (currentClient?.id) {
-      query = query.eq('client_id', currentClient.id);
-    }
+  // --- QUERIES ---
 
-    const { data, error: fetchError } = await query.order('license_plate');
+  const { data: vehicles = [], isLoading: loadingVehicles, error: vehiclesError } = useQuery({
+    queryKey: ['vehicles', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase.from('vehicles').select('*, drivers(name), shippers(name), operational_units(name)');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query.order('license_plate');
+      if (error) throw error;
+      return (data as VehicleRow[]).map(vehicleFromRow);
+    },
+    enabled: !!user,
+  });
 
-    if (fetchError) {
-      setError('Erro ao carregar veículos. Tente novamente.');
-    } else {
-      setVehicles((data as VehicleRow[]).map(vehicleFromRow));
-    }
-    setLoading(false);
-  }, [currentClient?.id]);
+  const { data: fieldSettings } = useQuery({
+    queryKey: ['vehicleFieldSettings', currentClient?.id],
+    queryFn: async () => {
+      if (!currentClient?.id) return defaultFieldSettings('');
+      const { data } = await supabase
+        .from('vehicle_field_settings')
+        .select('*')
+        .eq('client_id', currentClient.id)
+        .maybeSingle();
+      return data ? fieldSettingsFromRow(data as VehicleFieldSettingsRow) : defaultFieldSettings(currentClient.id);
+    },
+    enabled: !!currentClient?.id,
+  });
 
-  const fetchAvailableDrivers = useCallback(async (currentDriverId?: string) => {
-    let driversQuery = supabase.from('drivers').select('id, name, cpf');
-    let vehiclesQuery = supabase.from('vehicles').select('driver_id').not('driver_id', 'is', null);
+  const { data: logisticsData } = useQuery({
+    queryKey: ['availableLogistics', currentClient?.id],
+    queryFn: async () => {
+      let shippersQuery = supabase.from('shippers').select('id, name').eq('active', true);
+      let unitsQuery = supabase.from('operational_units').select('id, name, shipper_id').eq('active', true);
 
-    if (currentClient?.id) {
-      driversQuery = driversQuery.eq('client_id', currentClient.id);
-      vehiclesQuery = vehiclesQuery.eq('client_id', currentClient.id);
-    }
+      if (currentClient?.id) {
+        shippersQuery = shippersQuery.eq('client_id', currentClient.id);
+        unitsQuery = unitsQuery.eq('client_id', currentClient.id);
+      }
 
-    const { data: allDrivers } = await driversQuery.order('name');
-    const { data: usedRows } = await vehiclesQuery;
+      const [{ data: shippersData }, { data: unitsData }] = await Promise.all([
+        shippersQuery.order('name'),
+        unitsQuery.order('name'),
+      ]);
 
-    const usedIds = new Set(
-      (usedRows ?? [])
-        .map((r: { driver_id: string }) => r.driver_id)
-        .filter((id: string) => id !== currentDriverId)
-    );
+      return {
+        shippers: (shippersData ?? []) as AvailableShipper[],
+        units: (unitsData ?? []).map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          shipperId: u.shipper_id,
+        })) as AvailableOperationalUnit[]
+      };
+    },
+    enabled: !!currentClient?.id,
+  });
 
-    setAvailableDrivers(
-      (allDrivers ?? []).filter((d: AvailableDriver) => !usedIds.has(d.id))
-    );
-  }, [currentClient?.id]);
+  const { data: availableDrivers = [] } = useQuery({
+    queryKey: ['availableDrivers', currentClient?.id, editingVehicle?.driverId],
+    queryFn: async () => {
+      let driversQuery = supabase.from('drivers').select('id, name, cpf');
+      let vehiclesQuery = supabase.from('vehicles').select('driver_id').not('driver_id', 'is', null);
 
-  const fetchFieldSettings = useCallback(async () => {
-    if (!currentClient?.id) {
-      setFieldSettings(null);
-      return;
-    }
-    const { data } = await supabase
-      .from('vehicle_field_settings')
-      .select('*')
-      .eq('client_id', currentClient.id)
-      .maybeSingle();
-    setFieldSettings(data ? fieldSettingsFromRow(data as VehicleFieldSettingsRow) : defaultFieldSettings(currentClient.id));
-  }, [currentClient?.id]);
+      if (currentClient?.id) {
+        driversQuery = driversQuery.eq('client_id', currentClient.id);
+        vehiclesQuery = vehiclesQuery.eq('client_id', currentClient.id);
+      }
 
-  const fetchAvailableShippersAndUnits = useCallback(async () => {
-    let shippersQuery = supabase.from('shippers').select('id, name').eq('active', true);
-    let unitsQuery = supabase.from('operational_units').select('id, name, shipper_id').eq('active', true);
+      const [{ data: allDrivers }, { data: usedRows }] = await Promise.all([
+        driversQuery.order('name'),
+        vehiclesQuery
+      ]);
 
-    if (currentClient?.id) {
-      shippersQuery = shippersQuery.eq('client_id', currentClient.id);
-      unitsQuery = unitsQuery.eq('client_id', currentClient.id);
-    }
+      const usedIds = new Set(
+        (usedRows ?? [])
+          .map((r: { driver_id: string }) => r.driver_id)
+          .filter((id: string) => id !== editingVehicle?.driverId)
+      );
 
-    const [{ data: shippersData }, { data: unitsData }] = await Promise.all([
-      shippersQuery.order('name'),
-      unitsQuery.order('name'),
-    ]);
+      return (allDrivers ?? []).filter((d: any) => !usedIds.has(d.id)) as AvailableDriver[];
+    },
+    enabled: isFormOpen && !!currentClient?.id,
+  });
 
-    setAvailableShippers((shippersData ?? []) as AvailableShipper[]);
-    setAvailableOperationalUnits(
-      (unitsData ?? []).map((u: { id: string; name: string; shipper_id: string }) => ({
-        id: u.id,
-        name: u.name,
-        shipperId: u.shipper_id,
-      }))
-    );
-  }, [currentClient?.id]);
+  const availableShippers = logisticsData?.shippers ?? [];
+  const availableOperationalUnits = logisticsData?.units ?? [];
 
-  useEffect(() => {
-    fetchVehicles();
-    fetchFieldSettings();
-    fetchAvailableShippersAndUnits();
-  }, [fetchVehicles, fetchFieldSettings, fetchAvailableShippersAndUnits]);
+  const saveMutation = useMutation({
+    mutationFn: async ({ vehicle, files }: {
+      vehicle: Partial<Vehicle>;
+      files: { crlv: File | null; sanitaryInspection: File | null; gr: File | null; insurancePolicy: File | null; maintenanceContract: File | null };
+    }) => {
+      if (!currentClient?.id) throw new Error('Sessão inválida');
+      const row = vehicleToRow(vehicle, currentClient.id);
 
-  useEffect(() => {
-    // Recarrega drivers sempre que o modal abre, para garantir lista atualizada
-    if (isFormOpen) {
-      fetchAvailableDrivers(editingVehicle?.driverId);
-    }
-  }, [isFormOpen, editingVehicle?.driverId, fetchAvailableDrivers]);
+      let savedId = editingVehicle?.id;
 
-  // Recarrega lista de drivers disponíveis após salvar um veículo
-  useEffect(() => {
-    if (!isFormOpen && availableDrivers.length > 0) {
-      // Se o modal fechou após save, recarregar drivers para sincronizar
-      fetchAvailableDrivers();
-    }
-  }, [isFormOpen]);
+      if (editingVehicle) {
+        const { error: updateError } = await supabase
+          .from('vehicles')
+          .update(row)
+          .eq('id', editingVehicle.id);
+        if (updateError) throw updateError;
+      } else {
+        const { data: inserted, error: insertError } = await supabase
+          .from('vehicles')
+          .insert(row)
+          .select('id')
+          .single();
+        if (insertError) throw insertError;
+        savedId = inserted.id;
+      }
+
+      if (savedId) {
+        const urlUpdates: Record<string, string> = {};
+
+        if (files.crlv) {
+          if (vehicle.crlvUpload) await deleteVehicleDocument(vehicle.crlvUpload);
+          urlUpdates.crlv_upload = await uploadVehicleDocument(currentClient.id, savedId, files.crlv, 'crlv');
+        }
+        if (files.sanitaryInspection) {
+          if (vehicle.sanitaryInspectionUpload) await deleteVehicleDocument(vehicle.sanitaryInspectionUpload);
+          urlUpdates.sanitary_inspection_upload = await uploadVehicleDocument(currentClient.id, savedId, files.sanitaryInspection, 'sanitary-inspection');
+        }
+        if (files.gr) {
+          if (vehicle.grUpload) await deleteVehicleDocument(vehicle.grUpload);
+          urlUpdates.gr_upload = await uploadVehicleDocument(currentClient.id, savedId, files.gr, 'gr');
+        }
+        if (files.insurancePolicy) {
+          if (vehicle.insurancePolicyUpload) await deleteVehicleDocument(vehicle.insurancePolicyUpload);
+          urlUpdates.insurance_policy_upload = await uploadVehicleDocument(currentClient.id, savedId, files.insurancePolicy, 'insurance-policy');
+        }
+        if (files.maintenanceContract) {
+          if (vehicle.maintenanceContractUpload) await deleteVehicleDocument(vehicle.maintenanceContractUpload);
+          urlUpdates.maintenance_contract_upload = await uploadVehicleDocument(currentClient.id, savedId, files.maintenanceContract, 'maintenance-contract');
+        }
+
+        if (Object.keys(urlUpdates).length > 0) {
+          const { error: updateUrlError } = await supabase
+            .from('vehicles')
+            .update(urlUpdates)
+            .eq('id', savedId);
+          if (updateUrlError) throw updateUrlError;
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vehicles', currentClient?.id] });
+      queryClient.invalidateQueries({ queryKey: ['availableDrivers'] });
+      setIsFormOpen(false);
+      setEditingVehicle(null);
+      sessionStorage.removeItem('vehicleFormOpen');
+      sessionStorage.removeItem('vehicleFormEditing');
+      sessionStorage.removeItem('vehicleFormData');
+    },
+  });
 
   const handleSave = async (
     vehicle: Partial<Vehicle>,
     files: { crlv: File | null; sanitaryInspection: File | null; gr: File | null; insurancePolicy: File | null; maintenanceContract: File | null }
   ): Promise<void> => {
-    if (!currentClient?.id) return;
-    const row = vehicleToRow(vehicle, currentClient.id);
-
-    let savedId = editingVehicle?.id;
-
-    if (editingVehicle) {
-      const { error: updateError } = await supabase
-        .from('vehicles')
-        .update(row)
-        .eq('id', editingVehicle.id);
-      if (updateError) throw updateError;
-    } else {
-      const { data: inserted, error: insertError } = await supabase
-        .from('vehicles')
-        .insert(row)
-        .select('id')
-        .single();
-      if (insertError) throw insertError;
-      savedId = inserted.id;
-    }
-
-    if (savedId) {
-      const urlUpdates: Record<string, string> = {};
-
-      if (files.crlv) {
-        if (vehicle.crlvUpload) await deleteVehicleDocument(vehicle.crlvUpload);
-        urlUpdates.crlv_upload = await uploadVehicleDocument(currentClient.id, savedId, files.crlv, 'crlv');
-      }
-      if (files.sanitaryInspection) {
-        if (vehicle.sanitaryInspectionUpload) await deleteVehicleDocument(vehicle.sanitaryInspectionUpload);
-        urlUpdates.sanitary_inspection_upload = await uploadVehicleDocument(currentClient.id, savedId, files.sanitaryInspection, 'sanitary-inspection');
-      }
-      if (files.gr) {
-        if (vehicle.grUpload) await deleteVehicleDocument(vehicle.grUpload);
-        urlUpdates.gr_upload = await uploadVehicleDocument(currentClient.id, savedId, files.gr, 'gr');
-      }
-      if (files.insurancePolicy) {
-        if (vehicle.insurancePolicyUpload) await deleteVehicleDocument(vehicle.insurancePolicyUpload);
-        urlUpdates.insurance_policy_upload = await uploadVehicleDocument(currentClient.id, savedId, files.insurancePolicy, 'insurance-policy');
-      }
-      if (files.maintenanceContract) {
-        if (vehicle.maintenanceContractUpload) await deleteVehicleDocument(vehicle.maintenanceContractUpload);
-        urlUpdates.maintenance_contract_upload = await uploadVehicleDocument(currentClient.id, savedId, files.maintenanceContract, 'maintenance-contract');
-      }
-
-      if (Object.keys(urlUpdates).length > 0) {
-        const { error: updateUrlError } = await supabase
-          .from('vehicles')
-          .update(urlUpdates)
-          .eq('id', savedId);
-        if (updateUrlError) throw updateUrlError;
-      }
-    }
-
-    await fetchVehicles();
-    setIsFormOpen(false);
-    setEditingVehicle(null);
-    sessionStorage.removeItem('vehicleFormOpen');
-    sessionStorage.removeItem('vehicleFormEditing');
-    sessionStorage.removeItem('vehicleFormData');
+    await saveMutation.mutateAsync({ vehicle, files });
   };
+
+  const deleteMutation = useMutation({
+    mutationFn: async (vehicle: Vehicle) => {
+      if (vehicle.crlvUpload) await deleteVehicleDocument(vehicle.crlvUpload);
+      if (vehicle.sanitaryInspectionUpload) await deleteVehicleDocument(vehicle.sanitaryInspectionUpload);
+      if (vehicle.grUpload) await deleteVehicleDocument(vehicle.grUpload);
+      if (vehicle.insurancePolicyUpload) await deleteVehicleDocument(vehicle.insurancePolicyUpload);
+      if (vehicle.maintenanceContractUpload) await deleteVehicleDocument(vehicle.maintenanceContractUpload);
+
+      const { error: deleteError } = await supabase
+        .from('vehicles')
+        .delete()
+        .eq('id', vehicle.id);
+      if (deleteError) throw deleteError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vehicles', currentClient?.id] });
+      queryClient.invalidateQueries({ queryKey: ['availableDrivers'] });
+    },
+    onError: (err) => {
+      console.error('Erro ao excluir veículo:', err);
+      alert('Erro ao excluir veículo. Tente novamente.');
+    },
+  });
 
   const handleDelete = async (vehicle: Vehicle) => {
     if (!window.confirm(`Excluir o veículo ${vehicle.licensePlate}? Esta ação não pode ser desfeita.`)) return;
-
-    // Delete documents from Storage first (if exists)
-    if (vehicle.crlvUpload) await deleteVehicleDocument(vehicle.crlvUpload);
-    if (vehicle.sanitaryInspectionUpload) await deleteVehicleDocument(vehicle.sanitaryInspectionUpload);
-    if (vehicle.grUpload) await deleteVehicleDocument(vehicle.grUpload);
-    if (vehicle.insurancePolicyUpload) await deleteVehicleDocument(vehicle.insurancePolicyUpload);
-    if (vehicle.maintenanceContractUpload) await deleteVehicleDocument(vehicle.maintenanceContractUpload);
-
-    const { error: deleteError } = await supabase
-      .from('vehicles')
-      .delete()
-      .eq('id', vehicle.id);
-    if (deleteError) {
-      setError('Erro ao excluir veículo. Tente novamente.');
-    } else {
-      await fetchVehicles();
-    }
+    deleteMutation.mutate(vehicle);
   };
 
-  const filteredVehicles = vehicles.filter(v => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      v.licensePlate.toLowerCase().includes(q) ||
-      `${v.brand} ${v.model}`.toLowerCase().includes(q) ||
-      v.chassi.toLowerCase().includes(q)
-    );
-  });
+  const filteredVehicles = useMemo(() => {
+    return vehicles.filter(v => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        v.licensePlate.toLowerCase().includes(q) ||
+        `${v.brand} ${v.model}`.toLowerCase().includes(q) ||
+        v.chassi.toLowerCase().includes(q)
+      );
+    });
+  }, [vehicles, search]);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Vehicles</h1>
-          <p className="text-sm text-zinc-500 mt-1">Manage your fleet inventory and details.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Veículos</h1>
+          <p className="text-sm text-zinc-500 mt-1">Gerencie a frota de veículos do cliente.</p>
         </div>
 
         {canCreate && (
           <button
             onClick={() => {
-              sessionStorage.removeItem('vehicleFormData'); // clear any drafts for adding new
+              sessionStorage.removeItem('vehicleFormData'); 
               sessionStorage.setItem('vehicleFormOpen', 'true');
               sessionStorage.removeItem('vehicleFormEditing');
               setEditingVehicle(null);
@@ -281,7 +286,7 @@ export default function Vehicles() {
             className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
           >
             <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-            Add Vehicle
+            Adicionar Veículo
           </button>
         )}
       </div>
@@ -296,23 +301,23 @@ export default function Vehicles() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="block w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
-            placeholder="Search by plate, model, or chassis..."
+            placeholder="Buscar por placa, modelo ou chassi..."
           />
         </div>
         <button className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 transition-colors">
           <Filter className="-ml-1 mr-2 h-5 w-5 text-zinc-400" aria-hidden="true" />
-          Filters
+          Filtros
         </button>
       </div>
 
-      {error && (
+      {vehiclesError && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erro ao carregar veículos. Tente novamente.
         </div>
       )}
 
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        {loading ? (
+        {loadingVehicles ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-orange-500" />
           </div>
@@ -321,12 +326,12 @@ export default function Vehicles() {
             <table className="min-w-full divide-y divide-zinc-200">
               <thead className="bg-zinc-50">
                 <tr>
-                  <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider sm:pl-6">Vehicle</th>
+                  <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider sm:pl-6">Veículo</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Tipo / Energia</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Proprietário</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Motorista</th>
                   <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                    <span className="sr-only">Actions</span>
+                    <span className="sr-only">Ações</span>
                   </th>
                 </tr>
               </thead>
@@ -403,7 +408,7 @@ export default function Vehicles() {
                 {filteredVehicles.length === 0 && (
                   <tr>
                     <td colSpan={5} className="py-10 text-center text-sm text-zinc-500">
-                      {search ? 'No vehicles match your search.' : 'No vehicles found for this client.'}
+                      {search ? 'Nenhum veículo encontrado para esta busca.' : 'Nenhum veículo cadastrado para este cliente.'}
                     </td>
                   </tr>
                 )}

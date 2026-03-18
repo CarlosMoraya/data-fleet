@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Shipper } from '../types';
@@ -6,6 +6,7 @@ import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react';
 import ShipperForm from '../components/ShipperForm';
 import { supabase } from '../lib/supabase';
 import { shipperFromRow, shipperToRow, formatCNPJ, ShipperRow } from '../lib/shipperMappers';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -25,9 +26,7 @@ function formatPhone(phone: string): string {
 
 export default function Shippers() {
   const { currentClient, user } = useAuth();
-  const [shippers, setShippers] = useState<Shipper[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(() => {
     return sessionStorage.getItem('shipperFormOpen') === 'true';
@@ -45,83 +44,95 @@ export default function Shippers() {
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
   const canDelete = ROLES_CAN_DELETE.includes(user?.role || '');
 
+  // Queries
+  const { data: shippers = [], isLoading: loadingShippers, isError: shippersError } = useQuery({
+    queryKey: ['shippers', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase.from('shippers').select('*');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query.order('name');
+      if (error) throw error;
+      return (data as ShipperRow[]).map(shipperFromRow);
+    },
+    enabled: !!user
+  });
+
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
     return <Navigate to="/checklists" replace />;
   }
 
-  const fetchShippers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    let query = supabase.from('shippers').select('*');
-    if (currentClient?.id) {
-      query = query.eq('client_id', currentClient.id);
+  const saveMutation = useMutation({
+    mutationFn: async (shipper: Partial<Shipper>) => {
+      if (!currentClient?.id) return;
+      const row = shipperToRow(shipper, currentClient.id);
+      if (editingShipper) {
+        const { error } = await supabase
+          .from('shippers')
+          .update(row)
+          .eq('id', editingShipper.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('shippers')
+          .insert(row);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shippers', currentClient?.id] });
+      setIsFormOpen(false);
+      setEditingShipper(null);
+      sessionStorage.removeItem('shipperFormOpen');
+      sessionStorage.removeItem('shipperFormEditing');
+      sessionStorage.removeItem('shipperFormData');
+    },
+    onError: (err: any) => {
+      console.error('Erro ao salvar embarcador:', err);
+      // Let ShipperForm handle the error display
     }
-    const { data, error: fetchError } = await query.order('name');
-
-    if (fetchError) {
-      setError('Erro ao carregar embarcadores. Tente novamente.');
-    } else {
-      setShippers((data as ShipperRow[]).map(shipperFromRow));
-    }
-    setLoading(false);
-  }, [currentClient?.id]);
-
-  useEffect(() => {
-    fetchShippers();
-  }, [fetchShippers]);
+  });
 
   const handleSave = async (shipper: Partial<Shipper>): Promise<void> => {
-    if (!currentClient?.id) return;
-    const row = shipperToRow(shipper, currentClient.id);
-
-    if (editingShipper) {
-      const { error: updateError } = await supabase
-        .from('shippers')
-        .update(row)
-        .eq('id', editingShipper.id);
-      if (updateError) throw updateError;
-    } else {
-      const { error: insertError } = await supabase
-        .from('shippers')
-        .insert(row);
-      if (insertError) throw insertError;
-    }
-
-    await fetchShippers();
-    setIsFormOpen(false);
-    setEditingShipper(null);
-    sessionStorage.removeItem('shipperFormOpen');
-    sessionStorage.removeItem('shipperFormEditing');
-    sessionStorage.removeItem('shipperFormData');
+    await saveMutation.mutateAsync(shipper);
   };
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('shippers')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shippers', currentClient?.id] });
+    },
+    onError: (err: any) => {
+      if (err.code === '23503') {
+        alert('Este embarcador possui unidades operacionais vinculadas. Exclua as unidades antes de excluir o embarcador.');
+      } else {
+        alert('Erro ao excluir embarcador. Tente novamente.');
+      }
+    }
+  });
 
   const handleDelete = async (shipper: Shipper) => {
     if (!window.confirm(`Excluir o embarcador "${shipper.name}"? Esta ação não pode ser desfeita.`)) return;
-
-    const { error: deleteError } = await supabase
-      .from('shippers')
-      .delete()
-      .eq('id', shipper.id);
-
-    if (deleteError) {
-      if (deleteError.code === '23503') {
-        setError('Este embarcador possui unidades operacionais vinculadas. Exclua as unidades antes de excluir o embarcador.');
-      } else {
-        setError('Erro ao excluir embarcador. Tente novamente.');
-      }
-    } else {
-      await fetchShippers();
-    }
+    deleteMutation.mutate(shipper.id);
   };
 
-  const filteredShippers = shippers.filter((s) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      s.name.toLowerCase().includes(q) ||
-      (s.cnpj ?? '').includes(q.replace(/\D/g, ''))
-    );
-  });
+  const filteredShippers = useMemo(() => {
+    return shippers.filter((s) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        s.name.toLowerCase().includes(q) ||
+        (s.cnpj ?? '').includes(q.replace(/\D/g, ''))
+      );
+    });
+  }, [shippers, search]);
 
   return (
     <div className="space-y-6">
@@ -161,14 +172,14 @@ export default function Shippers() {
         />
       </div>
 
-      {error && (
+      {shippersError && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erro ao carregar embarcadores. Tente novamente.
         </div>
       )}
 
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        {loading ? (
+        {loadingShippers ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-blue-500" />
           </div>

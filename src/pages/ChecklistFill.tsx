@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, XCircle, MinusCircle, Camera, ChevronLeft, Loader2, Lock, AlertTriangle, Building2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -10,6 +10,7 @@ import CameraCapture from '../components/CameraCapture';
 import type { Checklist, ChecklistItem, ChecklistContext, ResponseStatus } from '../types';
 import { WORKSHOP_CONTEXTS } from '../types';
 import { cn } from '../lib/utils';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface ItemState {
   item: ChecklistItem;
@@ -31,173 +32,132 @@ export default function ChecklistFill() {
   const { checklistId } = useParams<{ checklistId: string }>();
   const { currentClient } = useAuth();
   const navigate = useNavigate();
-
-  const [checklist, setChecklist] = useState<Checklist | null>(null);
-  const [itemStates, setItemStates] = useState<ItemState[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const queryClient = useQueryClient();
 
   const [cameraItemIdx, setCameraItemIdx] = useState<number | null>(null);
-  const [templateName, setTemplateName] = useState('');
-  const [templateContext, setTemplateContext] = useState<ChecklistContext | null>(null);
-  // Workshop selection (for Entrada/Saída de Oficina)
-  const [workshops, setWorkshops] = useState<WorkshopOption[]>([]);
+  const [localItemChanges, setLocalItemChanges] = useState<Record<string, Partial<ItemState>>>({});
   const [selectedWorkshopId, setSelectedWorkshopId] = useState<string>('');
-  const [workshopSaved, setWorkshopSaved] = useState(false);
+  const [error, setError] = useState('');
 
+  // ── Queries ───────────────────────────────────────────────────────────────
+
+  const { data: checklist, isLoading: isLoadingChecklist } = useQuery({
+    queryKey: ['checklist', checklistId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('checklists')
+        .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context), workshops(name)')
+        .eq('id', checklistId)
+        .single();
+      if (error) throw error;
+      return checklistFromRow(data as ChecklistRow);
+    },
+    enabled: !!checklistId
+  });
+
+  const { data: items = [], isLoading: isLoadingItems } = useQuery({
+    queryKey: ['checklistItems', checklist?.templateId, checklist?.versionNumber],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('checklist_items')
+        .select('*')
+        .eq('template_id', checklist!.templateId)
+        .eq('version_number', checklist!.versionNumber)
+        .order('order_number');
+      if (error) throw error;
+      return (data ?? []).map(r => checklistItemFromRow(r as ChecklistItemRow));
+    },
+    enabled: !!checklist?.templateId
+  });
+
+  const { data: responses = [], isLoading: isLoadingResponses } = useQuery({
+    queryKey: ['checklistResponses', checklistId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('checklist_responses')
+        .select('*')
+        .eq('checklist_id', checklistId);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!checklistId
+  });
+
+  const templateContext = checklist?.templateContext as ChecklistContext | null;
   const needsWorkshop = templateContext !== null && WORKSHOP_CONTEXTS.includes(templateContext as typeof WORKSHOP_CONTEXTS[number]);
+  // Use workshop from checklist record or selected via local UI
+  const effectiveWorkshopId = checklist?.workshopId || selectedWorkshopId;
+  const workshopSaved = !!checklist?.workshopId;
   const workshopReady = !needsWorkshop || workshopSaved;
 
-  const fetchData = useCallback(async () => {
-    if (!checklistId) return;
-    setLoading(true);
+  const { data: workshops = [] } = useQuery({
+    queryKey: ['workshops', currentClient?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('workshops')
+        .select('id, name')
+        .eq('client_id', currentClient!.id)
+        .eq('active', true)
+        .order('name');
+      if (error) throw error;
+      return (data ?? []) as WorkshopOption[];
+    },
+    enabled: needsWorkshop && !!currentClient?.id
+  });
 
-    const { data: chkData } = await supabase
-      .from('checklists')
-      .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context), workshops(name)')
-      .eq('id', checklistId)
-      .single();
+  // ── Derived State ────────────────────────────────────────────────────────
 
-    if (!chkData) { setError('Checklist não encontrado.'); setLoading(false); return; }
+  const itemStates: ItemState[] = useMemo(() => {
+    const respMap = new Map(responses.map(r => [r.item_id, r]));
+    return items.map(item => {
+      const existing = respMap.get(item.id);
+      const local = localItemChanges[item.id] || {};
+      return {
+        item,
+        status: local.status !== undefined ? local.status : ((existing?.status as ResponseStatus) ?? null),
+        observation: local.observation !== undefined ? local.observation : ((existing?.observation as string) ?? ''),
+        photoUrl: local.photoUrl !== undefined ? local.photoUrl : ((existing?.photo_url as string) ?? ''),
+        photoFile: local.photoFile || null,
+        uploading: local.uploading || false,
+      };
+    });
+  }, [items, responses, localItemChanges]);
 
-    const chk = checklistFromRow(chkData as ChecklistRow);
-    setChecklist(chk);
-    setTemplateName(chkData.checklist_templates?.name ?? 'Checklist');
-    setTemplateContext((chkData.checklist_templates?.context as ChecklistContext) ?? null);
+  // ── Mutations ────────────────────────────────────────────────────────────
 
-    // If workshop already saved in record
-    if (chk.workshopId) {
-      setSelectedWorkshopId(chk.workshopId);
-      setWorkshopSaved(true);
+  const saveResponseMutation = useMutation({
+    mutationFn: async ({ itemId, status, observation, photoUrl }: { itemId: string; status: ResponseStatus; observation: string; photoUrl: string }) => {
+      const { error } = await supabase.from('checklist_responses').upsert({
+        checklist_id: checklistId,
+        item_id: itemId,
+        status,
+        observation: observation.trim() || null,
+        photo_url: photoUrl || null,
+        responded_at: new Date().toISOString(),
+      }, { onConflict: 'checklist_id,item_id' });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checklistResponses', checklistId] });
     }
+  });
 
-    // Fetch template config
-    const { data: tplData } = await supabase
-      .from('checklist_templates')
-      .select('context')
-      .eq('id', chk.templateId)
-      .single();
-    if (tplData) {
-      const ctx = tplData.context as ChecklistContext;
-      setTemplateContext(ctx);
-
-      // Load workshops if needed
-      if (WORKSHOP_CONTEXTS.includes(ctx as typeof WORKSHOP_CONTEXTS[number])) {
-        const { data: wsData } = await supabase
-          .from('workshops')
-          .select('id, name')
-          .eq('client_id', currentClient.id)
-          .eq('active', true)
-          .order('name');
-        setWorkshops((wsData ?? []) as WorkshopOption[]);
-      }
+  const confirmWorkshopMutation = useMutation({
+    mutationFn: async (workshopId: string) => {
+      const { error } = await supabase
+        .from('checklists')
+        .update({ workshop_id: workshopId })
+        .eq('id', checklistId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checklist', checklistId] });
     }
+  });
 
-    // Fetch items
-    const { data: itemsData } = await supabase
-      .from('checklist_items')
-      .select('*')
-      .eq('template_id', chk.templateId)
-      .eq('version_number', chk.versionNumber)
-      .order('order_number');
-
-    const items = (itemsData ?? []).map(r => checklistItemFromRow(r as ChecklistItemRow));
-
-    // Fetch existing responses
-    const { data: respData } = await supabase
-      .from('checklist_responses')
-      .select('*')
-      .eq('checklist_id', checklistId);
-
-    const respMap = new Map((respData ?? []).map((r: Record<string, unknown>) => [r.item_id as string, r]));
-
-    setItemStates(
-      items.map(item => {
-        const existing = respMap.get(item.id) as Record<string, unknown> | undefined;
-        return {
-          item,
-          status: (existing?.status as ResponseStatus) ?? null,
-          observation: (existing?.observation as string) ?? '',
-          photoUrl: (existing?.photo_url as string) ?? '',
-          photoFile: null,
-          uploading: false,
-        };
-      }),
-    );
-
-    setLoading(false);
-  }, [checklistId, currentClient.id]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  const handleWorkshopConfirm = async () => {
-    if (!selectedWorkshopId || !checklistId) return;
-    await supabase
-      .from('checklists')
-      .update({ workshop_id: selectedWorkshopId })
-      .eq('id', checklistId);
-    setWorkshopSaved(true);
-  };
-
-  const updateItemState = (idx: number, patch: Partial<ItemState>) => {
-    setItemStates(prev => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
-  };
-
-  const handleStatusChange = (idx: number, status: ResponseStatus) => {
-    updateItemState(idx, { status });
-    if (status !== 'issue') {
-      saveResponse(idx, status, itemStates[idx].observation, itemStates[idx].photoUrl);
-    }
-  };
-
-  const handlePhotoCapture = async (idx: number, file: File, lat?: number, lng?: number) => {
-    setCameraItemIdx(null);
-    updateItemState(idx, { photoFile: file, photoLat: lat, photoLng: lng, uploading: true });
-    try {
-      if (!checklist || !checklistId) return;
-      const url = await uploadChecklistPhoto(currentClient.id, checklistId, itemStates[idx].item.id, file);
-      updateItemState(idx, { photoUrl: url, uploading: false });
-    } catch (err) {
-      updateItemState(idx, { uploading: false });
-      console.error('Upload error:', err);
-    }
-  };
-
-  const saveResponse = async (idx: number, status: ResponseStatus, observation: string, photoUrl: string) => {
-    if (!checklistId) return;
-    const item = itemStates[idx].item;
-    await supabase.from('checklist_responses').upsert({
-      checklist_id: checklistId,
-      item_id: item.id,
-      status,
-      observation: observation.trim() || null,
-      photo_url: photoUrl || null,
-      responded_at: new Date().toISOString(),
-    }, { onConflict: 'checklist_id,item_id' });
-  };
-
-  const handleObservationBlur = (idx: number) => {
-    const s = itemStates[idx];
-    if (s.status) saveResponse(idx, s.status, s.observation, s.photoUrl);
-  };
-
-  const mandatoryAnswered = itemStates.filter(s => s.item.isMandatory).every(s => s.status !== null);
-  const totalAnswered = itemStates.filter(s => s.status !== null).length;
-  const progress = itemStates.length > 0 ? Math.round((totalAnswered / itemStates.length) * 100) : 0;
-
-  const handleFinish = async () => {
-    if (!checklist?.vehicleId) {
-      setError('Este checklist não está associado a um veículo. Cancele e inicie um novo.');
-      return;
-    }
-    setError('');
-    setSaving(true);
-    try {
-      const answeredItems = itemStates.filter(s => s.status !== null);
-      for (const s of answeredItems) {
-        await saveResponse(itemStates.indexOf(s), s.status!, s.observation, s.photoUrl);
-      }
+  const finishChecklistMutation = useMutation({
+    mutationFn: async () => {
+      if (!checklist?.vehicleId) throw new Error('Este checklist não está associado a um veículo.');
 
       const completedAt = new Date().toISOString();
       const { error: chkErr } = await supabase
@@ -206,44 +166,100 @@ export default function ChecklistFill() {
         .eq('id', checklistId);
       if (chkErr) throw chkErr;
 
-      // Auto-concluir agendamento de oficina (best-effort)
-      const resolvedWorkshopId = selectedWorkshopId || checklist?.workshopId;
-      if (templateContext === 'Entrada em Oficina' && resolvedWorkshopId && checklist?.vehicleId) {
-        try {
-          const { data: matchingSchedule } = await supabase
-            .from('workshop_schedules')
-            .select('id')
-            .eq('vehicle_id', checklist.vehicleId)
-            .eq('workshop_id', resolvedWorkshopId)
-            .eq('status', 'scheduled')
-            .order('scheduled_date', { ascending: true })
-            .limit(1)
-            .maybeSingle();
+      // Auto-concluir agendamento de oficina
+      if (templateContext === 'Entrada em Oficina' && checklist.workshopId && checklist.vehicleId) {
+        const { data: matchingSchedule } = await supabase
+          .from('workshop_schedules')
+          .select('id')
+          .eq('vehicle_id', checklist.vehicleId)
+          .eq('workshop_id', checklist.workshopId)
+          .eq('status', 'scheduled')
+          .order('scheduled_date', { ascending: true })
+          .limit(1)
+          .maybeSingle();
 
-          if (matchingSchedule) {
-            await supabase
-              .from('workshop_schedules')
-              .update({
-                status: 'completed',
-                completed_at: completedAt,
-                checklist_id: checklistId,
-              })
-              .eq('id', matchingSchedule.id);
-          }
-        } catch {
-          // Não bloqueia a conclusão do checklist
+        if (matchingSchedule) {
+          await supabase
+            .from('workshop_schedules')
+            .update({
+              status: 'completed',
+              completed_at: completedAt,
+              checklist_id: checklistId,
+            })
+            .eq('id', matchingSchedule.id);
         }
       }
-
+    },
+    onSuccess: () => {
       navigate('/checklists');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erro ao finalizar checklist');
-    } finally {
-      setSaving(false);
+    },
+    onError: (err: Error) => {
+      setError(err.message);
+    }
+  });
+
+  // ── Actions ─────────────────────────────────────────────────────────────
+
+  const updateItemLocal = (itemId: string, patch: Partial<ItemState>) => {
+    setLocalItemChanges(prev => ({
+      ...prev,
+      [itemId]: { ...prev[itemId], ...patch }
+    }));
+  };
+
+  const handleStatusChange = (idx: number, status: ResponseStatus) => {
+    const item = itemStates[idx];
+    updateItemLocal(item.item.id, { status });
+    if (status !== 'issue') {
+      saveResponseMutation.mutate({
+        itemId: item.item.id,
+        status,
+        observation: item.observation,
+        photoUrl: item.photoUrl
+      });
     }
   };
 
-  if (loading) {
+  const handlePhotoCapture = async (idx: number, file: File, lat?: number, lng?: number) => {
+    const itemId = itemStates[idx].item.id;
+    setCameraItemIdx(null);
+    updateItemLocal(itemId, { photoFile: file, photoLat: lat, photoLng: lng, uploading: true });
+    try {
+      const url = await uploadChecklistPhoto(currentClient!.id, checklistId!, itemId, file);
+      updateItemLocal(itemId, { photoUrl: url, uploading: false });
+      
+      const currentState = itemStates[idx];
+      saveResponseMutation.mutate({
+        itemId,
+        status: currentState.status!,
+        observation: currentState.observation,
+        photoUrl: url
+      });
+    } catch (err) {
+      updateItemLocal(itemId, { uploading: false });
+      console.error('Upload error:', err);
+    }
+  };
+
+  const handleObservationBlur = (idx: number) => {
+    const s = itemStates[idx];
+    if (s.status) {
+      saveResponseMutation.mutate({
+        itemId: s.item.id,
+        status: s.status,
+        observation: s.observation,
+        photoUrl: s.photoUrl
+      });
+    }
+  };
+
+  const mandatoryAnswered = itemStates.filter(s => s.item.isMandatory).every(s => s.status !== null);
+  const totalAnswered = itemStates.filter(s => s.status !== null).length;
+  const progress = itemStates.length > 0 ? Math.round((totalAnswered / itemStates.length) * 100) : 0;
+
+  const isLoading = isLoadingChecklist || isLoadingItems || isLoadingResponses;
+
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
@@ -272,7 +288,7 @@ export default function ChecklistFill() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-zinc-900 truncate">
                 {templateContext && <span className="text-orange-500">{templateContext} · </span>}
-                {templateName}
+                {checklist?.templateName}
               </p>
               {checklist?.vehicleLicensePlate && (
                 <p className="text-xs text-zinc-500">{checklist.vehicleLicensePlate}</p>
@@ -311,7 +327,7 @@ export default function ChecklistFill() {
                 </select>
                 <button
                   disabled={!selectedWorkshopId}
-                  onClick={handleWorkshopConfirm}
+                  onClick={() => confirmWorkshopMutation.mutate(selectedWorkshopId)}
                   className="w-full py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 disabled:opacity-40"
                 >
                   Confirmar oficina
@@ -383,7 +399,7 @@ export default function ChecklistFill() {
                 <div className="space-y-2">
                   <textarea
                     value={s.observation}
-                    onChange={e => updateItemState(idx, { observation: e.target.value })}
+                    onChange={e => updateItemLocal(s.item.id, { observation: e.target.value })}
                     onBlur={() => handleObservationBlur(idx)}
                     placeholder="Descreva o problema observado..."
                     rows={2}
@@ -437,12 +453,12 @@ export default function ChecklistFill() {
             <p className="text-xs text-amber-600 text-center">Responda todos os itens obrigatórios para finalizar</p>
           )}
           <button
-            onClick={handleFinish}
-            disabled={!mandatoryAnswered || saving || !workshopReady}
+            onClick={() => finishChecklistMutation.mutate()}
+            disabled={!mandatoryAnswered || finishChecklistMutation.isPending || !workshopReady}
             className="w-full py-3 rounded-xl bg-orange-500 text-white font-semibold text-sm disabled:opacity-40 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
           >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            {saving ? 'Finalizando...' : 'Finalizar Checklist'}
+            {finishChecklistMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {finishChecklistMutation.isPending ? 'Finalizando...' : 'Finalizar Checklist'}
           </button>
         </div>
       </div>
