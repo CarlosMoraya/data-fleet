@@ -1,5 +1,47 @@
 import { MaintenanceOrder, MaintenanceStatus, MaintenanceType } from '../pages/Maintenance';
 
+export type BudgetStatus = 'sem_orcamento' | 'pendente' | 'aprovado' | 'reprovado';
+
+export interface BudgetItem {
+  id?: string;
+  maintenanceOrderId?: string;
+  clientId?: string;
+  itemName: string;
+  system: string;
+  quantity: number;
+  value: number;
+  sortOrder: number;
+}
+
+export interface MaintenanceBudgetItemRow {
+  id: string;
+  maintenance_order_id: string;
+  client_id: string;
+  item_name: string;
+  system: string | null;
+  quantity: number;
+  value: number;
+  sort_order: number;
+  created_at: string;
+}
+
+export function budgetItemFromRow(row: MaintenanceBudgetItemRow): BudgetItem {
+  return {
+    id: row.id,
+    maintenanceOrderId: row.maintenance_order_id,
+    clientId: row.client_id,
+    itemName: row.item_name,
+    system: row.system || '',
+    quantity: Number(row.quantity),
+    value: Number(row.value),
+    sortOrder: row.sort_order,
+  };
+}
+
+export function calcBudgetSubtotal(items: BudgetItem[]): number {
+  return items.reduce((sum, i) => sum + i.quantity * i.value, 0);
+}
+
 export interface MaintenanceOrderRow {
   id: string;
   client_id: string;
@@ -18,6 +60,11 @@ export interface MaintenanceOrderRow {
   created_by_id: string;
   notes: string | null;
   workshop_os_number: string | null;
+  current_km: number | null;
+  budget_pdf_url: string | null;
+  budget_status: BudgetStatus | null;
+  budget_reviewed_by: string | null;
+  budget_reviewed_at: string | null;
   created_at: string;
   updated_at: string;
 
@@ -25,6 +72,7 @@ export interface MaintenanceOrderRow {
   vehicles?: { license_plate: string };
   workshops?: { name: string };
   profiles?: { name: string };
+  budget_reviewer?: { name: string };
 }
 
 export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
@@ -36,7 +84,7 @@ export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
     vehicleId: row.vehicle_id,
     workshopId: row.workshop_id,
     entryDate: row.entry_date,
-    expectedExitDate: row.expected_exit_date || row.entry_date, 
+    expectedExitDate: row.expected_exit_date || row.entry_date,
     type: row.type,
     status: row.status,
     description: row.description || '',
@@ -47,5 +95,10 @@ export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
     createdAt: row.created_at,
     notes: row.notes || undefined,
     workshopOs: row.workshop_os_number || undefined,
+    currentKm: row.current_km !== null && row.current_km !== undefined ? Number(row.current_km) : undefined,
+    budgetPdfUrl: row.budget_pdf_url || undefined,
+    budgetStatus: row.budget_status || 'sem_orcamento',
+    budgetReviewedBy: row.budget_reviewer?.name || undefined,
+    budgetReviewedAt: row.budget_reviewed_at || undefined,
   };
 }

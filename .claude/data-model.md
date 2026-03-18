@@ -33,6 +33,7 @@ interface User {
   canDeleteVehicles: boolean;
   canDeleteDrivers: boolean;
   canDeleteWorkshops: boolean;
+  budgetApprovalLimit: number; // 0 = sem permissão de aprovação; > 0 = limite em R$
 }
 ```
 
@@ -142,6 +143,52 @@ interface OperationalUnit {
   active: boolean;
   createdAt?: string;
 }
+```
+
+### MaintenanceOrder (src/pages/Maintenance.tsx)
+```ts
+type MaintenanceStatus = 'Aguardando orçamento' | 'Aguardando aprovação' | 'Orçamento aprovado' | 'Serviço em execução' | 'Concluído';
+
+interface MaintenanceOrder {
+  id: string; os: string; vehicleId: string; workshopId: string;
+  licensePlate: string; workshop: string; entryDate: string;
+  expectedExitDate: string; type: 'Corretiva' | 'Preventiva' | 'Preditiva';
+  status: MaintenanceStatus; description: string; mechanicName: string;
+  estimatedCost: number; approvedCost?: number;
+  createdBy: string; createdAt: string; notes?: string;
+  workshopOs?: string;      // OS fornecida pela oficina (editável)
+  currentKm?: number;       // Km atual do veículo (auto-extraído do PDF ou manual)
+  budgetPdfUrl?: string;    // URL pública do PDF no Storage
+  budgetStatus?: BudgetStatus; // sem_orcamento | pendente | aprovado | reprovado
+  budgetReviewedBy?: string;   // nome do revisor (join)
+  budgetReviewedAt?: string;
+}
+```
+
+### BudgetItem / BudgetStatus (src/lib/maintenanceMappers.ts)
+```ts
+type BudgetStatus = 'sem_orcamento' | 'pendente' | 'aprovado' | 'reprovado';
+
+interface BudgetItem {
+  id?: string; maintenanceOrderId?: string; clientId?: string;
+  itemName: string; system: string;
+  quantity: number; value: number; // valor unitário (R$)
+  sortOrder: number;
+}
+
+function calcBudgetSubtotal(items: BudgetItem[]): number // sum(qty * value)
+```
+
+### Aprovação de Orçamentos — Regras de Permissão
+```ts
+const ALWAYS_APPROVE_ROLES = ['Coordinator', 'Director', 'Admin Master'];
+
+function canApprove(user: User, budgetTotal: number): boolean {
+  if (ALWAYS_APPROVE_ROLES.includes(user.role)) return true;
+  return user.budgetApprovalLimit > 0 && budgetTotal <= user.budgetApprovalLimit;
+}
+// budgetApprovalLimit = 0 → sem permissão de aprovação
+// Coordinator/Director/Admin Master → sempre podem aprovar (sem limite)
 ```
 
 ### VehicleFieldSettings
@@ -343,4 +390,8 @@ Tabelas de checklists (ativas):
 - `checklist_items` (`can_block_vehicle` BOOLEAN NOT NULL DEFAULT false — usado em contexto Segurança)
 - `checklists` (`workshop_id UUID NULL FK → workshops(id)` — preenchido nos contextos Entrada/Saída de Oficina; DELETE Admin Master only)
 - `checklist_responses` (status ok/issue/skipped/not_applicable; CASCADE)
+
+Tabelas de manutenção (ativas):
+- `maintenance_orders` (os_number auto-gerado, workshop_os_number editável, current_km, budget_pdf_url, budget_status, budget_reviewed_by/at; status CHECK inclui 'Aguardando aprovação')
+- `maintenance_budget_items` (item_name, system, quantity, value unitário R$, sort_order; RLS rank >= 3 + Admin Master; save: delete-then-insert)
 - `action_plans` (pending/in_progress/completed/cancelled; work_order_number; DELETE Admin Master only)

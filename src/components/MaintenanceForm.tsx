@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Wrench, Loader2 } from 'lucide-react';
+import { X, Wrench, Loader2, FileText, ExternalLink, AlertTriangle } from 'lucide-react';
 import { MaintenanceOrder, MaintenanceStatus, MaintenanceType } from '../pages/Maintenance';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import type { BudgetItem } from '../lib/maintenanceMappers';
+import { budgetItemFromRow, type MaintenanceBudgetItemRow } from '../lib/maintenanceMappers';
+import { validateFile } from '../lib/storageHelpers';
+import { extractBudgetData } from '../lib/budgetOcr';
+import BudgetItemsTable from './BudgetItemsTable';
 
 const inputClass =
   'mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 text-sm shadow-sm ' +
@@ -23,7 +28,7 @@ interface MaintenanceFormProps {
   order: MaintenanceOrder | null;
   prefill?: Partial<MaintenanceOrder>;
   onClose: () => void;
-  onSave: (order: Partial<MaintenanceOrder>) => Promise<void>;
+  onSave: (order: Partial<MaintenanceOrder>, budgetItems: BudgetItem[], budgetFile: File | null) => Promise<void>;
 }
 
 interface VehicleOption { id: string; licensePlate: string; }
@@ -48,6 +53,13 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
   const [workshops, setWorkshops] = useState<WorkshopOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
 
+  // Budget states
+  const [budgetFile, setBudgetFile] = useState<File | null>(null);
+  const [budgetItems, setBudgetItems] = useState<BudgetItem[]>([]);
+  const [extracting, setExtracting] = useState(false);
+  const [extractionWarning, setExtractionWarning] = useState<string | null>(null);
+  const [existingBudgetPdfUrl, setExistingBudgetPdfUrl] = useState<string | undefined>();
+
   // Inicializa dados
   useEffect(() => {
     const initial = order
@@ -61,6 +73,22 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
     setFormData(initial);
     sessionStorage.setItem('maintenanceFormData', JSON.stringify(initial));
   }, [order, prefill]);
+
+  // Carrega itens de orçamento existentes (modo edição)
+  useEffect(() => {
+    if (!order?.id) return;
+    setExistingBudgetPdfUrl(order.budgetPdfUrl);
+    supabase
+      .from('maintenance_budget_items')
+      .select('*')
+      .eq('maintenance_order_id', order.id)
+      .order('sort_order')
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setBudgetItems((data as MaintenanceBudgetItemRow[]).map(budgetItemFromRow));
+        }
+      });
+  }, [order?.id, order?.budgetPdfUrl]);
 
   // Carrega opções
   const fetchOptions = useCallback(async () => {
@@ -88,18 +116,46 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    
-    // Tratamento para inputs numéricos reais
     let parsedValue: string | number | undefined = value;
     if (type === 'number') {
       parsedValue = value ? Number(value) : undefined;
     }
-
     setFormData((prev) => {
       const next = { ...prev, [name]: parsedValue };
       sessionStorage.setItem('maintenanceFormData', JSON.stringify(next));
       return next;
     });
+  };
+
+  const handleBudgetUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setExtractionWarning(null);
+    try {
+      validateFile(file);
+    } catch (err: any) {
+      setExtractionWarning(err?.message ?? 'Arquivo inválido.');
+      return;
+    }
+    setBudgetFile(file);
+    setExtracting(true);
+    try {
+      const result = await extractBudgetData(file);
+      if (result.items.length > 0) setBudgetItems(result.items);
+      if (result.workshopOs) {
+        setFormData(prev => ({ ...prev, workshopOs: result.workshopOs }));
+      }
+      if (result.currentKm) {
+        setFormData(prev => ({ ...prev, currentKm: result.currentKm }));
+      }
+      if (result.warnings.length > 0) {
+        setExtractionWarning(result.warnings.join(' '));
+      }
+    } catch {
+      setExtractionWarning('Falha na extração automática. Preencha os itens manualmente.');
+    } finally {
+      setExtracting(false);
+    }
   };
 
   const handleClose = () => {
@@ -118,7 +174,7 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
     setSaving(true);
     setError(null);
     try {
-      await onSave(formData);
+      await onSave(formData, budgetItems, budgetFile);
       handleClose();
     } catch (err: any) {
       setError(err?.message ?? 'Erro ao salvar. Tente novamente.');
@@ -167,7 +223,7 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
                     value={formData.vehicleId ?? ''}
                     onChange={handleChange}
                     className={inputClass}
-                    disabled={!!order} // Desabilitar se for edição para não quebrar referências facilmente
+                    disabled={!!order}
                   >
                     <option value="">Selecione...</option>
                     {vehicles.map((v) => (
@@ -220,6 +276,7 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
                     className={inputClass}
                   >
                     <option value="Aguardando orçamento">Aguardando orçamento</option>
+                    <option value="Aguardando aprovação">Aguardando aprovação</option>
                     <option value="Orçamento aprovado">Orçamento aprovado</option>
                     <option value="Serviço em execução">Serviço em execução</option>
                     <option value="Concluído">Concluído</option>
@@ -252,30 +309,17 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
                   />
                 </div>
 
-                {/* Linha 6 */}
+                {/* Km atual */}
                 <div>
-                  <Label htmlFor="estimatedCost" required>Custo Estimado (R$)</Label>
+                  <Label htmlFor="currentKm">Km Atual do Veículo</Label>
                   <input
-                    id="estimatedCost"
-                    name="estimatedCost"
+                    id="currentKm"
+                    name="currentKm"
                     type="number"
-                    step="0.01"
                     min="0"
-                    required
-                    value={formData.estimatedCost ?? ''}
-                    onChange={handleChange}
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="approvedCost">Custo Aprovado (R$)</Label>
-                  <input
-                    id="approvedCost"
-                    name="approvedCost"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.approvedCost ?? ''}
+                    step="1"
+                    placeholder="Ex: 85000"
+                    value={formData.currentKm ?? ''}
                     onChange={handleChange}
                     className={inputClass}
                   />
@@ -302,6 +346,50 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
                     className={inputClass}
                   />
                 </div>
+              </div>
+
+              {/* Upload de orçamento + tabela de itens */}
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="budgetPdf">PDF do Orçamento (Opcional)</Label>
+                  <input
+                    id="budgetPdf"
+                    type="file"
+                    accept="application/pdf,image/*"
+                    onChange={handleBudgetUpload}
+                    className="mt-1 block w-full text-sm text-zinc-500 file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100 transition-colors cursor-pointer"
+                  />
+                  {existingBudgetPdfUrl && !budgetFile && (
+                    <a
+                      href={existingBudgetPdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                    >
+                      <FileText className="h-3 w-3" />
+                      Ver PDF atual
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {budgetFile && (
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Arquivo selecionado: {budgetFile.name}
+                    </p>
+                  )}
+                </div>
+
+                {extractionWarning && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span>{extractionWarning}</span>
+                  </div>
+                )}
+
+                <BudgetItemsTable
+                  items={budgetItems}
+                  onChange={setBudgetItems}
+                  extracting={extracting}
+                />
               </div>
 
               {/* Mecânico Responsável */}
@@ -368,7 +456,7 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
             <button
               type="submit"
               form="maintenance-form"
-              disabled={saving || loadingOptions}
+              disabled={saving || loadingOptions || extracting}
               className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center min-w-[120px]"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : (order ? 'Salvar Edição' : 'Criar Manutenção')}

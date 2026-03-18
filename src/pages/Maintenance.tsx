@@ -1,15 +1,16 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit } from 'lucide-react';
+import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink } from 'lucide-react';
 import { cn } from '../lib/utils';
 import MaintenanceDetailModal from '../components/MaintenanceDetailModal';
 import MaintenanceForm from '../components/MaintenanceForm';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import { maintenanceFromRow, MaintenanceOrderRow } from '../lib/maintenanceMappers';
+import { maintenanceFromRow, MaintenanceOrderRow, BudgetStatus, BudgetItem } from '../lib/maintenanceMappers';
+import { uploadMaintenanceBudget } from '../lib/storageHelpers';
 import { useAuth } from '../context/AuthContext';
 
-export type MaintenanceStatus = 'Aguardando orçamento' | 'Orçamento aprovado' | 'Serviço em execução' | 'Concluído';
+export type MaintenanceStatus = 'Aguardando orçamento' | 'Aguardando aprovação' | 'Orçamento aprovado' | 'Serviço em execução' | 'Concluído';
 export type MaintenanceType = 'Preventiva' | 'Preditiva' | 'Corretiva';
 
 export interface MaintenanceOrder {
@@ -31,19 +32,65 @@ export interface MaintenanceOrder {
   createdAt: string;
   notes?: string;
   workshopOs?: string;
+  currentKm?: number;
+  budgetPdfUrl?: string;
+  budgetStatus?: BudgetStatus;
+  budgetReviewedBy?: string;
+  budgetReviewedAt?: string;
 }
 
 type StatusFilter = MaintenanceStatus | 'all';
 
-const ALL_STATUSES: StatusFilter[] = ['all', 'Aguardando orçamento', 'Orçamento aprovado', 'Serviço em execução', 'Concluído'];
+const ALL_STATUSES: StatusFilter[] = [
+  'all',
+  'Aguardando orçamento',
+  'Aguardando aprovação',
+  'Orçamento aprovado',
+  'Serviço em execução',
+  'Concluído',
+];
 
 function statusColor(status: MaintenanceStatus) {
   switch (status) {
     case 'Aguardando orçamento': return 'bg-yellow-100 text-yellow-800';
+    case 'Aguardando aprovação': return 'bg-orange-100 text-orange-800';
     case 'Orçamento aprovado':   return 'bg-blue-100 text-blue-800';
-    case 'Serviço em execução':  return 'bg-orange-100 text-orange-800';
+    case 'Serviço em execução':  return 'bg-purple-100 text-purple-800';
     case 'Concluído':            return 'bg-green-100 text-green-800';
   }
+}
+
+function budgetStatusBadge(budgetStatus?: BudgetStatus, pdfUrl?: string) {
+  if (!budgetStatus || budgetStatus === 'sem_orcamento') return null;
+  const colors: Record<string, string> = {
+    pendente:  'bg-yellow-100 text-yellow-800',
+    aprovado:  'bg-green-100 text-green-800',
+    reprovado: 'bg-red-100 text-red-800',
+  };
+  const labels: Record<string, string> = {
+    pendente:  'Aguardando',
+    aprovado:  'Aprovado',
+    reprovado: 'Reprovado',
+  };
+  return (
+    <div className="flex items-center gap-1">
+      <span className={cn('inline-flex text-xs px-2 py-0.5 rounded-full font-medium', colors[budgetStatus] ?? 'bg-zinc-100 text-zinc-600')}>
+        {labels[budgetStatus] ?? budgetStatus}
+      </span>
+      {pdfUrl && (
+        <a
+          href={pdfUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          className="p-0.5 rounded text-zinc-400 hover:text-blue-600"
+          title="Ver PDF do orçamento"
+        >
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
+    </div>
+  );
 }
 
 function typeColor(type: MaintenanceType) {
@@ -70,7 +117,7 @@ export default function Maintenance() {
   const [activeTab, setActiveTab] = React.useState<StatusFilter>('all');
   const [search, setSearch] = React.useState('');
   const [selectedOrder, setSelectedOrder] = React.useState<MaintenanceOrder | null>(null);
-  
+
   const location = useLocation();
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [orderToEdit, setOrderToEdit] = React.useState<MaintenanceOrder | null>(null);
@@ -96,7 +143,8 @@ export default function Maintenance() {
           *,
           vehicles (license_plate),
           workshops (name),
-          profiles (name)
+          profiles!created_by_id (name),
+          budget_reviewer:profiles!budget_reviewed_by (name)
         `)
         .order('created_at', { ascending: false });
 
@@ -120,7 +168,15 @@ export default function Maintenance() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: async (data: Partial<MaintenanceOrder>) => {
+    mutationFn: async ({
+      data,
+      budgetItems,
+      budgetFile,
+    }: {
+      data: Partial<MaintenanceOrder>;
+      budgetItems: BudgetItem[];
+      budgetFile: File | null;
+    }) => {
       if (!currentClient || !profile) throw new Error('Sessão inválida');
 
       const commonFields: any = {
@@ -137,29 +193,69 @@ export default function Maintenance() {
         approved_cost: data.approvedCost || null,
         notes: data.notes || null,
         workshop_os_number: data.workshopOs || null,
+        current_km: data.currentKm || null,
       };
+
+      let orderId: string;
 
       if (data.id) {
         // UPDATE — os_number é imutável, nunca atualizar
         const { error } = await supabase.from('maintenance_orders').update(commonFields).eq('id', data.id);
         if (error) throw error;
+        orderId = data.id;
       } else {
-        // INSERT — sempre gerar OS Interna automaticamente
+        // INSERT — gerar OS Interna automaticamente
         const d = new Date();
         const yy = d.getFullYear().toString().slice(-2);
         const mm = (d.getMonth() + 1).toString().padStart(2, '0');
         const rand = Math.floor(1000 + Math.random() * 9000);
         const osNumber = `OS-${yy}${mm}-${rand}`;
-        const { error } = await supabase.from('maintenance_orders').insert([{
-          ...commonFields,
-          os_number: osNumber,
-          created_by_id: profile.id,
-        }]);
+        const { data: inserted, error } = await supabase
+          .from('maintenance_orders')
+          .insert([{ ...commonFields, os_number: osNumber, created_by_id: profile.id }])
+          .select('id')
+          .single();
         if (error) throw error;
+        orderId = inserted.id;
+      }
+
+      // Passo 2: se há PDF, fazer upload e atualizar campos de orçamento
+      if (budgetFile) {
+        const pdfUrl = await uploadMaintenanceBudget(currentClient.id, orderId, budgetFile);
+        const { error: updateErr } = await supabase
+          .from('maintenance_orders')
+          .update({
+            budget_pdf_url: pdfUrl,
+            budget_status: 'pendente',
+            status: 'Aguardando aprovação',
+          })
+          .eq('id', orderId);
+        if (updateErr) throw updateErr;
+      }
+
+      // Passo 3: substituir itens de orçamento
+      const hasSignificantItems = budgetItems.some(i => i.itemName.trim().length > 0);
+      if (hasSignificantItems || budgetFile) {
+        await supabase.from('maintenance_budget_items').delete().eq('maintenance_order_id', orderId);
+        const significantItems = budgetItems.filter(i => i.itemName.trim().length > 0);
+        if (significantItems.length > 0) {
+          const rows = significantItems.map((item, idx) => ({
+            maintenance_order_id: orderId,
+            client_id: currentClient.id,
+            item_name: item.itemName,
+            system: item.system || null,
+            quantity: item.quantity,
+            value: item.value,
+            sort_order: idx,
+          }));
+          const { error: insertErr } = await supabase.from('maintenance_budget_items').insert(rows);
+          if (insertErr) throw insertErr;
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
+      queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
       setIsFormOpen(false);
       setOrderToEdit(null);
     },
@@ -167,13 +263,14 @@ export default function Maintenance() {
 
   const counts = React.useMemo(() => {
     return {
-      all: orders.length,
-      'Aguardando orçamento': orders.filter(o => o.status === 'Aguardando orçamento').length,
-      'Orçamento aprovado':   orders.filter(o => o.status === 'Orçamento aprovado').length,
-      'Serviço em execução':  orders.filter(o => o.status === 'Serviço em execução').length,
-      'Concluído':            orders.filter(o => o.status === 'Concluído').length,
-      corretiva:              orders.filter(o => o.type === 'Corretiva').length,
-      preventiva:             orders.filter(o => o.type === 'Preventiva').length,
+      all:                      orders.length,
+      'Aguardando orçamento':   orders.filter(o => o.status === 'Aguardando orçamento').length,
+      'Aguardando aprovação':   orders.filter(o => o.status === 'Aguardando aprovação').length,
+      'Orçamento aprovado':     orders.filter(o => o.status === 'Orçamento aprovado').length,
+      'Serviço em execução':    orders.filter(o => o.status === 'Serviço em execução').length,
+      'Concluído':              orders.filter(o => o.status === 'Concluído').length,
+      corretiva:                orders.filter(o => o.type === 'Corretiva').length,
+      preventiva:               orders.filter(o => o.type === 'Preventiva').length,
     };
   }, [orders]);
 
@@ -201,7 +298,7 @@ export default function Maintenance() {
           </h1>
           <p className="text-sm text-zinc-500 mt-1">Acompanhe as ordens de serviço e o status dos veículos em manutenção</p>
         </div>
-        
+
         <button
           onClick={() => {
             setOrderToEdit(null);
@@ -237,22 +334,28 @@ export default function Maintenance() {
           <p className="text-xs text-zinc-500 mt-0.5">Aguardando Orçamento</p>
         </button>
         <button
+          onClick={() => setActiveTab('Aguardando aprovação')}
+          className={cn(
+            'rounded-2xl border p-4 text-left transition-colors hover:border-orange-300',
+            activeTab === 'Aguardando aprovação' ? 'border-orange-400 bg-orange-50' : 'border-zinc-200 bg-white',
+          )}
+        >
+          <p className="text-2xl font-bold text-orange-600">{counts['Aguardando aprovação']}</p>
+          <p className="text-xs text-zinc-500 mt-0.5">Ag. Aprovação</p>
+        </button>
+        <button
           onClick={() => setActiveTab('Serviço em execução')}
           className={cn(
             'rounded-2xl border p-4 text-left transition-colors hover:border-orange-300',
             activeTab === 'Serviço em execução' ? 'border-orange-400 bg-orange-50' : 'border-zinc-200 bg-white',
           )}
         >
-          <p className="text-2xl font-bold text-orange-600">{counts['Serviço em execução']}</p>
+          <p className="text-2xl font-bold text-purple-600">{counts['Serviço em execução']}</p>
           <p className="text-xs text-zinc-500 mt-0.5">Em Execução</p>
         </button>
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
           <p className="text-2xl font-bold text-red-600">{counts.corretiva}</p>
           <p className="text-xs text-zinc-500 mt-0.5">Total Corretiva</p>
-        </div>
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
-          <p className="text-2xl font-bold text-blue-600">{counts.preventiva}</p>
-          <p className="text-xs text-zinc-500 mt-0.5">Total Preventiva</p>
         </div>
       </div>
 
@@ -270,8 +373,8 @@ export default function Maintenance() {
               )}
             >
               {s === 'all' ? 'Todos' : s}
-              {counts[s] > 0 && (
-                <span className="ml-1.5 text-xs opacity-70">({counts[s]})</span>
+              {counts[s as keyof typeof counts] > 0 && (
+                <span className="ml-1.5 text-xs opacity-70">({counts[s as keyof typeof counts]})</span>
               )}
             </button>
           ))}
@@ -309,7 +412,7 @@ export default function Maintenance() {
             <table className="min-w-full divide-y divide-zinc-100">
               <thead>
                 <tr className="bg-zinc-50">
-                  {['OS', 'Placa', 'Oficina', 'Dias em Oficina', 'Previsão de Saída', 'Tipo', 'Status', ''].map(h => (
+                  {['OS', 'Placa', 'Oficina', 'Dias', 'Previsão de Saída', 'Tipo', 'Status', 'Orçamento', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">
                       {h}
                     </th>
@@ -327,7 +430,7 @@ export default function Maintenance() {
                       <td className="px-4 py-3 text-sm font-semibold text-zinc-900 whitespace-nowrap">
                         {o.licensePlate}
                       </td>
-                      <td className="px-4 py-3 text-sm text-zinc-600 max-w-[160px] truncate">
+                      <td className="px-4 py-3 text-sm text-zinc-600 max-w-[140px] truncate">
                         {o.workshop}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -352,6 +455,9 @@ export default function Maintenance() {
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
+                        {budgetStatusBadge(o.budgetStatus, o.budgetPdfUrl)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => setSelectedOrder(o)}
@@ -372,7 +478,6 @@ export default function Maintenance() {
                               <Edit className="h-4 w-4" />
                             </button>
                           )}
-
                           {o.status !== 'Concluído' && (
                             <button
                               onClick={(e) => handleComplete(o.id, e)}
@@ -409,7 +514,9 @@ export default function Maintenance() {
             setOrderToEdit(null);
             setPrefillData(undefined);
           }}
-          onSave={async (data) => saveMutation.mutateAsync(data)}
+          onSave={async (data, budgetItems, budgetFile) =>
+            saveMutation.mutateAsync({ data, budgetItems, budgetFile })
+          }
         />
       )}
     </div>

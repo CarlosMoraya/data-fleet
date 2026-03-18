@@ -27,6 +27,7 @@ import Cadastros from './pages/Cadastros';
 import Shippers from './pages/Shippers';
 import OperationalUnits from './pages/OperationalUnits';
 import WorkshopSchedules from './pages/WorkshopSchedules';
+import BudgetApprovals from './pages/BudgetApprovals';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -64,6 +65,7 @@ export default function App() {
               <Route path="acoes" element={<ActionPlans />} />
               <Route path="agendamentos" element={<WorkshopSchedules />} />
               <Route path="manutencao" element={<Maintenance />} />
+              <Route path="aprovacao-orcamentos" element={<BudgetApprovals />} />
               <Route path="settings" element={<Settings />} />
               <Route path="admin/clients" element={<AdminClients />} />
               <Route path="admin/users" element={<AdminUsers />} />

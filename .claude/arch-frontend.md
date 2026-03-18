@@ -27,7 +27,10 @@ src/
 │   ├── ChecklistTemplateForm.tsx # Modal 3-step: metadados (categoria + contexto) → ações → itens; nome auto-gerado como "Checklist [Categoria] [Contexto]"
 │   ├── ChecklistDetailModal.tsx  # Modal read-only com respostas, fotos, score de conformidade
 │   ├── ActionPlanModal.tsx       # Modal de gestão de ação (status, notas de conclusão, upload de evidência — imagem/PDF via uploadActionPlanEvidence)
-│   └── CameraCapture.tsx         # Captura de foto via câmera (getUserMedia + GPS + compressão)
+│   ├── CameraCapture.tsx         # Captura de foto via câmera (getUserMedia + GPS + compressão)
+│   ├── MaintenanceForm.tsx       # Formulário de OS (dual OS, upload PDF orçamento, extração OCR, BudgetItemsTable, Km Atual, sem Custo Estimado/Subtotal)
+│   ├── MaintenanceDetailModal.tsx # Modal read-only de OS (seção Orçamento: badge, PDF link, BudgetItemsTable readOnly)
+│   └── BudgetItemsTable.tsx      # Tabela editável/read-only de itens de orçamento (5 cols: Item, Sistema, Qtd, Valor, Total) + subtotal
 ├── context/
 │   └── AuthContext.tsx   # Auth + client context → useAuth() hook
 ├── lib/
@@ -41,7 +44,9 @@ src/
 │   ├── fieldSettingsMappers.ts  # Mapper + CONFIGURABLE_FIELDS + isFieldRequired() para Veículo
 │   ├── driverFieldSettingsMappers.ts  # Mapper + DRIVER_CONFIGURABLE_FIELDS + isDriverFieldRequired() para Motorista
 │   ├── inputHelpers.ts    # Filtros de input (filterCPF, filterCNHCategory, filterCNPJ, filterPhone, filterCEP, etc.)
-│   ├── storageHelpers.ts  # Upload/delete de arquivos (vehicle-documents e driver-documents), compressão de imagens
+│   ├── storageHelpers.ts  # Upload/delete de arquivos (vehicle-documents e driver-documents), compressão de imagens; inclui uploadMaintenanceBudget()
+│   ├── maintenanceMappers.ts # Mappers para MaintenanceOrder + BudgetItem; BudgetStatus type; calcBudgetSubtotal()
+│   ├── budgetOcr.ts       # Extração de dados de PDF de orçamento: regex tabular → fallback Gemini Vision (gemini-2.5-flash)
 │   ├── checklistTemplateMappers.ts # Mappers para ChecklistTemplate, ChecklistItem, ChecklistItemSuggestion
 │   ├── checklistMappers.ts         # Mappers para Checklist e ChecklistResponse
 │   ├── actionPlanMappers.ts        # Mappers + actionStatusLabel() + actionStatusColor() para ActionPlan
@@ -59,6 +64,9 @@ src/
 │   ├── ChecklistFill.tsx # Tela fullscreen de preenchimento (OK/Problema/N/A, câmera, observação, auto-save, finalização com ações). Contexto Entrada/Saída de Oficina: seleção obrigatória de oficina antes dos itens. Contexto Segurança: badge ⚠ em itens com canBlockVehicle
 │   ├── ChecklistTemplates.tsx # CRUD de templates (draft/published/deprecated, versionamento, filtro dual por categoria + contexto)
 │   ├── ActionPlans.tsx  # Painel Fleet Assistant+ — tabela de ações, filtros por status, modal de gestão
+│   ├── Maintenance.tsx  # CRUD de ordens de serviço — dual OS, saveMutation 3-etapas (INSERT/UPDATE → upload PDF → items), coluna Orçamento
+│   ├── WorkshopSchedules.tsx # Agendamentos de oficina — botão "Gerar OS" navega para /manutencao com prefill via state
+│   └── BudgetApprovals.tsx  # Aprovação de orçamentos (Fleet Assistant+) — fila FIFO, canApprove(user, total), expand por linha
 │   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+); **não cria/lista Driver role** (drivers criados via DriverForm)
 │   ├── Settings.tsx     # Configurações de campos obrigatórios: Veículo + Motorista (Manager+)
 │   ├── AdminUsers.tsx   # CRUD todos usuários (Admin Master only)
@@ -79,7 +87,7 @@ src/
   - Fleet Assistant+ → acesso a `/cadastros/*` (abas visíveis)
   - Manager+ → acesso a `/settings`
 - **Backward compatibility**: `/vehicles` → `/cadastros/veiculos`, `/drivers` → `/cadastros/motoristas`, `/users` → `/cadastros/usuarios`
-- **Rotas disponíveis**: `/`, `/cadastros/veiculos`, `/cadastros/embarcadores`, `/cadastros/unidades-operacionais`, `/cadastros/motoristas`, `/cadastros/oficinas`, `/cadastros/usuarios`, `/checklists`, `/checklists/preencher/:checklistId`, `/checklist-templates`, `/acoes`, `/settings`, `/admin/clients`, `/admin/users`
+- **Rotas disponíveis**: `/`, `/cadastros/veiculos`, `/cadastros/embarcadores`, `/cadastros/unidades-operacionais`, `/cadastros/motoristas`, `/cadastros/oficinas`, `/cadastros/usuarios`, `/checklists`, `/checklists/preencher/:checklistId`, `/checklist-templates`, `/acoes`, `/agendamentos`, `/manutencao`, `/aprovacao-orcamentos`, `/settings`, `/admin/clients`, `/admin/users`
 
 ## Layout Shell
 

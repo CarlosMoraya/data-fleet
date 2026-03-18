@@ -1,7 +1,11 @@
 import React from 'react';
-import { X, Wrench, Building2, Calendar, User, FileText, DollarSign, Clock } from 'lucide-react';
+import { X, Wrench, Building2, Calendar, User, FileText, DollarSign, Clock, ExternalLink, BadgeCheck } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
 import type { MaintenanceOrder } from '../pages/Maintenance';
+import { supabase } from '../lib/supabase';
+import BudgetItemsTable from './BudgetItemsTable';
+import { budgetItemFromRow, type MaintenanceBudgetItemRow } from '../lib/maintenanceMappers';
 
 interface Props {
   order: MaintenanceOrder;
@@ -10,10 +14,20 @@ interface Props {
 
 function statusColor(status: MaintenanceOrder['status']) {
   switch (status) {
-    case 'Aguardando orçamento': return 'bg-yellow-100 text-yellow-800';
-    case 'Orçamento aprovado':   return 'bg-blue-100 text-blue-800';
-    case 'Serviço em execução':  return 'bg-orange-100 text-orange-800';
-    case 'Concluído':            return 'bg-green-100 text-green-800';
+    case 'Aguardando orçamento':  return 'bg-yellow-100 text-yellow-800';
+    case 'Aguardando aprovação':  return 'bg-orange-100 text-orange-800';
+    case 'Orçamento aprovado':    return 'bg-blue-100 text-blue-800';
+    case 'Serviço em execução':   return 'bg-orange-100 text-orange-800';
+    case 'Concluído':             return 'bg-green-100 text-green-800';
+  }
+}
+
+function budgetStatusLabel(status: string) {
+  switch (status) {
+    case 'pendente':   return { label: 'Aguardando Aprovação', cls: 'bg-yellow-100 text-yellow-800' };
+    case 'aprovado':   return { label: 'Aprovado', cls: 'bg-green-100 text-green-800' };
+    case 'reprovado':  return { label: 'Reprovado', cls: 'bg-red-100 text-red-800' };
+    default:           return { label: 'Sem Orçamento', cls: 'bg-zinc-100 text-zinc-500' };
   }
 }
 
@@ -50,6 +64,22 @@ function Field({ label, value, className }: { label: string; value: React.ReactN
 
 export default function MaintenanceDetailModal({ order, onClose }: Props) {
   const days = daysInWorkshop(order.entryDate);
+
+  const hasBudget = order.budgetStatus && order.budgetStatus !== 'sem_orcamento';
+
+  const { data: budgetItems = [] } = useQuery({
+    queryKey: ['budgetItems', order.id],
+    enabled: !!hasBudget,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('maintenance_budget_items')
+        .select('*')
+        .eq('maintenance_order_id', order.id)
+        .order('sort_order');
+      if (error) throw error;
+      return (data as MaintenanceBudgetItemRow[]).map(budgetItemFromRow);
+    },
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -159,7 +189,55 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
             </div>
           </section>
 
-          {/* Seção 4 — Registro */}
+          {/* Seção 4 — Orçamento */}
+          {(hasBudget || order.budgetPdfUrl) && (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <BadgeCheck className="h-4 w-4 text-zinc-400" />
+                <h3 className="text-sm font-semibold text-zinc-600 uppercase tracking-wide">Orçamento</h3>
+              </div>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-4 bg-zinc-50 rounded-xl p-4">
+                  {order.budgetStatus && (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Status</span>
+                      <span className={cn(
+                        'self-start text-xs px-2 py-0.5 rounded-full font-medium',
+                        budgetStatusLabel(order.budgetStatus).cls
+                      )}>
+                        {budgetStatusLabel(order.budgetStatus).label}
+                      </span>
+                    </div>
+                  )}
+                  {order.budgetPdfUrl && (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide">PDF do Orçamento</span>
+                      <a
+                        href={order.budgetPdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700 font-medium"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Ver PDF
+                      </a>
+                    </div>
+                  )}
+                  {order.budgetReviewedBy && (
+                    <Field label="Revisado por" value={order.budgetReviewedBy} />
+                  )}
+                  {order.budgetReviewedAt && (
+                    <Field label="Revisado em" value={formatDate(order.budgetReviewedAt)} />
+                  )}
+                </div>
+                {budgetItems.length > 0 && (
+                  <BudgetItemsTable items={budgetItems} readOnly />
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* Seção 5 — Registro */}
           <section>
             <div className="flex items-center gap-2 mb-3">
               <User className="h-4 w-4 text-zinc-400" />

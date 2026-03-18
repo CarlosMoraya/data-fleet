@@ -124,6 +124,38 @@ export async function deleteVehicleDocument(crlvUrl: string): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Maintenance Budget PDF
+// Bucket: vehicle-documents (reutiliza bucket existente)
+// Path: {clientId}/maintenance/{orderId}/budget.{ext}
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Uploads a maintenance budget PDF or image to Supabase Storage.
+ * Images are compressed before upload. PDFs are sent as-is.
+ * Returns the public URL of the uploaded file.
+ */
+export async function uploadMaintenanceBudget(
+  clientId: string,
+  orderId: string,
+  file: File,
+): Promise<string> {
+  validateFile(file);
+
+  const prepared = await prepareFile(file);
+  const ext = prepared.type === 'application/pdf' ? 'pdf' : 'jpg';
+  const path = `${clientId}/maintenance/${orderId}/budget.${ext}`;
+
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, prepared, { upsert: true, contentType: prepared.type });
+
+  if (error) throw new Error(`Erro ao enviar orçamento: ${error.message}`);
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+// ─────────────────────────────────────────────────────────────
 // Driver Documents
 // Bucket: driver-documents
 // Mesma lógica de validação/compressão dos documentos de veículo

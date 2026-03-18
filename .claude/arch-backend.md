@@ -53,10 +53,27 @@
 - FK constraint: `shipper_id` com `ON DELETE RESTRICT` — não permite deletar embarcador com unidades vinculadas
 - Unique partial index: `(client_id, code)` WHERE code IS NOT NULL
 
+### Tabela `maintenance_orders` (nova — migration `20260319000000_add_budget_to_maintenance.sql`):
+- Colunas adicionadas: `current_km NUMERIC(10,0) NULL`, `budget_pdf_url TEXT NULL`, `budget_status VARCHAR(20) NOT NULL DEFAULT 'sem_orcamento' CHECK IN ('sem_orcamento','pendente','aprovado','reprovado')`, `budget_reviewed_by UUID NULL FK → profiles(id)`, `budget_reviewed_at TIMESTAMPTZ NULL`
+- `status` CHECK atualizado: `IN ('Aguardando orçamento','Aguardando aprovação','Orçamento aprovado','Serviço em execução','Concluído')`
+- RLS: (role_rank >= 3 AND client_id = ...) OR role = 'Admin Master' — **SEMPRE incluir Admin Master bypass**
+- Index: `idx_maintenance_budget_status ON (client_id, budget_status) WHERE budget_status = 'pendente'`
+
+### Tabela `maintenance_budget_items`:
+- Colunas: `id UUID PK`, `maintenance_order_id UUID FK → maintenance_orders CASCADE`, `client_id UUID FK → clients CASCADE`, `item_name TEXT NOT NULL`, `system TEXT NULL`, `quantity NUMERIC(10,2) DEFAULT 1`, `value NUMERIC(12,2) DEFAULT 0 (valor unitário R$)`, `sort_order INT DEFAULT 0`, `created_at TIMESTAMPTZ`
+- RLS: (role_rank >= 3 AND client_id = ...) OR role = 'Admin Master'
+- Padrão de save: DELETE todos WHERE maintenance_order_id = orderId → INSERT novos (delete-then-insert)
+
+### Storage — Orçamentos de Manutenção:
+- Bucket: `vehicle-documents` (reutilizado)
+- Path: `{clientId}/maintenance/{orderId}/budget.{ext}` (pdf ou jpg)
+- Função: `uploadMaintenanceBudget(clientId, orderId, file)` em `storageHelpers.ts`
+
 ### Migrations Ativas
 - `create_drivers_tables.sql` — tabelas `drivers` e `driver_field_settings`
 - `add_driver_profile_link.sql` — adiciona coluna `profile_id UUID UNIQUE FK → profiles(id)` + INDEX `idx_drivers_profile_id` na tabela `drivers` para ligar cada motorista a seu perfil de usuário do sistema (2026-03-14)
 - `create_shippers_and_operational_units.sql` — tabelas `shippers` e `operational_units` com RLS policies, FK columns em `vehicles` (2026-03-17)
+- `20260319000000_add_budget_to_maintenance.sql` — novas colunas em `maintenance_orders` (current_km, budget_pdf_url, budget_status, budget_reviewed_by/at), tabela `maintenance_budget_items` com RLS ⚠️ **Executar no Supabase Dashboard**
 
 ### RLS — Padrões de Checklists
 - `checklists` SELECT: Driver/Auditor vê os próprios; Fleet Assistant+ vê todo o tenant; Admin Master vê tudo
