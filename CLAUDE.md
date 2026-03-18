@@ -94,6 +94,20 @@ Para detalhes completos, consulte os módulos em `.claude/`.
         - Implementado `actual_exit_date` automático na conclusão da O.S.
         - Trigger `set_maintenance_updated_at` para auditoria de timestamps.
 
+- **Integração Agendamento → Manutenção (2026-03-18 - Tarde)**:
+    - **Fluxo semi-automatizado**: Botão "Gerar OS" (ícone `ClipboardList`) em WorkshopSchedules.tsx navega para `/manutencao` com dados pré-preenchidos via React Router `state`.
+    - **Dual OS System**:
+      - **OS Interna** (`os_number`): auto-gerada no INSERT via formato `OS-YYMM-XXXX`, **imutável** (nunca incluída em UPDATE).
+      - **OS da Oficina** (`workshop_os_number`): novo campo editável por Fleet Assistant+, armazena OS fornecida pela oficina.
+    - **Arquivos modificados**:
+      - `src/pages/Maintenance.tsx`: adicionado `useLocation` para ler `prefillMaintenance` do state; `saveMutation` separado INSERT/UPDATE logic; novo state `prefillData`; auto-abertura do form via `useEffect`.
+      - `src/components/MaintenanceForm.tsx`: novo prop `prefill`, inicialização mergeada com `...prefill`; substituição do campo OS único por dual fields (OS Interna read-only display + OS da Oficina editable input).
+      - `src/lib/maintenanceMappers.ts`: adicionado `workshop_os_number` a `MaintenanceOrderRow`; mapeamento no return `workshopOs: row.workshop_os_number || undefined`.
+      - `src/pages/WorkshopSchedules.tsx`: função `handleGenerateMaintenance()` com `navigate()` + state; botão no `ScheduleRow` visível apenas para Fleet Assistant+ (status !== 'cancelled').
+    - **Migration SQL**: `20260318110000_add_workshop_os_to_maintenance.sql` — adiciona coluna `workshop_os_number VARCHAR(100) NULL`.
+    - **MaintenanceOrder interface**: adicionado `workshopOs?: string` (opcional).
+    - **Bug Fix**: Maintenance.tsx desestruturava `profile` inválido de `useAuth()` — corrigido com alias `user: profile`.
+
 - **Estabilização de Testes E2E (Shippers/Units - 2026-03-18)**:
     - Resolvidos erros de **Strict Mode** no Playwright substituindo `getByText` por `getByRole('cell', ...).first()`.
     - Implementado handler global de **diálogos nativos** (`window.confirm`) para aceitar exclusões automaticamente.
