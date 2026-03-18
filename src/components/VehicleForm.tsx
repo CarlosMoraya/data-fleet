@@ -144,6 +144,18 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
       const checked = (e.target as HTMLInputElement).checked;
       setFormData(prev => ({ ...prev, [name]: checked }));
     } else if (name === 'driverId') {
+      // Valida se o motorista está na lista de disponíveis do cliente atual
+      // (a query em Vehicles.tsx já filtra por client_id)
+      if (value) {
+        const isCurrentDriver = vehicle?.driverId === value;
+        const isAvailable = availableDrivers.some(d => d.id === value);
+        // Permite manter o motorista atual ou selecionar um da lista de disponíveis do cliente
+        if (!isCurrentDriver && !isAvailable) {
+          setError('Este motorista não está disponível para este cliente.');
+          return;
+        }
+      }
+      setError(null);
       setFormData(prev => ({ ...prev, driverId: value || undefined }));
     } else if (name === 'shipperId') {
       setFormData(prev => ({ ...prev, shipperId: value || undefined, operationalUnitId: undefined }));
@@ -277,7 +289,15 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     } catch (err: unknown) {
       const pgError = err as { code?: string; message?: string };
       if (pgError?.code === '23505') {
-        setError('Esta placa já está cadastrada para este cliente.');
+        // Erro 23505 = unique violation — pode ser placa ou motorista deste cliente
+        const msg = pgError.message ?? '';
+        if (msg.includes('idx_vehicles_client_driver_unique') || msg.includes('driver_id')) {
+          setError('Este motorista já está vinculado a outro veículo neste cliente. Selecione um motorista diferente.');
+        } else if (msg.includes('license_plate')) {
+          setError('Esta placa já está cadastrada para este cliente.');
+        } else {
+          setError('Este valor já está cadastrado para este cliente. Verifique placa e motorista.');
+        }
       } else {
         setError((err as Error).message ?? 'Erro ao salvar veículo. Tente novamente.');
       }
@@ -739,7 +759,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                     {/* Motorista atual (pode não estar na lista de disponíveis se já estava associado) */}
                     {vehicle?.driverId && vehicle?.driverName && formData.driverId === vehicle.driverId && (
                       <option key={vehicle.driverId} value={vehicle.driverId}>
-                        {vehicle.driverName}
+                        {vehicle.driverName} (Atual)
                       </option>
                     )}
                     {availableDrivers

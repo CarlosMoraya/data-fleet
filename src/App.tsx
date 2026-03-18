@@ -24,6 +24,7 @@ import Settings from './pages/Settings';
 import Cadastros from './pages/Cadastros';
 import Shippers from './pages/Shippers';
 import OperationalUnits from './pages/OperationalUnits';
+import WorkshopSchedules from './pages/WorkshopSchedules';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="checklists/preencher/:checklistId" element={<ChecklistFill />} />
             <Route path="checklist-templates" element={<ChecklistTemplates />} />
             <Route path="acoes" element={<ActionPlans />} />
+            <Route path="agendamentos" element={<WorkshopSchedules />} />
             <Route path="manutencao" element={<Maintenance />} />
             <Route path="settings" element={<Settings />} />
             <Route path="admin/clients" element={<AdminClients />} />

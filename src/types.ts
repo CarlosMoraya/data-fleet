@@ -375,3 +375,29 @@ export interface VehicleFieldSettings {
   // Finalidade
   vehicleUsageOptional: boolean;
 }
+
+export type WorkshopScheduleStatus = 'scheduled' | 'completed' | 'cancelled';
+
+export interface WorkshopSchedule {
+  id: string;
+  clientId: string;
+  vehicleId: string;
+  vehicleLicensePlate?: string;       // from JOIN vehicles
+  workshopId: string;
+  workshopName?: string;              // from JOIN workshops
+  workshopAddressStreet?: string;
+  workshopAddressNumber?: string;
+  workshopAddressComplement?: string;
+  workshopAddressNeighborhood?: string;
+  workshopAddressCity?: string;
+  workshopAddressState?: string;
+  workshopAddressZip?: string;
+  scheduledDate: string;              // DATE as 'YYYY-MM-DD'
+  status: WorkshopScheduleStatus;
+  completedAt?: string;
+  checklistId?: string;
+  notes?: string;
+  createdBy: string;
+  createdByName?: string;             // from JOIN profiles
+  createdAt?: string;
+}

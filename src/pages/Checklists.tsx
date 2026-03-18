@@ -77,29 +77,37 @@ export default function Checklists() {
   const fetchData = useCallback(async () => {
     setLoading(true);
 
+    if (!currentClient?.id) {
+      setLoading(false);
+      return;
+    }
+
     if (isDriver) {
-      // Find driver record
+      // Find driver record by profile_id and current client
       const { data: driverRec } = await supabase
         .from('drivers')
-        .select('id')
+        .select('id, client_id')
         .eq('profile_id', user!.id)
-        .eq('client_id', currentClient.id)
+        .eq('client_id', currentClient!.id)
         .maybeSingle();
 
       if (driverRec) {
+        // Get vehicle associated with this driver
         const { data: vehicleData } = await supabase
           .from('vehicles')
           .select('id, license_plate, category')
           .eq('driver_id', driverRec.id)
+          .eq('client_id', driverRec.client_id)
           .maybeSingle();
+
         if (vehicleData) {
           setVehicleInfo({ id: vehicleData.id, plate: vehicleData.license_plate, category: vehicleData.category });
           if (vehicleData.category) {
-            // Load ALL published templates for this category
+            // Load ALL published templates for this category (excluding Audit context)
             const { data: tplData } = await supabase
               .from('checklist_templates')
               .select('*')
-              .eq('client_id', currentClient.id)
+              .eq('client_id', currentClient!.id)
               .eq('vehicle_category', vehicleData.category)
               .eq('status', 'published')
               .neq('context', 'Auditoria')
@@ -192,6 +200,10 @@ export default function Checklists() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const startChecklist = async (template: ChecklistTemplate, vehicleId?: string) => {
+    if (!vehicleId) {
+      console.error('Tentativa de iniciar checklist sem veículo associado.');
+      return;
+    }
     setStarting(template.id);
     try {
       const { data, error } = await supabase

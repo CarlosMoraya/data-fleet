@@ -30,13 +30,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (data && !error) {
       const profile = data as any;
-      const rawClient = Array.isArray(profile.clients)
-        ? profile.clients[0]
-        : profile.clients;
-
-      const client: Client = rawClient
-        ? { id: rawClient.id, name: rawClient.name, logoUrl: rawClient.logo_url ?? undefined }
-        : rawClient;
 
       setUser({
         id: profile.id,
@@ -49,7 +42,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         canDeleteWorkshops: profile.can_delete_workshops ?? false,
         budgetApprovalLimit: profile.budget_approval_limit ?? 0,
       });
-      setCurrentClient(client ?? null);
+
+      // Se há client_id no profile, busca os dados do cliente
+      if (profile.client_id) {
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('id, name, logo_url')
+          .eq('id', profile.client_id)
+          .single();
+
+        if (clientData) {
+          setCurrentClient({
+            id: clientData.id,
+            name: clientData.name,
+            logoUrl: clientData.logo_url ?? undefined,
+          });
+        }
+      } else {
+        setCurrentClient(null);
+      }
 
       if (['Admin Master', 'Director', 'Manager', 'Coordinator'].includes(profile.role)) {
         const { data: clients } = await supabase.from('clients').select('id, name, logo_url');

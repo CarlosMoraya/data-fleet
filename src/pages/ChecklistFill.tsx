@@ -187,6 +187,10 @@ export default function ChecklistFill() {
   const progress = itemStates.length > 0 ? Math.round((totalAnswered / itemStates.length) * 100) : 0;
 
   const handleFinish = async () => {
+    if (!checklist?.vehicleId) {
+      setError('Este checklist não está associado a um veículo. Cancele e inicie um novo.');
+      return;
+    }
     setError('');
     setSaving(true);
     try {
@@ -195,11 +199,41 @@ export default function ChecklistFill() {
         await saveResponse(itemStates.indexOf(s), s.status!, s.observation, s.photoUrl);
       }
 
+      const completedAt = new Date().toISOString();
       const { error: chkErr } = await supabase
         .from('checklists')
-        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .update({ status: 'completed', completed_at: completedAt })
         .eq('id', checklistId);
       if (chkErr) throw chkErr;
+
+      // Auto-concluir agendamento de oficina (best-effort)
+      const resolvedWorkshopId = selectedWorkshopId || checklist?.workshopId;
+      if (templateContext === 'Entrada em Oficina' && resolvedWorkshopId && checklist?.vehicleId) {
+        try {
+          const { data: matchingSchedule } = await supabase
+            .from('workshop_schedules')
+            .select('id')
+            .eq('vehicle_id', checklist.vehicleId)
+            .eq('workshop_id', resolvedWorkshopId)
+            .eq('status', 'scheduled')
+            .order('scheduled_date', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          if (matchingSchedule) {
+            await supabase
+              .from('workshop_schedules')
+              .update({
+                status: 'completed',
+                completed_at: completedAt,
+                checklist_id: checklistId,
+              })
+              .eq('id', matchingSchedule.id);
+          }
+        } catch {
+          // Não bloqueia a conclusão do checklist
+        }
+      }
 
       navigate('/checklists');
     } catch (err: unknown) {

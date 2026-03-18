@@ -150,10 +150,19 @@ export default function Vehicles() {
   }, [fetchVehicles, fetchFieldSettings, fetchAvailableShippersAndUnits]);
 
   useEffect(() => {
+    // Recarrega drivers sempre que o modal abre, para garantir lista atualizada
     if (isFormOpen) {
       fetchAvailableDrivers(editingVehicle?.driverId);
     }
   }, [isFormOpen, editingVehicle?.driverId, fetchAvailableDrivers]);
+
+  // Recarrega lista de drivers disponíveis após salvar um veículo
+  useEffect(() => {
+    if (!isFormOpen && availableDrivers.length > 0) {
+      // Se o modal fechou após save, recarregar drivers para sincronizar
+      fetchAvailableDrivers();
+    }
+  }, [isFormOpen]);
 
   const handleSave = async (
     vehicle: Partial<Vehicle>,

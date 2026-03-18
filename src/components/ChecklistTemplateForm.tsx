@@ -5,8 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import {
   templateToRow,
   checklistItemToRow,
+  checklistItemFromRow,
   suggestionFromRow,
   type SuggestionRow,
+  type ChecklistItemRow,
 } from '../lib/checklistTemplateMappers';
 import type { ChecklistTemplate, ChecklistItem, ChecklistItemSuggestion, TemplateCategory, ChecklistContext } from '../types';
 import { cn } from '../lib/utils';
@@ -92,17 +94,20 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
         .order('order_number');
       if (data) {
         setItems(
-          (data as ChecklistItem[]).map((item, idx) => ({
-            id: item.id,
-            title: item.title,
-            description: item.description ?? '',
-            isMandatory: item.isMandatory,
-            requirePhotoIfIssue: item.requirePhotoIfIssue,
-            canBlockVehicle: item.canBlockVehicle ?? false,
-            defaultAction: item.defaultAction ?? '',
-            orderNumber: idx,
-            enabled: true,
-          })),
+          (data as ChecklistItemRow[]).map((row, idx) => {
+            const item = checklistItemFromRow(row);
+            return {
+              id: item.id,
+              title: item.title,
+              description: item.description ?? '',
+              isMandatory: item.isMandatory,
+              requirePhotoIfIssue: item.requirePhotoIfIssue,
+              canBlockVehicle: item.canBlockVehicle ?? false,
+              defaultAction: item.defaultAction ?? '',
+              orderNumber: idx,
+              enabled: true,
+            };
+          }),
         );
       }
     })();
@@ -236,7 +241,12 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
       }
       onSaved();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erro ao salvar template');
+      console.error('Erro ao salvar template:', err);
+      const msg = err instanceof Error
+        ? err.message
+        : (err as Record<string, unknown>)?.message as string | undefined
+          ?? 'Erro ao salvar template';
+      setError(msg);
     } finally {
       setSaving(false);
     }

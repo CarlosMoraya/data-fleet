@@ -211,7 +211,10 @@ export default function ActionPlans() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-zinc-600">
-                      {p.responsibleName ?? <span className="italic text-zinc-400">—</span>}
+                      <div>{p.responsibleName ?? <span className="italic text-zinc-400">—</span>}</div>
+                      {p.claimedByName && (
+                        <div className="text-xs text-zinc-400">Assumido: {p.claimedByName}</div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-zinc-600">
                       {formatDueDate(p.dueDate)}
