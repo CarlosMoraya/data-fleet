@@ -191,6 +191,9 @@ export default function ChecklistFill() {
       }
     },
     onSuccess: () => {
+      // Remove o checklist aberto do cache imediatamente para evitar flash
+      queryClient.setQueriesData({ queryKey: ['openChecklist'] }, null);
+      queryClient.invalidateQueries({ queryKey: ['checklists'] });
       navigate('/checklists');
     },
     onError: (err: Error) => {

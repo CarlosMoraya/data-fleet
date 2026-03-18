@@ -98,33 +98,75 @@ function DriverView() {
   const { user, currentClient } = useAuth();
   const queryClient = useQueryClient();
   const [showHistory, setShowHistory] = useState(false);
+  const [diagnosticError, setDiagnosticError] = useState<string | null>(null);
 
-  const { data: driverVehicle } = useQuery({
+  // Guard: se não tem currentClient, não pode proceder
+  if (!currentClient?.id) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Agendamentos</h1>
+          <p className="text-sm text-zinc-500 mt-1">Seus próximos agendamentos de oficina.</p>
+        </div>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 py-16 text-center">
+          <CalendarClock className="h-10 w-10 text-zinc-300 mb-3" />
+          <p className="text-sm font-medium text-zinc-500">Dados de cliente não carregados</p>
+          <p className="text-xs text-zinc-400 mt-1">Seu perfil de motorista não está associado a nenhum cliente. Contate o administrador.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const { data: driverVehicle, isLoading: loadingVehicle } = useQuery({
     queryKey: ['driverVehicle', user?.id, currentClient?.id],
     queryFn: async () => {
-      // Resolve veículo do motorista via profile_id → driver → vehicle
-      const { data: driverRec } = await supabase
-        .from('drivers')
-        .select('id, client_id')
-        .eq('profile_id', user!.id)
-        .eq('client_id', currentClient!.id)
-        .maybeSingle();
+      try {
+        // Resolve veículo do motorista via profile_id → driver → vehicle
+        const { data: driverRec, error: driverError } = await supabase
+          .from('drivers')
+          .select('id, client_id')
+          .eq('profile_id', user!.id)
+          .eq('client_id', currentClient!.id)
+          .maybeSingle();
 
-      if (!driverRec) return null;
+        if (driverError) {
+          setDiagnosticError(`Erro ao buscar motorista: ${driverError.message}`);
+          return null;
+        }
 
-      const { data: vehicleData } = await supabase
-        .from('vehicles')
-        .select('id')
-        .eq('driver_id', driverRec.id)
-        .eq('client_id', driverRec.client_id)
-        .maybeSingle();
+        if (!driverRec) {
+          setDiagnosticError('Você não está cadastrado como motorista no sistema.');
+          return null;
+        }
 
-      return vehicleData?.id ?? null;
+        const { data: vehicleData, error: vehicleError } = await supabase
+          .from('vehicles')
+          .select('id')
+          .eq('driver_id', driverRec.id)
+          .eq('client_id', driverRec.client_id)
+          .maybeSingle();
+
+        if (vehicleError) {
+          setDiagnosticError(`Erro ao buscar veículo: ${vehicleError.message}`);
+          return null;
+        }
+
+        if (!vehicleData) {
+          setDiagnosticError('Nenhum veículo está associado ao seu perfil de motorista.');
+          return null;
+        }
+
+        setDiagnosticError(null);
+        return vehicleData.id;
+      } catch (err) {
+        setDiagnosticError('Erro inesperado ao carregar dados.');
+        return null;
+      }
     },
     enabled: !!user?.id && !!currentClient?.id
   });
 
-  const { data: schedules = [], isLoading } = useQuery({
+  const { data: schedules = [], isLoading: loadingSchedules } = useQuery({
     queryKey: ['workshopSchedules', driverVehicle],
     queryFn: async () => {
       const { data } = await supabase
@@ -140,10 +182,29 @@ function DriverView() {
     enabled: !!driverVehicle
   });
 
+  const isLoading = loadingVehicle || loadingSchedules;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
+  // Se há erro diagnóstico, mostra mensagem
+  if (diagnosticError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Agendamentos</h1>
+          <p className="text-sm text-zinc-500 mt-1">Seus próximos agendamentos de oficina.</p>
+        </div>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-amber-300 bg-amber-50 py-16 text-center">
+          <CalendarClock className="h-10 w-10 text-amber-300 mb-3" />
+          <p className="text-sm font-medium text-amber-900">{diagnosticError}</p>
+          <p className="text-xs text-amber-700 mt-1">Recarregue a página ou contate o administrador se o problema persistir.</p>
+        </div>
       </div>
     );
   }
