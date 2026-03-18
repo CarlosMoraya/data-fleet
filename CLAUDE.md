@@ -127,3 +127,10 @@ Para detalhes completos, consulte os módulos em `.claude/`.
       6. Editar: OS Interna mostra valor real read-only; `input[name="workshopOs"]` tem o valor salvo.
       7. Fluxo manual: "+ Nova Manutenção" também exibe OS Interna read-only.
     - **Padrão**: `sessionStorage.clear()` removido (causava `SecurityError` em Playwright serial tests); `goto` antes de `evaluate` quando necessário.
+
+- **Auditoria de RLS — Admin Master Access (2026-03-18)**:
+    - **Investigação exaustiva**: Analisadas **19 tabelas** em todas as migrations e `schema.sql` para verificar suporte correto a Admin Master.
+    - **Problema identificado**: `maintenance_orders` usava políticas que requeriam `role_rank >= 3 AND client_id = (SELECT client_id FROM profiles WHERE id = auth.uid())` SEM exceção para Admin Master, bloqueando-o 100%.
+    - **Solução**: Criada migration `fix_maintenance_orders_admin_master_rls.sql` recriando as 4 policies (SELECT, INSERT, UPDATE, DELETE) com padrão `(... role_rank(...) AND client_id = ...) OR role = 'Admin Master'`.
+    - **Resultado final**: ✓ Todas as 19 tabelas agora suportam Admin Master corretamente. Nenhuma outra tabela afetada.
+    - **Padrão para futuro**: Ao criar novas tabelas com RLS baseada em `client_id`, SEMPRE adicionar `OR role = 'Admin Master'` (sem restrição de tenant) em TODAS as policies.
