@@ -21,6 +21,7 @@ function Label({ htmlFor, required, children }: { htmlFor?: string; required?: b
 
 interface MaintenanceFormProps {
   order: MaintenanceOrder | null;
+  prefill?: Partial<MaintenanceOrder>;
   onClose: () => void;
   onSave: (order: Partial<MaintenanceOrder>) => Promise<void>;
 }
@@ -28,7 +29,7 @@ interface MaintenanceFormProps {
 interface VehicleOption { id: string; licensePlate: string; }
 interface WorkshopOption { id: string; name: string; }
 
-export default function MaintenanceForm({ order, onClose, onSave }: MaintenanceFormProps) {
+export default function MaintenanceForm({ order, prefill, onClose, onSave }: MaintenanceFormProps) {
   const { currentClient } = useAuth();
 
   const [formData, setFormData] = useState<Partial<MaintenanceOrder>>(() => {
@@ -49,14 +50,17 @@ export default function MaintenanceForm({ order, onClose, onSave }: MaintenanceF
 
   // Inicializa dados
   useEffect(() => {
-    const initial = order ? { ...order } : {
-      type: 'Preventiva' as MaintenanceType,
-      status: 'Aguardando orçamento' as MaintenanceStatus,
-      estimatedCost: 0,
-    };
+    const initial = order
+      ? { ...order }
+      : {
+          type: 'Preventiva' as MaintenanceType,
+          status: 'Aguardando orçamento' as MaintenanceStatus,
+          estimatedCost: 0,
+          ...prefill,
+        };
     setFormData(initial);
     sessionStorage.setItem('maintenanceFormData', JSON.stringify(initial));
-  }, [order]);
+  }, [order, prefill]);
 
   // Carrega opções
   const fetchOptions = useCallback(async () => {
@@ -278,32 +282,40 @@ export default function MaintenanceForm({ order, onClose, onSave }: MaintenanceF
                 </div>
               </div>
 
-              {/* O.S. e Mecânico Responsável */}
+              {/* OS Interna (read-only) e OS da Oficina */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="os">Número da OS (Opcional gerado auto.)</Label>
-                  <input
-                    id="os"
-                    name="os"
-                    type="text"
-                    placeholder="Deixe em branco p/ gerar automático"
-                    value={formData.os ?? ''}
-                    onChange={handleChange}
-                    className={inputClass}
-                  />
+                  <Label>OS Interna</Label>
+                  <div className="mt-1 flex h-9 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm font-mono text-zinc-500 select-all cursor-default">
+                    {order?.os ?? 'Será gerada automaticamente'}
+                  </div>
                 </div>
                 <div>
-                  <Label htmlFor="mechanicName">Mecânico / Técnico (Opcional)</Label>
+                  <Label htmlFor="workshopOs">OS da Oficina (Opcional)</Label>
                   <input
-                    id="mechanicName"
-                    name="mechanicName"
+                    id="workshopOs"
+                    name="workshopOs"
                     type="text"
-                    value={formData.mechanicName ?? ''}
+                    placeholder="Número da OS fornecido pela oficina"
+                    value={formData.workshopOs ?? ''}
                     onChange={handleChange}
                     className={inputClass}
-                    placeholder="Nome do responsável"
                   />
                 </div>
+              </div>
+
+              {/* Mecânico Responsável */}
+              <div>
+                <Label htmlFor="mechanicName">Mecânico / Técnico (Opcional)</Label>
+                <input
+                  id="mechanicName"
+                  name="mechanicName"
+                  type="text"
+                  value={formData.mechanicName ?? ''}
+                  onChange={handleChange}
+                  className={inputClass}
+                  placeholder="Nome do responsável"
+                />
               </div>
 
               {/* Problema / Descrição */}

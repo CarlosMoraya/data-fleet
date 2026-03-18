@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit } from 'lucide-react';
 import { cn } from '../lib/utils';
 import MaintenanceDetailModal from '../components/MaintenanceDetailModal';
@@ -29,6 +30,7 @@ export interface MaintenanceOrder {
   createdBy: string;
   createdAt: string;
   notes?: string;
+  workshopOs?: string;
 }
 
 type StatusFilter = MaintenanceStatus | 'all';
@@ -63,14 +65,27 @@ function formatDate(iso: string) {
 }
 
 export default function Maintenance() {
-  const { currentClient, profile } = useAuth();
+  const { currentClient, user: profile } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = React.useState<StatusFilter>('all');
   const [search, setSearch] = React.useState('');
   const [selectedOrder, setSelectedOrder] = React.useState<MaintenanceOrder | null>(null);
   
+  const location = useLocation();
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [orderToEdit, setOrderToEdit] = React.useState<MaintenanceOrder | null>(null);
+  const [prefillData, setPrefillData] = React.useState<Partial<MaintenanceOrder> | undefined>(
+    () => (location.state as any)?.prefillMaintenance ?? undefined
+  );
+
+  // Abrir form automaticamente se vier do fluxo agendamento → manutenção
+  React.useEffect(() => {
+    if (prefillData) {
+      setOrderToEdit(null);
+      setIsFormOpen(true);
+      window.history.replaceState({}, document.title);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['maintenanceOrders', currentClient?.id],
@@ -108,17 +123,7 @@ export default function Maintenance() {
     mutationFn: async (data: Partial<MaintenanceOrder>) => {
       if (!currentClient || !profile) throw new Error('Sessão inválida');
 
-      let osNumber = data.os;
-      if (!osNumber) {
-        // Format OS-YYMM-XXXX
-        const d = new Date();
-        const yy = d.getFullYear().toString().slice(-2);
-        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
-        const rand = Math.floor(1000 + Math.random() * 9000);
-        osNumber = `OS-${yy}${mm}-${rand}`;
-      }
-
-      const payload: any = {
+      const commonFields: any = {
         client_id: currentClient.id,
         vehicle_id: data.vehicleId,
         workshop_id: data.workshopId,
@@ -131,15 +136,25 @@ export default function Maintenance() {
         estimated_cost: data.estimatedCost || 0,
         approved_cost: data.approvedCost || null,
         notes: data.notes || null,
-        os_number: osNumber,
+        workshop_os_number: data.workshopOs || null,
       };
 
       if (data.id) {
-        const { error } = await supabase.from('maintenance_orders').update(payload).eq('id', data.id);
+        // UPDATE — os_number é imutável, nunca atualizar
+        const { error } = await supabase.from('maintenance_orders').update(commonFields).eq('id', data.id);
         if (error) throw error;
       } else {
-        payload.created_by_id = profile.id;
-        const { error } = await supabase.from('maintenance_orders').insert([payload]);
+        // INSERT — sempre gerar OS Interna automaticamente
+        const d = new Date();
+        const yy = d.getFullYear().toString().slice(-2);
+        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+        const rand = Math.floor(1000 + Math.random() * 9000);
+        const osNumber = `OS-${yy}${mm}-${rand}`;
+        const { error } = await supabase.from('maintenance_orders').insert([{
+          ...commonFields,
+          os_number: osNumber,
+          created_by_id: profile.id,
+        }]);
         if (error) throw error;
       }
     },
@@ -388,9 +403,11 @@ export default function Maintenance() {
       {isFormOpen && (
         <MaintenanceForm
           order={orderToEdit}
+          prefill={prefillData}
           onClose={() => {
             setIsFormOpen(false);
             setOrderToEdit(null);
+            setPrefillData(undefined);
           }}
           onSave={async (data) => saveMutation.mutateAsync(data)}
         />

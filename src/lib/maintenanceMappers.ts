@@ -17,9 +17,10 @@ export interface MaintenanceOrderRow {
   approved_cost: number | null;
   created_by_id: string;
   notes: string | null;
+  workshop_os_number: string | null;
   created_at: string;
   updated_at: string;
-  
+
   // Joins
   vehicles?: { license_plate: string };
   workshops?: { name: string };
@@ -45,5 +46,6 @@ export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
     createdBy: row.profiles?.name || 'Desconhecido',
     createdAt: row.created_at,
     notes: row.notes || undefined,
+    workshopOs: row.workshop_os_number || undefined,
   };
 }

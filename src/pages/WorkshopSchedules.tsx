@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import {
   CalendarClock,
   MapPin,
@@ -12,6 +12,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -245,6 +246,22 @@ const DriverScheduleCard: React.FC<{ schedule: WorkshopSchedule; dimmed?: boolea
 function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isAssistantPlus: boolean }) {
   const { user, currentClient } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const handleGenerateMaintenance = (schedule: WorkshopSchedule) => {
+    navigate('/manutencao', {
+      state: {
+        prefillMaintenance: {
+          vehicleId: schedule.vehicleId,
+          workshopId: schedule.workshopId,
+          entryDate: schedule.scheduledDate,
+          type: 'Preventiva',
+          status: 'Aguardando orçamento',
+          estimatedCost: 0,
+        },
+      },
+    });
+  };
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -456,6 +473,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
                   onComplete={() => updateStatusMutation.mutate({ id: s.id, status: 'completed', completedAt: new Date().toISOString() })}
                   onCancel={() => updateStatusMutation.mutate({ id: s.id, status: 'cancelled' })}
                   onDelete={() => deleteMutation.mutate(s.id)}
+                  onGenerateMaintenance={() => handleGenerateMaintenance(s)}
                 />
               ))}
             </tbody>
@@ -491,7 +509,8 @@ const ScheduleRow: React.FC<{
   onComplete: () => void;
   onCancel: () => void;
   onDelete: () => void;
-}> = ({ schedule, canDelete, isAssistantPlus, onEdit, onComplete, onCancel, onDelete }) => {
+  onGenerateMaintenance: () => void;
+}> = ({ schedule, canDelete, isAssistantPlus, onEdit, onComplete, onCancel, onDelete, onGenerateMaintenance }) => {
   const isScheduled = schedule.status === 'scheduled';
   const address = formatWorkshopAddress(schedule);
   const mapsUrl = buildGoogleMapsUrl(schedule);
@@ -553,6 +572,15 @@ const ScheduleRow: React.FC<{
                 <XCircle className="h-4 w-4" />
               </button>
             </>
+          )}
+          {isAssistantPlus && schedule.status !== 'cancelled' && (
+            <button
+              onClick={onGenerateMaintenance}
+              title="Gerar OS de Manutenção"
+              className="rounded-lg p-1.5 text-zinc-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+            >
+              <ClipboardList className="h-4 w-4" />
+            </button>
           )}
           {canDelete && !isScheduled && (
             <button
