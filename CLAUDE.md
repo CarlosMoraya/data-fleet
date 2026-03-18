@@ -172,3 +172,32 @@ Para detalhes completos, consulte os módulos em `.claude/`.
     - Lógica de salvamento: após criação via Edge Function, faz `.update()` em `profiles` com o `budget_approval_limit`
   - **Validação Manual**: ✅ Testado como Alexandre (Manager) — campo aparece, salva corretamente, e persiste no banco
   - **Pronto para consumo**: Valor disponível para o módulo de Manutenção/Orçamentos quando implementado
+
+- **Novos Perfis: Coordinator e Supervisor (2026-03-17)**:
+  - **Contexto**: Criar dois novos perfis como espelhos de Manager (rank 5) e Fleet Analyst (rank 4) para maior flexibilidade no modelo de permissões
+  - **Backend**:
+    - Adicionado CHECK constraint em `profiles.role` incluindo 'Supervisor' e 'Coordinator' via `add_supervisor_coordinator_roles.sql`
+    - Role Hierarchy: Driver(1) < Yard Auditor(2) < Fleet Assistant(3) < Fleet Analyst(4)=Supervisor(4) < Manager(5)=Coordinator(5) < Director(6) < Admin Master(7)
+    - Coordinator tem exatamente as mesmas permissões de Manager; Supervisor tem as mesmas de Fleet Analyst
+  - **Frontend - Role Arrays Atualizadas** (8 arquivos):
+    - `Cadastros.tsx`: Todas as abas agora incluem Supervisor/Coordinator na lista de roles
+    - `Users.tsx` (CAN_MANAGE): Agora inclui Supervisor/Coordinator
+    - `Vehicles.tsx`: ROLES_WITH_ACCESS, ROLES_CAN_CREATE, ROLES_CAN_EDIT, ROLES_CAN_ALWAYS_DELETE
+    - `Drivers.tsx`: Mesmos arrays, mais lógica `canDelete` com Supervisor
+    - `Workshops.tsx`: ROLES_CAN_DELETE com Supervisor
+    - `Shippers.tsx`, `OperationalUnits.tsx`: Mesmos arrays
+    - `Checklists.tsx`: isAssistantPlus, isAnalystPlus incluem Supervisor/Coordinator apropriadamente
+    - `ChecklistTemplates.tsx`: isManager incluído Coordinator
+    - `ActionPlanModal.tsx`: ROLE_RANK com Supervisor(4) e Coordinator(5)
+  - **E2E Audit Suite** (`e2e/new-roles-audit.spec.ts`):
+    - 37 testes totais (18 Coordinator + 18 Supervisor + setup)
+    - Testes de autenticação, sidebar, navegação, acesso a todas as 8 seções de Cadastros, Checklists, Plano de Ação, Manutenção, Templates, Configurações
+    - Validação crítica: Coordinator acessa Settings (Manager+), Supervisor é bloqueado (correto)
+    - Validação de hierarquia: Coordinator pode criar até Fleet Assistant, Supervisor até Yard Auditor
+    - 100% de aprovação (37/37 testes passando)
+  - **Bug Fixes Realizados**:
+    - BUG-001: CHECK constraint não incluía novos roles → Edge Function 422 ao criar usuário
+    - BUG-002: Coordinator redirecionado para /checklists em /cadastros (ROLES_WITH_ACCESS faltava em Cadastros.tsx)
+    - BUG-003: Coordinator redirecionado para / em /cadastros/usuarios (CAN_MANAGE em Users.tsx faltava)
+    - BUG-004: 8 páginas com role arrays hardcoded sem Supervisor/Coordinator
+  - **Validação**: ✅ 100% de sucesso — Coordinator (Robson) e Supervisor (Pereira) funcionam como espelhos perfeitos de Manager e Fleet Analyst
