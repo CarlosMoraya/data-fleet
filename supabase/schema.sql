@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   name       TEXT NOT NULL,
   role       TEXT NOT NULL CHECK (role IN (
                'Driver', 'Yard Auditor', 'Fleet Assistant',
-               'Fleet Analyst', 'Manager', 'Director', 'Admin Master'
+               'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'
              )),
   client_id  UUID NOT NULL REFERENCES public.clients(id),
   created_at TIMESTAMPTZ DEFAULT NOW()

@@ -43,7 +43,7 @@ export default function ChecklistTemplates() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const isManager = ['Manager', 'Director', 'Admin Master'].includes(user?.role ?? '');
+  const isManager = ['Manager', 'Coordinator', 'Director', 'Admin Master'].includes(user?.role ?? '');
   const isAdminMaster = user?.role === 'Admin Master';
   const canCreate = isManager;
 

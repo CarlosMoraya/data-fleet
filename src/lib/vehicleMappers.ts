@@ -58,6 +58,7 @@ export interface VehicleRow {
   insurance_policy_upload: string | null;
   has_maintenance_contract: boolean;
   maintenance_contract_upload: string | null;
+  vehicle_usage: string | null;
 }
 
 /** Converte row do Supabase (snake_case) para interface Vehicle (camelCase) */
@@ -116,6 +117,7 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
     insurancePolicyUpload: row.insurance_policy_upload ?? undefined,
     hasMaintenanceContract: row.has_maintenance_contract ?? false,
     maintenanceContractUpload: row.maintenance_contract_upload ?? undefined,
+    vehicleUsage: row.vehicle_usage as Vehicle['vehicleUsage'] ?? undefined,
   };
 }
 
@@ -171,5 +173,6 @@ export function vehicleToRow(vehicle: Partial<Vehicle>, clientId: string): Omit<
     insurance_policy_upload: vehicle.insurancePolicyUpload ?? null,
     has_maintenance_contract: vehicle.hasMaintenanceContract ?? false,
     maintenance_contract_upload: vehicle.maintenanceContractUpload ?? null,
+    vehicle_usage: vehicle.vehicleUsage ?? null,
   };
 }

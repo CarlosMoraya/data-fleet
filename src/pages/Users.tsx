@@ -496,7 +496,7 @@ function EditUserModal({
 
 // ─── Página principal ──────────────────────────────────────────────────────
 
-const CAN_MANAGE: Role[] = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
+const CAN_MANAGE: Role[] = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 
 export default function Users() {
   const { user, currentClient } = useAuth();

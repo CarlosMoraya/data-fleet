@@ -10,10 +10,10 @@ import { driverFromRow, driverToRow, DriverRow } from '../lib/driverMappers';
 import { uploadDriverDocument, deleteDriverDocument } from '../lib/storageHelpers';
 import { driverFieldSettingsFromRow, defaultDriverFieldSettings, DriverFieldSettingsRow } from '../lib/driverFieldSettingsMappers';
 
-const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
-const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
-const ROLES_CAN_EDIT = ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
-const ROLES_CAN_ALWAYS_DELETE = ['Manager', 'Director', 'Admin Master'];
+const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_EDIT = ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_ALWAYS_DELETE = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 
 function formatCPF(cpf: string): string {
   const digits = cpf.replace(/\D/g, '');
@@ -45,7 +45,7 @@ export default function Drivers() {
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
-  const canDelete = ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') || (user?.role === 'Fleet Analyst' && user?.canDeleteDrivers === true);
+  const canDelete = ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') || ((user?.role === 'Fleet Analyst' || user?.role === 'Supervisor') && user?.canDeleteDrivers === true);
 
   // Redirect Drivers and Yard Auditors
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {

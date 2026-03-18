@@ -7,36 +7,36 @@ const TABS = [
   {
     name: 'Veículos',
     to: '/cadastros/veiculos',
-    roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'],
+    roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'],
   },
   {
     name: 'Motoristas',
     to: '/cadastros/motoristas',
-    roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'],
+    roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'],
   },
   {
     name: 'Oficinas',
     to: '/cadastros/oficinas',
-    roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'],
+    roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'],
   },
   {
     name: 'Embarcadores',
     to: '/cadastros/embarcadores',
-    roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'],
+    roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'],
   },
   {
     name: 'Unid. Operacionais',
     to: '/cadastros/unidades-operacionais',
-    roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'],
+    roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'],
   },
   {
     name: 'Usuários',
     to: '/cadastros/usuarios',
-    roles: ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'],
+    roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'],
   },
 ];
 
-const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
+const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 
 export default function Cadastros() {
   const { user } = useAuth();

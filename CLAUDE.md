@@ -138,6 +138,8 @@ Para detalhes completos, consulte os módulos em `.claude/`.
 
 - **Campo Exercício CRLV (2026-03-16)**: Adicionado campo `crlvYear` (ano do exercício do CRLV) em `VehicleForm.tsx`, `Vehicle` interface, `VehicleRow` e `vehicleMappers`. Coluna `crlv_year` adicionada à tabela `vehicles` no Supabase. Storage de uploads já utiliza `upsert: true` para garantir sobrescrita de arquivos anteriores (eliminando "lixo" do bucket).
 
+- **Campo Finalidade do Veículo (2026-03-17)**: Adicionado campo `vehicleUsage` no `VehicleForm.tsx` (select com opções: Operação, Uso Administrativo, Uso por Lideranças, Outros). Coluna `vehicle_usage TEXT` com CHECK constraint adicionada à tabela `vehicles`. Coluna `vehicle_usage_optional BOOLEAN` adicionada à tabela `vehicle_field_settings`. Mapeamento completo em `vehicleMappers.ts` e `fieldSettingsMappers.ts`. Campo configurável como obrigatório/opcional via Settings (seção "Propriedade & Rastreamento"). Migration: `add_vehicle_usage.sql`.
+
 - **Embarcadores + Unidades Operacionais (2026-03-17)**:
   - **Backend**: Criada migration `create_shippers_and_operational_units.sql` (110 linhas) com 2 novas tabelas:
     - `shippers` (id, client_id, name, cnpj unique per client, phone, email, contact_person, notes, active, created_at) com RLS (Fleet Assistant+ read/write, Manager+ delete)
@@ -158,3 +160,15 @@ Para detalhes completos, consulte os módulos em `.claude/`.
   - **Testes E2E**: `shippers-operational-units.spec.ts` com 16 test cases validando CRUD com 3 perfis (Pedro/Mariana/Alexandre), cascading dropdown, FK RESTRICT
   - **Validação Manual**: ✅ 100% passed — todos os 16 cenários de teste manual validados com sucesso, dados deixados no DB para testes futuros
   - **Auto-Sync**: Atualizados `arch-frontend.md`, `arch-backend.md`, `data-model.md`, `testing.md`
+
+- **Limite de Aprovação de Orçamentos (2026-03-17)**:
+  - **Backend**: Nova coluna `budget_approval_limit NUMERIC` em `profiles` (default 0) via migration `add_budget_approval_limit.sql`
+  - **Frontend - Types**: Campo `budgetApprovalLimit: number` adicionado à interface `User` em `types.ts`
+  - **Frontend - Users.tsx**:
+    - Interface `UserRow` atualizada com `budget_approval_limit`
+    - Campo numérico (input type="number", min=0, step=0.01) em `CreateUserModal` e `EditUserModal`
+    - Campo visível apenas para Manager+ (CAN_MANAGE_PERMISSIONS)
+    - Fetch query atualizada para incluir `budget_approval_limit`
+    - Lógica de salvamento: após criação via Edge Function, faz `.update()` em `profiles` com o `budget_approval_limit`
+  - **Validação Manual**: ✅ Testado como Alexandre (Manager) — campo aparece, salva corretamente, e persiste no banco
+  - **Pronto para consumo**: Valor disponível para o módulo de Manutenção/Orçamentos quando implementado

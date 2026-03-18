@@ -23,8 +23,8 @@ export default function Checklists() {
   const isDriver = user?.role === 'Driver';
   const isAuditor = user?.role === 'Yard Auditor';
   const isDriverOrAuditor = isDriver || isAuditor;
-  const isAssistantPlus = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'].includes(user?.role ?? '');
-  const isAnalystPlus = ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'].includes(user?.role ?? '');
+  const isAssistantPlus = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'].includes(user?.role ?? '');
+  const isAnalystPlus = ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'].includes(user?.role ?? '');
   const isAdminMaster = user?.role === 'Admin Master';
 
   // Driver state

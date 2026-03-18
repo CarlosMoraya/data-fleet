@@ -8,10 +8,10 @@ import WorkshopDetailModal from '../components/WorkshopDetailModal';
 import { supabase } from '../lib/supabase';
 import { workshopFromRow, workshopToRow, formatCNPJ, WorkshopRow } from '../lib/workshopMappers';
 
-const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
-const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
-const ROLES_CAN_EDIT = ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
-const ROLES_CAN_ALWAYS_DELETE = ['Manager', 'Director', 'Admin Master'];
+const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_EDIT = ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_ALWAYS_DELETE = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 
 function formatPhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -48,7 +48,7 @@ export default function Workshops() {
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
   const canDelete =
     ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') ||
-    (user?.role === 'Fleet Analyst' && user?.canDeleteWorkshops === true);
+    ((user?.role === 'Fleet Analyst' || user?.role === 'Supervisor') && user?.canDeleteWorkshops === true);
 
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
     return <Navigate to="/checklists" replace />;

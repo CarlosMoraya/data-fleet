@@ -7,10 +7,10 @@ import OperationalUnitForm from '../components/OperationalUnitForm';
 import { supabase } from '../lib/supabase';
 import { operationalUnitFromRow, operationalUnitToRow, OperationalUnitRow } from '../lib/operationalUnitMappers';
 
-const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
-const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
-const ROLES_CAN_EDIT = ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
-const ROLES_CAN_DELETE = ['Manager', 'Director', 'Admin Master'];
+const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_EDIT = ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_DELETE = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 
 interface AvailableShipper {
   id: string;

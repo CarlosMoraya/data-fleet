@@ -4,6 +4,17 @@
 -- Coordinator espelha todas as permissões de Manager
 -- ============================================================
 
+-- ─── 0. Atualizar CHECK constraint em profiles.role ────────
+
+ALTER TABLE public.profiles
+  DROP CONSTRAINT IF EXISTS profiles_role_check;
+
+ALTER TABLE public.profiles
+  ADD CONSTRAINT profiles_role_check CHECK (role IN (
+    'Driver', 'Yard Auditor', 'Fleet Assistant',
+    'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'
+  ));
+
 -- ─── 1. Atualizar a função role_rank() ─────────────────────
 
 CREATE OR REPLACE FUNCTION public.role_rank(role_name TEXT) RETURNS INT AS $$

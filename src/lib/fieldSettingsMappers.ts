@@ -34,6 +34,7 @@ export interface VehicleFieldSettingsRow {
   cooling_first_revision_deadline_optional: boolean;
   insurance_policy_upload_optional: boolean;
   maintenance_contract_upload_optional: boolean;
+  vehicle_usage_optional: boolean;
 }
 
 /** snake_case → camelCase */
@@ -71,6 +72,7 @@ export function fieldSettingsFromRow(row: VehicleFieldSettingsRow): VehicleField
     coolingFirstRevisionDeadlineOptional: row.cooling_first_revision_deadline_optional,
     insurancePolicyUploadOptional: row.insurance_policy_upload_optional,
     maintenanceContractUploadOptional: row.maintenance_contract_upload_optional,
+    vehicleUsageOptional: row.vehicle_usage_optional,
   };
 }
 
@@ -111,6 +113,7 @@ export function fieldSettingsToRow(
     cooling_first_revision_deadline_optional: settings.coolingFirstRevisionDeadlineOptional,
     insurance_policy_upload_optional: settings.insurancePolicyUploadOptional,
     maintenance_contract_upload_optional: settings.maintenanceContractUploadOptional,
+    vehicle_usage_optional: settings.vehicleUsageOptional,
   };
 }
 
@@ -149,6 +152,7 @@ export function defaultFieldSettings(clientId: string): VehicleFieldSettings {
     coolingFirstRevisionDeadlineOptional: false,
     insurancePolicyUploadOptional: false,
     maintenanceContractUploadOptional: false,
+    vehicleUsageOptional: false,
   };
 }
 
@@ -184,6 +188,7 @@ const FIELD_TO_SETTING: Record<string, keyof VehicleFieldSettings> = {
   coolingFirstRevisionDeadline: 'coolingFirstRevisionDeadlineOptional',
   insurancePolicyUpload: 'insurancePolicyUploadOptional',
   maintenanceContractUpload: 'maintenanceContractUploadOptional',
+  vehicleUsage: 'vehicleUsageOptional',
 };
 
 /** Retorna true se o campo é obrigatório. Campos não mapeados são sempre obrigatórios. */
@@ -232,4 +237,6 @@ export const CONFIGURABLE_FIELDS: { key: keyof VehicleFieldSettings; label: stri
   // Seguro & Contrato
   { key: 'insurancePolicyUploadOptional', label: 'Apólice de Seguro', section: 'Seguro & Contrato', note: 'Quando Veículo possui seguro = Sim' },
   { key: 'maintenanceContractUploadOptional', label: 'Contrato de Manutenção', section: 'Seguro & Contrato', note: 'Quando Veículo possui contrato = Sim' },
+  // Finalidade
+  { key: 'vehicleUsageOptional', label: 'Finalidade do Veículo', section: 'Propriedade & Rastreamento' },
 ];

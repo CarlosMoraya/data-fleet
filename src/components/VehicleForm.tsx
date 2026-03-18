@@ -157,7 +157,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
         // seleciona o primeiro tipo da nova categoria.
         if (newCategory && CATEGORY_TYPES_MAP[newCategory]) {
           const allowedTypes = CATEGORY_TYPES_MAP[newCategory];
-          if (!prev.type || !allowedTypes.includes(prev.type as any)) {
+          if (!prev.type || !(allowedTypes as readonly string[]).includes(prev.type)) {
             newData.type = allowedTypes[0] as any;
           }
         }
@@ -392,6 +392,16 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                     <option value="Owned">Próprio</option>
                     <option value="Rented">Locado</option>
                     <option value="Agregado">Agregado</option>
+                  </select>
+                </div>
+                <div>
+                  <Label name="vehicleUsage">Finalidade</Label>
+                  <select name="vehicleUsage" required={req('vehicleUsage')} value={formData.vehicleUsage || ''} onChange={handleChange} className={inputClass}>
+                    <option value="">Selecione...</option>
+                    <option value="Operação">Operação</option>
+                    <option value="Uso Administrativo">Uso Administrativo</option>
+                    <option value="Uso por Lideranças">Uso por Lideranças</option>
+                    <option value="Outros">Outros</option>
                   </select>
                 </div>
                 <div>

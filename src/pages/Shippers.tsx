@@ -7,10 +7,10 @@ import ShipperForm from '../components/ShipperForm';
 import { supabase } from '../lib/supabase';
 import { shipperFromRow, shipperToRow, formatCNPJ, ShipperRow } from '../lib/shipperMappers';
 
-const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
-const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
-const ROLES_CAN_EDIT = ['Fleet Analyst', 'Manager', 'Director', 'Admin Master'];
-const ROLES_CAN_DELETE = ['Manager', 'Director', 'Admin Master'];
+const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_EDIT = ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_DELETE = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 
 function formatPhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
