@@ -112,7 +112,8 @@ export default function CreateActionPlanModal({ checklist, onClose, onCreated }:
       if (insErr) throw insErr;
       onCreated();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar planos de ação');
+      const msg = err instanceof Error ? err.message : (err as any)?.message ?? 'Erro ao criar planos de ação';
+      setError(msg);
     } finally {
       setSaving(false);
     }
