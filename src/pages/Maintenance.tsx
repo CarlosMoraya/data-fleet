@@ -137,7 +137,7 @@ export default function Maintenance() {
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['maintenanceOrders', currentClient?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('maintenance_orders')
         .select(`
           *,
@@ -148,6 +148,11 @@ export default function Maintenance() {
         `)
         .order('created_at', { ascending: false });
 
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return (data as MaintenanceOrderRow[]).map(maintenanceFromRow);
     },
