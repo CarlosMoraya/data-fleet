@@ -71,7 +71,6 @@ function OrderRow({ order, user, onApprove, onReject, approving }: OrderRowProps
 
   const { data: items = [], isLoading: loadingItems } = useQuery<BudgetItem[]>({
     queryKey: ['budgetItems', order.id],
-    enabled: expanded,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('maintenance_budget_items')
