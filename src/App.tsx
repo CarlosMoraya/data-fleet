@@ -34,6 +34,9 @@ function HomeRedirect() {
   if (user?.role === 'Driver' || user?.role === 'Yard Auditor') {
     return <Navigate to="/checklists" replace />;
   }
+  if (user?.role === 'Workshop') {
+    return <Navigate to="/manutencao" replace />;
+  }
   return <Dashboard />;
 }
 

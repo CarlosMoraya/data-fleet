@@ -131,6 +131,54 @@ Para detalhes completos, consulte os módulos em `.claude/`.
 
 ---
 
+## Novos Recursos (2026-03-19) — Acesso de Oficinas Parceiras
+
+**Workshop Login e Visão de Manutenção:**
+
+- Novo role `'Workshop'` (rank 1) — oficinas parceiras acessam o sistema com login próprio
+- Fluxo de criação: Fleet Assistant+ cria workshop com campos opcionais `loginEmail + loginPassword`
+- Edge Function `create-user` suporta get-or-create semântico para Workshop (como Driver)
+- Tabela `workshops` nova coluna: `profile_id UUID FK → profiles(id)` — liga workshop ao perfil do usuário
+- `AuthContext.tsx` busca `workshopId` ao fazer login com role 'Workshop'
+- Sidebar: Workshop vê apenas "Manutenção"; redirect HomeRedirect → `/manutencao`
+- Maintenance.tsx:
+  - Query filtra por `workshop_id` quando Workshop
+  - Botão "Nova Manutenção" oculto para Workshop
+  - Coluna OS mostra `workshopOs` em vez de `os` para Workshop
+  - UPDATE parcial: Workshop atualiza apenas `expected_exit_date, workshop_os_number, mechanic_name, current_km`
+- MaintenanceForm.tsx:
+  - Novo prop `mode?: 'default' | 'workshop'`
+  - Modo Workshop: 4 campos obrigatórios (expectedExitDate, workshopOs, mechanicName, currentKm) + PDF obrigatório
+  - Botão: "Enviar Orçamento" (Workshop) vs "Criar/Editar Manutenção" (padrão)
+- WorkshopForm.tsx:
+  - Seção "Acesso ao Sistema" apenas na criação (loginEmail, loginPassword opcionais)
+  - Badge "Com/Sem acesso ao sistema" na edição
+- RLS: Múltiplas migrations para suportar Workshop
+  - `20260319100000_add_workshop_login.sql`: role 'Workshop' em CHECK, role_rank(1), profile_id em workshops, policies de maintenance_orders/items
+  - `fix_workshop_vehicles_rls.sql`: policy SELECT em vehicles para Workshop (acesso a veículos em suas OS)
+
+**Arquivos Modificados:**
+- `src/types.ts` — 'Workshop' em Role, workshopId em User, profileId em Workshop
+- `src/context/AuthContext.tsx` — busca workshopId para role Workshop
+- `supabase/functions/create-user/index.ts` — Workshop rank 1, get-or-create semântico
+- `src/components/WorkshopForm.tsx` — loginEmail/loginPassword opcionais, badge acesso
+- `src/lib/workshopMappers.ts` — profileId mapeado
+- `src/pages/Workshops.tsx` — saveMutation chama create-user se login fornecido
+- `src/components/Sidebar.tsx` — 'Workshop' em Manutenção roles
+- `src/App.tsx` — HomeRedirect para Workshop → /manutencao
+- `src/pages/Maintenance.tsx` — isWorkshopUser, query/UPDATE/UI adaptativos
+- `src/components/MaintenanceForm.tsx` — modo='workshop' com 4 campos + PDF obrigatório
+- `.claude/data-model.md` — Role union, User.workshopId, Workshop.profileId
+- `.claude/arch-backend.md` — workshops.profile_id, migrations 20260319100000 + fix_workshop_vehicles_rls
+- `.claude/arch-frontend.md` — WorkshopForm, MaintenanceForm, Maintenance adaptações
+
+**Pendente Execução Manual (Supabase Dashboard):**
+1. `supabase/migrations/20260319100000_add_workshop_login.sql` — role check, role_rank, profile_id, RLS
+2. `supabase/migrations/fix_workshop_vehicles_rls.sql` — vehicles SELECT policy para Workshop
+3. Republicar Edge Function `create-user` com suporte Workshop
+
+---
+
 ## Correções Recentes (2026-03-18)
 
 **Correções de Bugs de Multi-Tenancy e RLS:**

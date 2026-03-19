@@ -64,6 +64,7 @@ interface OrderRowProps {
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   approving: boolean;
+  key?: React.Key;
 }
 
 function OrderRow({ order, user, onApprove, onReject, approving }: OrderRowProps) {

@@ -27,6 +27,7 @@ function Label({ htmlFor, required, children }: { htmlFor?: string; required?: b
 interface MaintenanceFormProps {
   order: MaintenanceOrder | null;
   prefill?: Partial<MaintenanceOrder>;
+  mode?: 'default' | 'workshop';
   onClose: () => void;
   onSave: (order: Partial<MaintenanceOrder>, budgetItems: BudgetItem[], budgetFile: File | null) => Promise<void>;
 }
@@ -34,8 +35,9 @@ interface MaintenanceFormProps {
 interface VehicleOption { id: string; licensePlate: string; }
 interface WorkshopOption { id: string; name: string; }
 
-export default function MaintenanceForm({ order, prefill, onClose, onSave }: MaintenanceFormProps) {
+export default function MaintenanceForm({ order, prefill, mode = 'default', onClose, onSave }: MaintenanceFormProps) {
   const { currentClient } = useAuth();
+  const isWorkshopMode = mode === 'workshop';
 
   const [formData, setFormData] = useState<Partial<MaintenanceOrder>>(() => {
     try {
@@ -90,8 +92,9 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
       });
   }, [order?.id, order?.budgetPdfUrl]);
 
-  // Carrega opções
+  // Carrega opções (apenas no modo padrão — Workshop não precisa)
   const fetchOptions = useCallback(async () => {
+    if (isWorkshopMode) { setLoadingOptions(false); return; }
     if (!currentClient?.id) return;
     setLoadingOptions(true);
     const [{ data: vehiclesData }, { data: workshopsData }] = await Promise.all([
@@ -110,7 +113,7 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
     setVehicles((vehiclesData ?? []).map((v: { id: string; license_plate: string }) => ({ id: v.id, licensePlate: v.license_plate })));
     setWorkshops((workshopsData ?? []) as WorkshopOption[]);
     setLoadingOptions(false);
-  }, [currentClient?.id]);
+  }, [currentClient?.id, isWorkshopMode]);
 
   useEffect(() => { fetchOptions(); }, [fetchOptions]);
 
@@ -167,7 +170,17 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.vehicleId || !formData.workshopId || !formData.entryDate || !formData.type || !formData.status) {
+    if (isWorkshopMode) {
+      // Modo Workshop: validar apenas os 5 campos obrigatórios
+      if (!formData.expectedExitDate || !formData.workshopOs || !formData.mechanicName || !formData.currentKm) {
+        setError('Preencha todos os campos obrigatórios: Previsão de Saída, OS da Oficina, Mecânico Responsável e Km do Veículo.');
+        return;
+      }
+      if (!budgetFile && !existingBudgetPdfUrl) {
+        setError('O upload do orçamento em PDF é obrigatório.');
+        return;
+      }
+    } else if (!formData.vehicleId || !formData.workshopId || !formData.entryDate || !formData.type || !formData.status) {
       setError('Preencha os campos obrigatórios.');
       return;
     }
@@ -194,7 +207,7 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
               <Wrench className="h-4 w-4 text-orange-600" />
             </div>
             <h2 className="text-base font-semibold text-zinc-900">
-              {order ? 'Editar OS / Orçamento' : 'Nova Manutenção'}
+              {isWorkshopMode ? 'Preencher OS da Oficina' : order ? 'Editar OS / Orçamento' : 'Nova Manutenção'}
             </h2>
           </div>
           <button onClick={handleClose} className="rounded-lg p-1 hover:bg-zinc-100 transition-colors">
@@ -211,228 +224,344 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
           ) : (
             <form id="maintenance-form" onSubmit={handleSubmit} className="space-y-6">
 
-              {/* Grid 2 colunas */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Linha 1 */}
-                <div>
-                  <Label htmlFor="vehicleId" required>Veículo (Placa)</Label>
-                  <select
-                    id="vehicleId"
-                    name="vehicleId"
-                    required
-                    value={formData.vehicleId ?? ''}
-                    onChange={handleChange}
-                    className={inputClass}
-                    disabled={!!order}
-                  >
-                    <option value="">Selecione...</option>
-                    {vehicles.map((v) => (
-                      <option key={v.id} value={v.id}>{v.licensePlate}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="workshopId" required>Oficina</Label>
-                  <select
-                    id="workshopId"
-                    name="workshopId"
-                    required
-                    value={formData.workshopId ?? ''}
-                    onChange={handleChange}
-                    className={inputClass}
-                  >
-                    <option value="">Selecione...</option>
-                    {workshops.map((w) => (
-                      <option key={w.id} value={w.id}>{w.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Linha 2 */}
-                <div>
-                  <Label htmlFor="type" required>Tipo de Manutenção</Label>
-                  <select
-                    id="type"
-                    name="type"
-                    required
-                    value={formData.type ?? ''}
-                    onChange={handleChange}
-                    className={inputClass}
-                  >
-                    <option value="">Selecione...</option>
-                    <option value="Preventiva">Preventiva</option>
-                    <option value="Preditiva">Preditiva</option>
-                    <option value="Corretiva">Corretiva</option>
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="status" required>Status Atual</Label>
-                  <select
-                    id="status"
-                    name="status"
-                    required
-                    value={formData.status ?? ''}
-                    onChange={handleChange}
-                    className={inputClass}
-                  >
-                    <option value="Aguardando orçamento">Aguardando orçamento</option>
-                    <option value="Aguardando aprovação">Aguardando aprovação</option>
-                    <option value="Orçamento aprovado">Orçamento aprovado</option>
-                    <option value="Serviço em execução">Serviço em execução</option>
-                    <option value="Concluído">Concluído</option>
-                  </select>
-                </div>
-
-                {/* Linha 3 */}
-                <div>
-                  <Label htmlFor="entryDate" required>Data de Entrada</Label>
-                  <input
-                    id="entryDate"
-                    name="entryDate"
-                    type="date"
-                    required
-                    value={formData.entryDate ?? ''}
-                    onChange={handleChange}
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="expectedExitDate">Previsão de Saída</Label>
-                  <input
-                    id="expectedExitDate"
-                    name="expectedExitDate"
-                    type="date"
-                    min={formData.entryDate || today}
-                    value={formData.expectedExitDate ?? ''}
-                    onChange={handleChange}
-                    className={inputClass}
-                  />
-                </div>
-
-                {/* Km atual */}
-                <div>
-                  <Label htmlFor="currentKm">Km Atual do Veículo</Label>
-                  <input
-                    id="currentKm"
-                    name="currentKm"
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="Ex: 85000"
-                    value={formData.currentKm ?? ''}
-                    onChange={handleChange}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-
-              {/* OS Interna (read-only) e OS da Oficina */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label>OS Interna</Label>
-                  <div className="mt-1 flex h-9 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm font-mono text-zinc-500 select-all cursor-default">
-                    {order?.os ?? 'Será gerada automaticamente'}
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="workshopOs">OS da Oficina (Opcional)</Label>
-                  <input
-                    id="workshopOs"
-                    name="workshopOs"
-                    type="text"
-                    placeholder="Número da OS fornecido pela oficina"
-                    value={formData.workshopOs ?? ''}
-                    onChange={handleChange}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-
-              {/* Upload de orçamento + tabela de itens */}
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="budgetPdf">PDF do Orçamento (Opcional)</Label>
-                  <input
-                    id="budgetPdf"
-                    type="file"
-                    accept="application/pdf,image/*"
-                    onChange={handleBudgetUpload}
-                    className="mt-1 block w-full text-sm text-zinc-500 file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100 transition-colors cursor-pointer"
-                  />
-                  {existingBudgetPdfUrl && !budgetFile && (
-                    <a
-                      href={existingBudgetPdfUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                    >
-                      <FileText className="h-3 w-3" />
-                      Ver PDF atual
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
+              {isWorkshopMode ? (
+                /* ── MODO WORKSHOP: apenas 5 campos obrigatórios ── */
+                <>
+                  {/* Info da OS (read-only) */}
+                  {order && (
+                    <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 space-y-1">
+                      <div><span className="font-medium">Veículo:</span> {order.licensePlate}</div>
+                      <div><span className="font-medium">OS Interna:</span> <span className="font-mono">{order.os}</span></div>
+                    </div>
                   )}
-                  {budgetFile && (
-                    <p className="mt-1 text-xs text-zinc-500">
-                      Arquivo selecionado: {budgetFile.name}
-                    </p>
-                  )}
-                </div>
 
-                {extractionWarning && (
-                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                    <span>{extractionWarning}</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="expectedExitDate" required>Previsão de Saída</Label>
+                      <input
+                        id="expectedExitDate"
+                        name="expectedExitDate"
+                        type="date"
+                        required
+                        value={formData.expectedExitDate ?? ''}
+                        onChange={handleChange}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="workshopOs" required>OS da Oficina</Label>
+                      <input
+                        id="workshopOs"
+                        name="workshopOs"
+                        type="text"
+                        required
+                        placeholder="Número da OS gerado pela oficina"
+                        value={formData.workshopOs ?? ''}
+                        onChange={handleChange}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="mechanicName" required>Mecânico Responsável</Label>
+                      <input
+                        id="mechanicName"
+                        name="mechanicName"
+                        type="text"
+                        required
+                        value={formData.mechanicName ?? ''}
+                        onChange={handleChange}
+                        className={inputClass}
+                        placeholder="Nome do mecânico"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="currentKm" required>Km do Veículo</Label>
+                      <input
+                        id="currentKm"
+                        name="currentKm"
+                        type="number"
+                        required
+                        min="0"
+                        step="1"
+                        placeholder="Ex: 85000"
+                        value={formData.currentKm ?? ''}
+                        onChange={handleChange}
+                        className={inputClass}
+                      />
+                    </div>
                   </div>
-                )}
 
-                <BudgetItemsTable
-                  items={budgetItems}
-                  onChange={setBudgetItems}
-                  extracting={extracting}
-                />
-              </div>
+                  {/* Upload do orçamento (obrigatório para Workshop) */}
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="budgetPdf" required>PDF do Orçamento</Label>
+                      <input
+                        id="budgetPdf"
+                        type="file"
+                        accept="application/pdf,image/*"
+                        onChange={handleBudgetUpload}
+                        className="mt-1 block w-full text-sm text-zinc-500 file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100 transition-colors cursor-pointer"
+                      />
+                      {existingBudgetPdfUrl && !budgetFile && (
+                        <a
+                          href={existingBudgetPdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                        >
+                          <FileText className="h-3 w-3" />
+                          Ver PDF atual
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                      {budgetFile && (
+                        <p className="mt-1 text-xs text-zinc-500">
+                          Arquivo selecionado: {budgetFile.name}
+                        </p>
+                      )}
+                    </div>
 
-              {/* Mecânico Responsável */}
-              <div>
-                <Label htmlFor="mechanicName">Mecânico / Técnico (Opcional)</Label>
-                <input
-                  id="mechanicName"
-                  name="mechanicName"
-                  type="text"
-                  value={formData.mechanicName ?? ''}
-                  onChange={handleChange}
-                  className={inputClass}
-                  placeholder="Nome do responsável"
-                />
-              </div>
+                    {extractionWarning && (
+                      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                        <span>{extractionWarning}</span>
+                      </div>
+                    )}
 
-              {/* Problema / Descrição */}
-              <div>
-                <Label htmlFor="description">Descrição / Problema Relatado</Label>
-                <textarea
-                  id="description"
-                  name="description"
-                  value={formData.description ?? ''}
-                  onChange={handleChange}
-                  rows={2}
-                  className={`${inputClass} resize-none`}
-                  placeholder="Descreva o motivo da manutenção..."
-                />
-              </div>
+                    <BudgetItemsTable
+                      items={budgetItems}
+                      onChange={setBudgetItems}
+                      extracting={extracting}
+                    />
+                  </div>
+                </>
+              ) : (
+                /* ── MODO PADRÃO: formulário completo ── */
+                <>
+                  {/* Grid 2 colunas */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Linha 1 */}
+                    <div>
+                      <Label htmlFor="vehicleId" required>Veículo (Placa)</Label>
+                      <select
+                        id="vehicleId"
+                        name="vehicleId"
+                        required
+                        value={formData.vehicleId ?? ''}
+                        onChange={handleChange}
+                        className={inputClass}
+                        disabled={!!order}
+                      >
+                        <option value="">Selecione...</option>
+                        {vehicles.map((v) => (
+                          <option key={v.id} value={v.id}>{v.licensePlate}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <Label htmlFor="workshopId" required>Oficina</Label>
+                      <select
+                        id="workshopId"
+                        name="workshopId"
+                        required
+                        value={formData.workshopId ?? ''}
+                        onChange={handleChange}
+                        className={inputClass}
+                      >
+                        <option value="">Selecione...</option>
+                        {workshops.map((w) => (
+                          <option key={w.id} value={w.id}>{w.name}</option>
+                        ))}
+                      </select>
+                    </div>
 
-              {/* Observações Internas */}
-              <div>
-                <Label htmlFor="notes">Notas / Observações Internas</Label>
-                <textarea
-                  id="notes"
-                  name="notes"
-                  value={formData.notes ?? ''}
-                  onChange={handleChange}
-                  rows={2}
-                  className={`${inputClass} resize-none`}
-                  placeholder="Comentários internos visíveis para a gestão..."
-                />
-              </div>
+                    {/* Linha 2 */}
+                    <div>
+                      <Label htmlFor="type" required>Tipo de Manutenção</Label>
+                      <select
+                        id="type"
+                        name="type"
+                        required
+                        value={formData.type ?? ''}
+                        onChange={handleChange}
+                        className={inputClass}
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="Preventiva">Preventiva</option>
+                        <option value="Preditiva">Preditiva</option>
+                        <option value="Corretiva">Corretiva</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label htmlFor="status" required>Status Atual</Label>
+                      <select
+                        id="status"
+                        name="status"
+                        required
+                        value={formData.status ?? ''}
+                        onChange={handleChange}
+                        className={inputClass}
+                      >
+                        <option value="Aguardando orçamento">Aguardando orçamento</option>
+                        <option value="Aguardando aprovação">Aguardando aprovação</option>
+                        <option value="Orçamento aprovado">Orçamento aprovado</option>
+                        <option value="Serviço em execução">Serviço em execução</option>
+                        <option value="Concluído">Concluído</option>
+                      </select>
+                    </div>
+
+                    {/* Linha 3 */}
+                    <div>
+                      <Label htmlFor="entryDate" required>Data de Entrada</Label>
+                      <input
+                        id="entryDate"
+                        name="entryDate"
+                        type="date"
+                        required
+                        value={formData.entryDate ?? ''}
+                        onChange={handleChange}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="expectedExitDate">Previsão de Saída</Label>
+                      <input
+                        id="expectedExitDate"
+                        name="expectedExitDate"
+                        type="date"
+                        min={formData.entryDate || today}
+                        value={formData.expectedExitDate ?? ''}
+                        onChange={handleChange}
+                        className={inputClass}
+                      />
+                    </div>
+
+                    {/* Km atual */}
+                    <div>
+                      <Label htmlFor="currentKm">Km Atual do Veículo</Label>
+                      <input
+                        id="currentKm"
+                        name="currentKm"
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="Ex: 85000"
+                        value={formData.currentKm ?? ''}
+                        onChange={handleChange}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  {/* OS Interna (read-only) e OS da Oficina */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label>OS Interna</Label>
+                      <div className="mt-1 flex h-9 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm font-mono text-zinc-500 select-all cursor-default">
+                        {order?.os ?? 'Será gerada automaticamente'}
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="workshopOs">OS da Oficina (Opcional)</Label>
+                      <input
+                        id="workshopOs"
+                        name="workshopOs"
+                        type="text"
+                        placeholder="Número da OS fornecido pela oficina"
+                        value={formData.workshopOs ?? ''}
+                        onChange={handleChange}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Upload de orçamento + tabela de itens */}
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="budgetPdf">PDF do Orçamento (Opcional)</Label>
+                      <input
+                        id="budgetPdf"
+                        type="file"
+                        accept="application/pdf,image/*"
+                        onChange={handleBudgetUpload}
+                        className="mt-1 block w-full text-sm text-zinc-500 file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100 transition-colors cursor-pointer"
+                      />
+                      {existingBudgetPdfUrl && !budgetFile && (
+                        <a
+                          href={existingBudgetPdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                        >
+                          <FileText className="h-3 w-3" />
+                          Ver PDF atual
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                      {budgetFile && (
+                        <p className="mt-1 text-xs text-zinc-500">
+                          Arquivo selecionado: {budgetFile.name}
+                        </p>
+                      )}
+                    </div>
+
+                    {extractionWarning && (
+                      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                        <span>{extractionWarning}</span>
+                      </div>
+                    )}
+
+                    <BudgetItemsTable
+                      items={budgetItems}
+                      onChange={setBudgetItems}
+                      extracting={extracting}
+                    />
+                  </div>
+
+                  {/* Mecânico Responsável */}
+                  <div>
+                    <Label htmlFor="mechanicName">Mecânico / Técnico (Opcional)</Label>
+                    <input
+                      id="mechanicName"
+                      name="mechanicName"
+                      type="text"
+                      value={formData.mechanicName ?? ''}
+                      onChange={handleChange}
+                      className={inputClass}
+                      placeholder="Nome do responsável"
+                    />
+                  </div>
+
+                  {/* Problema / Descrição */}
+                  <div>
+                    <Label htmlFor="description">Descrição / Problema Relatado</Label>
+                    <textarea
+                      id="description"
+                      name="description"
+                      value={formData.description ?? ''}
+                      onChange={handleChange}
+                      rows={2}
+                      className={`${inputClass} resize-none`}
+                      placeholder="Descreva o motivo da manutenção..."
+                    />
+                  </div>
+
+                  {/* Observações Internas */}
+                  <div>
+                    <Label htmlFor="notes">Notas / Observações Internas</Label>
+                    <textarea
+                      id="notes"
+                      name="notes"
+                      value={formData.notes ?? ''}
+                      onChange={handleChange}
+                      rows={2}
+                      className={`${inputClass} resize-none`}
+                      placeholder="Comentários internos visíveis para a gestão..."
+                    />
+                  </div>
+                </>
+              )}
 
             </form>
           )}
@@ -459,7 +588,7 @@ export default function MaintenanceForm({ order, prefill, onClose, onSave }: Mai
               disabled={saving || loadingOptions || extracting}
               className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center min-w-[120px]"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : (order ? 'Salvar Edição' : 'Criar Manutenção')}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : isWorkshopMode ? 'Enviar Orçamento' : order ? 'Salvar Edição' : 'Criar Manutenção'}
             </button>
           </div>
         </div>

@@ -20,7 +20,7 @@ src/
 │   ├── DriverForm.tsx   # Formulário para motoristas (CNH, GR, certificados + email/senha ao criar, cria usuário via Edge Function)
 │   ├── ShipperForm.tsx  # Formulário modal para embarcadores (name, cnpj, phone, email, contactPerson, notes, active)
 │   ├── OperationalUnitForm.tsx # Formulário modal para unidades operacionais (shipperId required, name, code, city, state, notes, active)
-│   ├── WorkshopForm.tsx # Formulário modal para oficinas (sem uploads, 3 seções)
+│   ├── WorkshopForm.tsx # Formulário modal para oficinas (sem uploads, 4 seções); **NOVO**: seção "Acesso ao Sistema" apenas na criação (loginEmail + loginPassword opcionais); badge "Com/Sem acesso ao sistema" na edição; prop `onSave` recebe `(workshop, loginEmail?, loginPassword?)`
 │   ├── VehicleDetailModal.tsx  # Modal read-only de detalhes do veículo (8 seções, links de uploads)
 │   ├── DriverDetailModal.tsx   # Modal read-only de detalhes do motorista (5 seções, links de uploads)
 │   ├── WorkshopDetailModal.tsx # Modal read-only de detalhes da oficina (5 seções, sem uploads)
@@ -28,7 +28,7 @@ src/
 │   ├── ChecklistDetailModal.tsx  # Modal read-only com respostas, fotos, score de conformidade
 │   ├── ActionPlanModal.tsx       # Modal de gestão de ação (status, notas de conclusão, upload de evidência — imagem/PDF via uploadActionPlanEvidence)
 │   ├── CameraCapture.tsx         # Captura de foto via câmera (getUserMedia + GPS + compressão)
-│   ├── MaintenanceForm.tsx       # Formulário de OS (dual OS, upload PDF orçamento, extração OCR, BudgetItemsTable, Km Atual, sem Custo Estimado/Subtotal)
+│   ├── MaintenanceForm.tsx       # Formulário de OS (dual OS, upload PDF orçamento, extração OCR, BudgetItemsTable, Km Atual, sem Custo Estimado/Subtotal); **NOVO**: prop `mode?: 'default' | 'workshop'` — no modo 'workshop' exibe apenas 5 campos obrigatórios (expectedExitDate, workshopOs, mechanicName, currentKm, PDF) + info read-only da OS
 │   ├── MaintenanceDetailModal.tsx # Modal read-only de OS (seção Orçamento: badge, PDF link, BudgetItemsTable readOnly)
 │   ├── BudgetItemsTable.tsx      # Tabela editável/read-only de itens de orçamento (5 cols: Item, Sistema, Qtd, Valor, Total) + subtotal
 │   └── VehicleKmIntervalSettings.tsx # Aba "Revisões" em Settings: configura km entre revisões por veículo; filtros (marca/modelo/categoria), bulk apply, paginação 50/página, bulk upsert via onConflict vehicle_id; props: clientId, userId
@@ -65,7 +65,7 @@ src/
 │   ├── ChecklistFill.tsx # Tela fullscreen de preenchimento (OK/Problema/N/A, câmera, observação, auto-save, finalização com ações). **NOVO**: Campo KM obrigatório (primeiro, antes dos itens) — exibe último KM registrado ou initial_km do veículo como referência; valida KM >= último; bloqueia itens até KM confirmado. Contexto Entrada/Saída de Oficina: seleção obrigatória de oficina antes dos itens. Contexto Segurança: badge ⚠ em itens com canBlockVehicle
 │   ├── ChecklistTemplates.tsx # CRUD de templates (draft/published/deprecated, versionamento, filtro dual por categoria + contexto)
 │   ├── ActionPlans.tsx  # Painel Fleet Assistant+ — tabela de ações, filtros por status, modal de gestão
-│   ├── Maintenance.tsx  # CRUD de ordens de serviço — dual OS, saveMutation 3-etapas (INSERT/UPDATE → upload PDF → items), coluna Orçamento. **Query filtra por `client_id` do cliente selecionado (suporta Admin Master via dropdown, corrigido 2026-03-18)**
+│   ├── Maintenance.tsx  # CRUD de ordens de serviço — dual OS, saveMutation 3-etapas (INSERT/UPDATE → upload PDF → items), coluna Orçamento. **Query filtra por `client_id` do cliente selecionado (suporta Admin Master via dropdown, corrigido 2026-03-18)**; **NOVO**: suporte role 'Workshop' — query filtra por `workshop_id`, botão "Nova OS" oculto, UPDATE parcial (apenas 4 campos), modo 'workshop' em MaintenanceForm, coluna OS mostra workshopOs
 │   ├── WorkshopSchedules.tsx # Agendamentos de oficina — botão "Gerar OS" navega para /manutencao com prefill via state
 │   └── BudgetApprovals.tsx  # Aprovação de orçamentos (Fleet Assistant+) — fila FIFO, canApprove(user, total), expand por linha. **Query filtra por `client_id` + budgetItems query sem `enabled: expanded` (subtotal agora persiste após refresh, corrigido 2026-03-18)**
 │   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+); **não cria/lista Driver role** (drivers criados via DriverForm). **refreshSession antes de edição (corrigido JWT expired 2026-03-18)**

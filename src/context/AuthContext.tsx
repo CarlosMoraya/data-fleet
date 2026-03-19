@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data && !error) {
       const profile = data as any;
 
-      setUser({
+      const userObj: User = {
         id: profile.id,
         name: profile.name,
         email,
@@ -41,7 +41,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         canDeleteDrivers: profile.can_delete_drivers ?? false,
         canDeleteWorkshops: profile.can_delete_workshops ?? false,
         budgetApprovalLimit: profile.budget_approval_limit ?? 0,
-      });
+      };
+
+      // Busca workshopId para usuários com role 'Workshop'
+      if (profile.role === 'Workshop') {
+        const { data: workshopData } = await supabase
+          .from('workshops')
+          .select('id')
+          .eq('profile_id', profile.id)
+          .single();
+        if (workshopData) {
+          userObj.workshopId = workshopData.id;
+        }
+      }
+
+      setUser(userObj);
 
       // Se há client_id no profile, busca os dados do cliente
       if (profile.client_id) {

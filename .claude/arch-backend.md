@@ -24,7 +24,7 @@
 - `operational_units` — unidades operacionais (CRUD com RLS, code único por cliente); FK obrigatória para shipper (RESTRICT on delete)
 - `drivers` — motoristas (CRUD com RLS, CPF único por cliente, 5 uploads de documento)
 - `driver_field_settings` — configurações dinâmicas de campos obrigatórios de motorista por cliente
-- `workshops` — oficinas parceiras (CRUD com RLS, CNPJ único por cliente, sem uploads)
+- `workshops` — oficinas parceiras (CRUD com RLS, CNPJ único por cliente, sem uploads); **NOVO**: `profile_id UUID NULL FK → profiles(id) ON DELETE SET NULL` — quando preenchido, a oficina tem login próprio com role 'Workshop'; índice `idx_workshops_profile_id`
 - `vehicle_km_intervals` — km máximo entre revisões por veículo (UNIQUE vehicle_id); colunas: `id, client_id, vehicle_id, km_interval INTEGER NULL, updated_at, updated_by`; RLS: SELECT/INSERT/UPDATE Fleet Assistant(3)+ do próprio tenant ou Admin Master; DELETE Manager(5)+; migration: `create_vehicle_km_intervals.sql`
 
 ### Tabelas de Checklists (criadas em `create_checklist_tables.sql` + migrations adicionais)
@@ -77,6 +77,8 @@
 - `20260319000000_add_budget_to_maintenance.sql` — novas colunas em `maintenance_orders` (current_km, budget_pdf_url, budget_status, budget_reviewed_by/at), tabela `maintenance_budget_items` com RLS ⚠️ **Executar no Supabase Dashboard**
 - `add_initial_km_vehicles.sql` — adiciona `initial_km INTEGER NULL` em `vehicles` e `initial_km_optional BOOLEAN DEFAULT false` em `vehicle_field_settings` (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
 - `add_odometer_km_checklists.sql` — adiciona `odometer_km INTEGER NULL` em `checklists` (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
+- `20260319100000_add_workshop_login.sql` — role 'Workshop' no CHECK de profiles.role, atualiza `role_rank()` para Workshop=1, adiciona `profile_id` em workshops, recria RLS de `maintenance_orders` e `maintenance_budget_items` para incluir Workshop, policy `workshop_self_select` em workshops (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
+- `fix_workshop_vehicles_rls.sql` — adiciona policy SELECT em vehicles para Workshop (acesso apenas a veículos em suas próprias OS, via join com workshops.profile_id); resolve bug onde join vehicles retornava null para Workshop causando "N/A" na coluna Placa (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
 
 ### RLS — Padrões de Checklists
 - `checklists` SELECT: Driver/Auditor vê os próprios; Fleet Assistant+ vê todo o tenant; Admin Master vê tudo

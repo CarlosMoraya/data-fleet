@@ -69,7 +69,7 @@ export default function Workshops() {
   }
 
   const saveMutation = useMutation({
-    mutationFn: async (workshop: Partial<Workshop>) => {
+    mutationFn: async ({ workshop, loginEmail, loginPassword }: { workshop: Partial<Workshop>; loginEmail?: string; loginPassword?: string }) => {
       if (!currentClient?.id) throw new Error('Sessão inválida');
       const row = workshopToRow(workshop, currentClient.id);
 
@@ -80,9 +80,29 @@ export default function Workshops() {
           .eq('id', editingWorkshop.id);
         if (updateError) throw updateError;
       } else {
+        // Se login foi fornecido, criar conta de acesso primeiro
+        let profileId: string | undefined;
+        if (loginEmail && loginPassword) {
+          const { data: fnData, error: fnError } = await supabase.functions.invoke('create-user', {
+            body: {
+              email: loginEmail,
+              password: loginPassword,
+              name: workshop.name || 'Oficina',
+              role: 'Workshop',
+              client_id: currentClient.id,
+              can_delete_vehicles: false,
+              can_delete_drivers: false,
+              can_delete_workshops: false,
+            },
+          });
+          if (fnError) throw fnError;
+          if (fnData?.error) throw new Error(fnData.error);
+          profileId = fnData?.profileId;
+        }
+
         const { error: insertError } = await supabase
           .from('workshops')
-          .insert(row);
+          .insert({ ...row, profile_id: profileId ?? null });
         if (insertError) throw insertError;
       }
     },
@@ -96,8 +116,8 @@ export default function Workshops() {
     },
   });
 
-  const handleSave = async (workshop: Partial<Workshop>): Promise<void> => {
-    await saveMutation.mutateAsync(workshop);
+  const handleSave = async (workshop: Partial<Workshop>, loginEmail?: string, loginPassword?: string): Promise<void> => {
+    await saveMutation.mutateAsync({ workshop, loginEmail, loginPassword });
   };
 
   const deleteMutation = useMutation({
@@ -251,15 +271,23 @@ export default function Workshops() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm">
-                      {workshop.active ? (
-                        <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                          Ativa
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
-                          Inativa
-                        </span>
-                      )}
+                      <div className="flex flex-col gap-1">
+                        {workshop.active ? (
+                          <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                            Ativa
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
+                            Inativa
+                          </span>
+                        )}
+                        {workshop.profileId ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                            Acesso ativo
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                       <div className="flex items-center justify-end gap-3">

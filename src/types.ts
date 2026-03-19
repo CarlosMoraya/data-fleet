@@ -1,4 +1,4 @@
-export type Role = 'Driver' | 'Yard Auditor' | 'Fleet Assistant' | 'Fleet Analyst' | 'Supervisor' | 'Manager' | 'Coordinator' | 'Director' | 'Admin Master';
+export type Role = 'Driver' | 'Yard Auditor' | 'Workshop' | 'Fleet Assistant' | 'Fleet Analyst' | 'Supervisor' | 'Manager' | 'Coordinator' | 'Director' | 'Admin Master';
 
 // ─── Checklist types ──────────────────────────────────────────────────────────
 
@@ -139,6 +139,7 @@ export interface User {
   canDeleteDrivers: boolean;
   canDeleteWorkshops: boolean;
   budgetApprovalLimit: number;
+  workshopId?: string; // Populated when role = 'Workshop'
 }
 
 export interface Client {
@@ -272,6 +273,7 @@ export interface Workshop {
   specialties?: string[];
   notes?: string;
   active: boolean;
+  profileId?: string; // Auth account linked to this workshop (for Workshop login)
 }
 
 export interface Shipper {

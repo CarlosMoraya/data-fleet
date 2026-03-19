@@ -21,6 +21,7 @@ export interface WorkshopRow {
   specialties: string[] | null;
   notes: string | null;
   active: boolean;
+  profile_id?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -46,6 +47,7 @@ export function workshopFromRow(row: WorkshopRow): Workshop {
     specialties: row.specialties ?? undefined,
     notes: row.notes ?? undefined,
     active: row.active,
+    profileId: row.profile_id ?? undefined,
   };
 }
 

@@ -4,7 +4,7 @@
 
 ### Role
 ```ts
-type Role = 'Driver' | 'Yard Auditor' | 'Fleet Assistant' | 'Fleet Analyst' | 'Manager' | 'Director' | 'Admin Master';
+type Role = 'Driver' | 'Yard Auditor' | 'Workshop' | 'Fleet Assistant' | 'Fleet Analyst' | 'Supervisor' | 'Manager' | 'Coordinator' | 'Director' | 'Admin Master';
 ```
 
 ### Hierarquia de Roles
@@ -20,7 +20,7 @@ Driver(1) < Yard Auditor(2) < Fleet Assistant(3) < Fleet Analyst(4) < Manager(5)
 - **Exclusão de veículos**: Manager(5)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteVehicles` estiver ativo.
 - **Exclusão de motoristas**: Manager(5)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteDrivers` estiver ativo.
 - **Exclusão de oficinas**: Manager(5)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteWorkshops` estiver ativo.
-- Route guard: Driver/Yard Auditor → redirect para `/checklists`
+- Route guard: Driver/Yard Auditor → redirect para `/checklists`; Workshop → redirect para `/manutencao`
 
 ### User
 ```ts
@@ -34,6 +34,7 @@ interface User {
   canDeleteDrivers: boolean;
   canDeleteWorkshops: boolean;
   budgetApprovalLimit: number; // 0 = sem permissão de aprovação; > 0 = limite em R$
+  workshopId?: string; // preenchido apenas quando role = 'Workshop'; FK → workshops.id
 }
 ```
 
@@ -298,6 +299,7 @@ interface Workshop {
   specialties?: string[];    // Array de especialidades (Mecânica Geral, Elétrica, Funilaria/Pintura, etc.)
   notes?: string;
   active: boolean;
+  profileId?: string; // FK → profiles.id — quando preenchido, a oficina tem login próprio (role 'Workshop')
   createdAt?: string;
   updatedAt?: string;
 }

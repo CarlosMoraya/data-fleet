@@ -14,6 +14,7 @@ const ALL_ROLES: Role[] = [
 
 const ROLE_COLORS: Record<Role, string> = {
   'Driver':          'bg-zinc-100 text-zinc-700',
+  'Workshop':        'bg-orange-100 text-orange-700',
   'Yard Auditor':    'bg-amber-100 text-amber-700',
   'Fleet Assistant': 'bg-blue-100 text-blue-700',
   'Fleet Analyst':   'bg-indigo-100 text-indigo-700',

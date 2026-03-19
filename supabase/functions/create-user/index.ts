@@ -15,6 +15,7 @@ function json(body: unknown, status: number) {
 
 const ROLE_RANK: Record<string, number> = {
   "Driver": 1,
+  "Workshop": 1,
   "Yard Auditor": 2,
   "Fleet Assistant": 3,
   "Fleet Analyst": 4,
@@ -129,8 +130,8 @@ serve(async (req: Request) => {
 
     if (createError) {
       const isEmailConflict = createError.message.toLowerCase().includes("already");
-      if (isEmailConflict && role === "Driver") {
-        // get-or-create semântico: retornar profileId do usuário existente se for Driver do mesmo client
+      if (isEmailConflict && (role === "Driver" || role === "Workshop")) {
+        // get-or-create semântico: retornar profileId do usuário existente se for Driver/Workshop do mesmo client
         const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
         const existing = users.find((u: { email?: string; id: string }) => u.email === email.toLowerCase());
         if (existing) {
@@ -139,8 +140,8 @@ serve(async (req: Request) => {
             .select("role, client_id")
             .eq("id", existing.id)
             .single();
-          if (existingProfile?.role === "Driver" && existingProfile?.client_id === targetClientId) {
-            console.log(`Driver já existe: ${email} — retornando profileId existente.`);
+          if (existingProfile?.role === role && existingProfile?.client_id === targetClientId) {
+            console.log(`${role} já existe: ${email} — retornando profileId existente.`);
             return json({ id: existing.id, profileId: existing.id }, 200);
           }
         }

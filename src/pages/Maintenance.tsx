@@ -113,6 +113,7 @@ function formatDate(iso: string) {
 
 export default function Maintenance() {
   const { currentClient, user: profile } = useAuth();
+  const isWorkshopUser = profile?.role === 'Workshop';
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = React.useState<StatusFilter>('all');
   const [search, setSearch] = React.useState('');
@@ -135,7 +136,7 @@ export default function Maintenance() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['maintenanceOrders', currentClient?.id],
+    queryKey: ['maintenanceOrders', currentClient?.id, profile?.workshopId],
     queryFn: async () => {
       let query = supabase
         .from('maintenance_orders')
@@ -148,7 +149,10 @@ export default function Maintenance() {
         `)
         .order('created_at', { ascending: false });
 
-      if (currentClient?.id) {
+      if (isWorkshopUser && profile?.workshopId) {
+        // Workshop vê apenas suas próprias OS (defense-in-depth, RLS já filtra)
+        query = query.eq('workshop_id', profile.workshopId);
+      } else if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
       }
 
@@ -156,7 +160,7 @@ export default function Maintenance() {
       if (error) throw error;
       return (data as MaintenanceOrderRow[]).map(maintenanceFromRow);
     },
-    enabled: !!currentClient?.id,
+    enabled: isWorkshopUser ? !!profile?.workshopId : !!currentClient?.id,
   });
 
   const updateStatusMutation = useMutation({
@@ -205,7 +209,16 @@ export default function Maintenance() {
 
       if (data.id) {
         // UPDATE — os_number é imutável, nunca atualizar
-        const { error } = await supabase.from('maintenance_orders').update(commonFields).eq('id', data.id);
+        // Workshop faz partial update: apenas os campos de sua responsabilidade
+        const updateFields = profile?.role === 'Workshop'
+          ? {
+              expected_exit_date: data.expectedExitDate || null,
+              workshop_os_number: data.workshopOs || null,
+              mechanic_name: data.mechanicName || null,
+              current_km: data.currentKm || null,
+            }
+          : commonFields;
+        const { error } = await supabase.from('maintenance_orders').update(updateFields).eq('id', data.id);
         if (error) throw error;
         orderId = data.id;
       } else {
@@ -304,16 +317,18 @@ export default function Maintenance() {
           <p className="text-sm text-zinc-500 mt-1">Acompanhe as ordens de serviço e o status dos veículos em manutenção</p>
         </div>
 
-        <button
-          onClick={() => {
-            setOrderToEdit(null);
-            setIsFormOpen(true);
-          }}
-          className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 sm:py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors shadow-sm"
-        >
-          <Plus className="h-4 w-4" />
-          Nova Manutenção
-        </button>
+        {!isWorkshopUser && (
+          <button
+            onClick={() => {
+              setOrderToEdit(null);
+              setIsFormOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 sm:py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
+            Nova Manutenção
+          </button>
+        )}
       </div>
 
       {/* Summary cards */}
@@ -417,7 +432,7 @@ export default function Maintenance() {
             <table className="min-w-full divide-y divide-zinc-100">
               <thead>
                 <tr className="bg-zinc-50">
-                  {['OS', 'Placa', 'Oficina', 'Dias', 'Previsão de Saída', 'Tipo', 'Status', 'Orçamento', ''].map(h => (
+                  {[isWorkshopUser ? 'OS da Oficina' : 'OS', 'Placa', 'Oficina', 'Dias', 'Previsão de Saída', 'Tipo', 'Status', 'Orçamento', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">
                       {h}
                     </th>
@@ -430,7 +445,7 @@ export default function Maintenance() {
                   return (
                     <tr key={o.id} className="hover:bg-zinc-50 transition-colors">
                       <td className="px-4 py-3 text-sm font-mono font-medium text-zinc-900 whitespace-nowrap">
-                        {o.os}
+                        {isWorkshopUser ? (o.workshopOs || o.os) : o.os}
                       </td>
                       <td className="px-4 py-3 text-sm font-semibold text-zinc-900 whitespace-nowrap">
                         {o.licensePlate}
@@ -483,7 +498,7 @@ export default function Maintenance() {
                               <Edit className="h-4 w-4" />
                             </button>
                           )}
-                          {o.status !== 'Concluído' && (
+                          {o.status !== 'Concluído' && !isWorkshopUser && (
                             <button
                               onClick={(e) => handleComplete(o.id, e)}
                               title="Marcar como Concluído"
@@ -514,6 +529,7 @@ export default function Maintenance() {
         <MaintenanceForm
           order={orderToEdit}
           prefill={prefillData}
+          mode={isWorkshopUser ? 'workshop' : 'default'}
           onClose={() => {
             setIsFormOpen(false);
             setOrderToEdit(null);
