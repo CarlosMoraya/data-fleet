@@ -18,20 +18,21 @@
 ### Tabelas existentes
 - `profiles` — dados do usuário (vinculado a auth.users, can_delete_vehicles, can_delete_drivers, can_delete_workshops flags)
 - `clients` — tenants/empresas (id, name, logo_url)
-- `vehicles` — veículos da frota (CRUD completo com RLS); coluna `driver_id UUID NULL FK → drivers(id) ON DELETE SET NULL` + índice único parcial `WHERE driver_id IS NOT NULL` garante associação 1:1 motorista×veículo; **NOVO**: `shipper_id UUID NULL FK → shippers(id) ON DELETE SET NULL` + `operational_unit_id UUID NULL FK → operational_units(id) ON DELETE SET NULL`
-- `vehicle_field_settings` — configurações dinâmicas de campos obrigatórios de veículo por cliente
+- `vehicles` — veículos da frota (CRUD completo com RLS); coluna `driver_id UUID NULL FK → drivers(id) ON DELETE SET NULL` + índice único parcial `WHERE driver_id IS NOT NULL` garante associação 1:1 motorista×veículo; **NOVO**: `shipper_id UUID NULL FK → shippers(id) ON DELETE SET NULL` + `operational_unit_id UUID NULL FK → operational_units(id) ON DELETE SET NULL` + `initial_km INTEGER NULL` — hodômetro inicial do veículo (baseline para validação de checklists)
+- `vehicle_field_settings` — configurações dinâmicas de campos obrigatórios de veículo por cliente; **NOVO**: `initial_km_optional BOOLEAN DEFAULT false` — permite configurar se Km Inicial é obrigatório ou opcional
 - `shippers` — embarcadores (CRUD com RLS, CNPJ único por cliente, 6 campos opcionais); FK RESTRICT (não permite deletar se houver unidades vinculadas)
 - `operational_units` — unidades operacionais (CRUD com RLS, code único por cliente); FK obrigatória para shipper (RESTRICT on delete)
 - `drivers` — motoristas (CRUD com RLS, CPF único por cliente, 5 uploads de documento)
 - `driver_field_settings` — configurações dinâmicas de campos obrigatórios de motorista por cliente
 - `workshops` — oficinas parceiras (CRUD com RLS, CNPJ único por cliente, sem uploads)
+- `vehicle_km_intervals` — km máximo entre revisões por veículo (UNIQUE vehicle_id); colunas: `id, client_id, vehicle_id, km_interval INTEGER NULL, updated_at, updated_by`; RLS: SELECT/INSERT/UPDATE Fleet Assistant(3)+ do próprio tenant ou Admin Master; DELETE Manager(5)+; migration: `create_vehicle_km_intervals.sql`
 
 ### Tabelas de Checklists (criadas em `create_checklist_tables.sql` + migrations adicionais)
 - `checklist_item_suggestions` — banco global de sugestões por categoria de veículo (Leve/Médio/Pesado/Elétrico). Sem `client_id`. Seed com ~45 itens pré-populados. SELECT para qualquer autenticado.
 - `checklist_templates` — templates por cliente com ciclo `draft → published → deprecated`. Colunas: `context` TEXT NOT NULL DEFAULT 'Rotina' CHECK IN ('Rotina','Auditoria','Reboque','Entrada em Oficina','Saída de Oficina','Segurança'), `vehicle_category` NOT NULL, `current_version`, `allow_driver_actions`, `allow_auditor_actions`. EXCLUDE constraint `unique_published_category_context` via btree garante 1 published por (client, category, context). INSERT/UPDATE: Manager+. Nome do template gerado automaticamente como `"Checklist [Categoria] [Contexto]"`.
 - `checklist_template_versions` — snapshots imutáveis ao publicar. UNIQUE (template_id, version_number).
 - `checklist_items` — itens por (template_id, version_number). Coluna `can_block_vehicle BOOLEAN NOT NULL DEFAULT false` — ativado em templates de Segurança. Durante draft, itens editáveis livremente. Publicado: snapshot congelado. **RLS SELECT inclui Driver e Yard Auditor** (obrigatório para ChecklistFill.tsx funcionar). Ao atualizar esta policy, SEMPRE incluir todos os roles: `'Driver','Yard Auditor','Fleet Assistant','Fleet Analyst','Supervisor','Manager','Coordinator','Director'` + Admin Master. Fix: `fix_checklist_items_driver_rls.sql`.
-- `checklists` — instâncias preenchidas. `vehicle_id` obrigatório. `workshop_id UUID NULL FK → workshops(id) ON DELETE SET NULL` — preenchido nos contextos Entrada/Saída de Oficina. `status` IN ('in_progress','completed'). DELETE: APENAS Admin Master.
+- `checklists` — instâncias preenchidas. `vehicle_id` obrigatório. `workshop_id UUID NULL FK → workshops(id) ON DELETE SET NULL` — preenchido nos contextos Entrada/Saída de Oficina. `status` IN ('in_progress','completed'). `odometer_km INTEGER NULL` — hodômetro do veículo no momento do preenchimento (obrigatório, não pode ser menor que o último checklist concluído). DELETE: APENAS Admin Master.
 - `checklist_responses` — respostas por item (ok/issue/skipped/not_applicable). CASCADE delete do checklist pai. UNIQUE (checklist_id, item_id).
 - `action_plans` — ações geradas automaticamente para itens 'issue'. Campos v1: `suggested_action`, `observed_issue`, `photo_url`, `status` (pending/in_progress/awaiting_conclusion/completed/cancelled), `work_order_number`. Campos v2 (`add_action_plan_v2.sql`): `name`, `responsible_id`, `due_date`, `assigned_by`, `claimed_by`, `claimed_at`, `conclusion_evidence_url`. INSERT: Fleet Analyst+ do tenant ou Admin Master. DELETE: APENAS Admin Master.
 
@@ -74,6 +75,8 @@
 - `add_driver_profile_link.sql` — adiciona coluna `profile_id UUID UNIQUE FK → profiles(id)` + INDEX `idx_drivers_profile_id` na tabela `drivers` para ligar cada motorista a seu perfil de usuário do sistema (2026-03-14)
 - `create_shippers_and_operational_units.sql` — tabelas `shippers` e `operational_units` com RLS policies, FK columns em `vehicles` (2026-03-17)
 - `20260319000000_add_budget_to_maintenance.sql` — novas colunas em `maintenance_orders` (current_km, budget_pdf_url, budget_status, budget_reviewed_by/at), tabela `maintenance_budget_items` com RLS ⚠️ **Executar no Supabase Dashboard**
+- `add_initial_km_vehicles.sql` — adiciona `initial_km INTEGER NULL` em `vehicles` e `initial_km_optional BOOLEAN DEFAULT false` em `vehicle_field_settings` (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
+- `add_odometer_km_checklists.sql` — adiciona `odometer_km INTEGER NULL` em `checklists` (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
 
 ### RLS — Padrões de Checklists
 - `checklists` SELECT: Driver/Auditor vê os próprios; Fleet Assistant+ vê todo o tenant; Admin Master vê tudo

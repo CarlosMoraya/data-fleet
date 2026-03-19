@@ -18,6 +18,7 @@ export interface ChecklistRow {
   device_info: string | null;
   notes: string | null;
   workshop_id: string | null;
+  odometer_km: number | null;
   // join fields
   checklist_templates?: { name: string; context: string } | null;
   vehicles?: { license_plate: string } | null;
@@ -60,6 +61,7 @@ export function checklistFromRow(row: ChecklistRow): Checklist {
     notes: row.notes ?? undefined,
     workshopId: row.workshop_id ?? undefined,
     workshopName: row.workshops?.name ?? undefined,
+    odometerKm: row.odometer_km ?? undefined,
   };
 }
 
@@ -92,6 +94,7 @@ export function checklistToRow(c: Partial<Checklist>): Partial<ChecklistRow> {
   if (c.deviceInfo !== undefined)    row.device_info = c.deviceInfo ?? null;
   if (c.notes !== undefined)         row.notes = c.notes ? normalizeTrim(c.notes) : null;
   if (c.workshopId !== undefined)    row.workshop_id = c.workshopId ?? null;
+  if (c.odometerKm !== undefined)    row.odometer_km = c.odometerKm ?? null;
   return row;
 }
 

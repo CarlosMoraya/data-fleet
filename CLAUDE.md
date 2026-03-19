@@ -65,6 +65,72 @@ Para detalhes completos, consulte os módulos em `.claude/`.
 
 ---
 
+## Novos Recursos (2026-03-18) — Km entre Revisões
+
+**Configuração de Km entre Revisões por Veículo:**
+
+- Nova aba "Revisões" em `src/pages/Settings.tsx` — acessível a Fleet Assistant+
+- Mostra todos os veículos do cliente com campo para km entre revisões
+- Filtros por marca, modelo e categoria (client-side); paginação de 50/página
+- Bulk apply: insere o mesmo km em todos os veículos filtrados de uma só vez
+- Salva via `.upsert({ onConflict: 'vehicle_id' })` — um round-trip para N alterações
+- Guard de página alterado: `ROLES_CAN_ACCESS_SETTINGS` (Fleet Assistant+); abas Veículos/Motoristas condicionais (Manager+)
+- Sidebar: "Configurações" agora visível para Fleet Assistant+
+- Tabela: `vehicle_km_intervals` (migration: `create_vehicle_km_intervals.sql` — ✅ EXECUTADA NO SUPABASE DASHBOARD)
+- Componente: `src/components/VehicleKmIntervalSettings.tsx` (props: clientId, userId)
+
+**Arquivos Modificados:**
+- `src/types.ts` — Adicionado `VehicleKmInterval` interface
+- `src/pages/Settings.tsx` — Nova aba + role guards atualizados
+- `src/components/Sidebar.tsx` — Configurações visível para Fleet Assistant+
+- `src/components/VehicleKmIntervalSettings.tsx` — Novo componente
+- `supabase/migrations/create_vehicle_km_intervals.sql` — Nova tabela com RLS (✅ executada)
+- `.claude/arch-backend.md` — Documentada tabela `vehicle_km_intervals`
+- `.claude/arch-frontend.md` — Documentados Settings.tsx e VehicleKmIntervalSettings
+- `.claude/data-model.md` — Documentada interface `VehicleKmInterval`
+
+---
+
+## Novos Recursos (2026-03-19)
+
+**Rastreamento de Hodômetro em Checklists:**
+
+1. **Km Inicial em Veículos** — Novo campo obrigatório (configurável por cliente) no cadastro de veículos.
+   - Campo: `initialKm` (INTEGER) — baseline para validação de checklists
+   - Mapper: Incluído em `src/lib/vehicleMappers.ts` (bidirectional: camelCase ↔ snake_case)
+   - UI: Novo input na seção "Propriedade & Rastreamento" em `src/components/VehicleForm.tsx`
+   - Config: Campo `initial_km_optional` em `vehicle_field_settings` permite configuração por cliente
+   - Migration: `supabase/migrations/add_initial_km_vehicles.sql` — **⚠️ EXECUTAR NO SUPABASE DASHBOARD**
+
+2. **Hodômetro em Checklists** — Campo obrigatório como **primeira etapa** de todo preenchimento de checklist.
+   - Campo: `odometerKm` (INTEGER) — hodômetro do veículo no momento do preenchimento
+   - Validação: Não pode ser menor que o último `odometer_km` registrado (ou `initial_km` se nenhum checklist anterior)
+   - UI: Seção dedicada em `src/pages/ChecklistFill.tsx` com:
+     * Referência visual do último KM registrado (com fallback para `initial_km`)
+     * Input numérico com validação em tempo real
+     * Bloqueio dos itens até KM ser confirmado (mesmo padrão da seleção de oficina)
+     * Badge verde indicando KM confirmado + botão "Alterar"
+   - Mapper: Incluído em `src/lib/checklistMappers.ts` com type `odometerKm?: number`
+   - Migration: `supabase/migrations/add_odometer_km_checklists.sql` — **⚠️ EXECUTAR NO SUPABASE DASHBOARD**
+
+**Sequência de Preenchimento (ChecklistFill.tsx):**
+1. Confirmar oficina (se contexto é Entrada/Saída de Oficina)
+2. Confirmar hodômetro (novo)
+3. Responder todos os itens obrigatórios
+4. Finalizar checklist
+
+**Arquivos Modificados:**
+- `src/types.ts` — Adicionado `initialKm?: number` em Vehicle, `initialKmOptional` em VehicleFieldSettings, `odometerKm?: number` em Checklist
+- `src/lib/vehicleMappers.ts` — Mapeamento completo de initial_km
+- `src/lib/checklistMappers.ts` — Mapeamento completo de odometer_km
+- `src/lib/fieldSettingsMappers.ts` — Suporte a initial_km_optional com mapa FIELD_TO_SETTING
+- `src/components/VehicleForm.tsx` — Novo input para Km Inicial (section "Propriedade & Rastreamento")
+- `src/pages/ChecklistFill.tsx` — Lógica e UI do hodômetro com queries para lastOdometerKm e vehicleInitialKm
+- `.claude/arch-frontend.md` — Documentado VehicleForm (Km Inicial) e ChecklistFill (hodômetro)
+- `.claude/arch-backend.md` — Documentadas novas colunas e migrations
+
+---
+
 ## Correções Recentes (2026-03-18)
 
 **Correções de Bugs de Multi-Tenancy e RLS:**

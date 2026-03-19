@@ -77,6 +77,7 @@ export interface Checklist {
   notes?: string;
   workshopId?: string;
   workshopName?: string; // from join
+  odometerKm?: number;
 }
 
 export interface ChecklistResponse {
@@ -218,6 +219,9 @@ export interface Vehicle {
 
   // Finalidade
   vehicleUsage?: 'Operação' | 'Uso Administrativo' | 'Uso por Lideranças' | 'Outros';
+
+  // Hodômetro
+  initialKm?: number;
 }
 
 export interface Driver {
@@ -374,6 +378,9 @@ export interface VehicleFieldSettings {
 
   // Finalidade
   vehicleUsageOptional: boolean;
+
+  // Hodômetro
+  initialKmOptional: boolean;
 }
 
 export type WorkshopScheduleStatus = 'scheduled' | 'completed' | 'cancelled';
@@ -400,4 +407,15 @@ export interface WorkshopSchedule {
   createdBy: string;
   createdByName?: string;             // from JOIN profiles
   createdAt?: string;
+}
+
+// ─── Vehicle KM Intervals ──────────────────────────────────────────────────────
+
+export interface VehicleKmInterval {
+  id: string;
+  clientId: string;
+  vehicleId: string;
+  kmInterval: number | null;
+  updatedAt?: string;
+  updatedBy?: string;
 }

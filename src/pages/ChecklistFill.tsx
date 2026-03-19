@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, XCircle, MinusCircle, Camera, ChevronLeft, Loader2, Lock, AlertTriangle, Building2 } from 'lucide-react';
+import { CheckCircle, XCircle, MinusCircle, Camera, ChevronLeft, Loader2, Lock, AlertTriangle, Building2, Gauge } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
@@ -38,6 +38,9 @@ export default function ChecklistFill() {
   const [localItemChanges, setLocalItemChanges] = useState<Record<string, Partial<ItemState>>>({});
   const [selectedWorkshopId, setSelectedWorkshopId] = useState<string>('');
   const [error, setError] = useState('');
+  const [kmInput, setKmInput] = useState('');
+  const [kmConfirmed, setKmConfirmed] = useState(false);
+  const [kmError, setKmError] = useState<string | null>(null);
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -89,6 +92,39 @@ export default function ChecklistFill() {
   const effectiveWorkshopId = checklist?.workshopId || selectedWorkshopId;
   const workshopSaved = !!checklist?.workshopId;
   const workshopReady = !needsWorkshop || workshopSaved;
+  const canShowItems = workshopReady && kmConfirmed;
+
+  // KM do cadastro do veículo (fallback quando não há checklist anterior)
+  const { data: vehicleInitialKm = null } = useQuery({
+    queryKey: ['vehicleInitialKm', checklist?.vehicleId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('vehicles')
+        .select('initial_km')
+        .eq('id', checklist!.vehicleId!)
+        .single();
+      return (data as { initial_km: number | null } | null)?.initial_km ?? null;
+    },
+    enabled: !!checklist?.vehicleId,
+  });
+
+  // Último KM registrado em qualquer checklist concluído deste veículo
+  const { data: lastOdometerKm = null } = useQuery({
+    queryKey: ['lastOdometerKm', checklist?.vehicleId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('checklists')
+        .select('odometer_km')
+        .eq('vehicle_id', checklist!.vehicleId!)
+        .eq('status', 'completed')
+        .not('odometer_km', 'is', null)
+        .order('completed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return (data as { odometer_km: number } | null)?.odometer_km ?? null;
+    },
+    enabled: !!checklist?.vehicleId,
+  });
 
   const { data: workshops = [] } = useQuery({
     queryKey: ['workshops', currentClient?.id],
@@ -104,6 +140,17 @@ export default function ChecklistFill() {
     },
     enabled: needsWorkshop && !!currentClient?.id
   });
+
+  // Inicializa KM quando checklist já tem odometerKm (checklist retomado)
+  React.useEffect(() => {
+    if (checklist?.odometerKm != null && !kmConfirmed) {
+      setKmInput(String(checklist.odometerKm));
+      setKmConfirmed(true);
+    }
+  }, [checklist?.odometerKm]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Referência para exibir ao usuário: último checklist > initial_km do veículo
+  const referenceKm = lastOdometerKm ?? vehicleInitialKm ?? null;
 
   // ── Derived State ────────────────────────────────────────────────────────
 
@@ -141,6 +188,35 @@ export default function ChecklistFill() {
       queryClient.invalidateQueries({ queryKey: ['checklistResponses', checklistId] });
     }
   });
+
+  const confirmKmMutation = useMutation({
+    mutationFn: async (km: number) => {
+      const { error } = await supabase
+        .from('checklists')
+        .update({ odometer_km: km })
+        .eq('id', checklistId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checklist', checklistId] });
+    },
+  });
+
+  const handleConfirmKm = () => {
+    setKmError(null);
+    const parsed = parseInt(kmInput, 10);
+    if (!kmInput.trim() || isNaN(parsed)) {
+      setKmError('Informe o Km atual do veículo.');
+      return;
+    }
+    if (referenceKm !== null && parsed < referenceKm) {
+      setKmError(
+        `O Km informado (${parsed.toLocaleString('pt-BR')}) é menor que o último registrado (${referenceKm.toLocaleString('pt-BR')} km).`
+      );
+      return;
+    }
+    confirmKmMutation.mutate(parsed, { onSuccess: () => setKmConfirmed(true) });
+  };
 
   const confirmWorkshopMutation = useMutation({
     mutationFn: async (workshopId: string) => {
@@ -342,8 +418,62 @@ export default function ChecklistFill() {
         </div>
       )}
 
-      {/* Items */}
+      {/* Odometer KM */}
       {workshopReady && (
+        <div className="px-4 py-4 max-w-2xl mx-auto w-full">
+          <div className={cn(
+            'rounded-2xl border p-4 space-y-3',
+            kmConfirmed ? 'bg-green-50 border-green-200' : 'bg-white border-orange-200',
+          )}>
+            <div className="flex items-center gap-2">
+              <Gauge className="h-4 w-4 text-orange-500 flex-shrink-0" />
+              <p className="text-sm font-semibold text-zinc-800">
+                {kmConfirmed
+                  ? `Hodômetro: ${parseInt(kmInput).toLocaleString('pt-BR')} km`
+                  : 'Informe o hodômetro'}
+              </p>
+            </div>
+            {referenceKm !== null && (
+              <p className="text-xs text-zinc-500">
+                Último Km registrado: {referenceKm.toLocaleString('pt-BR')} km
+              </p>
+            )}
+            {!kmConfirmed && (
+              <>
+                {kmError && <p className="text-xs text-red-600">{kmError}</p>}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={kmInput}
+                    onChange={e => setKmInput(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Ex: 45000"
+                    className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                  <span className="text-sm text-zinc-500 flex-shrink-0">km</span>
+                </div>
+                <button
+                  disabled={confirmKmMutation.isPending}
+                  onClick={handleConfirmKm}
+                  className="w-full py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  {confirmKmMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Confirmar hodômetro
+                </button>
+                <p className="text-xs text-zinc-500 text-center">Informe o hodômetro para liberar os itens do checklist</p>
+              </>
+            )}
+            {kmConfirmed && (
+              <button onClick={() => setKmConfirmed(false)} className="text-xs text-orange-500 hover:underline">
+                Alterar
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Items */}
+      {canShowItems && (
         <div className="flex-1 px-4 py-4 max-w-2xl mx-auto w-full space-y-3">
           {itemStates.map((s, idx) => (
             <div
@@ -452,12 +582,15 @@ export default function ChecklistFill() {
           {!workshopReady && (
             <p className="text-xs text-amber-600 text-center">Selecione e confirme a oficina para liberar o checklist</p>
           )}
-          {workshopReady && !mandatoryAnswered && (
+          {workshopReady && !kmConfirmed && (
+            <p className="text-xs text-amber-600 text-center">Informe o hodômetro para liberar os itens do checklist</p>
+          )}
+          {workshopReady && kmConfirmed && !mandatoryAnswered && (
             <p className="text-xs text-amber-600 text-center">Responda todos os itens obrigatórios para finalizar</p>
           )}
           <button
             onClick={() => finishChecklistMutation.mutate()}
-            disabled={!mandatoryAnswered || finishChecklistMutation.isPending || !workshopReady}
+            disabled={!mandatoryAnswered || finishChecklistMutation.isPending || !workshopReady || !kmConfirmed}
             className="w-full py-3 rounded-xl bg-orange-500 text-white font-semibold text-sm disabled:opacity-40 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
           >
             {finishChecklistMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}

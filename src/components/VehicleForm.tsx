@@ -77,6 +77,7 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
   cmt: filterNumericComma,
   eixos: filterDigitsOnly,
   firstRevisionMaxKm: filterDigitsOnly,
+  initialKm: filterDigitsOnly,
 };
 
 export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, availableShippers, availableOperationalUnits, onClose, onSave }: VehicleFormProps) {
@@ -451,6 +452,10 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                 <div>
                   <Label name="tag">Tag (Sem Parar)</Label>
                   <input type="text" name="tag" required={req('tag')} value={formData.tag || ''} onChange={handleChange} className={inputClass} placeholder="Código do dispositivo" />
+                </div>
+                <div>
+                  <Label name="initialKm">Km Inicial</Label>
+                  <input type="text" name="initialKm" required={req('initialKm')} inputMode="numeric" value={formData.initialKm ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 15000" />
                 </div>
 
                 <div>

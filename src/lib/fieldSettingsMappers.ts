@@ -35,6 +35,7 @@ export interface VehicleFieldSettingsRow {
   insurance_policy_upload_optional: boolean;
   maintenance_contract_upload_optional: boolean;
   vehicle_usage_optional: boolean;
+  initial_km_optional: boolean;
 }
 
 /** snake_case → camelCase */
@@ -73,6 +74,7 @@ export function fieldSettingsFromRow(row: VehicleFieldSettingsRow): VehicleField
     insurancePolicyUploadOptional: row.insurance_policy_upload_optional,
     maintenanceContractUploadOptional: row.maintenance_contract_upload_optional,
     vehicleUsageOptional: row.vehicle_usage_optional,
+    initialKmOptional: row.initial_km_optional,
   };
 }
 
@@ -114,6 +116,7 @@ export function fieldSettingsToRow(
     insurance_policy_upload_optional: settings.insurancePolicyUploadOptional,
     maintenance_contract_upload_optional: settings.maintenanceContractUploadOptional,
     vehicle_usage_optional: settings.vehicleUsageOptional,
+    initial_km_optional: settings.initialKmOptional,
   };
 }
 
@@ -153,6 +156,7 @@ export function defaultFieldSettings(clientId: string): VehicleFieldSettings {
     insurancePolicyUploadOptional: false,
     maintenanceContractUploadOptional: false,
     vehicleUsageOptional: false,
+    initialKmOptional: false,
   };
 }
 
@@ -189,6 +193,7 @@ const FIELD_TO_SETTING: Record<string, keyof VehicleFieldSettings> = {
   insurancePolicyUpload: 'insurancePolicyUploadOptional',
   maintenanceContractUpload: 'maintenanceContractUploadOptional',
   vehicleUsage: 'vehicleUsageOptional',
+  initialKm: 'initialKmOptional',
 };
 
 /** Retorna true se o campo é obrigatório. Campos não mapeados são sempre obrigatórios. */
@@ -239,4 +244,6 @@ export const CONFIGURABLE_FIELDS: { key: keyof VehicleFieldSettings; label: stri
   { key: 'maintenanceContractUploadOptional', label: 'Contrato de Manutenção', section: 'Seguro & Contrato', note: 'Quando Veículo possui contrato = Sim' },
   // Finalidade
   { key: 'vehicleUsageOptional', label: 'Finalidade do Veículo', section: 'Propriedade & Rastreamento' },
+  // Hodômetro
+  { key: 'initialKmOptional', label: 'Km Inicial', section: 'Propriedade & Rastreamento' },
 ];

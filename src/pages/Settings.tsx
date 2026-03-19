@@ -17,17 +17,21 @@ import {
   DRIVER_CONFIGURABLE_FIELDS,
   DriverFieldSettingsRow,
 } from '../lib/driverFieldSettingsMappers';
-import { Loader2, Truck, UserCircle } from 'lucide-react';
+import { Loader2, Truck, UserCircle, Gauge } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
+import VehicleKmIntervalSettings from '../components/VehicleKmIntervalSettings';
 
-const ROLES_CAN_MANAGE = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_MANAGE_FIELDS = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_ACCESS_SETTINGS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 
-type TabType = 'vehicles' | 'drivers';
+type TabType = 'vehicles' | 'drivers' | 'revisoes';
 
 export default function Settings() {
   const { currentClient, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>('vehicles');
+
+  const canManageFields = user ? ROLES_CAN_MANAGE_FIELDS.includes(user.role) : false;
+  const [activeTab, setActiveTab] = useState<TabType>(canManageFields ? 'vehicles' : 'revisoes');
 
   // Vehicle field settings state
   const [settings, setSettings] = useState<VehicleFieldSettings | null>(null);
@@ -41,7 +45,7 @@ export default function Settings() {
   const [driverSuccess, setDriverSuccess] = useState(false);
   const [driverError, setDriverError] = useState<string | null>(null);
 
-  if (user && !ROLES_CAN_MANAGE.includes(user.role)) {
+  if (user && !ROLES_CAN_ACCESS_SETTINGS.includes(user.role)) {
     return <Navigate to="/" replace />;
   }
 
@@ -197,7 +201,7 @@ export default function Settings() {
     saveDriverMutation.mutate();
   };
 
-  if (vehicleSettingsQuery.isLoading || driverSettingsQuery.isLoading) {
+  if (canManageFields && (vehicleSettingsQuery.isLoading || driverSettingsQuery.isLoading)) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
@@ -220,8 +224,11 @@ export default function Settings() {
   }, {} as Record<string, typeof DRIVER_CONFIGURABLE_FIELDS>);
 
   const tabs = [
-    { id: 'vehicles', name: 'Veículos', icon: Truck },
-    { id: 'drivers', name: 'Motoristas', icon: UserCircle },
+    ...(canManageFields ? [
+      { id: 'vehicles', name: 'Veículos', icon: Truck },
+      { id: 'drivers', name: 'Motoristas', icon: UserCircle },
+    ] : []),
+    { id: 'revisoes', name: 'Revisões', icon: Gauge },
   ];
 
   return (
@@ -441,6 +448,10 @@ export default function Settings() {
             </button>
           </div>
         </div>
+      )}
+
+      {activeTab === 'revisoes' && currentClient?.id && user && (
+        <VehicleKmIntervalSettings clientId={currentClient.id} userId={user.id} />
       )}
     </div>
   );

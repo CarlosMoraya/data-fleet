@@ -109,6 +109,9 @@ interface Vehicle {
   shipperName?: string;         // Nome do embarcador (vem do JOIN, não persistido diretamente)
   operationalUnitId?: string;   // FK → operational_units.id (nullable) — depende de shipperId
   operationalUnitName?: string; // Nome da unidade (vem do JOIN, não persistido diretamente)
+
+  // Hodômetro inicial do veículo (rastreamento em checklists)
+  initialKm?: number;           // Km de partida quando o veículo entrou na frota
 }
 ```
 
@@ -222,6 +225,7 @@ interface VehicleFieldSettings {
   pbtOptional: boolean;
   cmtOptional: boolean;
   eixosOptional: boolean;
+  initialKmOptional: boolean;
 }
 ```
 
@@ -349,6 +353,7 @@ interface Checklist {
   latitude?: number;
   longitude?: number;
   notes?: string;
+  odometerKm?: number;            // Hodômetro do veículo no momento do preenchimento (obrigatório, >= último checklist)
 }
 ```
 
@@ -375,8 +380,8 @@ interface Checklist {
 Tabelas ativas:
 - `profiles` (id UUID PK → auth.users, name, email, role, client_id FK → clients, can_delete_vehicles, can_delete_drivers, can_delete_workshops)
 - `clients` (id UUID PK, name, logo_url)
-- `vehicles` (id UUID PK, client_id FK → clients, brand, model, crlv_upload, renavam, chassi, etc. + check constraints atualizados para incluir 'Agregado' na aquisição; adicionado `driver_id UUID NULL FK → drivers(id) ON DELETE SET NULL` + `UNIQUE INDEX idx_vehicles_driver_unique WHERE driver_id IS NOT NULL` (garante 1:1); adicionado `shipper_id UUID NULL FK → shippers(id) ON DELETE SET NULL` e `operational_unit_id UUID NULL FK → operational_units(id) ON DELETE SET NULL`)
-- `vehicle_field_settings` (client_id PK/FK → clients, renavam_optional, chassi_optional, e demais flags de configurabilidade)
+- `vehicles` (id UUID PK, client_id FK → clients, brand, model, crlv_upload, renavam, chassi, etc. + check constraints atualizados para incluir 'Agregado' na aquisição; adicionado `driver_id UUID NULL FK → drivers(id) ON DELETE SET NULL` + `UNIQUE INDEX idx_vehicles_driver_unique WHERE driver_id IS NOT NULL` (garante 1:1); adicionado `shipper_id UUID NULL FK → shippers(id) ON DELETE SET NULL` e `operational_unit_id UUID NULL FK → operational_units(id) ON DELETE SET NULL`; **NOVO**: `initial_km INTEGER NULL` — hodômetro inicial do veículo)
+- `vehicle_field_settings` (client_id PK/FK → clients, renavam_optional, chassi_optional, e demais flags de configurabilidade; **NOVO**: `initial_km_optional BOOLEAN DEFAULT false`)
 - `shippers` (id UUID PK, client_id FK → clients, name NOT NULL, cnpj — UNIQUE(client_id, cnpj) nullable, phone, email, contact_person, notes, active, created_at) com RLS policies + índices
 - `operational_units` (id UUID PK, client_id FK → clients, shipper_id UUID NOT NULL FK → shippers(id) ON DELETE RESTRICT, name NOT NULL, code, city, state, notes, active, created_at) com RLS policies + partial unique index `(client_id, code) WHERE code IS NOT NULL`
 - `drivers` (id UUID PK, client_id FK, **profile_id UUID UNIQUE FK → profiles(id)**, name, cpf — UNIQUE(client_id, cpf), issue_date, expiration_date, cnh_upload, registration_number, category, renach, gr_upload, gr_expiration_date, certificate1_upload, course_name1, certificate2_upload, course_name2, certificate3_upload, course_name3) + INDEX idx_drivers_profile_id
@@ -388,10 +393,23 @@ Tabelas de checklists (ativas):
 - `checklist_templates` (`context` TEXT NOT NULL CHECK IN ('Rotina','Auditoria','Reboque','Entrada em Oficina','Saída de Oficina','Segurança'), `vehicle_category` NOT NULL, status draft/published/deprecated; EXCLUDE constraint `unique_published_category_context` garante 1 publicado por client+category+context)
 - `checklist_template_versions` (snapshots imutáveis)
 - `checklist_items` (`can_block_vehicle` BOOLEAN NOT NULL DEFAULT false — usado em contexto Segurança)
-- `checklists` (`workshop_id UUID NULL FK → workshops(id)` — preenchido nos contextos Entrada/Saída de Oficina; DELETE Admin Master only)
+- `checklists` (`workshop_id UUID NULL FK → workshops(id)` — preenchido nos contextos Entrada/Saída de Oficina; DELETE Admin Master only; **NOVO**: `odometer_km INTEGER NULL` — hodômetro do veículo no momento do preenchimento, obrigatório, não pode ser menor que o último checklist)
 - `checklist_responses` (status ok/issue/skipped/not_applicable; CASCADE)
 
 Tabelas de manutenção (ativas):
 - `maintenance_orders` (os_number auto-gerado, workshop_os_number editável, current_km, budget_pdf_url, budget_status, budget_reviewed_by/at; status CHECK inclui 'Aguardando aprovação')
 - `maintenance_budget_items` (item_name, system, quantity, value unitário R$, sort_order; RLS rank >= 3 + Admin Master; save: delete-then-insert)
 - `action_plans` (pending/in_progress/completed/cancelled; work_order_number; DELETE Admin Master only)
+- `vehicle_km_intervals` (UNIQUE vehicle_id; km_interval INTEGER NULL; SELECT/INSERT/UPDATE Fleet Assistant+; DELETE Manager+; migration: `create_vehicle_km_intervals.sql`)
+
+### VehicleKmInterval
+```typescript
+interface VehicleKmInterval {
+  id: string;
+  clientId: string;
+  vehicleId: string;
+  kmInterval: number | null;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+```
