@@ -26,6 +26,7 @@
 - `driver_field_settings` — configurações dinâmicas de campos obrigatórios de motorista por cliente
 - `workshops` — oficinas parceiras (CRUD com RLS, CNPJ único por cliente, sem uploads); **NOVO**: `profile_id UUID NULL FK → profiles(id) ON DELETE SET NULL` — quando preenchido, a oficina tem login próprio com role 'Workshop'; índice `idx_workshops_profile_id`
 - `vehicle_km_intervals` — km máximo entre revisões por veículo (UNIQUE vehicle_id); colunas: `id, client_id, vehicle_id, km_interval INTEGER NULL, updated_at, updated_by`; RLS: SELECT/INSERT/UPDATE Fleet Assistant(3)+ do próprio tenant ou Admin Master; DELETE Manager(5)+; migration: `create_vehicle_km_intervals.sql`
+- `checklist_day_intervals` — intervalo em dias entre checklists consecutivos de Rotina e Segurança por cliente (UNIQUE client_id); colunas: `id, client_id, rotina_day_interval INTEGER NULL, seguranca_day_interval INTEGER NULL, updated_at, updated_by`; RLS: SELECT/INSERT/UPDATE Fleet Assistant(3)+ do próprio tenant ou Admin Master; DELETE Manager(5)+; migration: `create_checklist_day_intervals.sql` ⚠️ EXECUTAR NO SUPABASE DASHBOARD
 
 ### Tabelas de Checklists (criadas em `create_checklist_tables.sql` + migrations adicionais)
 - `checklist_item_suggestions` — banco global de sugestões por categoria de veículo (Leve/Médio/Pesado/Elétrico). Sem `client_id`. Seed com ~45 itens pré-populados. SELECT para qualquer autenticado.

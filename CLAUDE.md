@@ -179,6 +179,30 @@ Para detalhes completos, consulte os módulos em `.claude/`.
 
 ---
 
+## Novos Recursos (2026-03-19) — Intervalo em Dias entre Checklists
+
+**Configuração de Intervalo entre Checklists de Rotina e Segurança:**
+
+- Nova aba "Checklists" em `src/pages/Settings.tsx` — acessível a Fleet Assistant+
+- Configuração global por cliente (não por veículo) do intervalo em dias entre checklists consecutivos
+- Dois campos: intervalo máximo em dias para Rotina e intervalo máximo em dias para Segurança
+- Campos opcionais (podem ser deixados em branco = não configurado)
+- Informativo — valores usados futuramente para gerar alertas de checklists em atraso
+- Tabela: `checklist_day_intervals` (migration: `create_checklist_day_intervals.sql` — ⚠️ EXECUTAR NO SUPABASE DASHBOARD)
+- Componente: `src/components/ChecklistDayIntervalSettings.tsx` (props: clientId, userId)
+- Padrão de upsert: `onConflict: 'client_id'` — cria ou atualiza em um round-trip
+
+**Arquivos Modificados:**
+- `src/types.ts` — Adicionado `ChecklistDayInterval` interface
+- `src/pages/Settings.tsx` — Nova aba "Checklists" com import do componente, TabType expandido, tabs array com novo item
+- `src/components/ChecklistDayIntervalSettings.tsx` — Novo componente com validação inline
+- `supabase/migrations/create_checklist_day_intervals.sql` — Nova tabela com RLS
+- `.claude/data-model.md` — Documentada tabela `checklist_day_intervals` e interface `ChecklistDayInterval`
+- `.claude/arch-backend.md` — Documentada tabela `checklist_day_intervals` + migration
+- `.claude/arch-frontend.md` — Documentado componente `ChecklistDayIntervalSettings` + Settings.tsx description
+
+---
+
 ## Correções Recentes (2026-03-18)
 
 **Correções de Bugs de Multi-Tenancy e RLS:**

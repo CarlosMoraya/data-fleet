@@ -421,3 +421,14 @@ export interface VehicleKmInterval {
   updatedAt?: string;
   updatedBy?: string;
 }
+
+// ─── Checklist Day Intervals ────────────────────────────────────────────────
+
+export interface ChecklistDayInterval {
+  id: string;
+  clientId: string;
+  rotinaDayInterval: number | null;
+  segurancaDayInterval: number | null;
+  updatedAt?: string;
+  updatedBy?: string;
+}

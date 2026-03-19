@@ -31,7 +31,8 @@ src/
 │   ├── MaintenanceForm.tsx       # Formulário de OS (dual OS, upload PDF orçamento, extração OCR, BudgetItemsTable, Km Atual, sem Custo Estimado/Subtotal); **NOVO**: prop `mode?: 'default' | 'workshop'` — no modo 'workshop' exibe apenas 5 campos obrigatórios (expectedExitDate, workshopOs, mechanicName, currentKm, PDF) + info read-only da OS
 │   ├── MaintenanceDetailModal.tsx # Modal read-only de OS (seção Orçamento: badge, PDF link, BudgetItemsTable readOnly)
 │   ├── BudgetItemsTable.tsx      # Tabela editável/read-only de itens de orçamento (5 cols: Item, Sistema, Qtd, Valor, Total) + subtotal
-│   └── VehicleKmIntervalSettings.tsx # Aba "Revisões" em Settings: configura km entre revisões por veículo; filtros (marca/modelo/categoria), bulk apply, paginação 50/página, bulk upsert via onConflict vehicle_id; props: clientId, userId
+│   ├── VehicleKmIntervalSettings.tsx # Aba "Revisões" em Settings: configura km entre revisões por veículo; filtros (marca/modelo/categoria), bulk apply, paginação 50/página, bulk upsert via onConflict vehicle_id; props: clientId, userId
+│   └── ChecklistDayIntervalSettings.tsx # Aba "Checklists" em Settings: configura intervalo em dias entre checklists de Rotina e Segurança (global por cliente); 2 inputs numéricos, upsert via onConflict client_id; props: clientId, userId
 ├── context/
 │   └── AuthContext.tsx   # Auth + client context → useAuth() hook
 ├── lib/
@@ -69,7 +70,7 @@ src/
 │   ├── WorkshopSchedules.tsx # Agendamentos de oficina — botão "Gerar OS" navega para /manutencao com prefill via state
 │   └── BudgetApprovals.tsx  # Aprovação de orçamentos (Fleet Assistant+) — fila FIFO, canApprove(user, total), expand por linha. **Query filtra por `client_id` + budgetItems query sem `enabled: expanded` (subtotal agora persiste após refresh, corrigido 2026-03-18)**
 │   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+); **não cria/lista Driver role** (drivers criados via DriverForm). **refreshSession antes de edição (corrigido JWT expired 2026-03-18)**
-│   ├── Settings.tsx     # Configurações: abas Veículo + Motorista (Manager+) + Revisões (Fleet Assistant+); guard: ROLES_CAN_ACCESS_SETTINGS (Fleet Assistant+); canManageFields controla abas visíveis
+│   ├── Settings.tsx     # Configurações: abas Veículo + Motorista (Manager+) + Revisões + Checklists (Fleet Assistant+); guard: ROLES_CAN_ACCESS_SETTINGS (Fleet Assistant+); canManageFields controla abas Veículos/Motoristas
 │   ├── AdminUsers.tsx   # CRUD todos usuários (Admin Master only). **refreshSession antes de edição (corrigido JWT expired 2026-03-18)**
 │   └── AdminClients.tsx # CRUD clientes (Admin Master only)
 ├── types.ts             # Interfaces compartilhadas

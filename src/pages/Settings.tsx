@@ -17,15 +17,16 @@ import {
   DRIVER_CONFIGURABLE_FIELDS,
   DriverFieldSettingsRow,
 } from '../lib/driverFieldSettingsMappers';
-import { Loader2, Truck, UserCircle, Gauge } from 'lucide-react';
+import { Loader2, Truck, UserCircle, Gauge, CalendarDays } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
 import VehicleKmIntervalSettings from '../components/VehicleKmIntervalSettings';
+import ChecklistDayIntervalSettings from '../components/ChecklistDayIntervalSettings';
 
 const ROLES_CAN_MANAGE_FIELDS = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_ACCESS_SETTINGS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 
-type TabType = 'vehicles' | 'drivers' | 'revisoes';
+type TabType = 'vehicles' | 'drivers' | 'revisoes' | 'checklists';
 
 export default function Settings() {
   const { currentClient, user } = useAuth();
@@ -229,6 +230,7 @@ export default function Settings() {
       { id: 'drivers', name: 'Motoristas', icon: UserCircle },
     ] : []),
     { id: 'revisoes', name: 'Revisões', icon: Gauge },
+  { id: 'checklists', name: 'Checklists', icon: CalendarDays },
   ];
 
   return (
@@ -452,6 +454,10 @@ export default function Settings() {
 
       {activeTab === 'revisoes' && currentClient?.id && user && (
         <VehicleKmIntervalSettings clientId={currentClient.id} userId={user.id} />
+      )}
+
+      {activeTab === 'checklists' && currentClient?.id && user && (
+        <ChecklistDayIntervalSettings clientId={currentClient.id} userId={user.id} />
       )}
     </div>
   );

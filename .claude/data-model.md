@@ -403,6 +403,7 @@ Tabelas de manutenção (ativas):
 - `maintenance_budget_items` (item_name, system, quantity, value unitário R$, sort_order; RLS rank >= 3 + Admin Master; save: delete-then-insert)
 - `action_plans` (pending/in_progress/completed/cancelled; work_order_number; DELETE Admin Master only)
 - `vehicle_km_intervals` (UNIQUE vehicle_id; km_interval INTEGER NULL; SELECT/INSERT/UPDATE Fleet Assistant+; DELETE Manager+; migration: `create_vehicle_km_intervals.sql`)
+- `checklist_day_intervals` (UNIQUE client_id; rotina_day_interval INTEGER NULL, seguranca_day_interval INTEGER NULL; SELECT/INSERT/UPDATE Fleet Assistant+; DELETE Manager+; migration: `create_checklist_day_intervals.sql` ⚠️ EXECUTAR NO SUPABASE DASHBOARD)
 
 ### VehicleKmInterval
 ```typescript
@@ -411,6 +412,18 @@ interface VehicleKmInterval {
   clientId: string;
   vehicleId: string;
   kmInterval: number | null;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+```
+
+### ChecklistDayInterval
+```typescript
+interface ChecklistDayInterval {
+  id: string;
+  clientId: string;
+  rotinaDayInterval: number | null;    // null = não configurado
+  segurancaDayInterval: number | null; // null = não configurado
   updatedAt?: string;
   updatedBy?: string;
 }
