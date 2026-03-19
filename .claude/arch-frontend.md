@@ -64,12 +64,12 @@ src/
 │   ├── ChecklistFill.tsx # Tela fullscreen de preenchimento (OK/Problema/N/A, câmera, observação, auto-save, finalização com ações). Contexto Entrada/Saída de Oficina: seleção obrigatória de oficina antes dos itens. Contexto Segurança: badge ⚠ em itens com canBlockVehicle
 │   ├── ChecklistTemplates.tsx # CRUD de templates (draft/published/deprecated, versionamento, filtro dual por categoria + contexto)
 │   ├── ActionPlans.tsx  # Painel Fleet Assistant+ — tabela de ações, filtros por status, modal de gestão
-│   ├── Maintenance.tsx  # CRUD de ordens de serviço — dual OS, saveMutation 3-etapas (INSERT/UPDATE → upload PDF → items), coluna Orçamento. Query filtra por `client_id` do cliente selecionado (suporta Admin Master ver qualquer cliente)
+│   ├── Maintenance.tsx  # CRUD de ordens de serviço — dual OS, saveMutation 3-etapas (INSERT/UPDATE → upload PDF → items), coluna Orçamento. **Query filtra por `client_id` do cliente selecionado (suporta Admin Master via dropdown, corrigido 2026-03-18)**
 │   ├── WorkshopSchedules.tsx # Agendamentos de oficina — botão "Gerar OS" navega para /manutencao com prefill via state
-│   └── BudgetApprovals.tsx  # Aprovação de orçamentos (Fleet Assistant+) — fila FIFO, canApprove(user, total), expand por linha
-│   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+); **não cria/lista Driver role** (drivers criados via DriverForm)
+│   └── BudgetApprovals.tsx  # Aprovação de orçamentos (Fleet Assistant+) — fila FIFO, canApprove(user, total), expand por linha. **Query filtra por `client_id` + budgetItems query sem `enabled: expanded` (subtotal agora persiste após refresh, corrigido 2026-03-18)**
+│   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+); **não cria/lista Driver role** (drivers criados via DriverForm). **refreshSession antes de edição (corrigido JWT expired 2026-03-18)**
 │   ├── Settings.tsx     # Configurações de campos obrigatórios: Veículo + Motorista (Manager+)
-│   ├── AdminUsers.tsx   # CRUD todos usuários (Admin Master only)
+│   ├── AdminUsers.tsx   # CRUD todos usuários (Admin Master only). **refreshSession antes de edição (corrigido JWT expired 2026-03-18)**
 │   └── AdminClients.tsx # CRUD clientes (Admin Master only)
 ├── types.ts             # Interfaces compartilhadas
 ├── constants.ts         # Mock data (MOCK_CLIENTS, MOCK_VEHICLES — Dashboard ainda usa MOCK_VEHICLES)

@@ -65,6 +65,35 @@ Para detalhes completos, consulte os módulos em `.claude/`.
 
 ---
 
+## Correções Recentes (2026-03-18)
+
+**Correções de Bugs de Multi-Tenancy e RLS:**
+
+1. **Maintenance.tsx** — Query não filtrava por `client_id` quando cliente era selecionado no dropdown. Admin Master via sempre os mesmos dados (Grupo LLE) independente do cliente selecionado.
+   - Alteração: Adicionado `.eq('client_id', currentClient.id)` na query quando `currentClient?.id` existe
+   - Arquivo: `src/pages/Maintenance.tsx`
+
+2. **BudgetApprovals.tsx** — Mesmo problema: query sem filtro por `client_id`. Removido também o `enabled: expanded` desnecessário que fazia subtotal sumir após refresh.
+   - Alteração: Adicionado filtro `client_id` + removido `enabled: expanded` de budgetItems query
+   - Arquivo: `src/pages/BudgetApprovals.tsx`
+
+3. **Users.tsx + AdminUsers.tsx** — Token JWT expirado ao editar usuário (erro "JWT expired"). SDK do Supabase não fazia refresh automático antes de operações críticas.
+   - Alteração: Adicionado `await supabase.auth.refreshSession()` antes do `.update()` nas mutations
+   - Arquivos: `src/pages/Users.tsx`, `src/pages/AdminUsers.tsx`
+
+4. **CreateActionPlanModal.tsx** — Admin Master bloqueado de criar planos de ação por bug de RLS no banco.
+   - Alteração: Melhorado tratamento de erro para exibir mensagem real do Supabase (não genérica)
+   - Arquivo: `src/components/CreateActionPlanModal.tsx`
+   - **Correção de BD**: Nova migration `supabase/migrations/fix_action_plans_admin_master_rls.sql` — **⚠️ EXECUTAR NO SUPABASE DASHBOARD**
+
+**Causa Raiz de action_plans RLS:**
+- Admin Master tem `client_id = NULL` no profile
+- Migration `add_supervisor_coordinator_roles.sql` usava `client_id IN (SELECT client_id FROM profiles WHERE ... OR role = 'Admin Master')`
+- Em SQL, `coluna IN (NULL)` é sempre UNKNOWN (nunca TRUE) → Admin Master ficava bloqueado
+- Solução: Usar `EXISTS` com check direto `p.role = 'Admin Master'` em vez de depender de `client_id`
+
+---
+
 ## Histórico de Mudanças
 
 Consulte [CHANGELOG.md](CHANGELOG.md) para o histórico detalhado de todas as sessões.

@@ -78,8 +78,10 @@
 ### RLS — Padrões de Checklists
 - `checklists` SELECT: Driver/Auditor vê os próprios; Fleet Assistant+ vê todo o tenant; Admin Master vê tudo
 - `checklists` DELETE: APENAS Admin Master (exclusão hard-delete para trilha de auditoria)
-- `action_plans` SELECT/UPDATE: Fleet Assistant+ do tenant
+- `action_plans` SELECT/UPDATE: Fleet Assistant+ do tenant **OU Admin Master** (via migration `fix_action_plans_admin_master_rls.sql`)
+- `action_plans` INSERT: Fleet Analyst+ do tenant **OU Admin Master** (via migration `fix_action_plans_admin_master_rls.sql`)
 - `action_plans` DELETE: APENAS Admin Master
+- **⚠️ BUG CORRIGIDO (2026-03-18)**: Migration anterior usava `client_id IN (SELECT client_id...)` que bloqueava Admin Master (client_id = NULL). Corrigido com `EXISTS` + check `role = 'Admin Master'`.
 
 ### Tabela `vehicles` — colunas principais
 `id`, `client_id`, `type` (Passeio a Cavalo), `energy_source`, `cooling_equipment`, `semi_reboque`, `placa_semi_reboque`, `fuel_type`, `tank_capacity`, `avg_consumption`, `cooling_brand`, `license_plate`, `renavam`, `chassi`, `detran_uf`, `brand`, `model`, `year`, `color`, `acquisition`, `acquisition_date`, `fipe_price`, `tracker`, `antt`, `owner`, `status`, `autonomy`, `tag`, `crlv_upload`, `sanitary_inspection_upload`, `gr_upload`, `gr_expiration_date`, `spare_key`, `vehicle_manual`, `category`, `created_at`, `updated_at`
