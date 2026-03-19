@@ -201,11 +201,13 @@ export default function BudgetApprovals() {
     if (rank < 3) navigate('/', { replace: true });
   }, [user, rank, navigate]);
 
+  const { currentClient } = useAuth();
+
   const { data: orders = [], isLoading } = useQuery<PendingOrder[]>({
-    queryKey: ['budgetApprovals'],
+    queryKey: ['budgetApprovals', currentClient?.id],
     enabled: rank >= 3,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('maintenance_orders')
         .select(`
           id, os_number, entry_date, workshop_os_number, current_km,
@@ -216,6 +218,12 @@ export default function BudgetApprovals() {
         `)
         .eq('status', 'Aguardando aprovação')
         .order('created_at', { ascending: true });
+
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
 
       return (data as any[]).map(row => ({
