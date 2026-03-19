@@ -342,6 +342,7 @@ function EditUserModal({
   const editMutation = useMutation({
     mutationFn: async (updates: Record<string, unknown>) => {
       if (!user) return;
+      await supabase.auth.refreshSession();
       const { error: dbError } = await supabase
         .from('profiles')
         .update(updates)
