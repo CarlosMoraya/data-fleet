@@ -362,6 +362,35 @@ type DashboardFilters = {
 
 ---
 
+## Novos Recursos (2026-03-20) — Redesign da Tela de Login com Logo βetaFleet e Background Mídia
+
+**Tela de Login Alinhada com Marca + Preparada para Mídia:**
+
+- **Logo βetaFleet**: Substituição do ícone Truck + texto "Sign in to Data Fleet" pelo logo tipográfico βetaFleet (β em orange-500 + etaFleet em branco) + tagline "Evolution always", mesmo padrão visual do Sidebar
+- **Texto**: "Sign in to βetaFleet"
+- **Background com Fallback Inteligente**:
+  - Prioridade 1: Vídeo em `public/videos/login-bg.mp4` (autoPlay, loop, muted, playsInline)
+  - Prioridade 2: Imagem em `public/images/login-bg.jpg` (fallback se vídeo falha)
+  - Prioridade 3: Fundo sólido `bg-zinc-900` (fallback se ambos falham)
+  - Detecção via `onError` handlers — sem pré-fetch, browser determina o que consegue carregar
+- **Overlay**: `bg-black/50` sobre mídia para garantir legibilidade do formulário
+- **Card do Formulário**: Branco semi-transparente `bg-white/95` com backdrop-blur, posicionado sobre a mídia com z-index adequado
+
+**Estrutura de Pastas:**
+```
+public/
+  videos/
+    login-bg.mp4   ← colocar vídeo aqui
+  images/
+    login-bg.jpg   ← colocar imagem aqui (fallback)
+```
+
+**Arquivo Modificado:**
+- `src/pages/Login.tsx` — Reescrito com logo βetaFleet, texto "Sign in to βetaFleet", lógica de background com fallback vídeo → imagem → cor, estados `videoFailed` e `imageFailed` para detecção de erros via `onError`
+- `.claude/arch-frontend.md` — Atualizado descrição de Login.tsx
+
+---
+
 ## Histórico de Mudanças
 
 Consulte [CHANGELOG.md](CHANGELOG.md) para o histórico detalhado de todas as sessões.

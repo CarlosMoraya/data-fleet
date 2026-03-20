@@ -60,7 +60,7 @@ src/
 │   ├── actionPlanMappers.ts        # Mappers + actionStatusLabel() + actionStatusColor() para ActionPlan
 │   └── checklistStorageHelpers.ts  # uploadChecklistPhoto() + deleteChecklistPhoto() — bucket checklist-photos
 ├── pages/
-│   ├── Login.tsx        # Login com email/senha (Supabase Auth)
+│   ├── Login.tsx        # Login com email/senha (Supabase Auth); **REDESIGN 2026-03-20**: Logo βetaFleet tipográfica (β orange-500 + etaFleet branco + "Evolution always"); background com fallback: vídeo `/videos/login-bg.mp4` → imagem `/images/login-bg.jpg` → fundo zinc-900; detecção via `onError` handlers (videoFailed, imageFailed state); overlay black/50; card branco/95 backdrop-blur
 │   ├── Dashboard.tsx    # Dois painéis (abas): Painel Operacional + Painel de Custos. Queries: dashboard-vehicles, dashboard-maintenance (com join vehicles(type)), dashboard-checklists, dashboard-intervals, dashboard-drivers. Filtros interativos (vehicleType + maintenanceType) compartilhados entre abas. Cálculo de checklists vencidos via useMemo + checklist_day_intervals.
 │   ├── Cadastros.tsx    # Layout wrapper com abas (Veículos, Motoristas, Embarcadores, Unidades Operacionais, Oficinas, Usuários) + <Outlet />
 │   ├── Vehicles.tsx     # CRUD de veículos (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → VehicleDetailModal + carrega availableShippers/Units para VehicleForm

@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Truck } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  const showVideo = !videoFailed;
+  const showImage = videoFailed && !imageFailed;
+  const showOverlay = showVideo || showImage;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,20 +30,53 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <div className="bg-blue-600 p-3 rounded-2xl shadow-sm">
-            <Truck className="h-8 w-8 text-white" />
-          </div>
-        </div>
-        <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-zinc-900">
-          Sign in to Data Fleet
-        </h2>
-      </div>
+    <div className="relative min-h-screen bg-zinc-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 overflow-hidden">
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-sm sm:rounded-2xl sm:px-10 border border-zinc-100">
+      {/* Vídeo de fundo — oculto via onError se não existir */}
+      <video
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${showVideo ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        autoPlay
+        loop
+        muted
+        playsInline
+        onError={() => setVideoFailed(true)}
+      >
+        <source src="/videos/login-bg.mp4" type="video/mp4" onError={() => setVideoFailed(true)} />
+      </video>
+
+      {/* Imagem de fundo — fallback quando vídeo falha */}
+      {videoFailed && (
+        <img
+          src="/images/login-bg.jpg"
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      )}
+
+      {/* Overlay escuro sobre a mídia */}
+      {showOverlay && (
+        <div className="absolute inset-0 bg-black/50" />
+      )}
+
+      {/* Conteúdo do formulário */}
+      <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-md">
+        {/* Logo βetaFleet */}
+        <div className="flex flex-col items-center mb-8">
+          <span className="text-[36px] font-bold tracking-tight leading-none flex items-baseline">
+            <span className="text-orange-500 mr-[2px] text-[38px]">β</span>
+            <span className="text-white">etaFleet</span>
+          </span>
+          <span className="text-[11px] font-medium text-white/50 uppercase tracking-[0.25em] mt-1 ml-5">
+            Evolution always
+          </span>
+        </div>
+
+        <h2 className="text-center text-2xl font-semibold tracking-tight text-white mb-8">
+          Sign in to βetaFleet
+        </h2>
+
+        <div className="bg-white/95 backdrop-blur-sm py-8 px-4 shadow-xl rounded-2xl sm:px-10 border border-white/20">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label className="block text-sm font-medium text-zinc-700">Email</label>
