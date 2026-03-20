@@ -329,19 +329,36 @@ type DashboardFilters = {
 
 ---
 
-## Novos Recursos (2026-03-19) — Novo Logo da BetaFleet
+## Novos Recursos (2026-03-19) — Novo Logo Tipográfico βetaFleet
 
 **Implementação do Logo BetaFleet:**
 
-- Criação de um novo logo em formato SVG escalável, combinando formato de escudo, rotas/vias e checkmark.
-- Adaptação rigorosa do logo aos Design Tokens existentes (Tailwind v4 `blue-600` como principal, `orange-500` como detalhe interativo, tipografia `Inter`).
-- Substituição do ícone genérico "Truck" e texto "Data Fleet" na barra lateral (`Sidebar.tsx`) pelo novo logo SVG da BetaFleet em formato horizontal.
-- Criação do artefato `betafleet_logo_guidelines.md` com as referências, guidelines e SVGs do logo em variações horizontais, verticais e "icon-only".
-- O novo logo não conflitua com logos de clientes gerenciados no Topbar da aplicação.
+- Criação de um novo logo tipográfico, substituindo o ícone e texto originais "Data Fleet" na barra lateral (`Sidebar.tsx`) pelo formato original da marca: **βetaFleet**.
+- Utilização da letra grega beta (`β`) em cor laranja (`orange-500`) combinada com "etaFleet" em branco, alinhadas milimetricamente na mesma baseline da fonte Inter.
+- Inclusão do subtítulo "Evolution always" em uppercase com amplo espaçamento entre caracteres para uma aparência harmônica e moderna.
+- Implementação baseada em texto e classes Tailwind (100% livre de assets ou complexidade SVG).
+- Criação do arquivo auxiliar `betafleet_logo_guidelines.md` (o qual possui histórico de design system alternativo também).
 
 **Arquivos Modificados:**
-- `src/components/Sidebar.tsx` — Substituição do header da sidebar pelo logo inline (SVG) da BetaFleet.
+- `src/components/Sidebar.tsx` — Nova construção flex-col no header contendo a tipografia βetaFleet pura.
 - `.claude/arch-frontend.md` — Modificações refletidas no layout da Sidebar.
+
+---
+
+## Novos Recursos (2026-03-20) — OCR Inteligente com Cache e Portabilidade (βetaFleet)
+
+**Arquitetura de OCR Otimizada para Custo e Escalabilidade:**
+
+- **Cache de Resultados**: Implementada tabela `ocr_cache` no Supabase que armazena o hash SHA-256 do arquivo e o JSON retornado pela IA. Isso evita cobranças duplicadas para o mesmo documento.
+- **Portabilidade de IA (Vendor Agnostic)**: A lógica do Gemini foi abstraída para `src/lib/ocr/geminiProvider.ts` seguindo a interface `OcrProvider`. Trocar de IA agora requer apenas a criação de um novo provider.
+- **Orquestrador Central**: `src/lib/ocr/ocrEngine.ts` gerencia o fluxo: Hash → Busca Cache → (Miss) Chamada IA → Salva Cache → Retorno.
+- **Utilitários**: `src/lib/hashUtils.ts` para cálculo de SHA-256 no navegador.
+
+**Arquivos Criados/Modificados:**
+- `src/lib/ocr/` (types.ts, geminiProvider.ts, cacheService.ts, ocrEngine.ts) — Nova infraestrutura.
+- `src/lib/hashUtils.ts` — Cálculo de hash de arquivos.
+- `src/lib/documentOcr.ts`, `src/lib/budgetOcr.ts` — Refatorados para usar a nova engine.
+- `supabase/migrations/20260320090000_create_ocr_cache.sql` — Nova tabela com RLS. **⚠️ EXECUTAR NO SUPABASE DASHBOARD**
 
 ---
 

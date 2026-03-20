@@ -1,7 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { GoogleGenAI } from '@google/genai';
 import type { Vehicle, Driver } from '../types';
+import { performOcr } from './ocr/ocrEngine';
 import {
   filterDigitsOnly,
   filterPlate,
@@ -76,27 +76,6 @@ async function fileToBase64(file: File): Promise<string> {
     reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
     reader.readAsDataURL(file);
   });
-}
-
-/**
- * Renderiza a primeira página de um PDF como JPEG base64 (para envio ao Gemini Vision).
- * Gemini não aceita PDF como inline data — apenas imagens.
- */
-async function pdfFirstPageToJpegBase64(file: File): Promise<string> {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  const page = await pdf.getPage(1);
-
-  const scale = 2.0; // alta resolução para melhor OCR
-  const viewport = page.getViewport({ scale });
-  const canvas = document.createElement('canvas');
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  await page.render({ canvas, viewport }).promise;
-
-  // Converte para JPEG com qualidade 0.92 e remove prefixo data:...;base64,
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-  return dataUrl.split(',')[1];
 }
 
 /** Converte "31/12/2025" → "2025-12-31" (formato aceito pelo input type="date") */
@@ -280,32 +259,8 @@ Regras:
 - "cor": primeira letra maiúscula
 - Não inclua campos extras. Retorne SOMENTE o JSON, sem markdown.`;
 
-async function extractCrlvViaGemini(file: File): Promise<Partial<Vehicle>> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY não configurada');
-
-  const genai = new GoogleGenAI({ apiKey });
-
-  // gemini-2.5-flash suporta PDF como inline data nativamente
-  const base64 = await fileToBase64(file);
-  const mimeType = file.type;
-
-  const response = await genai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: [{
-      role: 'user',
-      parts: [
-        { inlineData: { data: base64, mimeType } },
-        { text: CRLV_PROMPT },
-      ],
-    }],
-    config: { responseMimeType: 'application/json' },
-  });
-
-  const raw = response.text ?? '';
-  // Remove code fences se o modelo retornar com ```json ... ```
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-  const json = JSON.parse(cleaned);
+async function extractCrlvViaIA(file: File): Promise<Partial<Vehicle>> {
+  const json = await performOcr(file, CRLV_PROMPT);
 
   const result: Partial<Vehicle> = {};
   if (json.placa) result.licensePlate = filterPlate(String(json.placa));
@@ -360,31 +315,8 @@ Regras:
 - "nome": nome completo como aparece no documento
 - Não inclua campos extras. Retorne SOMENTE o JSON, sem markdown.`;
 
-async function extractCnhViaGemini(file: File): Promise<Partial<Driver>> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY não configurada');
-
-  const genai = new GoogleGenAI({ apiKey });
-
-  // gemini-2.5-flash suporta PDF como inline data nativamente
-  const base64 = await fileToBase64(file);
-  const mimeType = file.type;
-
-  const response = await genai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: [{
-      role: 'user',
-      parts: [
-        { inlineData: { data: base64, mimeType } },
-        { text: CNH_PROMPT },
-      ],
-    }],
-    config: { responseMimeType: 'application/json' },
-  });
-
-  const raw = response.text ?? '';
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-  const json = JSON.parse(cleaned);
+async function extractCnhViaIA(file: File): Promise<Partial<Driver>> {
+  const json = await performOcr(file, CNH_PROMPT);
 
   const result: Partial<Driver> = {};
   if (json.nome) result.name = capitalizeWords(String(json.nome));
@@ -462,18 +394,17 @@ export async function extractCrlvData(file: File): Promise<ExtractionResult<Vehi
       }
     }
 
-    // Imagens ou PDF com regex insuficiente → Gemini Vision
-    ocrDebug('CRLV: chamando Gemini Vision...');
-    const geminiData = await extractCrlvViaGemini(file);
-    const { count, missing } = countFields(geminiData, CRLV_FIELDS);
+    // Imagens ou PDF com regex insuficiente → IA Vision
+    ocrDebug('Chamando IA Vision...');
+    const data = await extractCrlvViaIA(file);
     return {
-      data: geminiData,
-      fieldCount: count,
+      data,
+      fieldCount: countFields(data, CRLV_FIELDS).count,
       totalFields,
-      method: 'gemini',
-      warnings: missing,
+      method: 'gemini', // Mantemos 'gemini' no tipo por agora, mas o motor é dinâmico
+      warnings: countFields(data, CRLV_FIELDS).missing,
     };
-  } catch {
+  } catch (err) { console.error("OCR FALHOU:", err);
     return {
       data: {},
       fieldCount: 0,
@@ -517,18 +448,17 @@ export async function extractCnhData(file: File): Promise<ExtractionResult<Drive
       }
     }
 
-    // Imagens ou PDF com regex insuficiente → Gemini Vision
-    ocrDebug('CNH: chamando Gemini Vision...');
-    const geminiData = await extractCnhViaGemini(file);
-    const { count, missing } = countFields(geminiData, CNH_FIELDS);
+    // Imagens ou PDF com regex insuficiente → IA Vision
+    ocrDebug('Chamando IA Vision...');
+    const data = await extractCnhViaIA(file);
     return {
-      data: geminiData,
-      fieldCount: count,
+      data,
+      fieldCount: countFields(data, CNH_FIELDS).count,
       totalFields,
       method: 'gemini',
-      warnings: missing,
+      warnings: countFields(data, CNH_FIELDS).missing,
     };
-  } catch {
+  } catch (err) { console.error("OCR FALHOU:", err);
     return {
       data: {},
       fieldCount: 0,

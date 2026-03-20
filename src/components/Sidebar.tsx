@@ -69,7 +69,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <span className="text-orange-500 mr-[2px] text-[32px]">β</span>etaFleet
           </span>
           <span className="text-[10px] font-medium text-blue-200/80 uppercase tracking-[0.25em] ml-5 mt-1">
-            Fleet Management
+            Evolution always
           </span>
         </div>
       </div>

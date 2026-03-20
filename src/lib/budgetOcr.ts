@@ -1,7 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { GoogleGenAI } from '@google/genai';
 import type { BudgetItem } from './maintenanceMappers';
+import { performOcr } from './ocr/ocrEngine';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -198,28 +198,8 @@ Regras:
 - Ignore totais gerais, CNPJ, endereços e dados do cliente.
 Retorne SOMENTE o JSON, sem markdown.`;
 
-async function extractBudgetViaGemini(file: File): Promise<BudgetExtractionResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY não configurada');
-
-  const genai = new GoogleGenAI({ apiKey });
-  const base64 = await fileToBase64(file);
-
-  const response = await genai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: [{
-      role: 'user',
-      parts: [
-        { inlineData: { data: base64, mimeType: file.type } },
-        { text: BUDGET_PROMPT },
-      ],
-    }],
-    config: { responseMimeType: 'application/json' },
-  });
-
-  const raw = response.text ?? '';
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-  const json = JSON.parse(cleaned);
+async function extractBudgetViaIA(file: File): Promise<BudgetExtractionResult> {
+  const json = await performOcr(file, BUDGET_PROMPT);
 
   const items: BudgetItem[] = (json.items ?? []).map((it: any, idx: number) => ({
     itemName: String(it.item_name || ''),
@@ -257,8 +237,8 @@ export async function extractBudgetData(file: File): Promise<BudgetExtractionRes
       }
     }
 
-    debug('Chamando Gemini Vision...');
-    return await extractBudgetViaGemini(file);
+    debug('Chamando IA Vision...');
+    return await extractBudgetViaIA(file);
   } catch (err) {
     debug('Falha total na extração:', err);
     return {
