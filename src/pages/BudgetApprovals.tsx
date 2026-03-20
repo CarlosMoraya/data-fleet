@@ -282,9 +282,6 @@ export default function BudgetApprovals() {
       {!ALWAYS_APPROVE_ROLES.includes(user.role) && (
         <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-sm text-orange-700">
           Seu limite de aprovação é <strong>{formatCurrency(user.budgetApprovalLimit)}</strong>.
-          {user.budgetApprovalLimit === 0
-            ? ' Você não possui permissão de aprovação no momento.'
-            : ' Orçamentos acima deste valor precisam de um Coordenador ou Diretor.'}
         </div>
       )}
 
