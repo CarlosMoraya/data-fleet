@@ -232,6 +232,77 @@ Para detalhes completos, consulte os módulos em `.claude/`.
 
 ---
 
+## Novos Recursos (2026-03-19) — Dashboard com Painéis Operacional e de Custos
+
+**Dashboard Completo com KPIs Reais e Gráficos Interativos:**
+
+- Dois painéis (abas): **Painel Operacional** e **Painel de Custos de Manutenção**
+- Gráficos interativos que atuam como filtros (click = toggle filtro)
+- Filtros aditivos (AND) compartilhados entre painéis: `vehicleType` + `maintenanceType`
+
+**Painel Operacional — 5 KPIs:**
+1. **Total de Veículos** (Truck, azul) — contagem de veículos filtrados
+2. **Em Manutenção** (Wrench, âmbar) — OS com `status !== 'Concluído'`
+3. **Checklists Vencidos** (CalendarDays, vermelho) — veículos cuja última checklist de Rotina ou Segurança ultrapassa intervalo em `checklist_day_intervals`
+4. **CRLVs Vencidos** (FileWarning, laranja) — veículos com `crlv_year < ano atual`
+5. **CNHs Vencidas** (UserX, vermelho) — motoristas com `expiration_date < hoje`
+
+**Painel Operacional — 2 Gráficos:**
+- Barras: veículos por tipo (8 tipos)
+- Rosca: contagem de OS por tipo de manutenção (Corretiva/Preventiva/Preditiva)
+
+**Painel de Custos — 3 KPIs:**
+1. **Custo Total** (DollarSign, verde) — `SUM(approved_cost)` de OS com custo aprovado
+2. **Custo por Veículo** (Truck, azul) — Custo Total / nº de veículos distintos com OS
+3. **Custo por KM** (Gauge, roxo) — Custo Total / km total agregado (por veículo: MAX(current_km) - initial_km)
+
+**Painel de Custos — 2 Gráficos:**
+- Barras: custo por tipo de veículo
+- Rosca: custo por tipo de manutenção
+
+**Arquivos Criados:**
+- `src/components/dashboard/DashboardKpiCard.tsx` — Card reutilizável (icon, label, value, subtitle, isAlert)
+- `src/components/dashboard/VehicleTypeBarChart.tsx` — Gráfico de barras com click=filtro; click novamente limpa
+- `src/components/dashboard/MaintenanceTypeDonutChart.tsx` — Gráfico de rosca com click=filtro; cores: Corretiva=#ef4444, Preventiva=#3b82f6, Preditiva=#8b5cf6
+- `src/components/dashboard/OperationalPanel.tsx` — 5 KPIs + 2 gráficos; exporta interfaces VehicleRow, MaintenanceOrderDashboard, DashboardFilters
+- `src/components/dashboard/CostPanel.tsx` — 3 KPIs + 2 gráficos; cálculo de cost per KM
+
+**Arquivo Modificado:**
+- `src/pages/Dashboard.tsx` — Reescrito: 5 queries (dashboard-vehicles, dashboard-maintenance, dashboard-checklists, dashboard-intervals, dashboard-drivers); state de filtros lifted; abas + loading state; cálculo de overdue checklists via useMemo
+
+**Arquivos de Migração:**
+- `supabase/migrations/fix_vehicles_admin_master_rls.sql` — Corrige SELECT RLS em vehicles table para incluir `OR role = 'Admin Master'` (Admin Master tem client_id = NULL, precisava de exceção especial como em maintenance_orders e action_plans). **⚠️ EXECUTAR NO SUPABASE DASHBOARD**
+
+**Queries (react-query):**
+```ts
+dashboard-vehicles    → vehicles: SELECT id, type, crlv_year, driver_id
+dashboard-maintenance → maintenance_orders: SELECT id, vehicle_id, type, status, approved_cost, current_km, vehicles(type)
+dashboard-checklists  → checklists: SELECT vehicle_id, context, completed_at (status='completed')
+dashboard-intervals   → checklist_day_intervals: SELECT rotina_day_interval, seguranca_day_interval (maybeSingle)
+dashboard-drivers     → drivers: SELECT id, expiration_date
+```
+
+**Filtros Interativos:**
+```ts
+type DashboardFilters = {
+  vehicleType: string | null;       // ex: 'Passeio'
+  maintenanceType: string | null;   // ex: 'Corretiva'
+};
+```
+- Client-side filtering via useMemo em ambos os painéis
+- Alterar filtro atualiza KPIs e ambos os gráficos
+- Filtros persistem ao trocar entre abas
+
+**Arquivos Modificados:**
+- `src/pages/Dashboard.tsx` — Reescrito com 5 queries, filtros, abas, painéis
+- `src/components/dashboard/OperationalPanel.tsx` — Criado com VehicleRow interface (sem coluna `status` pois não existe no DB)
+- `src/components/dashboard/CostPanel.tsx` — Criado com cálculo de cost per KM
+- `.claude/arch-frontend.md` — Documentado Dashboard e componentes do dashboard/
+- `.claude/arch-backend.md` — Documentada migration fix_vehicles_admin_master_rls.sql
+- `.claude/data-model.md` — Documentadas interfaces VehicleRow, MaintenanceOrderDashboard, DashboardFilters
+
+---
+
 ## Histórico de Mudanças
 
 Consulte [CHANGELOG.md](CHANGELOG.md) para o histórico detalhado de todas as sessões.

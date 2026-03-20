@@ -1,61 +1,204 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Truck, AlertTriangle, Wrench, Loader2 } from 'lucide-react';
+import { Loader2, LayoutDashboard, DollarSign, AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend
-} from 'recharts';
+import { cn } from '../lib/utils';
+import OperationalPanel from '../components/dashboard/OperationalPanel';
+import CostPanel from '../components/dashboard/CostPanel';
+import type {
+  VehicleRow,
+  MaintenanceOrderDashboard,
+  DashboardFilters,
+} from '../components/dashboard/OperationalPanel';
+
+type TabType = 'operacional' | 'custos';
+
+const tabs: { id: TabType; label: string; icon: typeof LayoutDashboard }[] = [
+  { id: 'operacional', label: 'Painel Operacional', icon: LayoutDashboard },
+  { id: 'custos', label: 'Painel de Custos de Manutenção', icon: DollarSign },
+];
+
+function daysBetween(a: Date, b: Date) {
+  return Math.floor((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
+}
 
 export default function Dashboard() {
-  const { currentClient } = useAuth();
-  
-  const { data: vehicles = [], isLoading } = useQuery({
-    queryKey: ['dashboard-vehicles', currentClient?.id],
-    queryFn: async () => {
-      if (!currentClient?.id) return [];
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select('*')
-        .eq('client_id', currentClient.id);
-      
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!currentClient?.id
+  const { currentClient, user } = useAuth();
+  const [activeTab, setActiveTab] = useState<TabType>('operacional');
+  const [filters, setFilters] = useState<DashboardFilters>({
+    vehicleType: null,
+    maintenanceType: null,
   });
 
-  const totalVehicles = vehicles.length;
-  const inMaintenance = vehicles.filter(v => v.status === 'Em Manutenção').length;
-  const activeAlerts = Math.floor(Math.random() * 10); // Mock alerts
+  // ── Queries ──────────────────────────────────────────────────────────────
 
-  // Chart Data
-  const categoryData = [
-    { name: 'Passeio', count: vehicles.filter(v => v.type === 'Passeio').length },
-    { name: 'Utilitário', count: vehicles.filter(v => v.type === 'Utilitário').length },
-    { name: 'Van', count: vehicles.filter(v => v.type === 'Van').length },
-    { name: 'Moto', count: vehicles.filter(v => v.type === 'Moto').length },
-    { name: 'Vuc', count: vehicles.filter(v => v.type === 'Vuc').length },
-    { name: 'Toco', count: vehicles.filter(v => v.type === 'Toco').length },
-    { name: 'Truck', count: vehicles.filter(v => v.type === 'Truck').length },
-    { name: 'Cavalo', count: vehicles.filter(v => v.type === 'Cavalo').length },
-  ];
+  const { data: vehicles = [], isLoading: loadingVehicles, error: vehiclesError } = useQuery<VehicleRow[]>({
+    queryKey: ['dashboard-vehicles', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase.from('vehicles').select('id, type, crlv_year, driver_id');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as VehicleRow[];
+    },
+    enabled: !!user,
+  });
 
-  const statusData = [
-    { name: 'Available', value: vehicles.filter(v => v.status === 'Available').length },
-    { name: 'In Use', value: vehicles.filter(v => v.status === 'In Use').length },
-    { name: 'Maintenance', value: inMaintenance },
-  ];
+  const { data: maintenanceOrders = [], isLoading: loadingMaintenance } =
+    useQuery<MaintenanceOrderDashboard[]>({
+      queryKey: ['dashboard-maintenance', currentClient?.id],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('maintenance_orders')
+          .select('id, vehicle_id, type, status, approved_cost, current_km, vehicles(type)')
+          .eq('client_id', currentClient!.id);
+        if (error) throw error;
+        return (data ?? []).map((row: Record<string, unknown>) => ({
+          id: row.id as string,
+          vehicle_id: row.vehicle_id as string,
+          type: row.type as MaintenanceOrderDashboard['type'],
+          status: row.status as string,
+          approved_cost: row.approved_cost != null ? Number(row.approved_cost) : null,
+          current_km: row.current_km != null ? Number(row.current_km) : null,
+          vehicle_type:
+            row.vehicles && typeof row.vehicles === 'object' && !Array.isArray(row.vehicles)
+              ? (row.vehicles as Record<string, unknown>).type as string | null
+              : Array.isArray(row.vehicles) && row.vehicles.length > 0
+              ? (row.vehicles[0] as Record<string, unknown>).type as string | null
+              : null,
+        }));
+      },
+      enabled: !!currentClient?.id,
+    });
+
+  const { data: checklistRows = [], isLoading: loadingChecklists } = useQuery<
+    { vehicle_id: string; context: string; completed_at: string }[]
+  >({
+    queryKey: ['dashboard-checklists', currentClient?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('checklists')
+        .select('vehicle_id, context, completed_at')
+        .eq('client_id', currentClient!.id)
+        .eq('status', 'completed')
+        .not('vehicle_id', 'is', null);
+      if (error) throw error;
+      return (data ?? []) as { vehicle_id: string; context: string; completed_at: string }[];
+    },
+    enabled: !!currentClient?.id,
+  });
+
+  const { data: intervals } = useQuery<{
+    rotina_day_interval: number | null;
+    seguranca_day_interval: number | null;
+  } | null>({
+    queryKey: ['dashboard-intervals', currentClient?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('checklist_day_intervals')
+        .select('rotina_day_interval, seguranca_day_interval')
+        .eq('client_id', currentClient!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentClient?.id,
+  });
+
+  const { data: drivers = [], isLoading: loadingDrivers } = useQuery<
+    { id: string; expiration_date: string | null }[]
+  >({
+    queryKey: ['dashboard-drivers', currentClient?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('id, expiration_date')
+        .eq('client_id', currentClient!.id);
+      if (error) throw error;
+      return (data ?? []) as { id: string; expiration_date: string | null }[];
+    },
+    enabled: !!currentClient?.id,
+  });
+
+  // ── Computed values ───────────────────────────────────────────────────────
+
+  const overdueChecklistVehicleIds = useMemo(() => {
+    const overdue = new Set<string>();
+    if (!intervals) return overdue;
+    if (!intervals.rotina_day_interval && !intervals.seguranca_day_interval)
+      return overdue;
+
+    // Build map: vehicle_id → { lastRotina, lastSeguranca }
+    const lastByVehicle = new Map<
+      string,
+      { rotina?: string; seguranca?: string }
+    >();
+    for (const c of checklistRows) {
+      if (!c.vehicle_id || !c.completed_at) continue;
+      const entry = lastByVehicle.get(c.vehicle_id) ?? {};
+      if (
+        c.context === 'Rotina' &&
+        (!entry.rotina || c.completed_at > entry.rotina)
+      ) {
+        entry.rotina = c.completed_at;
+      }
+      if (
+        c.context === 'Segurança' &&
+        (!entry.seguranca || c.completed_at > entry.seguranca)
+      ) {
+        entry.seguranca = c.completed_at;
+      }
+      lastByVehicle.set(c.vehicle_id, entry);
+    }
+
+    const today = new Date();
+    for (const v of vehicles) {
+      const last = lastByVehicle.get(v.id);
+      if (intervals.rotina_day_interval != null) {
+        const lastDate = last?.rotina ? new Date(last.rotina) : null;
+        if (!lastDate || daysBetween(lastDate, today) > intervals.rotina_day_interval) {
+          overdue.add(v.id);
+          continue;
+        }
+      }
+      if (intervals.seguranca_day_interval != null) {
+        const lastDate = last?.seguranca ? new Date(last.seguranca) : null;
+        if (
+          !lastDate ||
+          daysBetween(lastDate, today) > intervals.seguranca_day_interval
+        ) {
+          overdue.add(v.id);
+        }
+      }
+    }
+
+    return overdue;
+  }, [vehicles, checklistRows, intervals]);
+
+  const currentYear = new Date().getFullYear().toString();
+  const expiredCrlvCount = useMemo(
+    () =>
+      vehicles.filter((v) => v.crlv_year !== null && v.crlv_year < currentYear)
+        .length,
+    [vehicles, currentYear]
+  );
+
+  const today = new Date().toISOString().split('T')[0];
+  const expiredCnhCount = useMemo(
+    () =>
+      drivers.filter(
+        (d) => d.expiration_date !== null && d.expiration_date < today
+      ).length,
+    [drivers, today]
+  );
+
+  // ── Loading state ─────────────────────────────────────────────────────────
+
+  const isLoading =
+    loadingVehicles || loadingMaintenance || loadingChecklists || loadingDrivers;
 
   if (isLoading) {
     return (
@@ -65,100 +208,69 @@ export default function Dashboard() {
     );
   }
 
-  const COLORS = ['#10b981', '#3b82f6', '#f59e0b'];
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Dashboard</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+          Dashboard
+        </h1>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <Truck className="h-6 w-6" />
-            </div>
-            <div className="ml-4">
-              <h2 className="text-sm font-medium text-zinc-500">Total Vehicles</h2>
-              <p className="text-3xl font-semibold text-zinc-900">{totalVehicles}</p>
-            </div>
-          </div>
+      {/* Debug: erro temporário de veículos */}
+      {vehiclesError && (
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Erro ao carregar veículos: {(vehiclesError as Error).message}</span>
         </div>
+      )}
 
-        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-              <Wrench className="h-6 w-6" />
-            </div>
-            <div className="ml-4">
-              <h2 className="text-sm font-medium text-zinc-500">In Maintenance</h2>
-              <p className="text-3xl font-semibold text-zinc-900">{inMaintenance}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">
-              <AlertTriangle className="h-6 w-6" />
-            </div>
-            <div className="ml-4">
-              <h2 className="text-sm font-medium text-zinc-500">Active Alerts</h2>
-              <p className="text-3xl font-semibold text-zinc-900">{activeAlerts}</p>
-            </div>
-          </div>
-        </div>
+      {/* Tabs */}
+      <div className="border-b border-zinc-200">
+        <nav className="-mb-px flex gap-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'flex items-center gap-2 border-b-2 px-4 py-3 text-sm transition-colors',
+                  isActive
+                    ? 'border-orange-500 text-orange-600 font-medium'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <h3 className="text-base font-semibold text-zinc-900 mb-6">Fleet by Category</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={categoryData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 12 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 12 }} />
-                <Tooltip 
-                  cursor={{ fill: '#f4f4f5' }}
-                  contentStyle={{ borderRadius: '12px', border: '1px solid #e4e4e7', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                />
-                <Bar dataKey="count" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <h3 className="text-base font-semibold text-zinc-900 mb-6">Current Status</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: '1px solid #e4e4e7', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
+      {/* Panels */}
+      {activeTab === 'operacional' && (
+        <OperationalPanel
+          vehicles={vehicles}
+          maintenanceOrders={maintenanceOrders}
+          overdueChecklistVehicleIds={overdueChecklistVehicleIds}
+          expiredCrlvCount={expiredCrlvCount}
+          expiredCnhCount={expiredCnhCount}
+          filters={filters}
+          onFiltersChange={setFilters}
+        />
+      )}
+      {activeTab === 'custos' && (
+        <CostPanel
+          vehicles={vehicles}
+          maintenanceOrders={maintenanceOrders}
+          filters={filters}
+          onFiltersChange={setFilters}
+        />
+      )}
     </div>
   );
 }

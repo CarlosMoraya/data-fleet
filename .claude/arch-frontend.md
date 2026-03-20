@@ -31,6 +31,12 @@ src/
 │   ├── MaintenanceForm.tsx       # Formulário de OS (dual OS, upload PDF orçamento, extração OCR, BudgetItemsTable, Km Atual, sem Custo Estimado/Subtotal); **NOVO**: prop `mode?: 'default' | 'workshop'` — no modo 'workshop' exibe apenas 5 campos obrigatórios (expectedExitDate, workshopOs, mechanicName, currentKm, PDF) + info read-only da OS
 │   ├── MaintenanceDetailModal.tsx # Modal read-only de OS (seção Orçamento: badge, PDF link, BudgetItemsTable readOnly)
 │   ├── BudgetItemsTable.tsx      # Tabela editável/read-only de itens de orçamento (5 cols: Item, Sistema, Qtd, Valor, Total) + subtotal
+│   ├── dashboard/
+│   │   ├── DashboardKpiCard.tsx          # Card de KPI reutilizável (icon, label, value, isAlert)
+│   │   ├── VehicleTypeBarChart.tsx        # Gráfico de barras por tipo de veículo com click=filtro; props: data, activeFilter, onFilterChange, title, valueFormatter
+│   │   ├── MaintenanceTypeDonutChart.tsx  # Gráfico de rosca por tipo de manutenção com click=filtro; cores: Corretiva=#ef4444, Preventiva=#3b82f6, Preditiva=#8b5cf6
+│   │   ├── OperationalPanel.tsx           # Painel Operacional: 5 KPIs (Total Veículos, Em Manutenção, Checklists Vencidos, CRLVs Vencidos, CNHs Vencidas) + 2 gráficos; exporta VehicleRow, MaintenanceOrderDashboard, DashboardFilters
+│   │   └── CostPanel.tsx                  # Painel de Custos: 3 KPIs (Custo Total, por Veículo, por KM) + 2 gráficos; usa approved_cost + current_km/initial_km
 │   ├── VehicleKmIntervalSettings.tsx # Aba "Revisões" em Settings: configura km entre revisões por veículo; filtros (marca/modelo/categoria), bulk apply, paginação 50/página, bulk upsert via onConflict vehicle_id; props: clientId, userId
 │   └── ChecklistDayIntervalSettings.tsx # Aba "Checklists" em Settings: configura intervalo em dias entre checklists de Rotina e Segurança (global por cliente); 2 inputs numéricos, upsert via onConflict client_id; props: clientId, userId
 ├── context/
@@ -55,7 +61,7 @@ src/
 │   └── checklistStorageHelpers.ts  # uploadChecklistPhoto() + deleteChecklistPhoto() — bucket checklist-photos
 ├── pages/
 │   ├── Login.tsx        # Login com email/senha (Supabase Auth)
-│   ├── Dashboard.tsx    # KPIs + gráficos (ainda mock data)
+│   ├── Dashboard.tsx    # Dois painéis (abas): Painel Operacional + Painel de Custos. Queries: dashboard-vehicles, dashboard-maintenance (com join vehicles(type)), dashboard-checklists, dashboard-intervals, dashboard-drivers. Filtros interativos (vehicleType + maintenanceType) compartilhados entre abas. Cálculo de checklists vencidos via useMemo + checklist_day_intervals.
 │   ├── Cadastros.tsx    # Layout wrapper com abas (Veículos, Motoristas, Embarcadores, Unidades Operacionais, Oficinas, Usuários) + <Outlet />
 │   ├── Vehicles.tsx     # CRUD de veículos (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → VehicleDetailModal + carrega availableShippers/Units para VehicleForm
 │   ├── Shippers.tsx     # CRUD de embarcadores (Fleet Assistant+ acessa, Fleet Analyst+ edita, Manager+ deleta) + busca por nome/CNPJ
@@ -141,3 +147,47 @@ O `Layout.tsx` renderiza:
   1. Cria a conta de usuário (auth + profile) via Edge Function `create-user`
   2. Insere driver record com `profile_id` linkando ao novo user
   3. Garante que toda conta Driver tem um driver record associado
+
+## Dashboard.tsx — Painéis Operacional e de Custos (2026-03-19)
+
+**Arquitetura:**
+- Dois painéis (abas): Painel Operacional + Painel de Custos de Manutenção
+- Abas: mesmo padrão de Settings.tsx (border-b-2 orange, `cn()` utility, TabType state)
+- 5 queries independentes via react-query (todas scoped por `currentClient.id`)
+- Filtros interativos compartilhados entre painéis: `{ vehicleType, maintenanceType }`
+- Gráficos atuam como filtros (click = toggle; click novamente = clear)
+- Client-side filtering via useMemo (sem round-trips extras ao Supabase)
+
+**Painel Operacional:**
+- 5 KPI cards: Total Veículos (Truck/azul), Em Manutenção (Wrench/âmbar), Checklists Vencidos (CalendarDays/vermelho), CRLVs Vencidos (FileWarning/laranja), CNHs Vencidas (UserX/vermelho)
+- Gráfico de barras: veículos por tipo (Passeio, Utilitário, Van, Moto, Vuc, Toco, Truck, Cavalo)
+- Gráfico de rosca: contagem de OS por tipo de manutenção (Corretiva=#ef4444, Preventiva=#3b82f6, Preditiva=#8b5cf6)
+- Cálculo de checklists vencidos: useMemo agrupa por vehicle_id + context, compara última data contra `checklist_day_intervals` config
+
+**Painel de Custos:**
+- 3 KPI cards: Custo Total (DollarSign/verde), Custo por Veículo (Truck/azul), Custo por KM (Gauge/roxo)
+- Gráfico de barras: custo total por tipo de veículo
+- Gráfico de rosca: custo total por tipo de manutenção
+- Cálculo de custo por KM: `SUM(approved_cost) / (MAX(current_km) - initial_km)` por veículo agregado
+
+**Componentes do Dashboard (src/components/dashboard/):**
+- `DashboardKpiCard.tsx` — Card reutilizável (icon + label + value + optional subtitle + optional isAlert flag)
+- `VehicleTypeBarChart.tsx` — BarChart com click=filtro; active bar azul, inactive dimmed; props: data, activeFilter, onFilterChange, title, valueFormatter, yAxisLabel
+- `MaintenanceTypeDonutChart.tsx` — PieChart donut com click=filtro; cores por tipo; props: data, activeFilter, onFilterChange, title, valueFormatter
+- `OperationalPanel.tsx` — Exporta interfaces (VehicleRow, MaintenanceOrderDashboard, DashboardFilters); renderiza 5 KPIs + 2 gráficos; aplica filtros via useMemo
+- `CostPanel.tsx` — Renderiza 3 KPIs + 2 gráficos; calcula cost per KM com `new Map<string, VehicleRow>` e `new Set<string>` explícitos (TS fix)
+
+**Queries (react-query):**
+```ts
+dashboard-vehicles    → vehicles: id, type, crlv_year, driver_id
+dashboard-maintenance → maintenance_orders: id, vehicle_id, type, status, approved_cost, current_km, vehicles(type)
+dashboard-checklists  → checklists: vehicle_id, context, completed_at (status='completed')
+dashboard-intervals   → checklist_day_intervals: rotina_day_interval, seguranca_day_interval (maybeSingle per client)
+dashboard-drivers     → drivers: id, expiration_date
+```
+
+**Notas Importantes:**
+- `VehicleRow` NOT inclui coluna `status` (não existe no schema vehicles)
+- `MaintenanceOrderDashboard` inclui tipo de manutenção (union: 'Corretiva' | 'Preventiva' | 'Preditiva')
+- Filtros persistem ao trocar entre abas
+- Temporário: `vehiclesError` exibido em red banner se RLS de vehicles bloquear (diagnóstico)

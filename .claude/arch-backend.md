@@ -80,6 +80,7 @@
 - `add_odometer_km_checklists.sql` — adiciona `odometer_km INTEGER NULL` em `checklists` (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
 - `20260319100000_add_workshop_login.sql` — role 'Workshop' no CHECK de profiles.role, atualiza `role_rank()` para Workshop=1, adiciona `profile_id` em workshops, recria RLS de `maintenance_orders` e `maintenance_budget_items` para incluir Workshop, policy `workshop_self_select` em workshops (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
 - `fix_workshop_vehicles_rls.sql` — adiciona policy SELECT em vehicles para Workshop (acesso apenas a veículos em suas próprias OS, via join com workshops.profile_id); resolve bug onde join vehicles retornava null para Workshop causando "N/A" na coluna Placa (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
+- `fix_vehicles_admin_master_rls.sql` — corrige SELECT policy em `vehicles` para incluir `OR role = 'Admin Master'` (Admin Master tem client_id = NULL, precisava de exceção especial como em maintenance_orders e action_plans); resolve bug no Dashboard onde Total de Veículos exibia 0 para Admin Master (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
 
 ### RLS — Padrões de Checklists
 - `checklists` SELECT: Driver/Auditor vê os próprios; Fleet Assistant+ vê todo o tenant; Admin Master vê tudo

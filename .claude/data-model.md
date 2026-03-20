@@ -428,3 +428,43 @@ interface ChecklistDayInterval {
   updatedBy?: string;
 }
 ```
+
+### Dashboard — Interfaces (src/components/dashboard/OperationalPanel.tsx)
+
+**VehicleRow** — Subconjunto de Vehicle para queries do Dashboard
+```typescript
+interface VehicleRow {
+  id: string;
+  type: string;                    // Passeio | Utilitário | Van | Moto | Vuc | Toco | Truck | Cavalo
+  crlv_year: string | null;        // Ano de validade do CRLV (ex: "2026")
+  driver_id: string | null;        // FK → drivers.id
+  initial_km?: number | null;      // Km inicial do veículo (linha de base)
+}
+```
+
+**MaintenanceOrderDashboard** — Subconjunto de MaintenanceOrder para queries do Dashboard
+```typescript
+interface MaintenanceOrderDashboard {
+  id: string;
+  vehicle_id: string;              // FK → vehicles.id
+  type: 'Corretiva' | 'Preventiva' | 'Preditiva';
+  status: string;                  // 'Aguardando orçamento' | ... | 'Concluído'
+  approved_cost: number | null;    // Custo aprovado (null = não aprovado ainda)
+  current_km: number | null;       // Km atual do veículo
+  vehicle_type: string | null;     // Tipo de veículo (join de vehicles.type)
+}
+```
+
+**DashboardFilters** — Estado de filtros compartilhados entre painéis
+```typescript
+interface DashboardFilters {
+  vehicleType: string | null;      // ex: 'Passeio' — null = sem filtro
+  maintenanceType: string | null;  // ex: 'Corretiva' — null = sem filtro
+}
+```
+
+**Notas:**
+- VehicleRow NÃO inclui coluna `status` (não existe em vehicles table)
+- MaintenanceOrderDashboard inclui `vehicle_type` via join com vehicles
+- DashboardFilters aplicados client-side via useMemo (sem round-trips ao Supabase)
+- Filtros são toggleáveis: mesmo valor = clear filtro
