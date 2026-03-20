@@ -104,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setCurrentClient(null);
         setAllClients([]);
+        localStorage.removeItem('dashboard_date_filter');
       }
     });
 

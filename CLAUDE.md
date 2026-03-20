@@ -303,6 +303,32 @@ type DashboardFilters = {
 
 ---
 
+## Novos Recursos (2026-03-19) — Gráficos de Embarcador e Unidade Operacional no Dashboard
+
+**Novos gráficos no Painel Operacional e Painel de Custos:**
+
+**Painel Operacional:**
+- Gráfico "Frota por Embarcador" — contagem de veículos filtrados agrupados por `shipper_name`
+- Gráfico "Frota por Unidade Operacional" — contagem de veículos filtrados agrupados por `operational_unit_name`
+
+**Painel de Custos:**
+- Gráfico "Custo por Embarcador" — soma de `approved_cost` das OS filtradas, agrupadas por embarcador
+- Gráfico "Custo por Unidade Operacional" — soma de `approved_cost` das OS filtradas, agrupadas por unidade operacional
+- Todos os 4 novos gráficos são condicionais (renderizam apenas se `data.length > 0`)
+
+**Correções de KPIs no Painel de Custos:**
+- **Custo por Veículo**: denominator corrigido para `filteredVehicles.length` (todos os veículos filtrados, não só com OS aprovada)
+- **Custo por KM**: fórmula reescrita — usa `odometer_km` dos **checklists** (não `current_km` de maintenance_orders); por veículo: `MAX(odometer_km) - MIN(odometer_km)` nos checklists dentro do `dateRange`; props `checklistRows` e `dateRange` adicionadas ao `CostPanel`
+
+**Arquivos Modificados:**
+- `src/components/dashboard/OperationalPanel.tsx` — Interface `VehicleRow` expandida com `shipper_name?` e `operational_unit_name?`; 2 novos `useMemo` + 2 novos `VehicleTypeBarChart` condicionais
+- `src/pages/Dashboard.tsx` — Query `dashboard-vehicles` expandida com `shippers(name), operational_units(name)` + mapeamento explícito para extração dos joins; query `dashboard-checklists` adicionada coluna `odometer_km`; `checklistRows` e `dateRange` passados ao `CostPanel`
+- `src/components/dashboard/CostPanel.tsx` — Props `checklistRows` e `dateRange` adicionadas; `costPerVehicle` corrigido; `costPerKm` reescrito para usar checklists; 2 novos `useMemo` + 2 novos `VehicleTypeBarChart` condicionais
+- `.claude/data-model.md` — `VehicleRow` atualizado com campos `shipper_name?` e `operational_unit_name?`
+- `.claude/arch-frontend.md` — Atualizado descrição de `OperationalPanel.tsx`, `CostPanel.tsx`, queries do Dashboard, fórmulas de KPI
+
+---
+
 ## Histórico de Mudanças
 
 Consulte [CHANGELOG.md](CHANGELOG.md) para o histórico detalhado de todas as sessões.

@@ -35,8 +35,8 @@ src/
 │   │   ├── DashboardKpiCard.tsx          # Card de KPI reutilizável (icon, label, value, isAlert)
 │   │   ├── VehicleTypeBarChart.tsx        # Gráfico de barras por tipo de veículo com click=filtro; props: data, activeFilter, onFilterChange, title, valueFormatter
 │   │   ├── MaintenanceTypeDonutChart.tsx  # Gráfico de rosca por tipo de manutenção com click=filtro; cores: Corretiva=#ef4444, Preventiva=#3b82f6, Preditiva=#8b5cf6
-│   │   ├── OperationalPanel.tsx           # Painel Operacional: 5 KPIs (Total Veículos, Em Manutenção, Checklists Vencidos, CRLVs Vencidos, CNHs Vencidas) + 2 gráficos; exporta VehicleRow, MaintenanceOrderDashboard, DashboardFilters
-│   │   └── CostPanel.tsx                  # Painel de Custos: 3 KPIs (Custo Total, por Veículo, por KM) + 2 gráficos; usa approved_cost + current_km/initial_km
+│   │   ├── OperationalPanel.tsx           # Painel Operacional: 5 KPIs (Total Veículos, Em Manutenção, Checklists Vencidos, CRLVs Vencidos, CNHs Vencidas) + 4 gráficos (por Tipo, por Tipo de Manutenção, por Embarcador*, por Unidade Operacional*); exporta VehicleRow, MaintenanceOrderDashboard, DashboardFilters (*condicionais, aparecem só se houver dados)
+│   │   └── CostPanel.tsx                  # Painel de Custos: 3 KPIs (Custo Total, por Veículo, por KM) + 4 gráficos (por Tipo, por Tipo de Manutenção, por Embarcador*, por Unidade Operacional*); props: vehicles, maintenanceOrders, checklistRows, dateRange, filters, onFiltersChange (*condicionais)
 │   ├── VehicleKmIntervalSettings.tsx # Aba "Revisões" em Settings: configura km entre revisões por veículo; filtros (marca/modelo/categoria), bulk apply, paginação 50/página, bulk upsert via onConflict vehicle_id; props: clientId, userId
 │   └── ChecklistDayIntervalSettings.tsx # Aba "Checklists" em Settings: configura intervalo em dias entre checklists de Rotina e Segurança (global por cliente); 2 inputs numéricos, upsert via onConflict client_id; props: clientId, userId
 ├── context/
@@ -162,13 +162,18 @@ O `Layout.tsx` renderiza:
 - 5 KPI cards: Total Veículos (Truck/azul), Em Manutenção (Wrench/âmbar), Checklists Vencidos (CalendarDays/vermelho), CRLVs Vencidos (FileWarning/laranja), CNHs Vencidas (UserX/vermelho)
 - Gráfico de barras: veículos por tipo (Passeio, Utilitário, Van, Moto, Vuc, Toco, Truck, Cavalo)
 - Gráfico de rosca: contagem de OS por tipo de manutenção (Corretiva=#ef4444, Preventiva=#3b82f6, Preditiva=#8b5cf6)
+- Gráfico de barras: frota por embarcador (condicional — aparece só se houver dados)
+- Gráfico de barras: frota por unidade operacional (condicional — aparece só se houver dados)
 - Cálculo de checklists vencidos: useMemo agrupa por vehicle_id + context, compara última data contra `checklist_day_intervals` config
 
 **Painel de Custos:**
 - 3 KPI cards: Custo Total (DollarSign/verde), Custo por Veículo (Truck/azul), Custo por KM (Gauge/roxo)
 - Gráfico de barras: custo total por tipo de veículo
 - Gráfico de rosca: custo total por tipo de manutenção
-- Cálculo de custo por KM: `SUM(approved_cost) / (MAX(current_km) - initial_km)` por veículo agregado
+- Gráfico de barras: custo por embarcador (condicional — aparece só se houver dados)
+- Gráfico de barras: custo por unidade operacional (condicional — aparece só se houver dados)
+- Custo por Veículo: `SUM(approved_cost) / filteredVehicles.length` (todos os veículos filtrados, não só os com OS)
+- Custo por KM: `SUM(approved_cost) / SUM(MAX(odometer_km) - MIN(odometer_km) por veículo)` — usa `odometer_km` dos **checklists** filtrados pelo `dateRange` (não usa `current_km` de maintenance_orders)
 
 **Componentes do Dashboard (src/components/dashboard/):**
 - `DashboardKpiCard.tsx` — Card reutilizável (icon + label + value + optional subtitle + optional isAlert flag)
@@ -179,9 +184,10 @@ O `Layout.tsx` renderiza:
 
 **Queries (react-query):**
 ```ts
-dashboard-vehicles    → vehicles: id, type, crlv_year, driver_id
+dashboard-vehicles    → vehicles: id, type, crlv_year, driver_id, shippers(name), operational_units(name)
+                         — resultado mapeado explicitamente para extrair shipper_name e operational_unit_name dos joins
 dashboard-maintenance → maintenance_orders: id, vehicle_id, type, status, approved_cost, current_km, vehicles(type)
-dashboard-checklists  → checklists: vehicle_id, context, completed_at (status='completed')
+dashboard-checklists  → checklists: vehicle_id, context, completed_at, odometer_km (status='completed')
 dashboard-intervals   → checklist_day_intervals: rotina_day_interval, seguranca_day_interval (maybeSingle per client)
 dashboard-drivers     → drivers: id, expiration_date
 ```

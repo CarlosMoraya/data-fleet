@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Truck, Wrench, CalendarDays, FileWarning, UserX } from 'lucide-react';
+import { Truck, Wrench, CalendarDays, FileWarning, UserX, Loader2 } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
 import VehicleTypeBarChart from './VehicleTypeBarChart';
 import MaintenanceTypeDonutChart from './MaintenanceTypeDonutChart';
@@ -10,6 +10,8 @@ export interface VehicleRow {
   crlv_year: string | null;
   driver_id: string | null;
   initial_km?: number | null;
+  shipper_name?: string | null;
+  operational_unit_name?: string | null;
 }
 
 export interface MaintenanceOrderDashboard {
@@ -38,6 +40,7 @@ interface OperationalPanelProps {
   expiredCnhCount: number;
   filters: DashboardFilters;
   onFiltersChange: (f: DashboardFilters) => void;
+  isLoading?: boolean;
 }
 
 export default function OperationalPanel({
@@ -48,6 +51,7 @@ export default function OperationalPanel({
   expiredCnhCount,
   filters,
   onFiltersChange,
+  isLoading = false,
 }: OperationalPanelProps) {
   // Apply filters client-side
   const { filteredVehicles, filteredOrders } = useMemo(() => {
@@ -91,6 +95,24 @@ export default function OperationalPanel({
     value: vehicles.filter((v) => v.type === t).length,
   }));
 
+  // Bar chart: frota por embarcador
+  const vehicleByShipperData = useMemo(() => {
+    const names = [...new Set(vehicles.map((v) => v.shipper_name ?? 'Sem Embarcador'))];
+    return names.map((name) => ({
+      name,
+      value: filteredVehicles.filter((v) => (v.shipper_name ?? 'Sem Embarcador') === name).length,
+    })).filter((d) => d.value > 0);
+  }, [vehicles, filteredVehicles]);
+
+  // Bar chart: frota por unidade operacional
+  const vehicleByOpUnitData = useMemo(() => {
+    const names = [...new Set(vehicles.map((v) => v.operational_unit_name ?? 'Sem Unidade'))];
+    return names.map((name) => ({
+      name,
+      value: filteredVehicles.filter((v) => (v.operational_unit_name ?? 'Sem Unidade') === name).length,
+    })).filter((d) => d.value > 0);
+  }, [vehicles, filteredVehicles]);
+
   // Donut: ordens por tipo de manutenção (filtrado por vehicleType se ativo)
   const ordersForDonut = filters.vehicleType
     ? maintenanceOrders.filter((o) => {
@@ -105,6 +127,14 @@ export default function OperationalPanel({
     name: t,
     value: ordersForDonut.filter((o) => o.type === t).length,
   })).filter((d) => d.value > 0);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -166,6 +196,22 @@ export default function OperationalPanel({
           }
           title="Manutenções por Tipo"
         />
+        {vehicleByShipperData.length > 0 && (
+          <VehicleTypeBarChart
+            data={vehicleByShipperData}
+            activeFilter={null}
+            onFilterChange={() => {}}
+            title="Frota por Embarcador"
+          />
+        )}
+        {vehicleByOpUnitData.length > 0 && (
+          <VehicleTypeBarChart
+            data={vehicleByOpUnitData}
+            activeFilter={null}
+            onFilterChange={() => {}}
+            title="Frota por Unidade Operacional"
+          />
+        )}
       </div>
     </div>
   );

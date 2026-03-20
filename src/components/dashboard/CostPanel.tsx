@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { DollarSign, Truck, Gauge } from 'lucide-react';
+import { DollarSign, Truck, Gauge, Loader2 } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
 import VehicleTypeBarChart from './VehicleTypeBarChart';
 import MaintenanceTypeDonutChart from './MaintenanceTypeDonutChart';
@@ -15,18 +15,30 @@ const MAINTENANCE_TYPES = ['Corretiva', 'Preventiva', 'Preditiva'] as const;
 const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatCurrency = (v: number) => fmt.format(v);
 
+interface ChecklistRow {
+  vehicle_id: string;
+  completed_at: string;
+  odometer_km: number | null;
+}
+
 interface CostPanelProps {
   vehicles: VehicleRow[];
   maintenanceOrders: MaintenanceOrderDashboard[];
+  checklistRows: ChecklistRow[];
+  dateRange: { from: string; to: string };
   filters: DashboardFilters;
   onFiltersChange: (f: DashboardFilters) => void;
+  isLoading?: boolean;
 }
 
 export default function CostPanel({
   vehicles,
   maintenanceOrders,
+  checklistRows,
+  dateRange,
   filters,
   onFiltersChange,
+  isLoading = false,
 }: CostPanelProps) {
   const { filteredVehicles, filteredOrders } = useMemo((): {
     filteredVehicles: VehicleRow[];
@@ -62,38 +74,33 @@ export default function CostPanel({
     0
   );
 
-  const distinctVehiclesWithCost = new Set(approvedOrders.map((o) => o.vehicle_id))
-    .size;
-
   const costPerVehicle =
-    distinctVehiclesWithCost > 0 ? totalCost / distinctVehiclesWithCost : 0;
+    filteredVehicles.length > 0 ? totalCost / filteredVehicles.length : 0;
 
-  // Custo por KM: for each vehicle, MAX(current_km) - initial_km
+  // Custo por KM: para cada veículo, MAX(odometer_km) - MIN(odometer_km) nos checklists do período
   const costPerKm = useMemo(() => {
-    const vehicleMap = new Map<string, VehicleRow>(filteredVehicles.map((v) => [v.id, v]));
+    const inPeriod = checklistRows.filter(
+      (r) =>
+        r.odometer_km !== null &&
+        r.completed_at >= dateRange.from &&
+        r.completed_at <= dateRange.to
+    );
+
+    const vehicleIds = new Set(filteredVehicles.map((v) => v.id));
     let totalKm = 0;
 
-    for (const vId of new Set<string>(approvedOrders.map((o) => o.vehicle_id))) {
-      const vehicle = vehicleMap.get(vId);
-      if (!vehicle) continue;
+    for (const vId of vehicleIds) {
+      const kms = inPeriod
+        .filter((r) => r.vehicle_id === vId)
+        .map((r) => r.odometer_km as number);
 
-      const vehicleOrders = approvedOrders.filter((o) => o.vehicle_id === vId);
-      const kms = vehicleOrders
-        .map((o) => o.current_km)
-        .filter((k): k is number => k !== null);
-
-      if (kms.length === 0) continue;
-
-      const maxKm = Math.max(...kms);
-      const baseKm =
-        vehicle.initial_km !== null ? vehicle.initial_km : Math.min(...kms);
-
-      const diff = maxKm - baseKm;
+      if (kms.length < 2) continue;
+      const diff = Math.max(...kms) - Math.min(...kms);
       if (diff > 0) totalKm += diff;
     }
 
     return totalKm > 0 ? totalCost / totalKm : 0;
-  }, [filteredVehicles, approvedOrders, totalCost]);
+  }, [checklistRows, dateRange, filteredVehicles, totalCost]);
 
   // Bar chart: custo por tipo de veículo
   const costByTypeData = useMemo(() => {
@@ -111,6 +118,44 @@ export default function CostPanel({
         .reduce((sum, o) => sum + (o.approved_cost ?? 0), 0);
       return { name: t, value: cost };
     });
+  }, [vehicles, filteredOrders]);
+
+  // Bar chart: custo por embarcador
+  const costByShipperData = useMemo(() => {
+    const vehicleShipperMap = new Map(
+      vehicles.map((v) => [v.id, v.shipper_name ?? 'Sem Embarcador'])
+    );
+    const names = [...new Set(vehicles.map((v) => v.shipper_name ?? 'Sem Embarcador'))];
+    return names.map((name) => ({
+      name,
+      value: filteredOrders
+        .filter(
+          (o) =>
+            vehicleShipperMap.get(o.vehicle_id) === name &&
+            o.approved_cost !== null &&
+            o.approved_cost > 0
+        )
+        .reduce((sum, o) => sum + (o.approved_cost ?? 0), 0),
+    })).filter((d) => d.value > 0);
+  }, [vehicles, filteredOrders]);
+
+  // Bar chart: custo por unidade operacional
+  const costByOpUnitData = useMemo(() => {
+    const vehicleOpUnitMap = new Map(
+      vehicles.map((v) => [v.id, v.operational_unit_name ?? 'Sem Unidade'])
+    );
+    const names = [...new Set(vehicles.map((v) => v.operational_unit_name ?? 'Sem Unidade'))];
+    return names.map((name) => ({
+      name,
+      value: filteredOrders
+        .filter(
+          (o) =>
+            vehicleOpUnitMap.get(o.vehicle_id) === name &&
+            o.approved_cost !== null &&
+            o.approved_cost > 0
+        )
+        .reduce((sum, o) => sum + (o.approved_cost ?? 0), 0),
+    })).filter((d) => d.value > 0);
   }, [vehicles, filteredOrders]);
 
   // Donut: custo por tipo de manutenção
@@ -133,6 +178,14 @@ export default function CostPanel({
       .reduce((sum, o) => sum + (o.approved_cost ?? 0), 0),
   })).filter((d) => d.value > 0);
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
@@ -152,8 +205,8 @@ export default function CostPanel({
           label="Custo por Veículo"
           value={formatCurrency(costPerVehicle)}
           subtitle={
-            distinctVehiclesWithCost > 0
-              ? `${distinctVehiclesWithCost} veículo${distinctVehiclesWithCost > 1 ? 's' : ''} com custo`
+            filteredVehicles.length > 0
+              ? `${filteredVehicles.length} veículo${filteredVehicles.length > 1 ? 's' : ''}`
               : 'sem dados'
           }
         />
@@ -186,6 +239,26 @@ export default function CostPanel({
           title="Custo por Tipo de Manutenção"
           valueFormatter={formatCurrency}
         />
+        {costByShipperData.length > 0 && (
+          <VehicleTypeBarChart
+            data={costByShipperData}
+            activeFilter={null}
+            onFilterChange={() => {}}
+            title="Custo por Embarcador"
+            valueFormatter={formatCurrency}
+            yAxisLabel="R$"
+          />
+        )}
+        {costByOpUnitData.length > 0 && (
+          <VehicleTypeBarChart
+            data={costByOpUnitData}
+            activeFilter={null}
+            onFilterChange={() => {}}
+            title="Custo por Unidade Operacional"
+            valueFormatter={formatCurrency}
+            yAxisLabel="R$"
+          />
+        )}
       </div>
     </div>
   );

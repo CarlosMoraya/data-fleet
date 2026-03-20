@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, LayoutDashboard, DollarSign, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, DollarSign, CalendarDays } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
@@ -23,6 +23,15 @@ function daysBetween(a: Date, b: Date) {
   return Math.floor((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+function getDefaultDateRange() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1)
+    .toISOString().split('T')[0];
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    .toISOString().split('T')[0];
+  return { from, to };
+}
+
 export default function Dashboard() {
   const { currentClient, user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('operacional');
@@ -31,30 +40,73 @@ export default function Dashboard() {
     maintenanceType: null,
   });
 
+  const [dateRange, setDateRange] = useState<{ from: string; to: string }>(() => {
+    try {
+      const stored = localStorage.getItem('dashboard_date_filter');
+      return stored ? JSON.parse(stored) : getDefaultDateRange();
+    } catch {
+      return getDefaultDateRange();
+    }
+  });
+
+  function handleDateChange(field: 'from' | 'to', value: string) {
+    const next = { ...dateRange, [field]: value };
+    setDateRange(next);
+    localStorage.setItem('dashboard_date_filter', JSON.stringify(next));
+  }
+
+  function handleResetToCurrentMonth() {
+    const next = getDefaultDateRange();
+    setDateRange(next);
+    localStorage.setItem('dashboard_date_filter', JSON.stringify(next));
+  }
+
   // ── Queries ──────────────────────────────────────────────────────────────
 
-  const { data: vehicles = [], isLoading: loadingVehicles, error: vehiclesError } = useQuery<VehicleRow[]>({
+  const { data: vehicles = [], isLoading: loadingVehicles } = useQuery<VehicleRow[]>({
     queryKey: ['dashboard-vehicles', currentClient?.id],
     queryFn: async () => {
-      let query = supabase.from('vehicles').select('id, type, crlv_year, driver_id');
+      let query = supabase
+        .from('vehicles')
+        .select('id, type, crlv_year, driver_id, shippers(name), operational_units(name)');
       if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
       }
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as VehicleRow[];
+      return (data ?? []).map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        type: row.type as string,
+        crlv_year: row.crlv_year as string | null,
+        driver_id: row.driver_id as string | null,
+        shipper_name:
+          row.shippers && typeof row.shippers === 'object' && !Array.isArray(row.shippers)
+            ? (row.shippers as Record<string, unknown>).name as string | null
+            : null,
+        operational_unit_name:
+          row.operational_units && typeof row.operational_units === 'object' && !Array.isArray(row.operational_units)
+            ? (row.operational_units as Record<string, unknown>).name as string | null
+            : null,
+      })) as VehicleRow[];
     },
     enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   const { data: maintenanceOrders = [], isLoading: loadingMaintenance } =
     useQuery<MaintenanceOrderDashboard[]>({
-      queryKey: ['dashboard-maintenance', currentClient?.id],
+      queryKey: ['dashboard-maintenance', currentClient?.id, dateRange.from, dateRange.to],
       queryFn: async () => {
-        const { data, error } = await supabase
+        let query = supabase
           .from('maintenance_orders')
           .select('id, vehicle_id, type, status, approved_cost, current_km, vehicles(type)')
-          .eq('client_id', currentClient!.id);
+          .gte('entry_date', dateRange.from)
+          .lte('entry_date', dateRange.to);
+        if (currentClient?.id) {
+          query = query.eq('client_id', currentClient.id);
+        }
+        const { data, error } = await query;
         if (error) throw error;
         return (data ?? []).map((row: Record<string, unknown>) => ({
           id: row.id as string,
@@ -71,24 +123,28 @@ export default function Dashboard() {
               : null,
         }));
       },
-      enabled: !!currentClient?.id,
+      enabled: !!user,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
     });
 
   const { data: checklistRows = [], isLoading: loadingChecklists } = useQuery<
-    { vehicle_id: string; context: string; completed_at: string }[]
+    { vehicle_id: string; context: string; completed_at: string; odometer_km: number | null }[]
   >({
     queryKey: ['dashboard-checklists', currentClient?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('checklists')
-        .select('vehicle_id, context, completed_at')
+        .select('vehicle_id, context, completed_at, odometer_km')
         .eq('client_id', currentClient!.id)
         .eq('status', 'completed')
         .not('vehicle_id', 'is', null);
       if (error) throw error;
-      return (data ?? []) as { vehicle_id: string; context: string; completed_at: string }[];
+      return (data ?? []) as { vehicle_id: string; context: string; completed_at: string; odometer_km: number | null }[];
     },
     enabled: !!currentClient?.id,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   const { data: intervals } = useQuery<{
@@ -106,6 +162,8 @@ export default function Dashboard() {
       return data;
     },
     enabled: !!currentClient?.id,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   const { data: drivers = [], isLoading: loadingDrivers } = useQuery<
@@ -121,6 +179,8 @@ export default function Dashboard() {
       return (data ?? []) as { id: string; expiration_date: string | null }[];
     },
     enabled: !!currentClient?.id,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   // ── Computed values ───────────────────────────────────────────────────────
@@ -197,16 +257,8 @@ export default function Dashboard() {
 
   // ── Loading state ─────────────────────────────────────────────────────────
 
-  const isLoading =
+  const isPanelLoading =
     loadingVehicles || loadingMaintenance || loadingChecklists || loadingDrivers;
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -218,13 +270,41 @@ export default function Dashboard() {
         </h1>
       </div>
 
-      {/* Debug: erro temporário de veículos */}
-      {vehiclesError && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>Erro ao carregar veículos: {(vehiclesError as Error).message}</span>
+      {/* Filtro de Período */}
+      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-zinc-500" />
+          <span className="text-sm font-medium text-zinc-700">Período</span>
         </div>
-      )}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-zinc-500">De</label>
+            <input
+              type="date"
+              value={dateRange.from}
+              max={dateRange.to}
+              onChange={(e) => handleDateChange('from', e.target.value)}
+              className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-zinc-500">Até</label>
+            <input
+              type="date"
+              value={dateRange.to}
+              min={dateRange.from}
+              onChange={(e) => handleDateChange('to', e.target.value)}
+              className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+          </div>
+          <button
+            onClick={handleResetToCurrentMonth}
+            className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100 transition-colors"
+          >
+            Mês atual
+          </button>
+        </div>
+      </div>
 
       {/* Tabs */}
       <div className="border-b border-zinc-200">
@@ -261,14 +341,18 @@ export default function Dashboard() {
           expiredCnhCount={expiredCnhCount}
           filters={filters}
           onFiltersChange={setFilters}
+          isLoading={isPanelLoading}
         />
       )}
       {activeTab === 'custos' && (
         <CostPanel
           vehicles={vehicles}
           maintenanceOrders={maintenanceOrders}
+          checklistRows={checklistRows}
+          dateRange={dateRange}
           filters={filters}
           onFiltersChange={setFilters}
+          isLoading={isPanelLoading}
         />
       )}
     </div>

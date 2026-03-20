@@ -435,10 +435,12 @@ interface ChecklistDayInterval {
 ```typescript
 interface VehicleRow {
   id: string;
-  type: string;                    // Passeio | Utilitário | Van | Moto | Vuc | Toco | Truck | Cavalo
-  crlv_year: string | null;        // Ano de validade do CRLV (ex: "2026")
-  driver_id: string | null;        // FK → drivers.id
-  initial_km?: number | null;      // Km inicial do veículo (linha de base)
+  type: string;                          // Passeio | Utilitário | Van | Moto | Vuc | Toco | Truck | Cavalo
+  crlv_year: string | null;              // Ano de validade do CRLV (ex: "2026")
+  driver_id: string | null;              // FK → drivers.id
+  initial_km?: number | null;            // Km inicial do veículo (linha de base)
+  shipper_name?: string | null;          // Nome do embarcador (join shippers.name)
+  operational_unit_name?: string | null; // Nome da unidade operacional (join operational_units.name)
 }
 ```
 
