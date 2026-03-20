@@ -63,12 +63,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-      <div className="flex h-16 shrink-0 items-center px-6 border-b border-blue-800 bg-blue-900">
-        <div className="flex items-center gap-2">
-          <div className="bg-blue-600 p-1.5 rounded-lg">
-            <Truck className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-lg font-semibold tracking-tight text-white">Data Fleet</span>
+      <div className="flex h-[80px] shrink-0 items-center px-6 border-b border-blue-800 bg-blue-900">
+        <div className="flex flex-col justify-center w-full" aria-label="BetaFleet Logo">
+          <span className="text-[30px] font-bold tracking-tight text-white leading-none flex items-baseline">
+            <span className="text-orange-500 mr-[2px] text-[32px]">β</span>etaFleet
+          </span>
+          <span className="text-[10px] font-medium text-blue-200/80 uppercase tracking-[0.25em] ml-5 mt-1">
+            Fleet Management
+          </span>
         </div>
       </div>
 

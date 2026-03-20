@@ -329,6 +329,22 @@ type DashboardFilters = {
 
 ---
 
+## Novos Recursos (2026-03-19) — Novo Logo da BetaFleet
+
+**Implementação do Logo BetaFleet:**
+
+- Criação de um novo logo em formato SVG escalável, combinando formato de escudo, rotas/vias e checkmark.
+- Adaptação rigorosa do logo aos Design Tokens existentes (Tailwind v4 `blue-600` como principal, `orange-500` como detalhe interativo, tipografia `Inter`).
+- Substituição do ícone genérico "Truck" e texto "Data Fleet" na barra lateral (`Sidebar.tsx`) pelo novo logo SVG da BetaFleet em formato horizontal.
+- Criação do artefato `betafleet_logo_guidelines.md` com as referências, guidelines e SVGs do logo em variações horizontais, verticais e "icon-only".
+- O novo logo não conflitua com logos de clientes gerenciados no Topbar da aplicação.
+
+**Arquivos Modificados:**
+- `src/components/Sidebar.tsx` — Substituição do header da sidebar pelo logo inline (SVG) da BetaFleet.
+- `.claude/arch-frontend.md` — Modificações refletidas no layout da Sidebar.
+
+---
+
 ## Histórico de Mudanças
 
 Consulte [CHANGELOG.md](CHANGELOG.md) para o histórico detalhado de todas as sessões.

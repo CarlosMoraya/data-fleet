@@ -14,7 +14,7 @@
 src/
 ├── components/          # Componentes reutilizáveis
 │   ├── Layout.tsx       # Shell: Sidebar + Topbar + Outlet
-│   ├── Sidebar.tsx      # Menu lateral com navegação
+│   ├── Sidebar.tsx      # Menu lateral com navegação (contém logo SVG BetaFleet inline)
 │   ├── Topbar.tsx       # Barra superior (client switcher, user info)
 │   ├── VehicleForm.tsx  # Formulário multi-step para veículos (props: availableDrivers, availableShippers, availableOperationalUnits). Campos: Identificação + Propriedade (incluindo Km Inicial) + Documentos + Técnicas + Garantia + Seguro + Motorista + Logística. Field settings dinâmicos.
 │   ├── DriverForm.tsx   # Formulário para motoristas (CNH, GR, certificados + email/senha ao criar, cria usuário via Edge Function)
