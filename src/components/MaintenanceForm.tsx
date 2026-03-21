@@ -195,7 +195,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
     }
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD em horário local
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -418,6 +418,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
                         name="entryDate"
                         type="date"
                         required
+                        max={today}
                         value={formData.entryDate ?? ''}
                         onChange={handleChange}
                         className={inputClass}

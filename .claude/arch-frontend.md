@@ -28,7 +28,7 @@ src/
 │   ├── ChecklistDetailModal.tsx  # Modal read-only com respostas, fotos, score de conformidade
 │   ├── ActionPlanModal.tsx       # Modal de gestão de ação (status, notas de conclusão, upload de evidência — imagem/PDF via uploadActionPlanEvidence)
 │   ├── CameraCapture.tsx         # Captura de foto via câmera (getUserMedia + GPS + compressão)
-│   ├── MaintenanceForm.tsx       # Formulário de OS (dual OS, upload PDF orçamento, extração OCR, BudgetItemsTable, Km Atual, sem Custo Estimado/Subtotal); **NOVO**: prop `mode?: 'default' | 'workshop'` — no modo 'workshop' exibe apenas 5 campos obrigatórios (expectedExitDate, workshopOs, mechanicName, currentKm, PDF) + info read-only da OS
+│   ├── MaintenanceForm.tsx       # Formulário de OS (dual OS, upload PDF orçamento, extração OCR, BudgetItemsTable, Km Atual, sem Custo Estimado/Subtotal); **NOVO**: prop `mode?: 'default' | 'workshop'` — no modo 'workshop' exibe apenas 5 campos obrigatórios (expectedExitDate, workshopOs, mechanicName, currentKm, PDF) + info read-only da OS. **Restrição Data Entrada (2026-03-20)**: campo `entryDate` com `max={today}` (horário local via `toLocaleDateString('en-CA')`) — impossibilita inserção de datas futuras
 │   ├── MaintenanceDetailModal.tsx # Modal read-only de OS (seção Orçamento: badge, PDF link, BudgetItemsTable readOnly)
 │   ├── BudgetItemsTable.tsx      # Tabela editável/read-only de itens de orçamento (5 cols: Item, Sistema, Qtd, Valor, Total) + subtotal
 │   ├── dashboard/
