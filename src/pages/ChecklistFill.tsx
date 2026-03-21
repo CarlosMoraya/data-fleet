@@ -6,7 +6,11 @@ import { useAuth } from '../context/AuthContext';
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
 import { checklistItemFromRow, type ChecklistItemRow } from '../lib/checklistTemplateMappers';
 import { uploadChecklistPhoto } from '../lib/checklistStorageHelpers';
+import { enqueueOperation, enqueuePhoto } from '../lib/offline/syncService';
 import CameraCapture from '../components/CameraCapture';
+import OfflineBanner from '../components/OfflineBanner';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { usePendingSyncCount } from '../hooks/usePendingSyncCount';
 import type { Checklist, ChecklistItem, ChecklistContext, ResponseStatus } from '../types';
 import { WORKSHOP_CONTEXTS } from '../types';
 import { cn } from '../lib/utils';
@@ -34,6 +38,9 @@ export default function ChecklistFill() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const isOnline = useOnlineStatus();
+  const pendingCount = usePendingSyncCount(checklistId ?? '');
+
   const [cameraItemIdx, setCameraItemIdx] = useState<number | null>(null);
   const [localItemChanges, setLocalItemChanges] = useState<Record<string, Partial<ItemState>>>({});
   const [selectedWorkshopId, setSelectedWorkshopId] = useState<string>('');
@@ -55,7 +62,9 @@ export default function ChecklistFill() {
       if (error) throw error;
       return checklistFromRow(data as ChecklistRow);
     },
-    enabled: !!checklistId
+    enabled: !!checklistId,
+    gcTime: Infinity,
+    networkMode: 'offlineFirst',
   });
 
   const { data: items = [], isLoading: isLoadingItems } = useQuery({
@@ -70,7 +79,9 @@ export default function ChecklistFill() {
       if (error) throw error;
       return (data ?? []).map(r => checklistItemFromRow(r as ChecklistItemRow));
     },
-    enabled: !!checklist?.templateId
+    enabled: !!checklist?.templateId,
+    gcTime: Infinity,
+    networkMode: 'offlineFirst',
   });
 
   const { data: responses = [], isLoading: isLoadingResponses } = useQuery({
@@ -83,7 +94,9 @@ export default function ChecklistFill() {
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!checklistId
+    enabled: !!checklistId,
+    gcTime: Infinity,
+    networkMode: 'offlineFirst',
   });
 
   const templateContext = checklist?.templateContext as ChecklistContext | null;
@@ -106,6 +119,8 @@ export default function ChecklistFill() {
       return (data as { initial_km: number | null } | null)?.initial_km ?? null;
     },
     enabled: !!checklist?.vehicleId,
+    gcTime: Infinity,
+    networkMode: 'offlineFirst',
   });
 
   // Último KM registrado em qualquer checklist concluído deste veículo
@@ -124,6 +139,8 @@ export default function ChecklistFill() {
       return (data as { odometer_km: number } | null)?.odometer_km ?? null;
     },
     enabled: !!checklist?.vehicleId,
+    gcTime: Infinity,
+    networkMode: 'offlineFirst',
   });
 
   const { data: workshops = [] } = useQuery({
@@ -138,7 +155,9 @@ export default function ChecklistFill() {
       if (error) throw error;
       return (data ?? []) as WorkshopOption[];
     },
-    enabled: needsWorkshop && !!currentClient?.id
+    enabled: needsWorkshop && !!currentClient?.id,
+    gcTime: 30 * 60 * 1000,
+    networkMode: 'offlineFirst',
   });
 
   // Inicializa KM quando checklist já tem odometerKm (checklist retomado)
@@ -174,6 +193,13 @@ export default function ChecklistFill() {
 
   const saveResponseMutation = useMutation({
     mutationFn: async ({ itemId, status, observation, photoUrl }: { itemId: string; status: ResponseStatus; observation: string; photoUrl: string }) => {
+      if (!navigator.onLine) {
+        await enqueueOperation(
+          { type: 'save_response', itemId, status, observation, photoUrl, respondedAt: new Date().toISOString() },
+          checklistId!,
+        );
+        return;
+      }
       const { error } = await supabase.from('checklist_responses').upsert({
         checklist_id: checklistId,
         item_id: itemId,
@@ -185,12 +211,18 @@ export default function ChecklistFill() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['checklistResponses', checklistId] });
+      if (navigator.onLine) {
+        queryClient.invalidateQueries({ queryKey: ['checklistResponses', checklistId] });
+      }
     }
   });
 
   const confirmKmMutation = useMutation({
     mutationFn: async (km: number) => {
+      if (!navigator.onLine) {
+        await enqueueOperation({ type: 'confirm_km', odometerKm: km }, checklistId!);
+        return;
+      }
       const { error } = await supabase
         .from('checklists')
         .update({ odometer_km: km })
@@ -198,7 +230,9 @@ export default function ChecklistFill() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['checklist', checklistId] });
+      if (navigator.onLine) {
+        queryClient.invalidateQueries({ queryKey: ['checklist', checklistId] });
+      }
     },
   });
 
@@ -220,6 +254,10 @@ export default function ChecklistFill() {
 
   const confirmWorkshopMutation = useMutation({
     mutationFn: async (workshopId: string) => {
+      if (!navigator.onLine) {
+        await enqueueOperation({ type: 'confirm_workshop', workshopId }, checklistId!);
+        return;
+      }
       const { error } = await supabase
         .from('checklists')
         .update({ workshop_id: workshopId })
@@ -227,13 +265,29 @@ export default function ChecklistFill() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['checklist', checklistId] });
+      if (navigator.onLine) {
+        queryClient.invalidateQueries({ queryKey: ['checklist', checklistId] });
+      }
     }
   });
 
   const finishChecklistMutation = useMutation({
     mutationFn: async () => {
       if (!checklist?.vehicleId) throw new Error('Este checklist não está associado a um veículo.');
+
+      if (!navigator.onLine) {
+        await enqueueOperation(
+          {
+            type: 'finish_checklist',
+            completedAt: new Date().toISOString(),
+            templateContext: templateContext ?? null,
+            workshopId: checklist.workshopId || selectedWorkshopId || undefined,
+            vehicleId: checklist.vehicleId,
+          },
+          checklistId!,
+        );
+        return;
+      }
 
       const completedAt = new Date().toISOString();
       const { error: chkErr } = await supabase
@@ -267,6 +321,10 @@ export default function ChecklistFill() {
       }
     },
     onSuccess: () => {
+      if (!navigator.onLine) {
+        navigate('/checklists');
+        return;
+      }
       // Remove o checklist aberto do cache imediatamente para evitar flash
       queryClient.setQueriesData({ queryKey: ['openChecklist'] }, null);
       queryClient.invalidateQueries({ queryKey: ['checklists'] });
@@ -302,11 +360,35 @@ export default function ChecklistFill() {
   const handlePhotoCapture = async (idx: number, file: File, lat?: number, lng?: number) => {
     const itemId = itemStates[idx].item.id;
     setCameraItemIdx(null);
-    updateItemLocal(itemId, { photoFile: file, photoLat: lat, photoLng: lng, uploading: true });
+    updateItemLocal(itemId, { photoFile: file, photoLat: lat, photoLng: lng, uploading: !navigator.onLine });
+
+    if (!navigator.onLine) {
+      // Armazena o blob offline e cria URL local para preview
+      const pendingPhotoKey = await enqueuePhoto(file, currentClient!.id, checklistId!, itemId);
+      const localPreviewUrl = URL.createObjectURL(file);
+      updateItemLocal(itemId, { photoUrl: localPreviewUrl, uploading: false });
+
+      const currentState = itemStates[idx];
+      await enqueueOperation(
+        {
+          type: 'save_response',
+          itemId,
+          status: currentState.status!,
+          observation: currentState.observation,
+          photoUrl: '',
+          pendingPhotoKey,
+          respondedAt: new Date().toISOString(),
+        },
+        checklistId!,
+      );
+      return;
+    }
+
+    updateItemLocal(itemId, { uploading: true });
     try {
       const url = await uploadChecklistPhoto(currentClient!.id, checklistId!, itemId, file);
       updateItemLocal(itemId, { photoUrl: url, uploading: false });
-      
+
       const currentState = itemStates[idx];
       saveResponseMutation.mutate({
         itemId,
@@ -356,9 +438,9 @@ export default function ChecklistFill() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex flex-col">
+    <div className="h-full bg-zinc-50 flex flex-col overflow-hidden">
       {/* Top bar */}
-      <div className="sticky top-0 z-10 bg-white border-b border-zinc-200 px-4 py-3">
+      <div className="flex-shrink-0 bg-white border-b border-zinc-200 px-4 py-3 z-10">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-3 mb-2">
             <button onClick={() => navigate('/checklists')} className="p-1.5 rounded-lg hover:bg-zinc-100">
@@ -380,6 +462,11 @@ export default function ChecklistFill() {
           </div>
         </div>
       </div>
+
+      {/* Scrollable content area */}
+      <div className="flex-1 overflow-y-auto">
+
+      <OfflineBanner isOnline={isOnline} pendingCount={pendingCount} />
 
       {/* Workshop selector (for Entrada/Saída de Oficina) */}
       {needsWorkshop && (
@@ -575,8 +662,10 @@ export default function ChecklistFill() {
         </div>
       )}
 
+      </div>{/* end scrollable area */}
+
       {/* Bottom bar */}
-      <div className="sticky bottom-0 bg-white border-t border-zinc-200 px-4 py-3">
+      <div className="flex-shrink-0 bg-white border-t border-zinc-200 px-4 py-3">
         <div className="max-w-2xl mx-auto space-y-2">
           {error && <p className="text-sm text-red-600 text-center">{error}</p>}
           {!workshopReady && (

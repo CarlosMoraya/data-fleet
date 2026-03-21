@@ -8,6 +8,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -40,9 +41,15 @@ function HomeRedirect() {
   return <Dashboard />;
 }
 
+function OfflineSyncBoot() {
+  useOnlineStatus(); // Dispara flushQueue ao reconectar, mesmo fora do ChecklistFill
+  return null;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <OfflineSyncBoot />
       <AuthProvider>
         <Router>
           <Routes>

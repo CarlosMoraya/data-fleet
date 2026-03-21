@@ -7,6 +7,7 @@
 - **Tailwind CSS v4** (utility-first)
 - **Recharts** para gráficos no Dashboard
 - **React Router DOM** para roteamento SPA
+- **Dexie** (~6KB) — wrapper tipado para IndexedDB, usado na infraestrutura offline
 
 ## Estrutura de Pastas
 
@@ -28,6 +29,7 @@ src/
 │   ├── ChecklistDetailModal.tsx  # Modal read-only com respostas, fotos, score de conformidade
 │   ├── ActionPlanModal.tsx       # Modal de gestão de ação (status, notas de conclusão, upload de evidência — imagem/PDF via uploadActionPlanEvidence)
 │   ├── CameraCapture.tsx         # Captura de foto via câmera (getUserMedia + GPS + compressão)
+│   ├── OfflineBanner.tsx         # Banner de status offline/sync: props(isOnline, pendingCount) — null se online sem pending; barra âmbar (WifiOff) se offline; barra azul+spin (RefreshCw) se online com itens pendentes
 │   ├── MaintenanceForm.tsx       # Formulário de OS (dual OS, upload PDF orçamento, extração OCR, BudgetItemsTable, Km Atual, sem Custo Estimado/Subtotal); **NOVO**: prop `mode?: 'default' | 'workshop'` — no modo 'workshop' exibe apenas 5 campos obrigatórios (expectedExitDate, workshopOs, mechanicName, currentKm, PDF) + info read-only da OS. **Restrição Data Entrada (2026-03-20)**: campo `entryDate` com `max={today}` (horário local via `toLocaleDateString('en-CA')`) — impossibilita inserção de datas futuras
 │   ├── MaintenanceDetailModal.tsx # Modal read-only de OS (seção Orçamento: badge, PDF link, BudgetItemsTable readOnly)
 │   ├── BudgetItemsTable.tsx      # Tabela editável/read-only de itens de orçamento (5 cols: Item, Sistema, Qtd, Valor, Total) + subtotal
@@ -39,6 +41,9 @@ src/
 │   │   └── CostPanel.tsx                  # Painel de Custos: 3 KPIs (Custo Total, por Veículo, por KM) + 4 gráficos (por Tipo, por Tipo de Manutenção, por Embarcador*, por Unidade Operacional*); props: vehicles, maintenanceOrders, checklistRows, dateRange, filters, onFiltersChange (*condicionais)
 │   ├── VehicleKmIntervalSettings.tsx # Aba "Revisões" em Settings: configura km entre revisões por veículo; filtros (marca/modelo/categoria), bulk apply, paginação 50/página, bulk upsert via onConflict vehicle_id; props: clientId, userId
 │   └── ChecklistDayIntervalSettings.tsx # Aba "Checklists" em Settings: configura intervalo em dias entre checklists de Rotina e Segurança (global por cliente); 2 inputs numéricos, upsert via onConflict client_id; props: clientId, userId
+├── hooks/
+│   ├── useOnlineStatus.ts       # Detecta online/offline via window events; chama flushQueue() ao reconectar e na montagem (sessões anteriores); retorna boolean isOnline
+│   └── usePendingSyncCount.ts   # Retorna contagem reativa (Dexie liveQuery) de entradas pending|syncing por checklistId
 ├── context/
 │   └── AuthContext.tsx   # Auth + client context → useAuth() hook
 ├── lib/
@@ -58,7 +63,10 @@ src/
 │   ├── checklistTemplateMappers.ts # Mappers para ChecklistTemplate, ChecklistItem, ChecklistItemSuggestion
 │   ├── checklistMappers.ts         # Mappers para Checklist e ChecklistResponse
 │   ├── actionPlanMappers.ts        # Mappers + actionStatusLabel() + actionStatusColor() para ActionPlan
-│   └── checklistStorageHelpers.ts  # uploadChecklistPhoto() + deleteChecklistPhoto() — bucket checklist-photos
+│   ├── checklistStorageHelpers.ts  # uploadChecklistPhoto() + deleteChecklistPhoto() — bucket checklist-photos
+│   └── offline/
+│       ├── offlineDb.ts    # Dexie DB `betafleet-offline-v1`: stores syncQueue (++id, checklistId, status, createdAt) + photoBlobs (key, checklistId)
+│       └── syncService.ts  # enqueueOperation(op, checklistId), enqueuePhoto(blob, clientId, checklistId, itemId)→key, flushQueue() — processa FIFO com atomic Dexie transaction; retry até 3x; flag isFlushRunning previne flushes simultâneos
 ├── pages/
 │   ├── Login.tsx        # Login com email/senha (Supabase Auth); **REDESIGN 2026-03-20**: Logo βetaFleet tipográfica (β orange-500 + etaFleet branco + "Evolution always"); background com fallback: vídeo `/videos/login-bg.mp4` → imagem `/images/login-bg.jpg` → fundo zinc-900; detecção via `onError` handlers (videoFailed, imageFailed state); overlay black/50; card branco/95 backdrop-blur
 │   ├── Dashboard.tsx    # Dois painéis (abas): Painel Operacional + Painel de Custos. Queries: dashboard-vehicles, dashboard-maintenance (com join vehicles(type)), dashboard-checklists, dashboard-intervals, dashboard-drivers. Filtros interativos (vehicleType + maintenanceType) compartilhados entre abas. Cálculo de checklists vencidos via useMemo + checklist_day_intervals.
@@ -68,8 +76,8 @@ src/
 │   ├── OperationalUnits.tsx # CRUD de unidades operacionais (Fleet Assistant+ acessa, Fleet Analyst+ edita, Manager+ deleta) + busca por nome/código/embarcador + FK restrict validation
 │   ├── Drivers.tsx      # CRUD de motoristas (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → DriverDetailModal
 │   ├── Workshops.tsx    # CRUD de oficinas (Fleet Assistant+ acessa, Fleet Analyst+ edita, Manager+ deleta ou Fleet Analyst com flag) + botão Eye → WorkshopDetailModal
-│   ├── Checklists.tsx   # Página de checklists: Driver vê todos os templates publicados da categoria do seu veículo; Auditor seleciona veículo no dropdown e vê apenas templates de Auditoria; Assistant+ vê tabela do tenant. Histórico com busca e filtro de status. **Lookup de veículo via drivers.profile_id → vehicles.driver_id**
-│   ├── ChecklistFill.tsx # Tela fullscreen de preenchimento (OK/Problema/N/A, câmera, observação, auto-save, finalização com ações). **NOVO**: Campo KM obrigatório (primeiro, antes dos itens) — exibe último KM registrado ou initial_km do veículo como referência; valida KM >= último; bloqueia itens até KM confirmado. Contexto Entrada/Saída de Oficina: seleção obrigatória de oficina antes dos itens. Contexto Segurança: badge ⚠ em itens com canBlockVehicle
+│   ├── Checklists.tsx   # Página de checklists: Driver vê todos os templates publicados da categoria do seu veículo; Auditor seleciona veículo no dropdown e vê apenas templates de Auditoria; Assistant+ vê tabela do tenant. Histórico com busca e filtro de status. **Lookup de veículo via drivers.profile_id → vehicles.driver_id**. **HistoryCard (Driver/Auditor)**: exibe `vehicleLicensePlate · templateContext · data` — permite identificar checklists de veículos anteriores.
+│   ├── ChecklistFill.tsx # Tela fullscreen de preenchimento (OK/Problema/N/A, câmera, observação, auto-save, finalização). **KM obrigatório** (1ª etapa): exibe último KM ou initial_km como referência; valida KM >= último; bloqueia itens até KM confirmado. **Oficina obrigatória** (Entrada/Saída de Oficina). **Offline-first (2026-03-20)**: usa `useOnlineStatus` + `usePendingSyncCount`; todas as mutations enfileiram via `enqueueOperation` quando `!navigator.onLine`; fotos offline via `enqueuePhoto` + `URL.createObjectURL` para preview; 6 queries com `gcTime: Infinity, networkMode: 'offlineFirst'`; `<OfflineBanner>` no topo do conteúdo. **Layout**: `h-full flex-col overflow-hidden` — top bar `flex-shrink-0`, área de scroll `flex-1 overflow-y-auto`, bottom bar `flex-shrink-0` (Padrão 6 abaixo)
 │   ├── ChecklistTemplates.tsx # CRUD de templates (draft/published/deprecated, versionamento, filtro dual por categoria + contexto)
 │   ├── ActionPlans.tsx  # Painel Fleet Assistant+ — tabela de ações, filtros por status, modal de gestão
 │   ├── Maintenance.tsx  # CRUD de ordens de serviço — dual OS, saveMutation 3-etapas (INSERT/UPDATE → upload PDF → items), coluna Orçamento. **Query filtra por `client_id` do cliente selecionado (suporta Admin Master via dropdown, corrigido 2026-03-18)**; **NOVO**: suporte role 'Workshop' — query filtra por `workshop_id`, botão "Nova OS" oculto, UPDATE parcial (apenas 4 campos), modo 'workshop' em MaintenanceForm, coluna OS mostra workshopOs. **CANCELAMENTO (2026-03-20)**: status 'Cancelado' terminal (Fleet Assistant+, !isWorkshopUser); botão Ban + modal confirmação; botão RotateCcw "Reabrir" (clone sem id → INSERT nova OS via prefillData); cancelMutation persiste cancelled_at + cancelled_by_id; 6º card "Cancelados"
@@ -130,6 +138,13 @@ O `Layout.tsx` renderiza:
 - Raiz: `flex flex-col gap-6 h-full`
 - Título: shrink-0
 - View ativa (Driver/Auditor/Assistant+): `flex-1 min-h-0 overflow-y-auto flex flex-col gap-6` (para Driver/Auditor); ou `flex-1 min-h-0 flex flex-col` + inner table pattern (para Assistant+)
+
+**Padrão 6: Fullscreen com Scroll Interno** (ChecklistFill)
+- Raiz: `h-full bg-zinc-50 flex flex-col overflow-hidden`
+- Top bar: `flex-shrink-0 bg-white border-b` (fixo no topo, sem sticky)
+- Conteúdo: `flex-1 overflow-y-auto` (toda a área intermediária — banner, workshop, KM, itens)
+- Bottom bar: `flex-shrink-0 bg-white border-t` (fixo no rodapé, sem sticky)
+- **Motivo**: Layout.tsx usa `main overflow-hidden` para scroll interno das tabelas; páginas fullscreen precisam de scroll próprio via `overflow-y-auto` interno
 
 **Padrão 5: Layout Wrapper com Sub-rotas** (Cadastros)
 - Raiz: `flex flex-col gap-6 h-full`

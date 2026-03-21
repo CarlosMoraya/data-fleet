@@ -650,7 +650,7 @@ function HistoryCard({ checklists, historySearch, setHistorySearch, historyStatu
             <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl border border-zinc-100">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-zinc-900 truncate">{c.templateName}</p>
-                <p className="text-xs text-zinc-500">{c.templateContext && `${c.templateContext} · `}{formatDate(c.startedAt)}</p>
+                <p className="text-xs text-zinc-500">{c.vehicleLicensePlate && `${c.vehicleLicensePlate} · `}{c.templateContext && `${c.templateContext} · `}{formatDate(c.startedAt)}</p>
               </div>
               <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0', STATUS_COLOR[c.status])}>
                 {STATUS_LABEL[c.status]}

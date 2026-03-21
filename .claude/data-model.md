@@ -473,3 +473,53 @@ interface DashboardFilters {
 - MaintenanceOrderDashboard inclui `vehicle_type` via join com vehicles
 - DashboardFilters aplicados client-side via useMemo (sem round-trips ao Supabase)
 - Filtros são toggleáveis: mesmo valor = clear filtro
+
+---
+
+## Infraestrutura Offline (IndexedDB via Dexie)
+
+Armazenamento local no browser — **sem migration de banco Supabase**.
+
+### SyncOperation (discriminated union)
+```typescript
+type SyncOperation =
+  | { type: 'save_response'; itemId: string; status: ResponseStatus; observation: string; photoUrl: string; pendingPhotoKey?: string; respondedAt: string }
+  | { type: 'confirm_km'; odometerKm: number }
+  | { type: 'confirm_workshop'; workshopId: string }
+  | { type: 'finish_checklist'; completedAt: string; templateContext: ChecklistContext | null; workshopId?: string; vehicleId?: string };
+```
+
+### SyncQueueEntry (store: `syncQueue`)
+```typescript
+interface SyncQueueEntry {
+  id?: number;           // PK auto-increment
+  createdAt: number;     // Date.now() — ordem FIFO
+  checklistId: string;
+  op: SyncOperation;
+  status: 'pending' | 'syncing' | 'error';
+  errorMessage?: string;
+  retryCount: number;    // >= 3 → status 'error' permanente
+}
+```
+
+### PhotoBlobEntry (store: `photoBlobs`)
+```typescript
+interface PhotoBlobEntry {
+  key: string;        // `${checklistId}/${itemId}/${timestamp}`
+  blob: Blob;
+  clientId: string;
+  checklistId: string;
+  itemId: string;
+  capturedAt: number;
+}
+```
+
+**Índices Dexie:**
+- `syncQueue`: `++id, checklistId, status, createdAt`
+- `photoBlobs`: `key, checklistId`
+
+**Idempotência de replay:**
+- `save_response` → upsert `onConflict: 'checklist_id,item_id'` (último vence)
+- `confirm_km` / `confirm_workshop` → UPDATE simples (no-op em replay)
+- `finish_checklist` → UPDATE status='completed' (no-op em replay)
+- Fotos → `uploadChecklistPhoto` usa upsert no Storage
