@@ -102,7 +102,8 @@ export default function Dashboard() {
           .from('maintenance_orders')
           .select('id, vehicle_id, type, status, approved_cost, current_km, vehicles(type)')
           .gte('entry_date', dateRange.from)
-          .lte('entry_date', dateRange.to);
+          .lte('entry_date', dateRange.to)
+          .neq('status', 'Cancelado');
         if (currentClient?.id) {
           query = query.eq('client_id', currentClient.id);
         }
@@ -263,7 +264,7 @@ export default function Dashboard() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6 h-full">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
           Dashboard
@@ -332,29 +333,31 @@ export default function Dashboard() {
       </div>
 
       {/* Panels */}
-      {activeTab === 'operacional' && (
-        <OperationalPanel
-          vehicles={vehicles}
-          maintenanceOrders={maintenanceOrders}
-          overdueChecklistVehicleIds={overdueChecklistVehicleIds}
-          expiredCrlvCount={expiredCrlvCount}
-          expiredCnhCount={expiredCnhCount}
-          filters={filters}
-          onFiltersChange={setFilters}
-          isLoading={isPanelLoading}
-        />
-      )}
-      {activeTab === 'custos' && (
-        <CostPanel
-          vehicles={vehicles}
-          maintenanceOrders={maintenanceOrders}
-          checklistRows={checklistRows}
-          dateRange={dateRange}
-          filters={filters}
-          onFiltersChange={setFilters}
-          isLoading={isPanelLoading}
-        />
-      )}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {activeTab === 'operacional' && (
+          <OperationalPanel
+            vehicles={vehicles}
+            maintenanceOrders={maintenanceOrders}
+            overdueChecklistVehicleIds={overdueChecklistVehicleIds}
+            expiredCrlvCount={expiredCrlvCount}
+            expiredCnhCount={expiredCnhCount}
+            filters={filters}
+            onFiltersChange={setFilters}
+            isLoading={isPanelLoading}
+          />
+        )}
+        {activeTab === 'custos' && (
+          <CostPanel
+            vehicles={vehicles}
+            maintenanceOrders={maintenanceOrders}
+            checklistRows={checklistRows}
+            dateRange={dateRange}
+            filters={filters}
+            onFiltersChange={setFilters}
+            isLoading={isPanelLoading}
+          />
+        )}
+      </div>
     </div>
   );
 }

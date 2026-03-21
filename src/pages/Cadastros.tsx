@@ -48,7 +48,7 @@ export default function Cadastros() {
   const visibleTabs = TABS.filter((tab) => tab.roles.includes(user?.role || ''));
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6 h-full">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Cadastros</h1>
         <p className="text-sm text-zinc-500 mt-1">Gerencie os cadastros da sua frota.</p>
@@ -77,7 +77,9 @@ export default function Cadastros() {
       </div>
 
       {/* Sub-page content */}
-      <Outlet />
+      <div className="flex-1 min-h-0">
+        <Outlet />
+      </div>
     </div>
   );
 }

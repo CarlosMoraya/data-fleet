@@ -29,8 +29,8 @@ export default function Layout() {
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar onMenuClick={() => setIsSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="mx-auto max-w-7xl">
+        <main className="flex-1 overflow-hidden flex flex-col p-4 md:p-8">
+          <div className="mx-auto max-w-7xl w-full flex-1 min-h-0 flex flex-col">
             <Outlet />
           </div>
         </main>

@@ -256,7 +256,7 @@ export default function Checklists() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6 h-full">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
@@ -271,7 +271,7 @@ export default function Checklists() {
 
       {/* ── Driver view ─────────────────────────────── */}
       {isDriver && (
-        <>
+        <div className="flex flex-col gap-6 flex-1 min-h-0 overflow-y-auto">
           {openChecklist && (
             <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-center gap-4">
               <ClipboardCheck className="h-8 w-8 text-orange-500 flex-shrink-0" />
@@ -350,12 +350,12 @@ export default function Checklists() {
             onView={setViewChecklist}
             formatDate={formatDate}
           />
-        </>
+        </div>
       )}
 
       {/* ── Auditor view ─────────────────────────────── */}
       {isAuditor && (
-        <>
+        <div className="flex flex-col gap-6 flex-1 min-h-0 overflow-y-auto">
           {openChecklist && (
             <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-center gap-4">
               <ClipboardCheck className="h-8 w-8 text-orange-500 flex-shrink-0" />
@@ -450,12 +450,12 @@ export default function Checklists() {
             onView={setViewChecklist}
             formatDate={formatDate}
           />
-        </>
+        </div>
       )}
 
       {/* ── Fleet Assistant+ view ─────────────────────────────── */}
       {isAssistantPlus && (
-        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-100">
             <button
               onClick={() => setOnlyWithIssues(false)}
@@ -487,9 +487,9 @@ export default function Checklists() {
               <p className="text-sm">Nenhum checklist realizado neste tenant.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="flex-1 overflow-auto">
               <table className="min-w-full divide-y divide-zinc-100">
-                <thead>
+                <thead className="sticky top-0 z-10">
                   <tr className="bg-zinc-50">
                     {['Template', 'Contexto', 'Veículo', 'Preenchido por', 'Data', 'Status', 'Ações'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">

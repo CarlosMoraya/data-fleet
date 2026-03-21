@@ -76,7 +76,7 @@ export default function OperationalPanel({
   }, [vehicles, maintenanceOrders, filters]);
 
   const totalVehicles = filteredVehicles.length;
-  const inMaintenance = filteredOrders.filter((o) => o.status !== 'Concluído').length;
+  const inMaintenance = filteredOrders.filter((o) => o.status !== 'Concluído' && o.status !== 'Cancelado').length;
 
   const overdueChecklists = filters.vehicleType
     ? filteredVehicles.filter((v) => overdueChecklistVehicleIds.has(v.id)).length

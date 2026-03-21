@@ -166,7 +166,7 @@ export default function ChecklistTemplates() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6 h-full">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -226,7 +226,7 @@ export default function ChecklistTemplates() {
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden flex-1 min-h-0 flex flex-col">
         {loadingTemplates ? (
           <div className="text-center py-16 text-zinc-400 text-sm">Carregando templates...</div>
         ) : filtered.length === 0 ? (
@@ -243,9 +243,9 @@ export default function ChecklistTemplates() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="flex-1 overflow-auto">
             <table className="min-w-full divide-y divide-zinc-100">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-zinc-50">
                   {['Nome', 'Contexto', 'Categoria', 'Status', 'Versão', 'Ações'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">

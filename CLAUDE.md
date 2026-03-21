@@ -391,6 +391,37 @@ public/
 
 ---
 
+## Novos Recursos (2026-03-20) — Cancelamento de Ordens de Serviço de Manutenção
+
+**Gerenciamento de OS Canceladas:**
+
+- Status **'Cancelado'** agora disponível como terminal (sem Edit/Complete, sem reabrir inline)
+- Fleet Assistant+ (`!isWorkshopUser`) pode cancelar qualquer OS ativa (não-concluída, não-cancelada)
+- Botão **Ban** (cancelar) abre modal de confirmação com resumo: OS, placa, status atual
+- Cancelamento persiste `cancelled_at` (TIMESTAMPTZ) + `cancelled_by_id` (UUID FK → profiles) para auditoria
+- OS canceladas **não contam** em cálculos de custo do Dashboard:
+  - Query `dashboard-maintenance`: `.neq('status', 'Cancelado')`
+  - Filtro defensivo em `CostPanel`: `maintenanceOrders.filter(o => o.status !== 'Cancelado')`
+  - KPI "Em Manutenção" em `OperationalPanel`: exclui tanto 'Concluído' quanto 'Cancelado'
+- Fluxo "Reabrir": botão **RotateCcw** em OS canceladas → abre formulário clone pré-preenchido (sem `id`, sem `os`, sem `cancelledAt/By`) com status resetado para 'Aguardando orçamento' → ao salvar, INSERT com nova OS gerada
+  - Reutiliza mecanismo `prefillData` existente (já usado por schedule-to-maintenance)
+  - Registro cancelado permanece intocado com status 'Cancelado'
+- 6º card de resumo "Cancelados" adicionado (grid 5→6 colunas, status terminal cinzento)
+
+**Arquivos Modificados:**
+- `src/pages/Maintenance.tsx` — Tipo `MaintenanceStatus` + 'Cancelado'; mutation `cancelMutation`; botões Cancel/Reopen; modal confirmação; card Cancelados; `counts['Cancelado']`
+- `src/lib/maintenanceMappers.ts` — `MaintenanceOrderRow` + colunas `cancelled_at/by`; mapper atualizado
+- `src/components/MaintenanceDetailModal.tsx` — `statusColor('Cancelado')`
+- `src/pages/Dashboard.tsx` — `.neq('status', 'Cancelado')` na query `dashboard-maintenance`
+- `src/components/dashboard/CostPanel.tsx` — Filtro defensivo client-side
+- `src/components/dashboard/OperationalPanel.tsx` — KPI "Em Manutenção" exclui canceladas
+- `supabase/migrations/add_cancelled_status_maintenance.sql` — ALTER CHECK de status, colunas de auditoria (⚠️ EXECUTADA NO SUPABASE DASHBOARD)
+- `.claude/arch-backend.md` — Documentada migration + CHECK status + colunas de auditoria
+- `.claude/arch-frontend.md` — Maintenance.tsx (cancel/reopen flow), Dashboard queries, panel filters
+- `.claude/data-model.md` — `MaintenanceStatus` union + `MaintenanceOrder` campos de auditoria
+
+---
+
 ## Histórico de Mudanças
 
 Consulte [CHANGELOG.md](CHANGELOG.md) para o histórico detalhado de todas as sessões.

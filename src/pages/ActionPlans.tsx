@@ -106,7 +106,7 @@ export default function ActionPlans() {
     date ? new Date(date).toLocaleDateString('pt-BR') : '—';
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6 h-full">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
@@ -168,7 +168,7 @@ export default function ActionPlans() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden flex-1 min-h-0 flex flex-col">
         {isLoading ? (
           <div className="flex items-center justify-center py-16 text-zinc-400">
             <Loader2 className="h-6 w-6 animate-spin mr-2" />
@@ -180,9 +180,9 @@ export default function ActionPlans() {
             <p className="text-sm">Nenhuma ação encontrada.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="flex-1 overflow-auto">
             <table className="min-w-full divide-y divide-zinc-100">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-zinc-50">
                   {['Nome / Ação', 'Veículo', 'Status', 'Responsável', 'Prazo', 'Criado em', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">

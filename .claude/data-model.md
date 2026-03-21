@@ -151,7 +151,8 @@ interface OperationalUnit {
 
 ### MaintenanceOrder (src/pages/Maintenance.tsx)
 ```ts
-type MaintenanceStatus = 'Aguardando orçamento' | 'Aguardando aprovação' | 'Orçamento aprovado' | 'Serviço em execução' | 'Concluído';
+type MaintenanceStatus = 'Aguardando orçamento' | 'Aguardando aprovação' | 'Orçamento aprovado' | 'Serviço em execução' | 'Concluído' | 'Cancelado';
+// 'Cancelado' é status terminal: sem Edit/Complete; não entra em cálculos de custo
 
 interface MaintenanceOrder {
   id: string; os: string; vehicleId: string; workshopId: string;
@@ -166,6 +167,8 @@ interface MaintenanceOrder {
   budgetStatus?: BudgetStatus; // sem_orcamento | pendente | aprovado | reprovado
   budgetReviewedBy?: string;   // nome do revisor (join)
   budgetReviewedAt?: string;
+  cancelledAt?: string;     // ISO timestamp do cancelamento (auditoria)
+  cancelledById?: string;   // profile_id de quem cancelou (auditoria)
 }
 ```
 
@@ -399,7 +402,7 @@ Tabelas de checklists (ativas):
 - `checklist_responses` (status ok/issue/skipped/not_applicable; CASCADE)
 
 Tabelas de manutenção (ativas):
-- `maintenance_orders` (os_number auto-gerado, workshop_os_number editável, current_km, budget_pdf_url, budget_status, budget_reviewed_by/at; status CHECK inclui 'Aguardando aprovação')
+- `maintenance_orders` (os_number auto-gerado, workshop_os_number editável, current_km, budget_pdf_url, budget_status, budget_reviewed_by/at; status CHECK inclui 'Cancelado'; colunas de auditoria: cancelled_at TIMESTAMPTZ, cancelled_by_id UUID FK profiles)
 - `maintenance_budget_items` (item_name, system, quantity, value unitário R$, sort_order; RLS rank >= 3 + Admin Master; save: delete-then-insert)
 - `action_plans` (pending/in_progress/completed/cancelled; work_order_number; DELETE Admin Master only)
 - `vehicle_km_intervals` (UNIQUE vehicle_id; km_interval INTEGER NULL; SELECT/INSERT/UPDATE Fleet Assistant+; DELETE Manager+; migration: `create_vehicle_km_intervals.sql`)

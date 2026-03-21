@@ -65,6 +65,8 @@ export interface MaintenanceOrderRow {
   budget_status: BudgetStatus | null;
   budget_reviewed_by: string | null;
   budget_reviewed_at: string | null;
+  cancelled_at: string | null;
+  cancelled_by_id: string | null;
   created_at: string;
   updated_at: string;
 
@@ -100,5 +102,7 @@ export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
     budgetStatus: row.budget_status || 'sem_orcamento',
     budgetReviewedBy: row.budget_reviewer?.name || undefined,
     budgetReviewedAt: row.budget_reviewed_at || undefined,
+    cancelledAt: row.cancelled_at || undefined,
+    cancelledById: row.cancelled_by_id || undefined,
   };
 }

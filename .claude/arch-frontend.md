@@ -72,7 +72,7 @@ src/
 │   ├── ChecklistFill.tsx # Tela fullscreen de preenchimento (OK/Problema/N/A, câmera, observação, auto-save, finalização com ações). **NOVO**: Campo KM obrigatório (primeiro, antes dos itens) — exibe último KM registrado ou initial_km do veículo como referência; valida KM >= último; bloqueia itens até KM confirmado. Contexto Entrada/Saída de Oficina: seleção obrigatória de oficina antes dos itens. Contexto Segurança: badge ⚠ em itens com canBlockVehicle
 │   ├── ChecklistTemplates.tsx # CRUD de templates (draft/published/deprecated, versionamento, filtro dual por categoria + contexto)
 │   ├── ActionPlans.tsx  # Painel Fleet Assistant+ — tabela de ações, filtros por status, modal de gestão
-│   ├── Maintenance.tsx  # CRUD de ordens de serviço — dual OS, saveMutation 3-etapas (INSERT/UPDATE → upload PDF → items), coluna Orçamento. **Query filtra por `client_id` do cliente selecionado (suporta Admin Master via dropdown, corrigido 2026-03-18)**; **NOVO**: suporte role 'Workshop' — query filtra por `workshop_id`, botão "Nova OS" oculto, UPDATE parcial (apenas 4 campos), modo 'workshop' em MaintenanceForm, coluna OS mostra workshopOs
+│   ├── Maintenance.tsx  # CRUD de ordens de serviço — dual OS, saveMutation 3-etapas (INSERT/UPDATE → upload PDF → items), coluna Orçamento. **Query filtra por `client_id` do cliente selecionado (suporta Admin Master via dropdown, corrigido 2026-03-18)**; **NOVO**: suporte role 'Workshop' — query filtra por `workshop_id`, botão "Nova OS" oculto, UPDATE parcial (apenas 4 campos), modo 'workshop' em MaintenanceForm, coluna OS mostra workshopOs. **CANCELAMENTO (2026-03-20)**: status 'Cancelado' terminal (Fleet Assistant+, !isWorkshopUser); botão Ban + modal confirmação; botão RotateCcw "Reabrir" (clone sem id → INSERT nova OS via prefillData); cancelMutation persiste cancelled_at + cancelled_by_id; 6º card "Cancelados"
 │   ├── WorkshopSchedules.tsx # Agendamentos de oficina — botão "Gerar OS" navega para /manutencao com prefill via state
 │   └── BudgetApprovals.tsx  # Aprovação de orçamentos (Fleet Assistant+) — fila FIFO, canApprove(user, total), expand por linha. **Query filtra por `client_id` + budgetItems query sem `enabled: expanded` (subtotal agora persiste após refresh, corrigido 2026-03-18)**
 │   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+); **não cria/lista Driver role** (drivers criados via DriverForm). **refreshSession antes de edição (corrigido JWT expired 2026-03-18)**
@@ -103,6 +103,44 @@ O `Layout.tsx` renderiza:
 1. `<Sidebar>` — navegação lateral com suporte a **Mobile Drawer** (hambúrguer menu)
 2. `<Topbar>` — exibe client atual, switcher, info do user e botão de menu no mobile
 3. `<Outlet>` — conteúdo da página ativa
+
+**Padrão de Scroll Interno (2026-03-20):**
+- `<main>` em `Layout.tsx`: `flex-1 overflow-hidden flex flex-col` (não scrollável, apenas contenedor)
+- Wrapper inner: `flex-1 min-h-0 flex flex-col` — propaga altura para o `<Outlet />`
+- **Cada página** segue um dos 3 padrões abaixo:
+
+**Padrão 1: Tabela Simples** (Vehicles, Drivers, Workshops, Shippers, OperationalUnits, Users, AdminUsers, AdminClients, ChecklistTemplates)
+- Raiz: `flex flex-col gap-6 h-full`
+- Tabela wrapper: `overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm flex-1 min-h-0 flex flex-col`
+- Inner table div: `flex-1 overflow-auto` (scrollável verticalmente)
+- `<thead>`: `sticky top-0 z-10` (permance visível ao rolar)
+
+**Padrão 2: Cards + Tabela** (Maintenance, ActionPlans, BudgetApprovals)
+- Raiz: `flex flex-col gap-6 h-full`
+- Cards/resumos: shrink-0 (altura natural, não participam do `flex-1`)
+- Tabela wrapper: `flex-1 min-h-0 flex flex-col overflow-hidden` (recebe espaço restante)
+- Inner table div: `flex-1 overflow-auto`
+
+**Padrão 3: Abas + Conteúdo** (Dashboard, Settings)
+- Raiz: `flex flex-col gap-6 h-full`
+- Título + filtros + tabs: shrink-0 (altura natural)
+- Painel/aba ativo: `flex-1 min-h-0 overflow-y-auto` (recebe espaço restante, scrollável)
+
+**Padrão 4: Múltiplas Views por Role** (Checklists)
+- Raiz: `flex flex-col gap-6 h-full`
+- Título: shrink-0
+- View ativa (Driver/Auditor/Assistant+): `flex-1 min-h-0 overflow-y-auto flex flex-col gap-6` (para Driver/Auditor); ou `flex-1 min-h-0 flex flex-col` + inner table pattern (para Assistant+)
+
+**Padrão 5: Layout Wrapper com Sub-rotas** (Cadastros)
+- Raiz: `flex flex-col gap-6 h-full`
+- Título + tabs: shrink-0
+- Outlet wrapper: `flex-1 min-h-0` — passa altura para sub-páginas (que usam Padrão 1)
+
+**Regra de Ouro:**
+- `h-full` só funciona quando o pai tem altura definida (raiz `h-full` ou `flex-1`)
+- `flex-1 min-h-0` garante que: (1) flexbox filho recebe espaço restante; (2) pode encolher abaixo do conteúdo (para scroll funcionar)
+- Sem `min-h-0`, altura mínima = conteúdo, scroll não ativa
+- Sem `flex-1`, não recebe espaço restante, torna-se "natural height"
 
 ## Deploy & Hosting
 
@@ -179,8 +217,8 @@ O `Layout.tsx` renderiza:
 - `DashboardKpiCard.tsx` — Card reutilizável (icon + label + value + optional subtitle + optional isAlert flag)
 - `VehicleTypeBarChart.tsx` — BarChart com click=filtro; active bar azul, inactive dimmed; props: data, activeFilter, onFilterChange, title, valueFormatter, yAxisLabel
 - `MaintenanceTypeDonutChart.tsx` — PieChart donut com click=filtro; cores por tipo; props: data, activeFilter, onFilterChange, title, valueFormatter
-- `OperationalPanel.tsx` — Exporta interfaces (VehicleRow, MaintenanceOrderDashboard, DashboardFilters); renderiza 5 KPIs + 2 gráficos; aplica filtros via useMemo
-- `CostPanel.tsx` — Renderiza 3 KPIs + 2 gráficos; calcula cost per KM com `new Map<string, VehicleRow>` e `new Set<string>` explícitos (TS fix)
+- `OperationalPanel.tsx` — Exporta interfaces (VehicleRow, MaintenanceOrderDashboard, DashboardFilters); renderiza 5 KPIs + 2 gráficos; aplica filtros via useMemo; KPI "Em Manutenção" exclui status 'Cancelado' e 'Concluído'
+- `CostPanel.tsx` — Renderiza 3 KPIs + 2 gráficos; calcula cost per KM com `new Map<string, VehicleRow>` e `new Set<string>` explícitos (TS fix); filtro defensivo exclui status 'Cancelado' antes de qualquer cálculo de custo
 
 **Queries (react-query):**
 ```ts

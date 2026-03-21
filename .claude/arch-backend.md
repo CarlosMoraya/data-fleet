@@ -57,7 +57,8 @@
 
 ### Tabela `maintenance_orders` (nova — migration `20260319000000_add_budget_to_maintenance.sql`):
 - Colunas adicionadas: `current_km NUMERIC(10,0) NULL`, `budget_pdf_url TEXT NULL`, `budget_status VARCHAR(20) NOT NULL DEFAULT 'sem_orcamento' CHECK IN ('sem_orcamento','pendente','aprovado','reprovado')`, `budget_reviewed_by UUID NULL FK → profiles(id)`, `budget_reviewed_at TIMESTAMPTZ NULL`
-- `status` CHECK atualizado: `IN ('Aguardando orçamento','Aguardando aprovação','Orçamento aprovado','Serviço em execução','Concluído')`
+- `status` CHECK atualizado: `IN ('Aguardando orçamento','Aguardando aprovação','Orçamento aprovado','Serviço em execução','Concluído','Cancelado')` (migration: `add_cancelled_status_maintenance.sql`)
+- Colunas de auditoria de cancelamento: `cancelled_at TIMESTAMPTZ NULL`, `cancelled_by_id UUID NULL FK → profiles(id)` (adicionadas na mesma migration)
 - RLS: (role_rank >= 3 AND client_id = ...) OR role = 'Admin Master' — **SEMPRE incluir Admin Master bypass**
 - Index: `idx_maintenance_budget_status ON (client_id, budget_status) WHERE budget_status = 'pendente'`
 
@@ -76,6 +77,7 @@
 - `add_driver_profile_link.sql` — adiciona coluna `profile_id UUID UNIQUE FK → profiles(id)` + INDEX `idx_drivers_profile_id` na tabela `drivers` para ligar cada motorista a seu perfil de usuário do sistema (2026-03-14)
 - `create_shippers_and_operational_units.sql` — tabelas `shippers` e `operational_units` com RLS policies, FK columns em `vehicles` (2026-03-17)
 - `20260319000000_add_budget_to_maintenance.sql` — novas colunas em `maintenance_orders` (current_km, budget_pdf_url, budget_status, budget_reviewed_by/at), tabela `maintenance_budget_items` com RLS ⚠️ **Executar no Supabase Dashboard**
+- `add_cancelled_status_maintenance.sql` — adiciona `'Cancelado'` ao CHECK de `status`, colunas `cancelled_at TIMESTAMPTZ` e `cancelled_by_id UUID FK → profiles(id)` em `maintenance_orders` ⚠️ **Executar no Supabase Dashboard**
 - `add_initial_km_vehicles.sql` — adiciona `initial_km INTEGER NULL` em `vehicles` e `initial_km_optional BOOLEAN DEFAULT false` em `vehicle_field_settings` (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
 - `add_odometer_km_checklists.sql` — adiciona `odometer_km INTEGER NULL` em `checklists` (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
 - `20260319100000_add_workshop_login.sql` — role 'Workshop' no CHECK de profiles.role, atualiza `role_rank()` para Workshop=1, adiciona `profile_id` em workshops, recria RLS de `maintenance_orders` e `maintenance_budget_items` para incluir Workshop, policy `workshop_self_select` em workshops (2026-03-19) ⚠️ **Executar no Supabase Dashboard**

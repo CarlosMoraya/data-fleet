@@ -283,7 +283,7 @@ export default function AdminClients() {
     : emptyForm;
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6 h-full">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -312,7 +312,7 @@ export default function AdminClients() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm flex-1 min-h-0 flex flex-col">
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-6 w-6 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
@@ -322,8 +322,9 @@ export default function AdminClients() {
             {search ? 'Nenhum cliente encontrado.' : 'Nenhum cliente cadastrado ainda.'}
           </div>
         ) : (
+          <div className="flex-1 overflow-auto">
           <table className="min-w-full divide-y divide-zinc-200">
-            <thead className="bg-zinc-50">
+            <thead className="bg-zinc-50 sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cliente</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cadastrado em</th>
@@ -364,6 +365,7 @@ export default function AdminClients() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

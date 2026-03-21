@@ -268,7 +268,7 @@ export default function BudgetApprovals() {
   if (!user || rank < 3) return null;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-6 max-w-7xl mx-auto flex flex-col gap-6 h-full">
       {/* Header */}
       <div className="flex items-center gap-3">
         <BadgeCheck className="h-6 w-6 text-orange-500" />
@@ -286,6 +286,7 @@ export default function BudgetApprovals() {
       )}
 
       {/* Table */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
       {isLoading ? (
         <p className="text-sm text-zinc-500">Carregando orçamentos...</p>
       ) : orders.length === 0 ? (
@@ -296,7 +297,7 @@ export default function BudgetApprovals() {
       ) : (
         <div className="border border-zinc-200 rounded-xl overflow-hidden">
           <table className="min-w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10">
               <tr className="bg-zinc-50 border-b border-zinc-200">
                 <th className="px-4 py-3 w-6" />
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">OS Interna</th>
@@ -323,6 +324,7 @@ export default function BudgetApprovals() {
           </table>
         </div>
       )}
+      </div>
     </div>
   );
 }

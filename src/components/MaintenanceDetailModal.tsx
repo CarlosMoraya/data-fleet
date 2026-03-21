@@ -19,6 +19,7 @@ function statusColor(status: MaintenanceOrder['status']) {
     case 'Orçamento aprovado':    return 'bg-blue-100 text-blue-800';
     case 'Serviço em execução':   return 'bg-orange-100 text-orange-800';
     case 'Concluído':             return 'bg-green-100 text-green-800';
+    case 'Cancelado':             return 'bg-zinc-100 text-zinc-500';
   }
 }
 

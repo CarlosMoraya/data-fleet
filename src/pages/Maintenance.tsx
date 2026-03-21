@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink } from 'lucide-react';
+import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, Ban, RotateCcw } from 'lucide-react';
 import { cn } from '../lib/utils';
 import MaintenanceDetailModal from '../components/MaintenanceDetailModal';
 import MaintenanceForm from '../components/MaintenanceForm';
@@ -10,7 +10,7 @@ import { maintenanceFromRow, MaintenanceOrderRow, BudgetStatus, BudgetItem } fro
 import { uploadMaintenanceBudget } from '../lib/storageHelpers';
 import { useAuth } from '../context/AuthContext';
 
-export type MaintenanceStatus = 'Aguardando orçamento' | 'Aguardando aprovação' | 'Orçamento aprovado' | 'Serviço em execução' | 'Concluído';
+export type MaintenanceStatus = 'Aguardando orçamento' | 'Aguardando aprovação' | 'Orçamento aprovado' | 'Serviço em execução' | 'Concluído' | 'Cancelado';
 export type MaintenanceType = 'Preventiva' | 'Preditiva' | 'Corretiva';
 
 export interface MaintenanceOrder {
@@ -37,6 +37,8 @@ export interface MaintenanceOrder {
   budgetStatus?: BudgetStatus;
   budgetReviewedBy?: string;
   budgetReviewedAt?: string;
+  cancelledAt?: string;
+  cancelledById?: string;
 }
 
 type StatusFilter = MaintenanceStatus | 'all';
@@ -48,6 +50,7 @@ const ALL_STATUSES: StatusFilter[] = [
   'Orçamento aprovado',
   'Serviço em execução',
   'Concluído',
+  'Cancelado',
 ];
 
 function statusColor(status: MaintenanceStatus) {
@@ -57,6 +60,7 @@ function statusColor(status: MaintenanceStatus) {
     case 'Orçamento aprovado':   return 'bg-blue-100 text-blue-800';
     case 'Serviço em execução':  return 'bg-purple-100 text-purple-800';
     case 'Concluído':            return 'bg-green-100 text-green-800';
+    case 'Cancelado':            return 'bg-zinc-100 text-zinc-500';
   }
 }
 
@@ -125,6 +129,7 @@ export default function Maintenance() {
   const [prefillData, setPrefillData] = React.useState<Partial<MaintenanceOrder> | undefined>(
     () => (location.state as any)?.prefillMaintenance ?? undefined
   );
+  const [orderToCancel, setOrderToCancel] = React.useState<MaintenanceOrder | null>(null);
 
   // Abrir form automaticamente se vier do fluxo agendamento → manutenção
   React.useEffect(() => {
@@ -173,6 +178,25 @@ export default function Maintenance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: async (order: MaintenanceOrder) => {
+      const { error } = await supabase
+        .from('maintenance_orders')
+        .update({
+          status: 'Cancelado',
+          cancelled_at: new Date().toISOString(),
+          cancelled_by_id: profile?.id ?? null,
+        })
+        .eq('id', order.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
+      queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
+      setOrderToCancel(null);
     },
   });
 
@@ -287,6 +311,7 @@ export default function Maintenance() {
       'Orçamento aprovado':     orders.filter(o => o.status === 'Orçamento aprovado').length,
       'Serviço em execução':    orders.filter(o => o.status === 'Serviço em execução').length,
       'Concluído':              orders.filter(o => o.status === 'Concluído').length,
+      'Cancelado':              orders.filter(o => o.status === 'Cancelado').length,
       corretiva:                orders.filter(o => o.type === 'Corretiva').length,
       preventiva:               orders.filter(o => o.type === 'Preventiva').length,
     };
@@ -306,7 +331,7 @@ export default function Maintenance() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6 h-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -332,7 +357,7 @@ export default function Maintenance() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
         <button
           onClick={() => setActiveTab('all')}
           className={cn(
@@ -377,6 +402,16 @@ export default function Maintenance() {
           <p className="text-2xl font-bold text-red-600">{counts.corretiva}</p>
           <p className="text-xs text-zinc-500 mt-0.5">Total Corretiva</p>
         </div>
+        <button
+          onClick={() => setActiveTab('Cancelado')}
+          className={cn(
+            'rounded-2xl border p-4 text-left transition-colors hover:border-zinc-400',
+            activeTab === 'Cancelado' ? 'border-zinc-500 bg-zinc-50' : 'border-zinc-200 bg-white',
+          )}
+        >
+          <p className="text-2xl font-bold text-zinc-400">{counts['Cancelado']}</p>
+          <p className="text-xs text-zinc-500 mt-0.5">Cancelados</p>
+        </button>
       </div>
 
       {/* Filters */}
@@ -401,8 +436,8 @@ export default function Maintenance() {
         </div>
 
         {/* Search */}
-        <div className="relative sm:ml-auto w-full sm:w-64">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+        <div className="relative sm:ml-auto w-full sm:w-64 flex items-center">
+          <Search className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-zinc-400" />
           <input
             type="text"
             value={search}
@@ -414,7 +449,7 @@ export default function Maintenance() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden min-h-[400px] relative">
+      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden relative flex-1 min-h-0 flex flex-col">
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm z-10">
             <div className="flex flex-col items-center gap-2">
@@ -428,9 +463,9 @@ export default function Maintenance() {
             <p className="text-sm">Nenhuma ordem de serviço encontrada.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="flex-1 overflow-auto">
             <table className="min-w-full divide-y divide-zinc-100">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-zinc-50">
                   {[isWorkshopUser ? 'OS da Oficina' : 'OS', 'Placa', 'Oficina', 'Dias', 'Previsão de Saída', 'Tipo', 'Status', 'Orçamento', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">
@@ -486,7 +521,7 @@ export default function Maintenance() {
                           >
                             <Eye className="h-4 w-4" />
                           </button>
-                          {o.status !== 'Concluído' && (
+                          {o.status !== 'Concluído' && o.status !== 'Cancelado' && (
                             <button
                               onClick={() => {
                                 setOrderToEdit(o);
@@ -498,13 +533,38 @@ export default function Maintenance() {
                               <Edit className="h-4 w-4" />
                             </button>
                           )}
-                          {o.status !== 'Concluído' && !isWorkshopUser && (
+                          {o.status !== 'Concluído' && o.status !== 'Cancelado' && !isWorkshopUser && (
                             <button
                               onClick={(e) => handleComplete(o.id, e)}
                               title="Marcar como Concluído"
                               className="p-1.5 rounded-lg text-zinc-400 hover:text-green-600 hover:bg-green-50 transition-colors"
                             >
                               <CheckCircle2 className="h-4 w-4" />
+                            </button>
+                          )}
+                          {o.status !== 'Concluído' && o.status !== 'Cancelado' && !isWorkshopUser && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setOrderToCancel(o); }}
+                              title="Cancelar OS"
+                              className="p-1.5 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            >
+                              <Ban className="h-4 w-4" />
+                            </button>
+                          )}
+                          {o.status === 'Cancelado' && !isWorkshopUser && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                                const { id, os, status, createdAt, cancelledAt, cancelledById, ...rest } = o;
+                                setPrefillData({ ...rest, status: 'Aguardando orçamento' });
+                                setOrderToEdit(null);
+                                setIsFormOpen(true);
+                              }}
+                              title="Reabrir (nova OS)"
+                              className="p-1.5 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            >
+                              <RotateCcw className="h-4 w-4" />
                             </button>
                           )}
                         </div>
@@ -539,6 +599,48 @@ export default function Maintenance() {
             saveMutation.mutateAsync({ data, budgetItems, budgetFile })
           }
         />
+      )}
+
+      {orderToCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 shrink-0">
+                <Ban className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-zinc-900">Cancelar Ordem de Serviço</h3>
+                <p className="text-sm text-zinc-500">Esta ação não pode ser desfeita diretamente.</p>
+              </div>
+            </div>
+            <div className="rounded-xl bg-zinc-50 border border-zinc-200 px-4 py-3 text-sm space-y-1">
+              <div><span className="font-medium text-zinc-700">OS:</span> <span className="font-mono">{orderToCancel.os}</span></div>
+              <div><span className="font-medium text-zinc-700">Placa:</span> {orderToCancel.licensePlate}</div>
+              <div><span className="font-medium text-zinc-700">Status atual:</span> {orderToCancel.status}</div>
+            </div>
+            <p className="text-sm text-zinc-600">
+              A OS será marcada como <strong>Cancelado</strong> e não contará mais para cálculos de custo.
+              Caso seja necessário, você poderá reabrir uma nova OS a partir deste registro.
+            </p>
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => setOrderToCancel(null)}
+                disabled={cancelMutation.isPending}
+                className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 rounded-lg hover:bg-zinc-100 transition-colors disabled:opacity-50"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={() => cancelMutation.mutate(orderToCancel)}
+                disabled={cancelMutation.isPending}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50 transition-colors"
+              >
+                {cancelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Confirmar Cancelamento
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -234,7 +234,7 @@ export default function Settings() {
   ];
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="flex flex-col gap-6 max-w-3xl h-full">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Configurações</h1>
         <p className="text-sm text-zinc-500 mt-1">Gerencie as configurações do sistema para este cliente.</p>
@@ -265,6 +265,7 @@ export default function Settings() {
         </nav>
       </div>
 
+      <div className="flex-1 min-h-0 overflow-y-auto">
       {activeTab === 'vehicles' && (
         /* ─── Card: Campos Obrigatórios do Veículo ─── */
         <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden animate-in fade-in duration-300">
@@ -459,6 +460,7 @@ export default function Settings() {
       {activeTab === 'checklists' && currentClient?.id && user && (
         <ChecklistDayIntervalSettings clientId={currentClient.id} userId={user.id} />
       )}
+      </div>
     </div>
   );
 }

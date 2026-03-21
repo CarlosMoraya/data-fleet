@@ -45,7 +45,7 @@ export default function CostPanel({
     filteredOrders: MaintenanceOrderDashboard[];
   } => {
     let fv = vehicles;
-    let fo = maintenanceOrders;
+    let fo = maintenanceOrders.filter((o) => o.status !== 'Cancelado');
 
     if (filters.vehicleType) {
       fv = vehicles.filter((v) => v.type === filters.vehicleType);
