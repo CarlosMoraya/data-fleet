@@ -7,19 +7,27 @@
 type Role = 'Driver' | 'Yard Auditor' | 'Workshop' | 'Fleet Assistant' | 'Fleet Analyst' | 'Supervisor' | 'Manager' | 'Coordinator' | 'Director' | 'Admin Master';
 ```
 
-### Hierarquia de Roles
+### Hierarquia de Roles (Ranks)
 ```
-Driver(1) < Yard Auditor(2) < Fleet Assistant(3) < Fleet Analyst(4) < Manager(5) < Director(6) < Admin Master(7)
+Driver(1) < Yard Auditor(2) < Workshop(1) < Fleet Assistant(3) < Fleet Analyst(4) < Supervisor(5) < Coordinator(6) < Manager(7) < Director(8) < Admin Master(9)
 ```
 
+**Alteração 2026-03-26:**
+- Supervisor: 4 → 5
+- Coordinator: 5 → 6 (novo role acima de Manager anterior)
+- Manager: 5 → 7
+- Director: 6 → 8
+- Admin Master: 7 → 9
+
 **Regras:**
-- Usuário só pode criar/editar roles abaixo do seu nível
-- Client switching: apenas Manager(5)+
-- Área admin (`/admin/*`): apenas Admin Master(7)
+- Usuário só pode criar roles abaixo do seu rank (ex: Manager(7) cria Coordinator(6) e abaixo)
+- Client switching: apenas Manager(7)+
+- Área admin (`/admin/*`): apenas Admin Master(9)
 - Gestão de usuários (`/users`): Fleet Assistant(3)+
-- **Exclusão de veículos**: Manager(5)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteVehicles` estiver ativo.
-- **Exclusão de motoristas**: Manager(5)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteDrivers` estiver ativo.
-- **Exclusão de oficinas**: Manager(5)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteWorkshops` estiver ativo.
+- **Exclusão de veículos**: Manager(7)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteVehicles` estiver ativo.
+- **Exclusão de motoristas**: Manager(7)+ sempre, ou Fleet Analyst(4) se o flag `canDeleteDrivers` estiver ativo; Supervisor(5) com flag.
+- **Exclusão de oficinas**: Manager(7)+ sempre, ou Fleet Analyst(4)/Supervisor(5) se o flag `canDeleteWorkshops` estiver ativo.
+- **Visualização de usuários**: Rank N só vê users com rank < N; ninguém se vê na lista (próprio user excludido)
 - Route guard: Driver/Yard Auditor → redirect para `/checklists`; Workshop → redirect para `/manutencao`
 
 ### User
@@ -523,3 +531,70 @@ interface PhotoBlobEntry {
 - `confirm_km` / `confirm_workshop` → UPDATE simples (no-op em replay)
 - `finish_checklist` → UPDATE status='completed' (no-op em replay)
 - Fotos → `uploadChecklistPhoto` usa upsert no Storage
+
+## Módulo de Gestão de Pneus
+
+### TireVisualClassification / TirePositionType
+```ts
+type TireVisualClassification = 'Novo' | 'Meia vida' | 'Troca';
+type TirePositionType = 'single' | 'dual_external' | 'dual_internal' | 'triple_external' | 'triple_middle' | 'triple_internal' | 'spare';
+```
+
+### AxleConfigEntry (configuração detalhada de eixos por veículo)
+```ts
+type AxleType = 'direcional' | 'simples' | 'duplo' | 'duplo_tandem' | 'triplo_tandem' | 'elevacao';
+type RodagemType = 'simples' | 'dupla' | 'tripla';
+
+interface AxleConfigEntry {
+  order: number;          // 1-based
+  type: AxleType;
+  rodagem: RodagemType;
+  physicalAxles: number;  // 1, 2 ou 3 (derivado do type)
+}
+```
+
+Campos novos em `Vehicle`:
+- `axleConfig?: AxleConfigEntry[]` — armazenado como JSONB em `vehicles.axle_config`
+- `stepsCount?: number` — estepes de fábrica em `vehicles.steps_count`
+
+### Tire
+```ts
+interface Tire {
+  id: string; clientId: string; vehicleId: string;
+  tireCode: string;          // Imutável após criação
+  specification: string;     // ex: "295/80R22.5"
+  dot?: string; fireMarking?: string; manufacturer?: string; brand?: string;
+  rotationIntervalKm?: number; usefulLifeKm?: number; retreadIntervalKm?: number;
+  visualClassification: TireVisualClassification;
+  currentPosition: string;   // ex: E1, D2I, Step 1
+  lastPosition?: string;
+  positionType: TirePositionType;
+  active: boolean;
+  // JOIN fields:
+  vehicleLicensePlate?: string; vehicleModel?: string; vehicleType?: string;
+}
+```
+
+### TirePositionHistory
+```ts
+interface TirePositionHistory {
+  id: string; clientId: string; tireId: string; vehicleId: string;
+  previousPosition?: string; newPosition: string;
+  movedAt: string; movedBy: string; movedByName?: string;
+  reason?: string; odometerKm?: number;
+}
+```
+
+### VehicleTireConfig
+```ts
+interface VehicleTireConfig {
+  id: string; vehicleType: string;
+  defaultAxles: number; defaultSpareCount: number;
+  dualAxles: number[];  // ex: [2, 3] = eixos com rodagem dupla
+}
+```
+
+**Tabelas:** `tires` (PK: id, UNIQUE: client_id+tire_code), `tire_position_history` (append-only), `vehicle_tire_configs` (seed pré-preenchido).
+**Índice Parcial:** `idx_tires_active_position ON tires(vehicle_id, current_position) WHERE active = true` — garante 1 pneu ativo por posição por veículo.
+**Colunas em vehicles:** `axle_config JSONB` + `steps_count INTEGER` (migration: `20260325081826_add_axle_config_vehicles.sql` — ⚠️ EXECUTAR NO SUPABASE DASHBOARD)
+**Geração de posições:** `generatePositionsFromConfig(entries, stepsCount, vehicleType)` em `tirePositions.ts` — prioridade sobre fallback `generatePositions()` + `VehicleTireConfig`.

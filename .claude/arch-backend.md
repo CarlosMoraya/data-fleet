@@ -83,6 +83,7 @@
 - `20260319100000_add_workshop_login.sql` — role 'Workshop' no CHECK de profiles.role, atualiza `role_rank()` para Workshop=1, adiciona `profile_id` em workshops, recria RLS de `maintenance_orders` e `maintenance_budget_items` para incluir Workshop, policy `workshop_self_select` em workshops (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
 - `fix_workshop_vehicles_rls.sql` — adiciona policy SELECT em vehicles para Workshop (acesso apenas a veículos em suas próprias OS, via join com workshops.profile_id); resolve bug onde join vehicles retornava null para Workshop causando "N/A" na coluna Placa (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
 - `fix_vehicles_admin_master_rls.sql` — corrige SELECT policy em `vehicles` para incluir `OR role = 'Admin Master'` (Admin Master tem client_id = NULL, precisava de exceção especial como em maintenance_orders e action_plans); resolve bug no Dashboard onde Total de Veículos exibia 0 para Admin Master (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
+- `20260326000000_fix_supervisor_coordinator_rls.sql` — Atualiza hierarquia de roles: Supervisor(5), Coordinator(6), Manager(7), Director(8), Admin Master(9); corrige role_rank() função; adiciona Supervisor/Coordinator aos RLS policies de 5 tabelas: drivers (SELECT/INSERT/UPDATE/DELETE), driver_field_settings (SELECT), shippers (SELECT/INSERT/UPDATE/DELETE), operational_units (SELECT/INSERT/UPDATE/DELETE), workshops (SELECT/INSERT/UPDATE/DELETE). Resolve bug onde Supervisor+ não conseguiam visualizar motoristas, embarcadores, unidades operacionais e oficinas apesar de terem permissões pelas regras do sistema (2026-03-26) ⚠️ **Executar no Supabase Dashboard**
 
 ### RLS — Padrões de Checklists
 - `checklists` SELECT: Driver/Auditor vê os próprios; Fleet Assistant+ vê todo o tenant; Admin Master vê tudo
@@ -177,3 +178,35 @@ TEST_MANAGER_PASSWORD=...
 - Arquivo: `supabase/schema.sql`
 - Contém DDL para tabelas e políticas RLS
 - Executar manualmente no Supabase SQL Editor
+
+## Módulo de Gestão de Pneus
+
+**Migration:** `supabase/migrations/20260324000000_create_tire_management.sql`
+⚠️ EXECUTAR NO SUPABASE DASHBOARD
+
+**Migration (configuração de eixos):** `supabase/migrations/20260325081826_add_axle_config_vehicles.sql`
+⚠️ EXECUTAR NO SUPABASE DASHBOARD
+- `ALTER TABLE vehicles ADD COLUMN axle_config JSONB DEFAULT NULL`
+- `ALTER TABLE vehicles ADD COLUMN steps_count INTEGER DEFAULT NULL`
+- Atualiza CHECK de `position_type` em `tires` para incluir `triple_external`, `triple_middle`, `triple_internal`
+
+### Tabelas
+
+**`tires`**
+- Colunas: id, client_id, vehicle_id, tire_code, specification, dot, fire_marking, manufacturer, brand, rotation_interval_km, useful_life_km, retread_interval_km, visual_classification (CHECK: Novo/Meia vida/Troca), current_position, last_position, position_type (CHECK: single/dual_external/dual_internal/spare), active, created_by, updated_by, created_at, updated_at
+- UNIQUE(client_id, tire_code)
+- Partial UNIQUE index: `(vehicle_id, current_position) WHERE active = true`
+
+**`tire_position_history`** (append-only)
+- Colunas: id, client_id, tire_id, vehicle_id, previous_position (NULL no cadastro), new_position, moved_at, moved_by, reason, odometer_km
+
+**`vehicle_tire_configs`**
+- Seed: Moto(1,0,[]), Passeio/Utilitário/Van/Vuc(2,1,[]), Toco(2,1,[2]), Truck(3,1,[2,3]), Cavalo(3,2,[2,3])
+- Admin Master-only para INSERT/UPDATE/DELETE
+
+### RLS
+- **tires SELECT:** role_rank >= 3 (Fleet Assistant+) + mesmo tenant OU Admin Master
+- **tires INSERT/UPDATE:** Manager/Coordinator/Director/Admin Master
+- **tires DELETE:** Director/Admin Master (policy `tires_delete` com bypass de client_id para Admin Master); frontend restringe a Admin Master apenas
+- **tire_position_history:** SELECT (Fleet Assistant+); INSERT (Manager+); sem UPDATE/DELETE para não-Admin; ON DELETE CASCADE ao deletar tire
+- **vehicle_tire_configs:** SELECT (qualquer authenticated); CUD (Admin Master apenas)

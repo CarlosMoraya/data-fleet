@@ -17,7 +17,8 @@ src/
 │   ├── Layout.tsx       # Shell: Sidebar + Topbar + Outlet
 │   ├── Sidebar.tsx      # Menu lateral com navegação (contém logo tipográfico βetaFleet com letra grega)
 │   ├── Topbar.tsx       # Barra superior (client switcher, user info)
-│   ├── VehicleForm.tsx  # Formulário multi-step para veículos (props: availableDrivers, availableShippers, availableOperationalUnits). Campos: Identificação + Propriedade (incluindo Km Inicial) + Documentos + Técnicas + Garantia + Seguro + Motorista + Logística. Field settings dinâmicos.
+│   ├── VehicleForm.tsx  # Formulário multi-step para veículos (props: availableDrivers, availableShippers, availableOperationalUnits). Campos: Identificação + Propriedade (incluindo Km Inicial) + Documentos + Técnicas (inclui AxleConfigEditor abaixo de eixos) + Garantia + Seguro + Motorista + Logística. Field settings dinâmicos.
+│   ├── AxleConfigEditor.tsx  # Editor dinâmico de configuração de eixos. Props: targetAxles, entries, stepsCount, onChange. Renderiza abaixo do campo eixos em VehicleForm. Primeiro eixo fixo como direcional. Dropdowns filtrados por slots restantes. Calcula total de pneus em tempo real. Oculto para tipo Moto.
 │   ├── DriverForm.tsx   # Formulário para motoristas (CNH, GR, certificados + email/senha ao criar, cria usuário via Edge Function)
 │   ├── ShipperForm.tsx  # Formulário modal para embarcadores (name, cnpj, phone, email, contactPerson, notes, active)
 │   ├── OperationalUnitForm.tsx # Formulário modal para unidades operacionais (shipperId required, name, code, city, state, notes, active)
@@ -83,7 +84,7 @@ src/
 │   ├── Maintenance.tsx  # CRUD de ordens de serviço — dual OS, saveMutation 3-etapas (INSERT/UPDATE → upload PDF → items), coluna Orçamento. **Query filtra por `client_id` do cliente selecionado (suporta Admin Master via dropdown, corrigido 2026-03-18)**; **NOVO**: suporte role 'Workshop' — query filtra por `workshop_id`, botão "Nova OS" oculto, UPDATE parcial (apenas 4 campos), modo 'workshop' em MaintenanceForm, coluna OS mostra workshopOs. **CANCELAMENTO (2026-03-20)**: status 'Cancelado' terminal (Fleet Assistant+, !isWorkshopUser); botão Ban + modal confirmação; botão RotateCcw "Reabrir" (clone sem id → INSERT nova OS via prefillData); cancelMutation persiste cancelled_at + cancelled_by_id; 6º card "Cancelados"
 │   ├── WorkshopSchedules.tsx # Agendamentos de oficina — botão "Gerar OS" navega para /manutencao com prefill via state
 │   └── BudgetApprovals.tsx  # Aprovação de orçamentos (Fleet Assistant+) — fila FIFO, canApprove(user, total), expand por linha. **Query filtra por `client_id` + budgetItems query sem `enabled: expanded` (subtotal agora persiste após refresh, corrigido 2026-03-18)**
-│   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+); **não cria/lista Driver role** (drivers criados via DriverForm). **refreshSession antes de edição (corrigido JWT expired 2026-03-18)**
+│   ├── Users.tsx        # CRUD usuários do tenant (Fleet Assistant+); **não cria/lista Driver role** (drivers criados via DriverForm). **refreshSession antes de edição (corrigido JWT expired 2026-03-18)**. **Correções 2026-03-26**: (1) Visibilidade corrigida — queryFn retorna todos os users, useMemo `visibleUsers` aplica filtro de rank + self-exclusion com deps [users, myRank, user.id]; (2) UI previne auto-edição/deleção — {u.id !== user.id && ...} envolvem botões de edit/delete; (3) Nenhum user se vê a si mesmo na lista**
 │   ├── Settings.tsx     # Configurações: abas Veículo + Motorista (Manager+) + Revisões + Checklists (Fleet Assistant+); guard: ROLES_CAN_ACCESS_SETTINGS (Fleet Assistant+); canManageFields controla abas Veículos/Motoristas
 │   ├── AdminUsers.tsx   # CRUD todos usuários (Admin Master only). **refreshSession antes de edição (corrigido JWT expired 2026-03-18)**
 │   └── AdminClients.tsx # CRUD clientes (Admin Master only)
@@ -250,3 +251,55 @@ dashboard-drivers     → drivers: id, expiration_date
 - `MaintenanceOrderDashboard` inclui tipo de manutenção (union: 'Corretiva' | 'Preventiva' | 'Preditiva')
 - Filtros persistem ao trocar entre abas
 - Temporário: `vehiclesError` exibido em red banner se RLS de vehicles bloquear (diagnóstico)
+
+## Módulo de Gestão de Pneus
+
+### `src/pages/Tires.tsx`
+- Layout: Padrão 2 (Cards + Tabela com flex-1 min-h-0 scroll)
+- 5 cards de resumo clicáveis: Total Ativos, Novos, Meia Vida, Para Troca, Inativos
+- Filtro por busca (especificação/placa) — código UUID (tireCode) é oculto (não exibido ao usuário)
+- Botão "+ Adicionar Pneus" → modal de seleção de modo (por placa ou por lote)
+- **Tabela**: Colunas: Especificação (+ DOT em texto menor quando disponível) | Veículo (placa + modelo) | Posição | Classificação | Status | Ações
+- Queries: `['tires', clientId]`, `['vehicleTireConfigs']`, `['vehiclesSimple', clientId]`
+- Acesso: `ROLES_CAN_VIEW_TIRES` = Fleet Assistant+; `ROLES_CAN_REGISTER_TIRES` = Manager/Coordinator/Director/Admin Master
+- **Exclusão (2026-03-25)**: `ROLES_CAN_DELETE_TIRES` = Admin Master; botão Trash2 (vermelho) na coluna Ações; modal `DeleteConfirmModal` com confirmação; mutation deleta pneu + histórico (ON DELETE CASCADE); `deleteMutation` invalida query e fecha modal
+
+### `src/components/TireForm.tsx`
+- Modal de cadastro/edição individual de pneu
+- Props: vehicleId, vehiclePlate, vehicleType, vehicleAxles?, vehicleAxleConfig?, vehicleStepsCount?, existingTires, tireConfig?, editingTire?, onSave, onClose
+- `onSave: (tires: Partial<Tire> | Partial<Tire>[], previousPosition?: string) => Promise<void>` — suporta criação individual ou em lote
+- **Modo de registro** (somente na criação): toggle segmentado "Pneu único" / "Todos os pneus (N)"
+  - "Pneu único": seletor de posição, gera 1 pneu com `crypto.randomUUID()` como `tireCode`
+  - "Todos os pneus": lista read-only de posições (livres em verde, ocupadas em cinza), gera N pneus com UUIDs únicos ao salvar; posições ocupadas são ignoradas
+- `tireCode` sempre auto-gerado (`crypto.randomUUID()`) na criação; read-only badge na edição (imutável)
+- Usa `generatePositionsFromConfig()` quando `vehicleAxleConfig` existe; fallback para `generatePositions()` + `VehicleTireConfig`
+- Ao salvar: INSERT/UPDATE em `tires` + INSERT em `tire_position_history` se posição mudou
+
+### `src/components/TireBatchForm.tsx`
+- Modal multi-step (4 passos): Selecionar Modelo → Veículos Elegíveis → Template → Confirmação
+- Veículos elegíveis = sem nenhum pneu ativo (`active = true`)
+- `tire_code` auto-gerado via `crypto.randomUUID()` (único por pneu)
+- Inserção em lotes de 100 rows + histórico inicial
+- Regra crítica: sem sobrescrita — veículos com pneus são excluídos silenciosamente
+
+### `src/components/TireHistoryModal.tsx`
+- Modal com dados completos do pneu (read-only) + tabela de movimentações
+- Query: `tire_position_history` por `tire_id`, ORDER BY `moved_at DESC`, join `profiles(name)`
+
+### `src/lib/tirePositions.ts`
+- `generatePositions(axleCount, dualAxles, spareCount, vehicleType)` → array de `TirePosition` (legacy, mantido como fallback)
+- `generatePositionsFromConfig(entries, stepsCount, vehicleType)` → array de `TirePosition` (novo, usa AxleConfigEntry[])
+  - Simples: E{n}/D{n}; Dupla: E{n}IN/E{n}EX/D{n}IN/D{n}EX; Tripla: E{n}IN/E{n}M/E{n}EX/D{n}IN/D{n}M/D{n}EX
+- `validatePositionAssignment(position, existingActiveTires, excludeTireId?)` → string | null
+- `classifyPositionType(position)` → TirePositionType (detecta sufixo IN/EX/M)
+
+### `src/lib/axleConfigUtils.ts` (novo)
+- `getPhysicalAxles(type)` — slots consumidos por tipo (1, 2 ou 3)
+- `getAvailableAxleTypes(remainingSlots, isFirst)` — opções filtradas por slots restantes
+- `getAvailableRodagem(isFirst)` — simples/dupla sempre; tripla só para não-primeiro
+- `calculateTotalTires(entries, stepsCount)` — total de pneus
+- `AXLE_TYPE_LABELS`, `RODAGEM_LABELS` — labels em PT-BR
+
+### `src/lib/tireMappers.ts`
+- `TireRow`, `TirePositionHistoryRow`, `VehicleTireConfigRow` (snake_case)
+- `tireFromRow()`, `tireToRow()`, `tireHistoryFromRow()`, `vehicleTireConfigFromRow()`
