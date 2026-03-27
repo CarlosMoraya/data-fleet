@@ -34,6 +34,11 @@ const TABS = [
     to: '/cadastros/usuarios',
     roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'],
   },
+  {
+    name: 'Pneus',
+    to: '/cadastros/pneus',
+    roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'],
+  },
 ];
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];

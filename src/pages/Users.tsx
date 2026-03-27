@@ -13,11 +13,11 @@ const ROLE_RANK: Record<Role, number> = {
   'Yard Auditor': 2,
   'Fleet Assistant': 3,
   'Fleet Analyst': 4,
-  'Supervisor': 4,
-  'Manager': 5,
-  'Coordinator': 5,
-  'Director': 6,
-  'Admin Master': 7,
+  'Supervisor': 5,
+  'Coordinator': 6,
+  'Manager': 7,
+  'Director': 8,
+  'Admin Master': 9,
 };
 
 const ALL_ROLES: Role[] = [
@@ -540,17 +540,19 @@ export default function Users() {
 
       const { data, error } = await query.order('name');
       if (error) throw error;
-      
-      return (data as UserRow[]).filter(
-        (u) => ROLE_RANK[u.role] < myRank && u.id !== user.id && u.role !== 'Driver'
-      );
+      return data as UserRow[];
     },
     enabled: !!currentClient?.id || !currentClient, // allows fetching if user has no client but is probably master
   });
 
+  const visibleUsers = useMemo(
+    () => users.filter((u) => ROLE_RANK[u.role] < myRank && u.id !== user.id && u.role !== 'Driver'),
+    [users, myRank, user.id]
+  );
+
   const filtered = useMemo(() => {
-    return users.filter((u) => u.name.toLowerCase().includes(search.toLowerCase()));
-  }, [users, search]);
+    return visibleUsers.filter((u) => u.name.toLowerCase().includes(search.toLowerCase()));
+  }, [visibleUsers, search]);
 
   const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -642,20 +644,24 @@ export default function Users() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => setEditingUser(u)}
-                        className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
-                        title="Editar"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(u)}
-                        className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {u.id !== user.id && (
+                        <button
+                          onClick={() => setEditingUser(u)}
+                          className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                          title="Editar"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      )}
+                      {u.id !== user.id && (
+                        <button
+                          onClick={() => handleDelete(u)}
+                          className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

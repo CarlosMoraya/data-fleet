@@ -1,4 +1,4 @@
-import { Vehicle } from '../types';
+import { Vehicle, AxleConfigEntry } from '../types';
 import {
   normalizeUpper,
   capitalizeWords,
@@ -60,6 +60,8 @@ export interface VehicleRow {
   maintenance_contract_upload: string | null;
   vehicle_usage: string | null;
   initial_km: number | null;
+  axle_config: AxleConfigEntry[] | null;
+  steps_count: number | null;
 }
 
 /** Converte row do Supabase (snake_case) para interface Vehicle (camelCase) */
@@ -120,6 +122,8 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
     maintenanceContractUpload: row.maintenance_contract_upload ?? undefined,
     vehicleUsage: row.vehicle_usage as Vehicle['vehicleUsage'] ?? undefined,
     initialKm: row.initial_km ?? undefined,
+    axleConfig: row.axle_config ?? undefined,
+    stepsCount: row.steps_count ?? undefined,
   };
 }
 
@@ -177,5 +181,7 @@ export function vehicleToRow(vehicle: Partial<Vehicle>, clientId: string): Omit<
     maintenance_contract_upload: vehicle.maintenanceContractUpload ?? null,
     vehicle_usage: vehicle.vehicleUsage ?? null,
     initial_km: vehicle.initialKm != null ? parseInt(String(vehicle.initialKm), 10) : null,
+    axle_config: vehicle.axleConfig ?? null,
+    steps_count: vehicle.stepsCount != null ? parseInt(String(vehicle.stepsCount), 10) : null,
   };
 }

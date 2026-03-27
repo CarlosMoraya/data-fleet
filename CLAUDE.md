@@ -7,12 +7,42 @@
 ## Atalhos Rápidos
 
 ```bash
-npm run dev       # Dev server (porta 3000)
-npm run lint      # Type-check (tsc --noEmit)
-npm run build     # Build produção
-npm run preview   # Preview do build
-npx playwright test  # Rodar testes E2E
+npm run dev              # Dev server (porta 3000)
+npm run lint             # Type-check (tsc --noEmit)
+npm run build            # Build produção
+npm run preview          # Preview do build
+npm run test:e2e         # Rodar todos os testes E2E (Playwright)
+npm run test:e2e:ui      # Abrir Playwright UI para debugging
+npm run test:e2e:report  # Visualizar relatório HTML de últimas execuções
+npm run test:shippers    # Rodar apenas testes de embarcadores
+npm run migrate:shippers # Executar migration de dados de embarcadores
 ```
+
+---
+
+## Configuração de Ambiente
+
+**Requisitos:**
+- Node.js 18+
+- Conta Supabase com projeto criado
+
+**Passos Iniciais:**
+
+1. Clone o repositório e instale dependências:
+   ```bash
+   npm install
+   ```
+
+2. Crie arquivo `.env.local` na raiz do projeto:
+   ```env
+   VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+   VITE_SUPABASE_ANON_KEY=sua-chave-anonima
+   GEMINI_API_KEY=sua-chave-gemini  # Para funcionalidade OCR
+   ```
+
+3. Verifique variáveis no `vite.config.ts` — apenas `VITE_*` são expostas ao navegador.
+
+**Nota sobre Migrations:** Migrations SQL criadas em `supabase/migrations/` são executadas manualmente no **Supabase Dashboard** (SQL Editor). Veja seção "Fluxo de Migrations" abaixo.
 
 ---
 
@@ -32,6 +62,47 @@ Antes de codificar, carregue o módulo relevante com `cat`:
 
 ---
 
+## Padrões de Testing
+
+**Abordagem:** Testes E2E com Playwright. Sem testes unitários (confiança via type-check e integração real).
+
+**Estrutura:**
+```
+e2e/
+  ├── fixtures/          # Fixtures reutilizáveis (auth, data setup)
+  ├── utils/             # Utilitários (loginAs, createVehicle, etc.)
+  ├── *.spec.ts          # Testes por funcionalidade
+  ├── DRIVER_INTEGRATION_TESTS.md    # Docs de testes de driver
+  ├── TESTS_SUMMARY.md              # Resumo de cobertura
+```
+
+**Setup & Teardown:**
+- Fixtures em `e2e/fixtures/` — loginAs(role), createVehicle(), createChecklist()
+- Cada teste usa `test()` do Playwright com page fixture automática
+- Ambiente: `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` do `.env.local`
+
+**Padrões Comuns:**
+1. **Login Multi-role**: Use fixture `loginAs('Driver')` ou `loginAs('Manager')`
+2. **Validação Visual**: Espere por seletor + texto: `await page.locator('text=Confirmar').click()`
+3. **Data Cleanup**: Migrations de teardown são executadas após cada spec (evita contaminação)
+4. **Relatório**: `npm run test:e2e:report` mostra screenshots + traces de falhas
+
+**Exemplo Mínimo:**
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('Driver pode preencher checklist', async ({ page }) => {
+  await loginAs(page, 'Driver');
+  await page.goto('/checklists/new');
+  await page.fill('input[name="odometerKm"]', '5000');
+  await expect(page.locator('text=Checklist salvo')).toBeVisible();
+});
+```
+
+Consulte `e2e/testing.md` para setup detalhado.
+
+---
+
 ## Protocolo de Auto-Sincronização
 
 > **DIRETRIZ RÍGIDA**: Se você alterar ferramentas, bibliotecas, padrões arquiteturais, interfaces, tabelas do banco, configuração de testes ou convenções de código, sua **última ação obrigatória ANTES do commit** deve ser atualizar o módulo correspondente na pasta `.claude/`.
@@ -43,6 +114,33 @@ Checklist de sincronização:
 - [ ] Adicionou/alterou página ou componente → atualizar `arch-frontend.md`
 - [ ] Adicionou/alterou teste E2E → atualizar `testing.md`
 - [ ] Mudou convenção ou padrão → atualizar `style-guide.md`
+
+---
+
+## Fluxo de Migrations do Supabase
+
+**Padrão Atual:** Migrations SQL são criadas em `supabase/migrations/` mas **executadas manualmente** via Supabase Dashboard.
+
+**Por que manual?** Projeto usa Supabase sem CLI de deployment automático. Isso garante controle total sobre quando schema é alterado e permite rollback manual se necessário.
+
+**Checklist ao Criar Nova Migration:**
+
+1. Crie arquivo em `supabase/migrations/` com naming: `YYYYMMDDHHMMSS_descricao.sql`
+2. Escreva SQL com suporte a múltiplos tenants (use `client_id` em WHERE clauses e RLS policies)
+3. Teste localmente contra Supabase dev/sandbox
+4. Commit do arquivo
+5. **ANTES de mergear:** adicione flag `⚠️ EXECUTAR NO SUPABASE DASHBOARD` ao CLAUDE.md na seção de "Novos Recursos"
+6. Após merge, executor (usuário com acesso Supabase) copia SQL do arquivo e executa no **Supabase Dashboard → SQL Editor**
+7. Confirme execução com sucesso (sem erros)
+8. Remova flag `⚠️` do CLAUDE.md
+
+**Tipos Comuns de Migrations:**
+- `ALTER TABLE ... ADD COLUMN` — adiciona campo, declare tipo e constraint
+- `CREATE TABLE ... WITH (RLS ENABLED)` — nova tabela sempre com RLS policies
+- `CREATE POLICY ... ON table_name` — políticas de segurança por role
+- `ALTER TYPE status ADD VALUE 'NewStatus'` — expande enum (APPEND ONLY, sem remover)
+
+**Verificação de RLS:** Após executar, valide que políticas foram criadas corretamente — Admin Master (`client_id = NULL`) frequentemente precisa de `OR role = 'Admin Master'` em WHEREs.
 
 ---
 
@@ -62,6 +160,46 @@ Isso garante que sessões longas não degradem a qualidade das respostas por sat
 **Data Fleet** — SaaS multi-tenant de gestão de frotas.
 Stack: React 19 + Vite + TypeScript + Tailwind CSS v4 + Supabase.
 Para detalhes completos, consulte os módulos em `.claude/`.
+
+---
+
+## Referência Rápida de Papéis (Roles)
+
+Sistema é multi-tenant com 6 papéis por rank (descendente de permissão). **`client_id`** diferencia tenants; **Admin Master** tem `client_id = NULL`.
+
+| Role | Rank | Acesso | Notas |
+|------|------|--------|-------|
+| **Admin Master** | 0 | Sistema inteiro, todos os clientes | Sem `client_id`; precisa de `OR role = 'Admin Master'` em RLS |
+| **Manager** | 2 | Todas as abas do cliente; usuários, oficinas, configurações | Acesso total dentro do tenant |
+| **Fleet Assistant** | 3 | Veículos, checklists, manutenção, configurações | Sem acesso a Usuários; pode criar/editar workshops |
+| **Supervisor** | 4 | Checklists, manutenção, planos de ação (coordenação) | Apenas leitura de usuários/oficinas |
+| **Driver** | 5 | Preenchimento de checklists, dados pessoais | Acesso a veículos atribuídos apenas |
+| **Workshop** | 1 | Visão de manutenção, atualiza OS com orçamento/status | Login próprio; acesso a veículos em suas OS |
+
+**Guardrails Comuns:**
+- `ROLES_CAN_ACCESS_SETTINGS`: Manager+ (excluir Driver, Supervisor)
+- `ROLES_CAN_EDIT_MAINTENANCE`: Manager+, Fleet Assistant, Workshop (update parcial)
+- `ROLES_CAN_CREATE_WORKSHOP`: Manager+, Fleet Assistant
+- `isWorkshopUser`: Deteta Workshop via `workshopId` em AuthContext — adapta UI (Manutenção apenas, UPDATE parcial)
+
+**Admin Master Gotcha:** Sempre use `OR role = 'Admin Master'` em RLS checks de coluna `client_id`, pois Admin Master tem `client_id = NULL`.
+
+---
+
+## Mapa de Localização de Código — Áreas Principais
+
+| Área | Localização | Módulo Contexto |
+|------|-------------|-----------------|
+| **Autenticação & Contexto** | `src/context/AuthContext.tsx`, `src/pages/Login.tsx` | Backend + Frontend |
+| **Estrutura de Páginas** | `src/pages/` (Dashboard, Vehicles, Drivers, Checklists, Maintenance, etc.) | Frontend |
+| **Componentes Reutilizáveis** | `src/components/` (Forms, Modals, Sidebar, Dashboard) | Frontend |
+| **Mapeadores de Dados** | `src/lib/*Mappers.ts` (vehicleMappers, checklistMappers, etc.) | Frontend |
+| **Queries React-Query** | Inline em páginas; `queryKey` pattern: `['resource', filter1, filter2]` | Frontend |
+| **Edge Functions** | `supabase/functions/create-user/`, `supabase/functions/...` | Backend |
+| **Migrations & RLS** | `supabase/migrations/`, `supabase/policies/` | Backend |
+| **Testes E2E** | `e2e/` (Playwright fixtures, specs, utilities) | Testing |
+| **Tipos & Interfaces** | `src/types.ts` (type-safe, sincronizar com DB schema) | Data Model |
+| **Estilos Tailwind** | Inline com `className=` + `tailwind.config.ts` | Frontend |
 
 ---
 
@@ -419,6 +557,182 @@ public/
 - `.claude/arch-backend.md` — Documentada migration + CHECK status + colunas de auditoria
 - `.claude/arch-frontend.md` — Maintenance.tsx (cancel/reopen flow), Dashboard queries, panel filters
 - `.claude/data-model.md` — `MaintenanceStatus` union + `MaintenanceOrder` campos de auditoria
+
+---
+
+## Novos Recursos (2026-03-25) — Configuração Detalhada de Eixos em Veículos
+
+**Configurador dinâmico de eixos no cadastro de veículos com cálculo automático de pneus:**
+
+- Campo `eixos` agora dispara um editor dinâmico "Configuração de Eixos" (oculto para Moto)
+- Cada eixo configurável: **Tipo de Eixo** (direcional, simples, duplo, duplo_tandem, triplo_tandem, elevação) + **Rodagem** (simples, dupla, tripla)
+- Regras de negócio: primeiro eixo fixo como Direcional; rodagem tripla proibida no primeiro eixo; tipos multi-eixo (duplo=2, triplo_tandem=3) consomem múltiplos slots e filtram opções disponíveis
+- Campo "Estepes de fábrica" (`stepsCount`) para estepes incluídos de fábrica
+- Total de pneus calculado automaticamente (mostra `—` enquanto configuração incompleta)
+- Badge de status: âmbar (incompleto) / esmeralda (completo com X/N eixos)
+- Dados persistidos como JSONB (`axle_config`) e INT (`steps_count`) na tabela `vehicles`
+- Módulo de pneus atualizado: `generatePositionsFromConfig()` usa a config detalhada quando disponível; fallback para `VehicleTireConfig` seed em veículos sem config
+- Rodagem tripla gera posições `E{n}I/E{n}M/E{n}E/D{n}I/D{n}M/D{n}E`
+
+**Arquivos Criados:**
+- `supabase/migrations/20260325081826_add_axle_config_vehicles.sql` — Colunas `axle_config JSONB`, `steps_count INT` em vehicles; atualiza CHECK `position_type` em tires para suportar `triple_*` — **⚠️ EXECUTAR NO SUPABASE DASHBOARD**
+- `src/lib/axleConfigUtils.ts` — Funções puras: `getPhysicalAxles`, `getAvailableAxleTypes`, `getAvailableRodagem`, `calculateTotalTires`, `totalPhysicalAxles`, `isConfigComplete` + labels
+- `src/components/AxleConfigEditor.tsx` — Editor dinâmico com rows por eixo, dropdowns filtrados, estepes e total
+
+**Arquivos Modificados:**
+- `src/types.ts` — `AxleType`, `RodagemType`, `AxleConfigEntry` types; `TirePositionType` expandido com `triple_*`; `axleConfig?` e `stepsCount?` em `Vehicle`
+- `src/lib/vehicleMappers.ts` — `axle_config` / `steps_count` em `VehicleRow`, `vehicleFromRow`, `vehicleToRow`
+- `src/lib/tirePositions.ts` — `generatePositionsFromConfig()`; `classifyPositionType()` atualizado para sufixo `M`
+- `src/components/VehicleForm.tsx` — Integração do `AxleConfigEditor`; useEffect para auto-inicializar primeiro eixo; reset de config ao alterar `eixos`
+- `src/pages/Tires.tsx`, `src/components/TireForm.tsx`, `src/components/TireBatchForm.tsx` — Suporte a `axleConfig` + `stepsCount`; usa `generatePositionsFromConfig` quando disponível
+
+---
+
+## Novos Recursos (2026-03-24) — Módulo de Gestão de Pneus
+
+**Cadastro, rastreamento e histórico de movimentação de pneus da frota:**
+
+- Rota: `/pneus` — item "Pneus" na Sidebar (icon: Circle, Fleet Assistant+)
+- Dois modos de cadastro: Por Placa (individual) e Por Modelo (lote multi-step)
+- Posições por veículo baseadas em `vehicle_tire_configs`: eixos simples (E/D), duplos (I/E), estepes (Step N)
+- Histórico de movimentação append-only em `tire_position_history`
+- Índice parcial `WHERE active = true` garante 1 pneu ativo por posição por veículo
+- Classificação visual: Novo / Meia vida / Troca
+- Toggle ativar/desativar com confirmação
+
+**Arquivos Criados:**
+- `supabase/migrations/20260324000000_create_tire_management.sql` — 3 tabelas + RLS + seed **⚠️ EXECUTAR NO SUPABASE DASHBOARD**
+- `src/types.ts` — Tire, TirePositionHistory, VehicleTireConfig + TireVisualClassification, TirePositionType
+- `src/lib/tireMappers.ts` — TireRow + converters camelCase ↔ snake_case
+- `src/lib/tirePositions.ts` — generatePositions(), validatePositionAssignment(), classifyPositionType()
+- `src/pages/Tires.tsx` — Página principal (cards + tabela + modais)
+- `src/components/TireForm.tsx` — Modal de cadastro/edição individual
+- `src/components/TireBatchForm.tsx` — Modal multi-step de lote por modelo
+- `src/components/TireHistoryModal.tsx` — Modal de histórico de movimentação
+
+**Arquivos Modificados:**
+- `src/App.tsx` — `<Route path="pneus" element={<Tires />} />`
+- `src/components/Sidebar.tsx` — Item "Pneus" após Manutenção (icon Circle)
+- `.claude/arch-frontend.md`, `.claude/arch-backend.md`, `.claude/data-model.md` — Documentados
+
+---
+
+## Novos Recursos (2026-03-25) — Exclusão de Pneus para Admin Master
+
+**Funcionalidade de exclusão permanente de pneus:**
+
+- Admin Master pode deletar pneus cadastrados permanentemente
+- Ícone `Trash2` (vermelho) na coluna Ações da tabela de pneus em `/pneus`
+- Modal de confirmação `DeleteConfirmModal` com aviso de ação irreversível
+- Histórico de movimentação deletado automaticamente via `ON DELETE CASCADE`
+- RLS policy `tires_delete` já existia na migration `20260324000000_create_tire_management.sql` — permite DELETE para Director/Admin Master com bypass de client_id para Admin Master
+- Frontend restrito a Admin Master apenas via `ROLES_CAN_DELETE_TIRES = ['Admin Master']`
+
+**Arquivos Modificados:**
+- `src/pages/Tires.tsx` — Adicionado import `Trash2`, constante `ROLES_CAN_DELETE_TIRES`, booleano `canDelete`, state `tireToDelete`, mutation `deleteMutation`, componente `DeleteConfirmModal`, botão delete na tabela, renderização do modal
+- `.claude/arch-frontend.md` — Documentada exclusão em seção Tires.tsx
+- `.claude/arch-backend.md` — Clarificada RLS policy `tires_delete` com suporte a Admin Master
+
+**⚠️ Nenhuma migration adicional necessária** — RLS já suporta a operação.
+
+---
+
+## Novos Recursos (2026-03-26) — Visibilidade de Embarcador, Unidade Operacional e Finalidade na Tabela de Veículos
+
+**Exibição de informações de alocação e uso de veículos na lista:**
+
+- Tabela de Veículos em `/cadastros/veiculos` agora exibe **Embarcador** e **Unidade Operacional** em coluna única (stacked) com quebra de linha
+- Nova coluna **Finalidade** com field `vehicleUsage` (Operação | Uso Administrativo | Uso por Lideranças | Outros)
+- Coluna **Motorista** agora quebra nome após o segundo nome para evitar desproporção (ex: "João da" / "Silva Santos")
+- Quando campos vazios: exibem `—` em cinza para clareza visual
+- Colunas totais: 7 (Veículo | Tipo/Energia | Proprietário | Motorista | Embarcador/Unid.Op. | Finalidade | Ações)
+- Dados já vinham da query via `.select('*, drivers(name), shippers(name), operational_units(name)')`
+- Tipos Vehicle já possuíam `shipperName`, `operationalUnitName` e `vehicleUsage` — apenas renderização ajustada
+
+**Arquivos Modificados:**
+- `src/pages/Vehicles.tsx` — Tabela atualizada: header + cells com novo layout stackable para Embarcador/Unid.Op.; quebra de linha em Motorista; `colSpan` ajustado de 5 para 7
+- `.claude/arch-frontend.md` — Documentado padrão visual e layout de Vehicles.tsx
+
+**⚠️ Nenhuma alteração de BD, tipos ou queries necessária** — dados já existiam.
+
+---
+
+## Troubleshooting & Gotchas Comuns
+
+### Autenticação & Multi-Tenancy
+
+**Problema:** Admin Master vê apenas dados de um cliente mesmo após selecionar outro
+**Causa:** Query sem filtro `client_id` ou RLS sem `OR role = 'Admin Master'`
+**Solução:**
+1. Adicione `.eq('client_id', currentClient.id)` na query quando `currentClient?.id` existe
+2. Verifique RLS — Admin Master precisa de `OR role = 'Admin Master'` em WHEREs de `client_id`
+
+**Problema:** "JWT expired" ao fazer edit/delete
+**Causa:** Token de sessão expirou antes da operação crítica
+**Solução:** Adicione `await supabase.auth.refreshSession()` antes de `.update()` ou `.delete()`
+
+### TypeScript & Tipos
+
+**Problema:** `Cannot find type Vehicle` em novo arquivo
+**Causa:** `src/types.ts` não foi importado
+**Solução:** `import { Vehicle } from '../types'` no topo do arquivo
+
+**Problema:** Type error em mapeador: `Property 'initial_km' doesn't exist`
+**Causa:** Campo novo no DB mas mapeador não foi atualizado
+**Solução:**
+1. Leia a migration que criou o campo
+2. Atualize `src/lib/*Mappers.ts` com novo mapeamento camelCase ↔ snake_case
+3. Atualize interface em `src/types.ts`
+
+### Migrations & Schema
+
+**Problema:** "ERROR: Current identity has insufficient privileges to..." ao executar migration
+**Causa:** Role SQL não tem permissão ou RLS está bloqueando INSERT/UPDATE
+**Solução:**
+1. Verifique `check_auth_role()` em migration — user precisa ser `postgres` ou `authenticated` com role correto
+2. Valide RLS policies — teste com role específica em Supabase SQL Editor
+
+**Problema:** Migration executada mas coluna não aparece em SELECT
+**Causa:** RLS policy está bloqueando visibilidade da coluna ou migração não foi sincronizada
+**Solução:**
+1. Execute `SELECT * FROM tabela LIMIT 1` no Supabase SQL Editor (bypass de RLS com role `postgres`)
+2. Se coluna existe — RLS está filtrando; verifique SECURITY DEFINER em view/function
+3. Se coluna não existe — migration falhou silenciosamente; verifique logs do Supabase Dashboard
+
+### React-Query & Data Fetching
+
+**Problema:** Query retorna `undefined` mesmo após sucesso
+**Causa:** `select()` transformer está retornando `undefined` ou `queryFn` não está retornando nada
+**Solução:**
+1. Adicione `console.log(data)` antes do `select()`
+2. Valide que `queryFn` retorna objeto ou array completo
+3. Se usar `select()`, certifique-se de retornar valor válido (não undefined)
+
+**Problema:** Dados não atualizam após mutation
+**Causa:** Faltou `queryClient.invalidateQueries({ queryKey: ['...'] })`
+**Solução:** Após mutation bem-sucedida, invalide query manualmente:
+```typescript
+await mutateAsync(...);
+queryClient.invalidateQueries({ queryKey: ['vehicles', clientId] });
+```
+
+### Dashboard & Filtros
+
+**Problema:** Valores de KPI não aparecem ou mostram 0
+**Causa:** Filtro `vehicleType` ou `maintenanceType` está excluindo todos os dados
+**Solução:**
+1. Abra DevTools → Console, verifique `filteredVehicles.length` e `filteredMaintenance.length`
+2. Se ambos são 0 — adicione dados de teste com tipo correspondente
+3. Verifique lógica de filtro em `useMemo` — AND vs OR
+
+### Supabase RLS & Policies
+
+**Problema:** "You do not have access to this table"
+**Causa:** RLS policy bloqueia SELECT/INSERT/UPDATE/DELETE
+**Solução:**
+1. Verifique `auth.uid()` matches `profiles(id)` do user logado
+2. Verifique `auth.jwt()->>'client_id'` matches `profile.client_id`
+3. Para Admin Master: certifique-se de `EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'Admin Master')`
 
 ---
 

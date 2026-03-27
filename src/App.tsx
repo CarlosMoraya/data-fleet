@@ -29,6 +29,7 @@ import Shippers from './pages/Shippers';
 import OperationalUnits from './pages/OperationalUnits';
 import WorkshopSchedules from './pages/WorkshopSchedules';
 import BudgetApprovals from './pages/BudgetApprovals';
+import Tires from './pages/Tires';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -64,6 +65,7 @@ export default function App() {
                 <Route path="embarcadores" element={<Shippers />} />
                 <Route path="unidades-operacionais" element={<OperationalUnits />} />
                 <Route path="usuarios" element={<Users />} />
+                <Route path="pneus" element={<Tires />} />
               </Route>
               {/* Redirects para compatibilidade com rotas antigas */}
               <Route path="vehicles" element={<Navigate to="/cadastros/veiculos" replace />} />

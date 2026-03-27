@@ -71,8 +71,8 @@ src/
 ├── pages/
 │   ├── Login.tsx        # Login com email/senha (Supabase Auth); **REDESIGN 2026-03-20**: Logo βetaFleet tipográfica (β orange-500 + etaFleet branco + "Evolution always"); background com fallback: vídeo `/videos/login-bg.mp4` → imagem `/images/login-bg.jpg` → fundo zinc-900; detecção via `onError` handlers (videoFailed, imageFailed state); overlay black/50; card branco/95 backdrop-blur
 │   ├── Dashboard.tsx    # Dois painéis (abas): Painel Operacional + Painel de Custos. Queries: dashboard-vehicles, dashboard-maintenance (com join vehicles(type)), dashboard-checklists, dashboard-intervals, dashboard-drivers. Filtros interativos (vehicleType + maintenanceType) compartilhados entre abas. Cálculo de checklists vencidos via useMemo + checklist_day_intervals.
-│   ├── Cadastros.tsx    # Layout wrapper com abas (Veículos, Motoristas, Embarcadores, Unidades Operacionais, Oficinas, Usuários) + <Outlet />
-│   ├── Vehicles.tsx     # CRUD de veículos (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → VehicleDetailModal + carrega availableShippers/Units para VehicleForm
+│   ├── Cadastros.tsx    # Layout wrapper com abas (Veículos, Motoristas, Embarcadores, Unidades Operacionais, Oficinas, Usuários, Pneus) + <Outlet /> — redireciona acessos não-autorizados para /checklists
+│   ├── Vehicles.tsx     # CRUD de veículos (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → VehicleDetailModal + carrega availableShippers/Units para VehicleForm. **Tabela (2026-03-26)**: colunas Veículo (placa + marca modelo ano) | Tipo/Energia | Proprietário | Motorista (quebra após 2º nome) | Embarcador/Unid.Op. (stackable, unidade abaixo) | Finalidade | Ações
 │   ├── Shippers.tsx     # CRUD de embarcadores (Fleet Assistant+ acessa, Fleet Analyst+ edita, Manager+ deleta) + busca por nome/CNPJ
 │   ├── OperationalUnits.tsx # CRUD de unidades operacionais (Fleet Assistant+ acessa, Fleet Analyst+ edita, Manager+ deleta) + busca por nome/código/embarcador + FK restrict validation
 │   ├── Drivers.tsx      # CRUD de motoristas (Fleet Assistant+ acessa, Fleet Analyst+ edita) + botão Eye → DriverDetailModal
@@ -260,6 +260,11 @@ dashboard-drivers     → drivers: id, expiration_date
 - Filtro por busca (especificação/placa) — código UUID (tireCode) é oculto (não exibido ao usuário)
 - Botão "+ Adicionar Pneus" → modal de seleção de modo (por placa ou por lote)
 - **Tabela**: Colunas: Especificação (+ DOT em texto menor quando disponível) | Veículo (placa + modelo) | Posição | Classificação | Status | Ações
+- **Validações (2026-03-26)**:
+  - **Pneu único ("Por Placa")**: `handleOpenPlateForm()` bloqueia abertura do formulário se `freePositions.length === 0`; exibe modal `FullVehicleAlertModal` com mensagem explicativa
+  - **Reativação**: `handleToggleTire()` verifica se posição já está ocupada ao reativar pneu inativo; se ocupada, exibe modal `ReactivateBlockedModal` em vez de abrir toggle confirmation
+  - **Histórico visual**: pneus inativos permanecem na lista com `opacity-50` para rastreamento completo; não são mais filtrados
+  - **Seletor de veículo**: `VehiclePickerModal` recebe `fullVehicleIds: Set<string>` (computado via `useMemo`) e exibe ícone `Ban` (vermelho) + `opacity-50` para veículos com todas as posições ocupadas
 - Queries: `['tires', clientId]`, `['vehicleTireConfigs']`, `['vehiclesSimple', clientId]`
 - Acesso: `ROLES_CAN_VIEW_TIRES` = Fleet Assistant+; `ROLES_CAN_REGISTER_TIRES` = Manager/Coordinator/Director/Admin Master
 - **Exclusão (2026-03-25)**: `ROLES_CAN_DELETE_TIRES` = Admin Master; botão Trash2 (vermelho) na coluna Ações; modal `DeleteConfirmModal` com confirmação; mutation deleta pneu + histórico (ON DELETE CASCADE); `deleteMutation` invalida query e fecha modal
@@ -274,13 +279,19 @@ dashboard-drivers     → drivers: id, expiration_date
 - `tireCode` sempre auto-gerado (`crypto.randomUUID()`) na criação; read-only badge na edição (imutável)
 - Usa `generatePositionsFromConfig()` quando `vehicleAxleConfig` existe; fallback para `generatePositions()` + `VehicleTireConfig`
 - Ao salvar: INSERT/UPDATE em `tires` + INSERT em `tire_position_history` se posição mudou
+- **Fallback defensivo (2026-03-26)**: se `!isEditing && freePositions.length === 0`, renderiza aviso em vez dos campos (AlertTriangle + mensagem "Todas as posições ocupadas")
 
 ### `src/components/TireBatchForm.tsx`
 - Modal multi-step (4 passos): Selecionar Modelo → Veículos Elegíveis → Template → Confirmação
-- Veículos elegíveis = sem nenhum pneu ativo (`active = true`)
+- Veículos elegíveis = sem nenhum pneu cadastrado (ativo ou inativo)
 - `tire_code` auto-gerado via `crypto.randomUUID()` (único por pneu)
 - Inserção em lotes de 100 rows + histórico inicial
 - Regra crítica: sem sobrescrita — veículos com pneus são excluídos silenciosamente
+- **Validação de divergência (2026-03-26)**:
+  - Computa assinatura de posições para cada veículo elegível via `getPositionSignature()` (serializa códigos gerados)
+  - Se `eligibleVehicles.length > 1 && signatures.size > 1` → divergência detectada
+  - Step 2 exibe erro com ícone AlertTriangle + mensagem: "Este modelo de veículo possui uma ou mais unidades com divergência na configuração dos eixos..."
+  - Botão "Próximo" fica desabilitado enquanto houver divergência
 
 ### `src/components/TireHistoryModal.tsx`
 - Modal com dados completos do pneu (read-only) + tabela de movimentações

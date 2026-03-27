@@ -330,6 +330,8 @@ export default function Vehicles() {
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Tipo / Energia</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Proprietário</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Motorista</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Embarcador / Unid. Op.</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Finalidade</th>
                   <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
                     <span className="sr-only">Ações</span>
                   </th>
@@ -357,14 +359,39 @@ export default function Vehicles() {
                       <div className="text-zinc-900">{vehicle.owner}</div>
                       <div>{vehicle.acquisition}</div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
-                      {vehicle.driverName ? (
-                        <div className="flex items-center gap-1.5">
-                          <User className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
-                          <span className="text-zinc-900">{vehicle.driverName}</span>
-                        </div>
-                      ) : (
+                    <td className="px-3 py-4 text-sm text-zinc-500 max-w-[140px]">
+                      {vehicle.driverName ? (() => {
+                        const parts = vehicle.driverName.split(' ');
+                        const firstLine = parts.slice(0, 2).join(' ');
+                        const secondLine = parts.slice(2).join(' ');
+                        return (
+                          <div className="flex items-start gap-1.5">
+                            <User className="h-3.5 w-3.5 text-orange-500 flex-shrink-0 mt-0.5" />
+                            <span className="text-zinc-900 leading-snug">
+                              {firstLine}
+                              {secondLine && <><br />{secondLine}</>}
+                            </span>
+                          </div>
+                        );
+                      })() : (
                         <span className="text-zinc-400 italic">Sem motorista</span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                      {vehicle.shipperName ? (
+                        <div className="text-zinc-900">{vehicle.shipperName}</div>
+                      ) : (
+                        <div className="text-zinc-400 italic">—</div>
+                      )}
+                      {vehicle.operationalUnitName && (
+                        <div className="text-zinc-500">{vehicle.operationalUnitName}</div>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                      {vehicle.vehicleUsage ? (
+                        <span className="text-zinc-900">{vehicle.vehicleUsage}</span>
+                      ) : (
+                        <span className="text-zinc-400 italic">—</span>
                       )}
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
@@ -407,7 +434,7 @@ export default function Vehicles() {
                 ))}
                 {filteredVehicles.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-10 text-center text-sm text-zinc-500">
+                    <td colSpan={7} className="py-10 text-center text-sm text-zinc-500">
                       {search ? 'Nenhum veículo encontrado para esta busca.' : 'Nenhum veículo cadastrado para este cliente.'}
                     </td>
                   </tr>

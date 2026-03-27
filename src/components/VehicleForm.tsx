@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Vehicle, VehicleFieldSettings } from '../types';
+import { Vehicle, VehicleFieldSettings, AxleConfigEntry } from '../types';
 import { X, FileText, ExternalLink, Loader2 } from 'lucide-react';
+import AxleConfigEditor from './AxleConfigEditor';
+import { getPhysicalAxles } from '../lib/axleConfigUtils';
 import { validateFile } from '../lib/storageHelpers';
 import { isFieldRequired } from '../lib/fieldSettingsMappers';
 import {
@@ -131,6 +133,22 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     sessionStorage.setItem('vehicleFormData', JSON.stringify(formData));
   }, [formData]);
 
+  // Auto-initialize first axle (always direcional) when eixos is set and no config yet
+  useEffect(() => {
+    if ((formData.eixos ?? 0) > 0 && formData.type !== 'Moto' && !formData.axleConfig?.length) {
+      setFormData(prev => ({
+        ...prev,
+        axleConfig: [{
+          order: 1,
+          type: 'direcional',
+          rodagem: 'simples',
+          physicalAxles: 1,
+        }],
+        stepsCount: prev.stepsCount ?? 0,
+      }));
+    }
+  }, [formData.eixos, formData.type]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const CATEGORY_TYPES_MAP = {
     'Leve': ['Moto', 'Passeio', 'Utilitário'],
     'Médio': ['Van', 'Vuc', 'Toco'],
@@ -162,6 +180,10 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
       setFormData(prev => ({ ...prev, shipperId: value || undefined, operationalUnitId: undefined }));
     } else if (name === 'operationalUnitId') {
       setFormData(prev => ({ ...prev, operationalUnitId: value || undefined }));
+    } else if (name === 'eixos') {
+      const filtered = filterDigitsOnly(value);
+      // Reset axle config when eixos changes
+      setFormData(prev => ({ ...prev, eixos: filtered ? parseInt(filtered, 10) : undefined, axleConfig: undefined, stepsCount: undefined }));
     } else if (name === 'category') {
       const newCategory = value as keyof typeof CATEGORY_TYPES_MAP | '';
       setFormData(prev => {
@@ -620,6 +642,24 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                   <Label name="eixos">Eixos</Label>
                   <input type="text" name="eixos" required={req('eixos')} inputMode="numeric" maxLength={2} value={formData.eixos ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 2" />
                 </div>
+
+                {/* Axle Configuration Editor */}
+                {formData.type !== 'Moto' && (formData.eixos ?? 0) > 0 && (
+                  <div className="sm:col-span-2">
+                    <AxleConfigEditor
+                      targetAxles={formData.eixos ?? 0}
+                      entries={formData.axleConfig ?? []}
+                      stepsCount={formData.stepsCount ?? 0}
+                      onChange={(entries: AxleConfigEntry[], steps: number) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          axleConfig: entries.length > 0 ? entries : undefined,
+                          stepsCount: steps,
+                        }));
+                      }}
+                    />
+                  </div>
+                )}
 
                 {/* Conditional: Cavalo */}
                 {formData.type === 'Cavalo' && (

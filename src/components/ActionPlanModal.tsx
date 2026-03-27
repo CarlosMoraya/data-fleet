@@ -18,11 +18,11 @@ const ROLE_RANK: Record<string, number> = {
   'Yard Auditor': 2,
   'Fleet Assistant': 3,
   'Fleet Analyst': 4,
-  'Supervisor': 4,
-  'Manager': 5,
-  'Coordinator': 5,
-  'Director': 6,
-  'Admin Master': 7,
+  'Supervisor': 5,
+  'Coordinator': 6,
+  'Manager': 7,
+  'Director': 8,
+  'Admin Master': 9,
 };
 
 export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
