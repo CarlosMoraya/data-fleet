@@ -14,7 +14,7 @@ interface TireFormProps {
   existingTires: Tire[];
   tireConfig?: VehicleTireConfig;
   editingTire?: Tire | null;
-  onSave: (tires: Partial<Tire> | Partial<Tire>[], previousPosition?: string) => Promise<void>;
+  onSave: (tires: Partial<Tire> | Partial<Tire>[], previousPosition?: string, odometerKm?: number) => Promise<void>;
   onClose: () => void;
   isSaving?: boolean;
   saveError?: string;
@@ -69,6 +69,7 @@ export default function TireForm({
     React.useState<TireVisualClassification>(editingTire?.visualClassification ?? 'Novo');
   const [currentPosition, setCurrentPosition] = React.useState(editingTire?.currentPosition ?? '');
   const [positionError, setPositionError] = React.useState<string | null>(null);
+  const [odometerKm, setOdometerKm] = React.useState('');
 
   // Posições livres para o modo "todos os pneus"
   const freePositions = React.useMemo(() => {
@@ -129,6 +130,7 @@ export default function TireForm({
           positionType: selectedPos?.type ?? 'single',
         },
         editingTire.currentPosition,
+        odometerKm ? parseInt(odometerKm) : undefined,
       );
       return;
     }
@@ -136,12 +138,16 @@ export default function TireForm({
     if (registerMode === 'single') {
       if (!currentPosition || positionError) return;
       const selectedPos = positions.find(p => p.code === currentPosition);
-      await onSave({
-        ...buildSharedData(),
-        tireCode: crypto.randomUUID(),
-        currentPosition,
-        positionType: selectedPos?.type ?? 'single',
-      });
+      await onSave(
+        {
+          ...buildSharedData(),
+          tireCode: crypto.randomUUID(),
+          currentPosition,
+          positionType: selectedPos?.type ?? 'single',
+        },
+        undefined,
+        odometerKm ? parseInt(odometerKm) : undefined,
+      );
     } else {
       // Modo "todos os pneus": gera um registro por posição livre
       if (freePositions.length === 0) return;
@@ -151,7 +157,7 @@ export default function TireForm({
         currentPosition: pos.code,
         positionType: pos.type,
       }));
-      await onSave(tiresArray);
+      await onSave(tiresArray, undefined, odometerKm ? parseInt(odometerKm) : undefined);
     }
   }
 
@@ -338,6 +344,26 @@ export default function TireForm({
                     className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                   />
                 </div>
+              </div>
+            </section>
+
+            {/* Hodômetro */}
+            <section>
+              <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3">Hodômetro</h3>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                  Km atual do veículo
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={odometerKm}
+                  onChange={e => setOdometerKm(e.target.value)}
+                  placeholder="ex: 125000"
+                  className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+                <p className="text-xs text-zinc-400 mt-1">Opcional — registrado no histórico de movimentação.</p>
               </div>
             </section>
 

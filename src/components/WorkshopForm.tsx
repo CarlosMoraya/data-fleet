@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, Wrench } from 'lucide-react';
+import { X, Wrench, AlertCircle } from 'lucide-react';
 import { Workshop } from '../types';
 import { workshopToRow, WORKSHOP_SPECIALTIES } from '../lib/workshopMappers';
 import { filterText, filterCNPJ, filterPhone, filterCEP, filterAlpha } from '../lib/inputHelpers';
+import { isValidCNPJ } from '../lib/cnpjValidator';
+import { supabase } from '../lib/supabase';
 
 // ─── Estilos ─────────────────────────────────────────────────────────────────
 
@@ -28,7 +30,7 @@ function Label({ htmlFor, required, children }: { htmlFor?: string; required?: b
 interface WorkshopFormProps {
   workshop: Workshop | null;
   onClose: () => void;
-  onSave: (workshop: Partial<Workshop>, loginEmail?: string, loginPassword?: string) => Promise<void>;
+  onSave: (workshop: Partial<Workshop>) => Promise<void>;
 }
 
 // ─── Filtros por campo ────────────────────────────────────────────────────────
@@ -54,10 +56,7 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Campos de acesso ao sistema (apenas na criação)
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
+  const [cnpjGlobalExists, setCnpjGlobalExists] = useState(false);
 
   // Inicializa form com dados do workshop ao editar
   useEffect(() => {
@@ -77,6 +76,18 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
       sessionStorage.setItem('workshopFormData', JSON.stringify(next));
       return next;
     });
+
+    // Verificar se CNPJ já existe globalmente (em workshop_accounts) ao criar nova oficina
+    if (name === 'cnpj' && !workshop && filtered.length === 14 && isValidCNPJ(filtered)) {
+      supabase
+        .from('workshop_accounts')
+        .select('id')
+        .eq('cnpj', filtered)
+        .maybeSingle()
+        .then(({ data }) => setCnpjGlobalExists(!!data));
+    } else if (name === 'cnpj') {
+      setCnpjGlobalExists(false);
+    }
   };
 
   const handleActiveToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,15 +119,10 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Validação: se um campo de login for preenchido, o outro é obrigatório
-    if ((loginEmail && !loginPassword) || (!loginEmail && loginPassword)) {
-      setError('Para habilitar o acesso ao sistema, preencha e-mail e senha.');
-      return;
-    }
     setSaving(true);
     setError(null);
     try {
-      await onSave(formData, loginEmail || undefined, loginPassword || undefined);
+      await onSave(formData);
     } catch (err: any) {
       const pgError = err as { code?: string; message?: string };
       if (pgError?.code === '23505') {
@@ -177,6 +183,14 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
                     placeholder="Somente números (14 dígitos)"
                     maxLength={14}
                   />
+                  {!workshop && cnpjGlobalExists && (
+                    <div className="mt-1.5 flex items-start gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                      <AlertCircle className="h-3.5 w-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-blue-700">
+                        Este CNPJ já possui conta no sistema. Use <strong>Convidar Oficina</strong> para vinculá-la ao seu cliente.
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="phone">Telefone</Label>
@@ -290,53 +304,6 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
                 </div>
               </div>
             </div>
-
-            {/* Seção 3: Acesso ao Sistema (apenas na criação) */}
-            {!workshop && (
-              <div>
-                <h3 className="mb-1 text-sm font-semibold uppercase tracking-wider text-zinc-500">
-                  Acesso ao Sistema
-                </h3>
-                <p className="mb-4 text-xs text-zinc-400">
-                  Opcional. Se preenchido, a oficina poderá fazer login e preencher suas OS diretamente no Data Fleet.
-                </p>
-                <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="loginEmail">E-mail de Login</Label>
-                    <input
-                      id="loginEmail"
-                      type="email"
-                      value={loginEmail}
-                      onChange={e => setLoginEmail(e.target.value)}
-                      className={inputClass}
-                      placeholder="login@oficina.com"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="loginPassword">Senha de Acesso</Label>
-                    <input
-                      id="loginPassword"
-                      type="password"
-                      value={loginPassword}
-                      onChange={e => setLoginPassword(e.target.value)}
-                      className={inputClass}
-                      placeholder="Mínimo 6 caracteres"
-                      minLength={6}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Badge de acesso ao sistema (modo edição) */}
-            {workshop && (
-              <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-                <div className={`h-2 w-2 rounded-full ${workshop.profileId ? 'bg-green-500' : 'bg-zinc-400'}`} />
-                <span className="text-sm text-zinc-700">
-                  {workshop.profileId ? 'Com acesso ao sistema' : 'Sem acesso ao sistema'}
-                </span>
-              </div>
-            )}
 
             {/* Seção: Especialidades e Detalhes */}
             <div>

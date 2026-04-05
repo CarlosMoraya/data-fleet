@@ -2,9 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Workshop } from '../types';
-import { Plus, Search, Edit2, Trash2, Wrench, MapPin, Eye } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Wrench, MapPin, Eye, Link2 } from 'lucide-react';
 import WorkshopForm from '../components/WorkshopForm';
 import WorkshopDetailModal from '../components/WorkshopDetailModal';
+import InviteWorkshopModal from '../components/InviteWorkshopModal';
 import { supabase } from '../lib/supabase';
 import { workshopFromRow, workshopToRow, formatCNPJ, WorkshopRow } from '../lib/workshopMappers';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -42,6 +43,7 @@ export default function Workshops() {
   });
 
   const [viewingWorkshop, setViewingWorkshop] = useState<Workshop | null>(null);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
@@ -64,12 +66,28 @@ export default function Workshops() {
     enabled: !!user
   });
 
+  const { data: partnerWorkshopIds = new Set<string>() } = useQuery({
+    queryKey: ['workshopPartnerIds', currentClient?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('workshop_partnerships')
+        .select('legacy_workshop_id')
+        .eq('client_id', currentClient!.id)
+        .eq('status', 'active');
+      if (error) throw error;
+      return new Set(
+        (data ?? []).map((p: any) => p.legacy_workshop_id).filter(Boolean) as string[]
+      );
+    },
+    enabled: !!currentClient?.id,
+  });
+
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
     return <Navigate to="/checklists" replace />;
   }
 
   const saveMutation = useMutation({
-    mutationFn: async ({ workshop, loginEmail, loginPassword }: { workshop: Partial<Workshop>; loginEmail?: string; loginPassword?: string }) => {
+    mutationFn: async ({ workshop }: { workshop: Partial<Workshop> }) => {
       if (!currentClient?.id) throw new Error('Sessão inválida');
       const row = workshopToRow(workshop, currentClient.id);
 
@@ -80,29 +98,18 @@ export default function Workshops() {
           .eq('id', editingWorkshop.id);
         if (updateError) throw updateError;
       } else {
-        // Se login foi fornecido, criar conta de acesso primeiro
-        let profileId: string | undefined;
-        if (loginEmail && loginPassword) {
-          const { data: fnData, error: fnError } = await supabase.functions.invoke('create-user', {
-            body: {
-              email: loginEmail,
-              password: loginPassword,
-              name: workshop.name || 'Oficina',
-              role: 'Workshop',
-              client_id: currentClient.id,
-              can_delete_vehicles: false,
-              can_delete_drivers: false,
-              can_delete_workshops: false,
-            },
-          });
-          if (fnError) throw fnError;
-          if (fnData?.error) throw new Error(fnData.error);
-          profileId = fnData?.profileId;
+        const { data: existing } = await supabase
+          .from('workshops')
+          .select('id')
+          .eq('client_id', currentClient.id)
+          .eq('cnpj', row.cnpj)
+          .maybeSingle();
+        if (existing) {
+          throw { code: '23505', message: 'Este CNPJ já está cadastrado para este cliente.' };
         }
-
         const { error: insertError } = await supabase
           .from('workshops')
-          .insert({ ...row, profile_id: profileId ?? null });
+          .insert(row);
         if (insertError) throw insertError;
       }
     },
@@ -116,8 +123,8 @@ export default function Workshops() {
     },
   });
 
-  const handleSave = async (workshop: Partial<Workshop>, loginEmail?: string, loginPassword?: string): Promise<void> => {
-    await saveMutation.mutateAsync({ workshop, loginEmail, loginPassword });
+  const handleSave = async (workshop: Partial<Workshop>): Promise<void> => {
+    await saveMutation.mutateAsync({ workshop });
   };
 
   const deleteMutation = useMutation({
@@ -161,19 +168,28 @@ export default function Workshops() {
         </div>
 
         {canCreate && (
-          <button
-            onClick={() => {
-              sessionStorage.removeItem('workshopFormData');
-              sessionStorage.setItem('workshopFormOpen', 'true');
-              sessionStorage.removeItem('workshopFormEditing');
-              setEditingWorkshop(null);
-              setIsFormOpen(true);
-            }}
-            className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
-          >
-            <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-            Adicionar Oficina
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsInviteModalOpen(true)}
+              className="inline-flex items-center justify-center rounded-xl border border-orange-300 bg-orange-50 px-4 py-2.5 text-sm font-medium text-orange-700 shadow-sm hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
+            >
+              <Link2 className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+              Convidar Oficina
+            </button>
+            <button
+              onClick={() => {
+                sessionStorage.removeItem('workshopFormData');
+                sessionStorage.setItem('workshopFormOpen', 'true');
+                sessionStorage.removeItem('workshopFormEditing');
+                setEditingWorkshop(null);
+                setIsFormOpen(true);
+              }}
+              className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
+            >
+              <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+              Cadastrar Oficina
+            </button>
+          </div>
         )}
       </div>
 
@@ -211,6 +227,7 @@ export default function Workshops() {
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Contato</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Localização</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Especialidades</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Tipo</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Status</th>
                   <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
                     <span className="sr-only">Ações</span>
@@ -271,23 +288,26 @@ export default function Workshops() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm">
-                      <div className="flex flex-col gap-1">
-                        {workshop.active ? (
-                          <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                            Ativa
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
-                            Inativa
-                          </span>
-                        )}
-                        {workshop.profileId ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                            <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                            Acesso ativo
-                          </span>
-                        ) : null}
-                      </div>
+                      {partnerWorkshopIds.has(workshop.id) ? (
+                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                          Parceira
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
+                          Referência
+                        </span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm">
+                      {workshop.active ? (
+                        <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                          Ativa
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
+                          Inativa
+                        </span>
+                      )}
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                       <div className="flex items-center justify-end gap-3">
@@ -308,6 +328,7 @@ export default function Workshops() {
                               setEditingWorkshop(workshop);
                               setIsFormOpen(true);
                             }}
+                            title="Editar"
                             className="text-zinc-400 hover:text-zinc-900 transition-colors"
                           >
                             <Edit2 className="h-5 w-5" />
@@ -329,7 +350,7 @@ export default function Workshops() {
                 ))}
                 {filteredWorkshops.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-10 text-center text-sm text-zinc-500">
+                    <td colSpan={8} className="py-10 text-center text-sm text-zinc-500">
                       {search ? 'Nenhuma oficina encontrada para esta busca.' : 'Nenhuma oficina cadastrada para este cliente.'}
                     </td>
                   </tr>
@@ -339,6 +360,10 @@ export default function Workshops() {
           </div>
         )}
       </div>
+
+      {isInviteModalOpen && (
+        <InviteWorkshopModal onClose={() => setIsInviteModalOpen(false)} />
+      )}
 
       {viewingWorkshop && (
         <WorkshopDetailModal

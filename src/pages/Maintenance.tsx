@@ -39,6 +39,7 @@ export interface MaintenanceOrder {
   budgetReviewedAt?: string;
   cancelledAt?: string;
   cancelledById?: string;
+  clientName?: string; // Populado quando Workshop vê múltiplas transportadoras
 }
 
 type StatusFilter = MaintenanceStatus | 'all';
@@ -140,8 +141,11 @@ export default function Maintenance() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const { activeWorkshopId, workshopPartnerships } = useAuth();
+  const isMultiWorkshop = isWorkshopUser && workshopPartnerships.length > 1;
+
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['maintenanceOrders', currentClient?.id, profile?.workshopId],
+    queryKey: ['maintenanceOrders', currentClient?.id, activeWorkshopId],
     queryFn: async () => {
       let query = supabase
         .from('maintenance_orders')
@@ -150,13 +154,23 @@ export default function Maintenance() {
           vehicles (license_plate),
           workshops (name),
           profiles!created_by_id (name),
-          budget_reviewer:profiles!budget_reviewed_by (name)
+          budget_reviewer:profiles!budget_reviewed_by (name),
+          clients (name)
         `)
         .order('created_at', { ascending: false });
 
-      if (isWorkshopUser && profile?.workshopId) {
-        // Workshop vê apenas suas próprias OS (defense-in-depth, RLS já filtra)
-        query = query.eq('workshop_id', profile.workshopId);
+      if (isWorkshopUser) {
+        if (isMultiWorkshop) {
+          // Workshop multi-transportadora: filtrar por client_id quando há cliente selecionado.
+          // Sem filtro → RLS retorna todas as partnerships ativas automaticamente.
+          if (currentClient?.id) {
+            query = query.eq('client_id', currentClient.id);
+          }
+        } else if (activeWorkshopId) {
+          query = query.eq('workshop_id', activeWorkshopId);
+        } else if (profile?.workshopId) {
+          query = query.eq('workshop_id', profile.workshopId);
+        }
       } else if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
       }
@@ -165,7 +179,9 @@ export default function Maintenance() {
       if (error) throw error;
       return (data as MaintenanceOrderRow[]).map(maintenanceFromRow);
     },
-    enabled: isWorkshopUser ? !!profile?.workshopId : !!currentClient?.id,
+    enabled: isWorkshopUser
+      ? (isMultiWorkshop || !!(activeWorkshopId ?? profile?.workshopId))
+      : !!currentClient?.id,
   });
 
   const updateStatusMutation = useMutation({
@@ -467,7 +483,17 @@ export default function Maintenance() {
             <table className="min-w-full divide-y divide-zinc-100">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-zinc-50">
-                  {[isWorkshopUser ? 'OS da Oficina' : 'OS', 'Placa', 'Oficina', 'Dias', 'Previsão de Saída', 'Tipo', 'Status', 'Orçamento', ''].map(h => (
+                  {[
+                    isWorkshopUser ? 'OS da Oficina' : 'OS',
+                    'Placa',
+                    isWorkshopUser ? 'Cliente' : 'Oficina',
+                    'Dias',
+                    'Previsão de Saída',
+                    'Tipo',
+                    'Status',
+                    'Orçamento',
+                    '',
+                  ].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">
                       {h}
                     </th>
@@ -486,7 +512,7 @@ export default function Maintenance() {
                         {o.licensePlate}
                       </td>
                       <td className="px-4 py-3 text-sm text-zinc-600 max-w-[140px] truncate">
-                        {o.workshop}
+                        {isWorkshopUser ? (o.clientName ?? o.workshop) : o.workshop}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={cn(

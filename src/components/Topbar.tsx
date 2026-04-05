@@ -24,7 +24,7 @@ function ClientLogo({ name, logoUrl }: { name: string; logoUrl?: string }) {
 }
 
 export default function Topbar({ onMenuClick }: TopbarProps) {
-  const { user, currentClient, clients, switchClient, canSwitchClient } = useAuth();
+  const { user, currentClient, clients, switchClient, canSwitchClient, workshopPartnerships } = useAuth();
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4 md:px-6">
@@ -50,7 +50,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
                 onChange={(e) => switchClient(e.target.value)}
                 className="appearance-none bg-transparent py-1.5 pl-3 pr-8 text-sm font-medium text-zinc-900 focus:outline-none focus:ring-0 border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
               >
-                {user?.role === 'Admin Master' && (
+                {(user?.role === 'Admin Master' || (user?.role === 'Workshop' && workshopPartnerships.length > 1)) && (
                   <option value="">Todos os Clientes</option>
                 )}
                 {clients.map((client) => (

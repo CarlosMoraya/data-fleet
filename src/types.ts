@@ -134,12 +134,60 @@ export interface User {
   name: string;
   email: string;
   role: Role;
-  clientId: string; // The primary client they belong to
+  clientId: string | null; // null para Workshop no novo modelo (multi-transportadora)
   canDeleteVehicles: boolean;
   canDeleteDrivers: boolean;
   canDeleteWorkshops: boolean;
   budgetApprovalLimit: number;
-  workshopId?: string; // Populated when role = 'Workshop'
+  workshopId?: string; // Populado quando role = 'Workshop' (modelo legado)
+  workshopAccountId?: string; // Populado quando role = 'Workshop' (novo modelo)
+}
+
+// ─── Workshop Partnership Types ───────────────────────────────────────────────
+
+/** Conta independente de oficina, desacoplada de client_id */
+export interface WorkshopAccount {
+  id: string;
+  profileId: string;
+  name: string;
+  cnpj: string;
+  phone?: string;
+  email?: string;
+  contactPerson?: string;
+  addressStreet?: string;
+  addressNumber?: string;
+  addressComplement?: string;
+  addressNeighborhood?: string;
+  addressCity?: string;
+  addressState?: string;
+  addressZip?: string;
+  specialties?: string[];
+  notes?: string;
+  active: boolean;
+}
+
+/** Vínculo M:N entre uma oficina e uma transportadora */
+export interface WorkshopPartnership {
+  id: string;
+  workshopAccountId: string;
+  clientId: string;
+  clientName?: string;
+  clientLogoUrl?: string;
+  legacyWorkshopId?: string;
+  status: 'active' | 'inactive';
+  invitedAt?: string;
+  acceptedAt?: string;
+}
+
+/** Convite gerado por uma transportadora para uma oficina */
+export interface WorkshopInvitation {
+  id: string;
+  clientId: string;
+  clientName?: string;
+  token: string;
+  status: 'pending' | 'accepted' | 'expired' | 'revoked';
+  expiresAt: string;
+  createdAt: string;
 }
 
 export interface Client {

@@ -401,9 +401,11 @@ export default function Tires() {
     mutationFn: async ({
       tireData,
       previousPosition,
+      odometerKm,
     }: {
       tireData: Partial<Tire> | Partial<Tire>[];
       previousPosition?: string;
+      odometerKm?: number;
     }) => {
       if (!currentClient || !profile) throw new Error('Sessão inválida');
 
@@ -444,6 +446,7 @@ export default function Tires() {
             new_position: t.current_position,
             moved_by: profile.id,
             moved_at: new Date().toISOString(),
+            odometer_km: odometerKm ?? null,
           }));
           for (let i = 0; i < historyRows.length; i += 100) {
             await supabase.from('tire_position_history').insert(historyRows.slice(i, i + 100));
@@ -495,6 +498,7 @@ export default function Tires() {
           new_position: tireData.currentPosition,
           moved_by: profile.id,
           moved_at: new Date().toISOString(),
+          odometer_km: odometerKm ?? null,
         });
       }
     },
@@ -764,8 +768,8 @@ export default function Tires() {
           existingTires={getVehicleTires(selectedVehicle.id)}
           tireConfig={getConfigForType(selectedVehicle.type)}
           editingTire={editingTire}
-          onSave={async (tireData: Partial<Tire> | Partial<Tire>[], previousPosition?: string) => {
-            await saveMutation.mutateAsync({ tireData, previousPosition });
+          onSave={async (tireData: Partial<Tire> | Partial<Tire>[], previousPosition?: string, odometerKm?: number) => {
+            await saveMutation.mutateAsync({ tireData, previousPosition, odometerKm });
           }}
           onClose={() => { setTireFormOpen(false); setEditingTire(null); setSelectedVehicle(null); }}
           isSaving={saveMutation.isPending}

@@ -11,7 +11,7 @@
 - **Supabase Auth** com email/senha
 - `AuthContext.tsx` expõe `useAuth()` hook → `{ user, currentClient, signIn, signOut }`
 - Session persistida via Supabase (localStorage)
-- Perfil do usuário armazenado na tabela `profiles` (id, name, email, role, client_id, can_delete_vehicles, can_delete_drivers, can_delete_workshops)
+- Perfil do usuário armazenado na tabela `profiles` (id, name, email, role, client_id [nullable para contas globais], can_delete_vehicles, can_delete_drivers, can_delete_workshops, workshop_account_id)
 
 ## Banco de Dados
 
@@ -24,7 +24,11 @@
 - `operational_units` — unidades operacionais (CRUD com RLS, code único por cliente); FK obrigatória para shipper (RESTRICT on delete)
 - `drivers` — motoristas (CRUD com RLS, CPF único por cliente, 5 uploads de documento)
 - `driver_field_settings` — configurações dinâmicas de campos obrigatórios de motorista por cliente
-- `workshops` — oficinas parceiras (CRUD com RLS, CNPJ único por cliente, sem uploads); **NOVO**: `profile_id UUID NULL FK → profiles(id) ON DELETE SET NULL` — quando preenchido, a oficina tem login próprio com role 'Workshop'; índice `idx_workshops_profile_id`
+- `workshops` — oficinas de referência por cliente (CRUD com RLS, CNPJ único por cliente, sem uploads); `profile_id UUID NULL FK → profiles(id) ON DELETE SET NULL` — quando preenchido via partnership, indica oficina promovida a parceira; `legacy_workshop_id` em `workshop_partnerships` aponta para este registro para compatibilidade de FK com `maintenance_orders`
+- `workshop_accounts` — contas globais de oficina (CNPJ único global, sem client_id); criadas ao aceitar convite; `profile_id` aponta para auth user com role 'Workshop'
+- `workshop_invitations` — convites de parceria (token URL-safe, status: pending/accepted/revoked/expired, expires_at +30 dias); gerados pela Edge Function `workshop-invitation`
+- `workshop_partnerships` — relacionamento ativo entre `workshop_accounts` e `clients`; `legacy_workshop_id FK → workshops(id)` mantém compatibilidade de FK com OS existentes; status: active/inactive
+- `workshop_partnership_audit` — auditoria de ações em partnerships (created, deactivated, reactivated)
 - `vehicle_km_intervals` — km máximo entre revisões por veículo (UNIQUE vehicle_id); colunas: `id, client_id, vehicle_id, km_interval INTEGER NULL, updated_at, updated_by`; RLS: SELECT/INSERT/UPDATE Fleet Assistant(3)+ do próprio tenant ou Admin Master; DELETE Manager(5)+; migration: `create_vehicle_km_intervals.sql`
 - `checklist_day_intervals` — intervalo em dias entre checklists consecutivos de Rotina e Segurança por cliente (UNIQUE client_id); colunas: `id, client_id, rotina_day_interval INTEGER NULL, seguranca_day_interval INTEGER NULL, updated_at, updated_by`; RLS: SELECT/INSERT/UPDATE Fleet Assistant(3)+ do próprio tenant ou Admin Master; DELETE Manager(5)+; migration: `create_checklist_day_intervals.sql` ⚠️ EXECUTAR NO SUPABASE DASHBOARD
 
@@ -84,6 +88,10 @@
 - `fix_workshop_vehicles_rls.sql` — adiciona policy SELECT em vehicles para Workshop (acesso apenas a veículos em suas próprias OS, via join com workshops.profile_id); resolve bug onde join vehicles retornava null para Workshop causando "N/A" na coluna Placa (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
 - `fix_vehicles_admin_master_rls.sql` — corrige SELECT policy em `vehicles` para incluir `OR role = 'Admin Master'` (Admin Master tem client_id = NULL, precisava de exceção especial como em maintenance_orders e action_plans); resolve bug no Dashboard onde Total de Veículos exibia 0 para Admin Master (2026-03-19) ⚠️ **Executar no Supabase Dashboard**
 - `20260326000000_fix_supervisor_coordinator_rls.sql` — Atualiza hierarquia de roles: Supervisor(5), Coordinator(6), Manager(7), Director(8), Admin Master(9); corrige role_rank() função; adiciona Supervisor/Coordinator aos RLS policies de 5 tabelas: drivers (SELECT/INSERT/UPDATE/DELETE), driver_field_settings (SELECT), shippers (SELECT/INSERT/UPDATE/DELETE), operational_units (SELECT/INSERT/UPDATE/DELETE), workshops (SELECT/INSERT/UPDATE/DELETE). Resolve bug onde Supervisor+ não conseguiam visualizar motoristas, embarcadores, unidades operacionais e oficinas apesar de terem permissões pelas regras do sistema (2026-03-26) ✅ **Executada no Supabase Dashboard**
+- `20260404000000_workshop_partnership.sql` — Cria workshop_accounts, workshop_partnerships, workshop_invitations, workshop_partnership_audit; adiciona workshop_account_id em profiles; RLS policies; RPC validate_workshop_token; atualiza maintenance_orders e maintenance_budget_items para modelo multi-parceria ✅ **Executada no Supabase Dashboard**
+- `20260405000000_fix_workshop_partnership_rls.sql` — **HOTFIX**: Corrige recursão infinita (42P17) entre policies `wpart_workshop_select` (workshop_partnerships) e `wa_client_select` (workshop_accounts). Fix: reescreve `wpart_workshop_select` para usar `profiles.workshop_account_id` diretamente em vez de join em `workshop_accounts`. Impactava TODAS as queries do sistema (veículos, motoristas, etc.) via cadeia: vehicles → maintenance_orders → workshop_partnerships ↔ workshop_accounts ✅ **Executada no Supabase Dashboard**
+- `20260405100000_allow_null_client_id_profiles.sql` — Remove constraint NOT NULL de `profiles.client_id` para permitir contas globais (Workshop e Admin Master) sem tenant específico ⚠️ **Executar no Supabase Dashboard**
+- `20260405110000_workshop_clients_rls.sql` — Adiciona RLS policy `clients_workshop_select` na tabela `clients` permitindo Workshop SELECT dos clientes para os quais tem partnerships ativas. Corrige bug onde joins `clients(name)` retornavam null quebrando dropdown de transportadoras e coluna Cliente na tela de Manutenção ⚠️ **Executar no Supabase Dashboard**
 
 ### RLS — Padrões de Checklists
 - `checklists` SELECT: Driver/Auditor vê os próprios; Fleet Assistant+ vê todo o tenant; Admin Master vê tudo
@@ -116,6 +124,9 @@ RLS vehicles:
 - Unique constraint: `(client_id, cnpj)`
 - Especialidades: array `TEXT[]` com 10 valores predefinidos (Mecânica Geral, Elétrica, Funilaria/Pintura, Pneus, Ar Condicionado, Suspensão, Freios, Injeção Eletrônica, Câmbio/Transmissão, Refrigeração Baú)
 
+### Tabela `clients` RLS:
+- SELECT: Acesso padrão para Fleet Assistant+ do tenant via `clients` como lista de tenants (Admin Master); Workshop via política `clients_workshop_select` filtrando por partnerships ativas
+
 ### Row Level Security (RLS)
 - Todas as tabelas devem ter RLS habilitado
 - Padrão: filtrar por `client_id` do usuário autenticado
@@ -140,6 +151,51 @@ RLS vehicles:
 - **Formatos aceitos**: PDF, JPG, PNG, WEBP. Máximo 10MB por arquivo.
 - **Policies**: Idênticas ao bucket vehicle-documents.
 
+### Novas Tabelas — Workshop Partnership (migration `20260404000000_workshop_partnership.sql`)
+
+#### `workshop_accounts`
+Entidade independente da oficina, desacoplada de `client_id`. CNPJ globalmente único.
+- `profile_id UUID NOT NULL UNIQUE FK → auth.users` — uma conta por login
+- `cnpj TEXT NOT NULL UNIQUE` — único globalmente (diferente da tabela `workshops` que é por cliente)
+- `workshop_account_id UUID FK → workshop_accounts(id)` adicionado em `profiles` para bind rápido
+- RLS: Workshop vê própria conta; Fleet Assistant+ vê contas com parceria ativa no seu cliente; Admin Master vê tudo
+
+#### `workshop_partnerships`
+Relação M:N entre `workshop_accounts` e `clients`.
+- `legacy_workshop_id UUID FK → workshops(id) ON DELETE SET NULL` — ponte com tabela legada (necessária pois `maintenance_orders.workshop_id → workshops.id`)
+- `status TEXT CHECK IN ('active', 'inactive')`
+- UNIQUE `(workshop_account_id, client_id)`
+- RLS: Workshop vê suas partnerships; Fleet Assistant+ vê do seu cliente; Admin Master vê tudo
+
+#### `workshop_invitations`
+Convites gerados por transportadoras para oficinas. Token criptográfico, expira em 30 dias.
+- `token TEXT NOT NULL UNIQUE` — token URL-safe gerado via `crypto.getRandomValues`
+- `status TEXT CHECK IN ('pending', 'accepted', 'expired', 'revoked')`
+- `expires_at TIMESTAMPTZ NOT NULL`
+- RLS: Fleet Assistant+ gerencia convites do próprio cliente; Admin Master vê tudo
+
+#### `workshop_partnership_audit`
+Auditoria de mudanças em partnerships (`created`, `activated`, `deactivated`, `reactivated`).
+
+#### RPC `validate_workshop_token(p_token TEXT) → JSON`
+Função pública (SECURITY DEFINER) para validar token de convite sem autenticação.
+Retorna `{ valid, reason?, invitationId?, clientId?, clientName?, clientLogoUrl? }`.
+
+#### RLS `maintenance_orders` e `maintenance_budget_items` — atualizado
+Workshop agora vê OS de TODAS as suas partnerships ativas (novo modelo) além do modelo legado:
+```sql
+AND workshop_id IN (
+  SELECT id FROM workshops WHERE profile_id = auth.uid()  -- legado
+  UNION
+  SELECT wp.legacy_workshop_id                             -- novo modelo
+  FROM workshop_partnerships wp JOIN workshop_accounts wa ON wa.id = wp.workshop_account_id
+  WHERE wa.profile_id = auth.uid() AND wp.status = 'active' AND wp.legacy_workshop_id IS NOT NULL
+)
+```
+
+#### Índices criados
+`idx_wp_account`, `idx_wp_client`, `idx_wp_legacy`, `idx_wp_status`, `idx_wi_token`, `idx_wa_cnpj`, `idx_wa_profile`
+
 ## Edge Functions
 
 ### `create-user` (ativa, deployed)
@@ -149,6 +205,24 @@ RLS vehicles:
 - Endpoint: `POST /functions/v1/create-user`
 - Requer `Authorization: Bearer <session_token>`
 - Código fonte: `supabase/functions/create-user/index.ts`
+
+### `workshop-invitation` (nova)
+- Ações: `create` (gera token + URL), `revoke` (revoga pendente), `list`
+- Requer Fleet Assistant+; Admin Master pode especificar `client_id`
+- Token criptográfico URL-safe de 48 chars; validade de 30 dias
+- Código: `supabase/functions/workshop-invitation/index.ts`
+
+### `workshop-accept-invitation` (nova)
+- Aceita convite via token (sem auth necessário para nova oficina)
+- Cria Supabase Auth user + profile (client_id = NULL) + workshop_account + partnership + legacy workshop record
+- Se oficina já existe (CNPJ): apenas cria nova partnership
+- Se usuário já autenticado: passa token de autenticação para vincular conta existente
+- Código: `supabase/functions/workshop-accept-invitation/index.ts`
+
+### `workshop-partnership-manage` (nova)
+- Ações: `deactivate` (Fleet Analyst+ do cliente OU própria oficina), `reactivate` (Fleet Analyst+ do cliente)
+- Soft delete com `deactivated_at` + `deactivated_by`; registra em audit
+- Código: `supabase/functions/workshop-partnership-manage/index.ts`
 
 ### `create-user-tenant` (ABANDONADA)
 - Teve problemas persistentes de 401

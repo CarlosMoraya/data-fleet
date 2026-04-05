@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
 import type { MaintenanceOrder } from '../pages/Maintenance';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import BudgetItemsTable from './BudgetItemsTable';
 import { budgetItemFromRow, type MaintenanceBudgetItemRow } from '../lib/maintenanceMappers';
 
@@ -64,6 +65,8 @@ function Field({ label, value, className }: { label: string; value: React.ReactN
 }
 
 export default function MaintenanceDetailModal({ order, onClose }: Props) {
+  const { user } = useAuth();
+  const isWorkshopUser = user?.role === 'Workshop';
   const days = daysInWorkshop(order.entryDate);
 
   const hasBudget = order.budgetStatus && order.budgetStatus !== 'sem_orcamento';
@@ -134,7 +137,10 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
               <h3 className="text-sm font-semibold text-zinc-600 uppercase tracking-wide">Oficina</h3>
             </div>
             <div className="grid grid-cols-2 gap-4 bg-zinc-50 rounded-xl p-4">
-              <Field label="Nome da Oficina" value={order.workshop} className="col-span-2" />
+              <Field label="Nome da Oficina" value={order.workshop} className={isWorkshopUser && order.clientName ? 'col-span-1' : 'col-span-2'} />
+              {isWorkshopUser && order.clientName && (
+                <Field label="Transportadora" value={order.clientName} />
+              )}
               <Field label="Data de Entrada" value={
                 <span className="flex items-center gap-1.5">
                   <Calendar className="h-3.5 w-3.5 text-zinc-400" />

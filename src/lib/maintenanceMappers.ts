@@ -75,6 +75,7 @@ export interface MaintenanceOrderRow {
   workshops?: { name: string };
   profiles?: { name: string };
   budget_reviewer?: { name: string };
+  clients?: { name: string };
 }
 
 export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
@@ -104,5 +105,6 @@ export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
     budgetReviewedAt: row.budget_reviewed_at || undefined,
     cancelledAt: row.cancelled_at || undefined,
     cancelledById: row.cancelled_by_id || undefined,
+    clientName: row.clients?.name || undefined,
   };
 }

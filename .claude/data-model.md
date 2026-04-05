@@ -37,12 +37,59 @@ interface User {
   name: string;
   email: string;
   role: Role;
-  clientId: string; // tenant primário
+  clientId: string | null; // null para Workshop no novo modelo multi-transportadora
   canDeleteVehicles: boolean;
   canDeleteDrivers: boolean;
   canDeleteWorkshops: boolean;
   budgetApprovalLimit: number; // 0 = sem permissão de aprovação; > 0 = limite em R$
-  workshopId?: string; // preenchido apenas quando role = 'Workshop'; FK → workshops.id
+  workshopId?: string;        // modelo legado: FK → workshops.id da transportadora única
+  workshopAccountId?: string; // novo modelo: FK → workshop_accounts.id
+}
+```
+
+### WorkshopAccount (novo modelo multi-transportadora)
+```ts
+interface WorkshopAccount {
+  id: string;
+  profileId: string;
+  name: string;
+  cnpj: string;      // globalmente único em workshop_accounts
+  phone?: string;
+  email?: string;
+  contactPerson?: string;
+  addressStreet?: string; addressNumber?: string; addressComplement?: string;
+  addressNeighborhood?: string; addressCity?: string; addressState?: string; addressZip?: string;
+  specialties?: string[];
+  notes?: string;
+  active: boolean;
+}
+```
+
+### WorkshopPartnership
+```ts
+interface WorkshopPartnership {
+  id: string;
+  workshopAccountId: string;
+  clientId: string;
+  clientName?: string;
+  clientLogoUrl?: string;
+  legacyWorkshopId?: string; // FK → workshops.id — necessário para manter FK em maintenance_orders
+  status: 'active' | 'inactive';
+  invitedAt?: string;
+  acceptedAt?: string;
+}
+```
+
+### WorkshopInvitation
+```ts
+interface WorkshopInvitation {
+  id: string;
+  clientId: string;
+  clientName?: string;
+  token: string;
+  status: 'pending' | 'accepted' | 'expired' | 'revoked';
+  expiresAt: string;
+  createdAt: string;
 }
 ```
 

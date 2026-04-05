@@ -2,7 +2,7 @@
 
 ## Visão Geral
 
-- **61 testes E2E** passando across 4 perfis de autenticação
+- **75 testes E2E** passando across 4 perfis de autenticação
 - Framework: **Playwright**
 - Config: `playwright.config.ts`
 - Diretório: `e2e/`
@@ -54,6 +54,7 @@ e2e/
 ├── tenant-users-manager-seed.spec.ts # Seeding (Massa de Dados)
 ├── tenant-users-manager-workshops.spec.ts # Oficinas CRUD (Fluxo Completo)
 ├── tenant-users.spec-analyst-workshops.ts # Oficinas Permissões - Analista
+├── tenant-users-manager-workshop-partnership.spec.ts # Partnership Oficinas (14 tests serial) — criação/edição/convite com validação CNPJ duplicado
 ├── shippers-operational-units.spec.ts # Embarcadores + Unidades Operacionais CRUD (3 perfis: Pedro/Mariana/Alexandre) — 16 test cases, dados deixados no DB
 └── cross-profile-flows.spec.ts # Fluxos cruzados (auditoria para manutenção)
 ```
@@ -141,3 +142,37 @@ page.on('dialog', (dialog) => dialog.accept()); // antes de triggerar delete
 - **FK RESTRICT**: Error message: "unidades operacionais vinculadas" quando tenta deletar embarcador com unidades
 - **Data persistence**: Testes deixam dados em DB para validação manual
 - **Modal selectors**: Usar `getByRole('button', {name: '...'})` em vez de `has-text()` para strict mode
+
+## E2E Tests para Workshop Partnership (2026-04-05)
+
+**Arquivo**: `e2e/tenant-users-manager-workshop-partnership.spec.ts` (14 test cases)
+
+### Contexto
+- Valida fluxo completo de partnership de oficinas: criação, edição, convites
+- Testa validação de CNPJ duplicado (aplicação pré-verifica antes de INSERT)
+- Testa modal "Convidar Oficina" com geração de links, cópia e revogação
+- Testes executam serialmente: teste 04 cria workshop que testes 08-09 dependem
+
+### Test Cases (14 total)
+| # | Teste | Status |
+|---|-------|--------|
+| 01 | Tabela: coluna "Tipo" existe | ✅ |
+| 02 | Botões "Cadastrar" + "Convidar" existem | ✅ |
+| 03 | Modal "Cadastrar": título + sem login fields | ✅ |
+| 04 | Criar oficina de referência com sucesso | ✅ |
+| 05 | Badge "Referência" exibido | ✅ |
+| 06 | Busca por nome | ✅ |
+| 07 | Busca por CNPJ | ✅ |
+| 08 | Editar: modal sem login fields, nome persiste | ✅ |
+| 09 | CNPJ duplicado: erro ao tentar criar | ✅ |
+| 10 | Modal "Convidar": abre com elementos corretos | ✅ |
+| 11 | Gerar link: convite criado e exibido | ✅ |
+| 12 | Copiar link: feedback visual (checkmark) | ✅ |
+| 13 | Revogar convite: remove da lista | ✅ |
+| 14 | Fechar modal "Convidar" | ✅ |
+
+### Padrões Críticos (Workshop Partnership)
+- **Validação CNPJ duplicado**: Pré-query em Workshops.tsx saveMutation antes do INSERT; lança erro código 23505 mesmo sem constraint DB
+- **Edit button selector**: Botão edit tem `title="Editar"` para Playwright `button[title="Editar"]` locator
+- **Serial dependency**: Teste 04 cria workshop; testes 08-09 usam esse dados. **Não rodar testes isolados com --grep "08|09"** — sempre executar suite completa
+- **Modal state**: BeforeEach navega para `/cadastros/oficinas` resetando UI state; session storage salva form data e state de edição

@@ -30,6 +30,7 @@ import OperationalUnits from './pages/OperationalUnits';
 import WorkshopSchedules from './pages/WorkshopSchedules';
 import BudgetApprovals from './pages/BudgetApprovals';
 import Tires from './pages/Tires';
+import WorkshopJoin from './pages/WorkshopJoin';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -55,6 +56,7 @@ export default function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
+          <Route path="/workshop/join" element={<WorkshopJoin />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<HomeRedirect />} />
               <Route path="cadastros" element={<Cadastros />}>
