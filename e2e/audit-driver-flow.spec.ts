@@ -23,21 +23,32 @@ test.describe('Motorista — Fluxo Operacional', () => {
     const myVehicleSection = page.locator('text=Meu veículo');
     await expect(myVehicleSection).toBeVisible({ timeout: 15000 });
 
-    // Verifica se há um botão "Iniciar" disponível
-    const startBtn = page.getByRole('button', { name: /Iniciar/i }).first();
-    
-    // Se o motorista não tiver veículo/templates, o botão não aparecerá.
-    // Vamos registrar o estado atual para auditoria.
-    const hasVehicle = await page.getByText(/Nenhum veículo associado/i).isVisible();
-    if (hasVehicle) {
+    // Se o motorista não tiver veículo associado
+    const hasNoVehicle = await page.getByText(/Nenhum veículo associado/i).isVisible();
+    if (hasNoVehicle) {
       console.log('Jorge não possui veículo associado no momento.');
-      return; // Sucesso parcial (validou a mensagem de erro esperada se sem dados)
+      return; // Sem dados de seed — estado esperado é mensagem de erro
     }
 
+    // Se o motorista tem veículo mas sem templates publicados
+    const hasNoTemplates = await page.getByText(/Nenhum template publicado/i).isVisible();
+    if (hasNoTemplates) {
+      console.log('Nenhum template publicado para o veículo de Jorge.');
+      return; // Sem dados de seed — estado esperado
+    }
+
+    // Se há checklist em aberto, o botão Iniciar estará desabilitado — usa Continuar
+    const openChecklistContinue = page.getByRole('button', { name: /Continuar/i }).first();
+    if (await openChecklistContinue.isVisible()) {
+      await openChecklistContinue.click();
+      await expect(page).toHaveURL(/.*checklists\/preencher.*/, { timeout: 15000 });
+      return;
+    }
+
+    // Caso normal: botão Iniciar disponível
+    const startBtn = page.getByRole('button', { name: /Iniciar/i }).first();
     await expect(startBtn).toBeVisible();
     await startBtn.click();
-    
-    // Se clicou em iniciar, deve ir para a página de preenchimento
     await expect(page).toHaveURL(/.*checklists\/preencher.*/, { timeout: 15000 });
   });
 

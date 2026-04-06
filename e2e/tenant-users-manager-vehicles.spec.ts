@@ -10,7 +10,7 @@ test.describe('Módulo de Veículos (Fluxo Completo)', () => {
   test.beforeEach(async ({ page }) => {
     // A maioria dos testes será via Manager (Alexandre) que já está logado via storageState no projeto 'manager'
     await page.goto('/cadastros/veiculos');
-    await expect(page.locator('h1', { hasText: 'Vehicles' })).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 15000 });
   });
 
   test('configura campos obrigatórios e valida no formulário', async ({ page }) => {
@@ -35,7 +35,7 @@ test.describe('Módulo de Veículos (Fluxo Completo)', () => {
 
     // 3. Voltar para Veículos e abrir o formulário
     await page.goto('/cadastros/veiculos');
-    await page.click('button:has-text("Add Vehicle")');
+    await page.click('button:has-text("Adicionar Veículo")');
     
     const modal = page.locator('.fixed.inset-0');
     await expect(modal.locator('h2', { hasText: 'Cadastrar Veículo' })).toBeVisible();
@@ -49,7 +49,7 @@ test.describe('Módulo de Veículos (Fluxo Completo)', () => {
   });
 
   test('cadastra veículo com todos os campos e anexos', async ({ page }) => {
-    await page.click('button:has-text("Add Vehicle")');
+    await page.click('button:has-text("Adicionar Veículo")');
     const modal = page.locator('.fixed.inset-0');
 
     // Preencher dados básicos
@@ -124,7 +124,7 @@ test.describe('Módulo de Veículos (Fluxo Completo)', () => {
 
   test('edita veículo e verifica persistência dos anexos', async ({ page }) => {
     // 1. Buscar o veículo
-    await page.fill('input[placeholder*="Search by plate"]', TEST_PLATE);
+    await page.fill('input[placeholder*="Buscar por placa"]', TEST_PLATE);
     const row = page.locator('tr', { hasText: TEST_PLATE });
     await row.locator('button').first().click(); // Botão Editar (o primeiro da div de ações)
 
@@ -145,7 +145,7 @@ test.describe('Módulo de Veículos (Fluxo Completo)', () => {
   });
 
   test('exclui o veículo criado', async ({ page }) => {
-    await page.fill('input[placeholder*="Search by plate"]', TEST_PLATE);
+    await page.fill('input[placeholder*="Buscar por placa"]', TEST_PLATE);
     const row = page.locator('tr', { hasText: TEST_PLATE });
     
     // Aceitar confirm

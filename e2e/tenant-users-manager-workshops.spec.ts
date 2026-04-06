@@ -18,7 +18,7 @@ test.describe.serial('Módulo de Oficinas (Fluxo Completo)', () => {
   });
 
   test('deve cadastrar uma nova oficina com sucesso', async ({ page }) => {
-    await page.click('button:has-text("Adicionar Oficina")');
+    await page.click('button:has-text("Cadastrar Oficina")');
     
     const modal = page.locator('.fixed.inset-0');
     await expect(modal.locator('h2', { hasText: 'Nova Oficina' })).toBeVisible();
@@ -94,7 +94,7 @@ test.describe.serial('Módulo de Oficinas (Fluxo Completo)', () => {
   });
 
   test('deve validar CNPJ duplicado', async ({ page }) => {
-    await page.click('button:has-text("Adicionar Oficina")');
+    await page.click('button:has-text("Cadastrar Oficina")');
     const modal = page.locator('.fixed.inset-0');
 
     await modal.locator('input[name="name"]').fill('Outra Oficina Mesma CNPJ');

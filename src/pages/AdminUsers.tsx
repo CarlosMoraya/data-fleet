@@ -7,6 +7,24 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Role } from '../types';
 import { capitalizeWords } from '../lib/inputHelpers';
 
+const invokeFn = async (fnName: string, body: object) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Sessão expirada. Faça login novamente.');
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.error ?? json?.message ?? `HTTP ${res.status}`);
+  return json;
+};
+
 const ALL_ROLES: Role[] = [
   'Driver', 'Yard Auditor', 'Fleet Assistant',
   'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master',
@@ -89,10 +107,7 @@ function CreateUserModal({
 
   const createMutation = useMutation({
     mutationFn: async (payload: any) => {
-      const { error: fnError } = await supabase.functions.invoke('create-user', {
-        body: payload
-      });
-      if (fnError) throw new Error(fnError.message);
+      await invokeFn('create-user', payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
@@ -386,11 +401,7 @@ export default function AdminUsers() {
 
   const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { data, error } = await supabase.functions.invoke('create-user', {
-        body: { action: 'delete', user_id: userId },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      await invokeFn('create-user', { action: 'delete', user_id: userId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });

@@ -83,7 +83,7 @@ test.describe.serial('Coordinator (Robson) — Auditoria de Permissões', () => 
     await page.goto('/cadastros/veiculos');
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL('/cadastros/veiculos');
-    await expect(page.getByRole('button', { name: /add vehicle/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: /Adicionar Veículo/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('1.7 Cadastros/Motoristas — lista carrega sem redirect', async () => {
@@ -243,7 +243,7 @@ test.describe.serial('Supervisor (Pereira) — Auditoria de Permissões', () => 
     await page.goto('/cadastros/veiculos');
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL('/cadastros/veiculos');
-    await expect(page.getByRole('button', { name: /add vehicle/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: /Adicionar Veículo/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('2.7 Cadastros/Motoristas — lista carrega sem redirect', async () => {

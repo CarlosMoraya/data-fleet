@@ -66,13 +66,13 @@ test.describe('semeia 6 veículos e vincula apenas alguns motoristas para testes
   
   test.beforeEach(async ({ page }) => {
     await page.goto('/cadastros/veiculos');
-    await expect(page.locator('h1', { hasText: 'Vehicles' })).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 15000 });
   });
 
   for (const v of VEHICLES_TO_SEED) {
     test(`Cadastrar Veículo: ${v.plate}`, async ({ page }) => {
       // 1. Abrir formulário
-      await page.click('button:has-text("Add Vehicle")');
+      await page.click('button:has-text("Adicionar Veículo")');
       const modal = page.locator('.fixed.inset-0');
       await expect(modal.locator('h2', { hasText: 'Cadastrar Veículo' })).toBeVisible();
 

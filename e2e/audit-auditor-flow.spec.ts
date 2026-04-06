@@ -30,13 +30,15 @@ test.describe('Auditor — Fluxo de Auditoria', () => {
 
   test('B.1 Visualização de Checklists e Filtros', async ({ page }) => {
     await page.goto('/checklists');
-    
-    // Pode ver a tabela OU a mensagem de "Sem checklists"
-    const content = page.locator('table').or(page.getByText('Sem checklists'));
+
+    // Para Auditor: o componente HistoryCard é renderizado com cabeçalho "Histórico"
+    // (em vez de uma <table> — o HistoryCard usa divs)
+    const content = page.locator('h2', { hasText: 'Histórico' })
+      .or(page.getByText('Nenhum checklist encontrado.'));
     await expect(content.first()).toBeVisible({ timeout: 15000 });
-    
-    // Deve ver o botão de filtro (presente em ambos os casos)
-    const filterBtn = page.locator('button').filter({ hasText: /Filtrar/i });
+
+    // HistoryCard tem botões de filtro de status: "Todos", "Em andamento", "Concluído"
+    const filterBtn = page.locator('button', { hasText: 'Todos' });
     await expect(filterBtn).toBeVisible();
   });
 

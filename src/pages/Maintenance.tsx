@@ -40,6 +40,7 @@ export interface MaintenanceOrder {
   cancelledAt?: string;
   cancelledById?: string;
   clientName?: string; // Populado quando Workshop vê múltiplas transportadoras
+  clientId?: string;   // client_id da OS; necessário para Workshop no modo "Todos os Clientes"
 }
 
 type StatusFilter = MaintenanceStatus | 'all';
@@ -226,10 +227,14 @@ export default function Maintenance() {
       budgetItems: BudgetItem[];
       budgetFile: File | null;
     }) => {
-      if (!currentClient || !profile) throw new Error('Sessão inválida');
+      const isWorkshopSave = profile?.role === 'Workshop';
+      // Para Workshop no modo "Todos os Clientes", currentClient pode ser null.
+      // Usamos o client_id da própria OS (data.clientId) para upload e budget items.
+      const effectiveClientId = isWorkshopSave ? (data.clientId ?? currentClient?.id) : currentClient?.id;
+      if (!effectiveClientId || !profile) throw new Error('Sessão inválida');
 
       const commonFields: any = {
-        client_id: currentClient.id,
+        client_id: effectiveClientId,
         vehicle_id: data.vehicleId,
         workshop_id: data.workshopId,
         entry_date: data.entryDate,
@@ -279,7 +284,7 @@ export default function Maintenance() {
 
       // Passo 2: se há PDF, fazer upload e atualizar campos de orçamento
       if (budgetFile) {
-        const pdfUrl = await uploadMaintenanceBudget(currentClient.id, orderId, budgetFile);
+        const pdfUrl = await uploadMaintenanceBudget(effectiveClientId, orderId, budgetFile);
         const { error: updateErr } = await supabase
           .from('maintenance_orders')
           .update({
@@ -299,7 +304,7 @@ export default function Maintenance() {
         if (significantItems.length > 0) {
           const rows = significantItems.map((item, idx) => ({
             maintenance_order_id: orderId,
-            client_id: currentClient.id,
+            client_id: effectiveClientId,
             item_name: item.itemName,
             system: item.system || null,
             quantity: item.quantity,

@@ -24,7 +24,7 @@ import VehicleKmIntervalSettings from '../components/VehicleKmIntervalSettings';
 import ChecklistDayIntervalSettings from '../components/ChecklistDayIntervalSettings';
 
 const ROLES_CAN_MANAGE_FIELDS = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
-const ROLES_CAN_ACCESS_SETTINGS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_ACCESS_SETTINGS = ['Coordinator', 'Manager', 'Director', 'Admin Master'];
 
 type TabType = 'vehicles' | 'drivers' | 'revisoes' | 'checklists';
 

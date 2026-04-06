@@ -120,13 +120,13 @@ Sistema é multi-tenant com 6 papéis por rank (descendente de permissão). **`c
 |------|------|--------|-------|
 | **Admin Master** | 0 | Sistema inteiro, todos os clientes | Sem `client_id`; precisa de `OR role = 'Admin Master'` em RLS |
 | **Manager** | 2 | Todas as abas do cliente; usuários, oficinas, configurações | Acesso total dentro do tenant |
-| **Fleet Assistant** | 3 | Veículos, checklists, manutenção, configurações | Sem acesso a Usuários; pode criar/editar workshops |
+| **Fleet Assistant** | 3 | Veículos, checklists, manutenção | Sem acesso a Usuários nem Configurações; pode criar/editar workshops |
 | **Supervisor** | 4 | Checklists, manutenção, planos de ação (coordenação) | Apenas leitura de usuários/oficinas |
 | **Driver** | 5 | Preenchimento de checklists, dados pessoais | Acesso a veículos atribuídos apenas |
 | **Workshop** | 1 | Visão de manutenção, atualiza OS com orçamento/status | Login próprio; acesso a veículos em suas OS |
 
 **Guardrails Comuns:**
-- `ROLES_CAN_ACCESS_SETTINGS`: Manager+ (excluir Driver, Supervisor)
+- `ROLES_CAN_ACCESS_SETTINGS`: Coordinator, Manager, Director, Admin Master (excluir Fleet Assistant, Fleet Analyst, Supervisor)
 - `ROLES_CAN_EDIT_MAINTENANCE`: Manager+, Fleet Assistant, Workshop (update parcial)
 - `ROLES_CAN_CREATE_WORKSHOP`: Manager+, Fleet Assistant
 - `isWorkshopUser`: Deteta Workshop via `workshopId` em AuthContext — adapta UI (Manutenção apenas, UPDATE parcial)

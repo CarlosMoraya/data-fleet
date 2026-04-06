@@ -87,26 +87,38 @@ test.describe('Admin Master — Auditoria Sistemática', () => {
 
     test('B.3 CRUD Veículos (Acesso Total)', async ({ page }) => {
       await page.goto('/cadastros/veiculos');
-      // Usar getByRole para evitar ambiguidade com "Cadastros" no breadcrumb/sidebar
-      await expect(page.getByRole('heading', { name: 'Vehicles' })).toBeVisible();
-      
+      await expect(page.getByRole('heading', { name: 'Veículos' })).toBeVisible();
+
       const plate = `AUD${Math.floor(Math.random() * 9000) + 1000}`;
-      await page.click('button:has-text("Add Vehicle")');
-      
-      // Preenchimento de campos obrigatórios
-      await page.fill('input[name="licensePlate"]', plate);
-      await page.selectOption('select[name="type"]', 'Cavalo');
-      await page.fill('input[name="brand"]', 'VOLVO');
-      await page.fill('input[name="model"]', 'FH 540');
-      await page.fill('input[name="renavam"]', '12345678901');
-      await page.fill('input[name="chassi"]', '12345678901234567');
-      await page.fill('input[name="year"]', '2024');
-      await page.fill('input[name="color"]', 'Branco');
-      
-      await page.click('button[type="submit"]');
-      
-      // Aguarda tabela atualizar
-      await expect(page.locator('table').getByText(plate)).toBeVisible({ timeout: 20000 });
+      await page.click('button:has-text("Adicionar Veículo")');
+
+      const modal = page.locator('.fixed.inset-0');
+      await expect(modal.locator('h2', { hasText: 'Cadastrar Veículo' })).toBeVisible({ timeout: 10000 });
+
+      // Identificação (sempre obrigatórios)
+      await modal.locator('input[name="licensePlate"]').fill(plate);
+      await modal.locator('select[name="type"]').selectOption('Cavalo');
+      await modal.locator('input[name="brand"]').fill('VOLVO');
+      await modal.locator('input[name="model"]').fill('FH 540');
+      await modal.locator('input[name="year"]').fill('2024');
+      await modal.locator('input[name="color"]').fill('Branco');
+      await modal.locator('input[name="renavam"]').fill('12345678901');
+      await modal.locator('input[name="chassi"]').fill('12345678901234567');
+      await modal.locator('input[name="detranUF"]').fill('SP');
+
+      // Propriedade (campos que costumam ser obrigatórios por padrão)
+      await modal.locator('select[name="acquisition"]').selectOption('Owned');
+      await modal.locator('input[name="owner"]').fill('Frota Admin E2E');
+      await modal.locator('input[name="fipePrice"]').fill('250000');
+      await modal.locator('input[name="tracker"]').fill('Omnilink');
+      await modal.locator('input[name="antt"]').fill('12345678');
+      await modal.locator('input[name="autonomy"]').fill('800');
+
+      await modal.locator('button:has-text("Salvar Veículo")').click();
+
+      // Aguarda modal fechar e tabela atualizar
+      await expect(modal).not.toBeVisible({ timeout: 15000 });
+      await expect(page.locator('table').getByText(plate)).toBeVisible({ timeout: 10000 });
     });
   });
 
@@ -114,8 +126,8 @@ test.describe('Admin Master — Auditoria Sistemática', () => {
     test('C.1 Visualização de Dashboard Global', async ({ page }) => {
       await page.goto('/');
       // Aguarda carregamento de cards de KPI (labels em inglês no Dashboard.tsx atualmente)
-      await expect(page.locator('text=Total Vehicles')).toBeVisible({ timeout: 10000 });
-      await expect(page.locator('text=In Maintenance')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('text=Total de Veículos')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('text=Em Manutenção')).toBeVisible({ timeout: 10000 });
     });
   });
 

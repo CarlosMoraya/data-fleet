@@ -6,6 +6,24 @@ import { Plus, Search, Edit2, Trash2, UserCircle, Truck, Eye } from 'lucide-reac
 import DriverForm from '../components/DriverForm';
 import DriverDetailModal from '../components/DriverDetailModal';
 import { supabase } from '../lib/supabase';
+
+const invokeFn = async (fnName: string, body: object) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Sessão expirada. Faça login novamente.');
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.error ?? json?.message ?? `HTTP ${res.status}`);
+  return json;
+};
 import { driverFromRow, driverToRow, DriverRow } from '../lib/driverMappers';
 import { uploadDriverDocument, deleteDriverDocument } from '../lib/storageHelpers';
 import { driverFieldSettingsFromRow, defaultDriverFieldSettings, DriverFieldSettingsRow } from '../lib/driverFieldSettingsMappers';
@@ -182,9 +200,7 @@ export default function Drivers() {
 
       // Delete associated user account (profile + auth.users)
       if (driver.profileId) {
-        await supabase.functions.invoke('create-user', {
-          body: { action: 'delete', user_id: driver.profileId },
-        });
+        await invokeFn('create-user', { action: 'delete', user_id: driver.profileId });
       }
 
       queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] });

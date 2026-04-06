@@ -12,13 +12,13 @@ test.describe('Analista de Frota (Mariana)', () => {
     test.skip(testInfo.project.name !== 'analyst', 'Teste exclusivo para Analista');
     await page.goto('/');
     await expect(page).toHaveURL('/');
-    await expect(page.locator('text=Total Vehicles')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('text=Total de Veículos')).toBeVisible({ timeout: 15000 });
   });
 
   test('B.1 Gestão de Veículos (Escrita)', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'analyst', 'Teste exclusivo para Analista');
     await page.goto('/cadastros/veiculos');
-    const addBtn = page.getByRole('button', { name: /Add Vehicle|Novo Veículo/i });
+    const addBtn = page.getByRole('button', { name: /Adicionar Veículo|Novo Veículo/i });
     await expect(addBtn).toBeVisible();
   });
 
@@ -38,9 +38,9 @@ test.describe('Assistente de Frota (Pedro)', () => {
   test('A.1 Restrição de Exclusão em Veículos', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'assistant', 'Teste exclusivo para Assistente');
     await page.goto('/cadastros/veiculos');
-    await expect(page.getByRole('heading', { name: 'Vehicles' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Veículos' })).toBeVisible();
     
-    const addBtn = page.getByRole('button', { name: /Add Vehicle|Novo Veículo/i });
+    const addBtn = page.getByRole('button', { name: /Adicionar Veículo|Novo Veículo/i });
     await expect(addBtn).toBeVisible();
 
     const trashBtn = page.locator('button').filter({ has: page.locator('svg.lucide-trash2') });

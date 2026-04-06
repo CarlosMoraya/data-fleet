@@ -7,6 +7,24 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Role } from '../types';
 import { capitalizeWords } from '../lib/inputHelpers';
 
+const invokeFn = async (fnName: string, body: object) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Sessão expirada. Faça login novamente.');
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.error ?? json?.message ?? `HTTP ${res.status}`);
+  return json;
+};
+
 const ROLE_RANK: Record<Role, number> = {
   'Driver': 1,
   'Workshop': 1,
@@ -38,11 +56,10 @@ const ROLE_COLORS: Record<Role, string> = {
   'Admin Master':    'bg-orange-100 text-orange-700',
 };
 
-/** Retorna os papéis que o usuário com `myRole` pode criar.
- *  'Driver' é excluído — motoristas são criados exclusivamente via Cadastros > Motoristas. */
+/** Retorna os papéis que o usuário com `myRole` pode criar. */
 function creatableRoles(myRole: Role): Role[] {
   const myRank = ROLE_RANK[myRole];
-  return ALL_ROLES.filter((r) => ROLE_RANK[r] < myRank && r !== 'Driver');
+  return ALL_ROLES.filter((r) => ROLE_RANK[r] < myRank);
 }
 
 interface UserRow {
@@ -114,13 +131,7 @@ function CreateUserModal({
 
   const createMutation = useMutation({
     mutationFn: async (payload: any) => {
-      const { data, error: fnError } = await supabase.functions.invoke('create-user', {
-        body: payload,
-      });
-      if (fnError) {
-        const msg = typeof data === 'object' && data?.error ? data.error : fnError.message;
-        throw new Error(msg);
-      }
+      const data = await invokeFn('create-user', payload);
 
       if (canManagePermissions && form.budgetLimit) {
         const budgetLimit = parseFloat(form.budgetLimit) || 0;
@@ -546,7 +557,7 @@ export default function Users() {
   });
 
   const visibleUsers = useMemo(
-    () => users.filter((u) => ROLE_RANK[u.role] < myRank && u.id !== user.id && u.role !== 'Driver'),
+    () => users.filter((u) => ROLE_RANK[u.role] < myRank && u.id !== user.id),
     [users, myRank, user.id]
   );
 
@@ -556,11 +567,7 @@ export default function Users() {
 
   const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { data, error } = await supabase.functions.invoke('create-user', {
-        body: { action: 'delete', user_id: userId },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      await invokeFn('create-user', { action: 'delete', user_id: userId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', currentClient?.id] });

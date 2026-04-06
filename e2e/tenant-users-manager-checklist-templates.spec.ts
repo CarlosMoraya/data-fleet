@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 const UID = Date.now().toString().slice(-6);
-const TPL_LEVE = `Inspeção Leve E2E ${UID}`;
+// Nome auto-gerado pelo form: "Checklist {categoria} {contexto}"
+const TPL_LEVE = 'Checklist Leve Rotina';
 const TPL_LIVRE = `Auditoria de Pátio E2E ${UID}`;
 
 test.describe.serial('Módulo de Templates de Checklist (Manager)', () => {
@@ -22,24 +23,18 @@ test.describe.serial('Módulo de Templates de Checklist (Manager)', () => {
     const modal = page.locator('.fixed.inset-0').first();
     await expect(modal.locator('h2', { hasText: 'Novo Template de Checklist' })).toBeVisible({ timeout: 10000 });
 
-    // Step 1: Metadata
-    await modal.locator('input[type="text"]').first().fill(TPL_LEVE);
+    // Passo 1: Metadados — o nome é auto-gerado (Checklist Leve Rotina)
     await modal.locator('input[value="Leve"]').check();
     await modal.locator('textarea').fill('Template de teste para veículos leves');
     await modal.locator('button:has-text("Próximo")').click();
 
-    // Step 2: Action config
-    await expect(modal.locator('text=permitir ações')).toBeVisible({ timeout: 5000 });
-    await modal.locator('button:has-text("Próximo")').click();
+    // Passo 2: Itens — sugestões pré-carregadas para categoria Leve
+    await expect(modal.locator('button:has-text("Adicionar item")')).toBeVisible({ timeout: 10000 });
 
-    // Step 3: Items (should show suggestions pre-loaded)
-    await expect(modal.locator('text=Adicionar item')).toBeVisible({ timeout: 10000 });
+    // Verifica que existe ao menos um item obrigatório do sistema (Lock icon)
+    await expect(modal.locator('[title="Item obrigatório do sistema"]').first()).toBeVisible({ timeout: 5000 });
 
-    // Verify at least one locked (mandatory) item exists
-    const lockIcon = modal.locator('svg').filter({ hasText: '' }).first();
-    await expect(modal.locator('[title="Item obrigatório do sistema"]').first()).toBeVisible();
-
-    // Add a custom item
+    // Adiciona item customizado
     await modal.locator('button:has-text("Adicionar item")').click();
     const inputs = modal.locator('input[placeholder="Título do item *"]');
     await inputs.last().fill('Item customizado E2E');
@@ -47,8 +42,8 @@ test.describe.serial('Módulo de Templates de Checklist (Manager)', () => {
     await modal.locator('button:has-text("Criar template")').click();
     await expect(modal).not.toBeVisible({ timeout: 15000 });
 
-    // Verify in table
-    await expect(page.locator('table').getByText(TPL_LEVE)).toBeVisible({ timeout: 10000 });
+    // Nome auto-gerado: "Checklist Leve Rotina"
+    await expect(page.locator('table').getByText('Checklist Leve Rotina')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('table').getByText('Rascunho').first()).toBeVisible();
   });
 

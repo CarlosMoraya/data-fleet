@@ -4,7 +4,7 @@ test.describe('Módulo de Veículos (Papel: Fleet Analyst - Mariana)', () => {
   
   test.beforeEach(async ({ page }) => { // Analyst (Mariana) já está logada
     await page.goto('/cadastros/veiculos');
-    await expect(page.locator('h1', { hasText: 'Vehicles' })).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 15000 });
   });
 
   test('Analyst pode editar mas não deve ver lixeira (sem o flag)', async ({ page }) => {

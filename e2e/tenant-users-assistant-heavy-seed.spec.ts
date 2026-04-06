@@ -58,14 +58,14 @@ test.describe('Seeding Heavy (Assistant): Cadastro de Veículos', () => {
   test('semeia 6 veículos com anexos como assistant', async ({ page }) => {
     // 1. Acessa a página de veículos
     await page.goto('/cadastros/veiculos');
-    await expect(page.locator('h1', { hasText: 'Vehicles' })).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 15000 });
   });
 
   test('Cadastrar Veículos (Assistant)', async ({ page }) => {
     for (const v of VEHICLES) {
       console.log(`\n--- Cadastrando veículo: ${v.plate} ---`);
       
-      await page.click('button:has-text("Add Vehicle")');
+      await page.click('button:has-text("Adicionar Veículo")');
       const modal = page.locator('.fixed.inset-0').last();
       await expect(modal.locator('h2', { hasText: 'Veículo' })).toBeVisible({ timeout: 10000 });
       await page.waitForTimeout(1000);

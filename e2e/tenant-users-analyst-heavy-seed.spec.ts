@@ -103,7 +103,7 @@ test.describe('Seeding Heavy (Full): Cadastro de Veículos via Analista', () => 
       console.log(`BROWSER [${msg.type()}]: ${msg.text()}`);
     });
     await page.goto('/cadastros/veiculos');
-    await expect(page.locator('h1', { hasText: 'Vehicles' })).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 15000 });
   });
 
   test('Cadastrar Todos os Veículos (Analyst Bypass)', async ({ page }) => {
@@ -117,7 +117,7 @@ test.describe('Seeding Heavy (Full): Cadastro de Veículos via Analista', () => 
         continue;
       }
 
-      await page.click('button:has-text("Add Vehicle")');
+      await page.click('button:has-text("Adicionar Veículo")');
       const modal = page.locator('.fixed.inset-0').last();
       await expect(modal.locator('h2', { hasText: 'Veículo' })).toBeVisible({ timeout: 10000 });
       await page.waitForTimeout(1000);

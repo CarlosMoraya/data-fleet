@@ -106,5 +106,6 @@ export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
     cancelledAt: row.cancelled_at || undefined,
     cancelledById: row.cancelled_by_id || undefined,
     clientName: row.clients?.name || undefined,
+    clientId: row.client_id,
   };
 }

@@ -24,7 +24,7 @@ test.describe('Módulo de Oficinas (Permissões Analyst)', () => {
   });
 
   test('deve permitir adicionar oficina', async ({ page }) => {
-    await expect(page.locator('button:has-text("Adicionar Oficina")')).toBeVisible();
+    await expect(page.locator('button:has-text("Cadastrar Oficina")')).toBeVisible();
   });
 
 });

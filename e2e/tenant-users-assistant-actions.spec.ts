@@ -14,13 +14,17 @@ test.describe.serial('Painel de Plano de Ação (Fleet Assistant)', () => {
   });
 
   test('deve filtrar ações por aba', async ({ page }) => {
+    // Os botões de aba são pills com classe "rounded-full" (summary cards têm "rounded-2xl")
+    const todosTab = page.locator('button.rounded-full:has-text("Todos")');
+    const emAndamentoTab = page.locator('button.rounded-full:has-text("Em Andamento")');
+
     // Click "Todos" tab
-    await page.locator('button:has-text("Todos")').click();
-    await expect(page.locator('button:has-text("Todos")').first()).toHaveClass(/bg-orange-500/);
+    await todosTab.click();
+    await expect(todosTab).toHaveClass(/bg-orange-500/);
 
     // Click "Em Andamento"
-    await page.locator('button:has-text("Em Andamento")').first().click();
-    await expect(page.locator('button:has-text("Em Andamento")').first()).toHaveClass(/bg-orange-500/);
+    await emAndamentoTab.click();
+    await expect(emAndamentoTab).toHaveClass(/bg-orange-500/);
   });
 
   test('deve buscar ações pelo campo de pesquisa', async ({ page }) => {
