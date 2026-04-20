@@ -5,7 +5,7 @@ const TEST_USER_NAME = `E2E Mgr ${UID}`;
 const TEST_USER_EMAIL = `e2e-mgr-${UID}@teste.com`;
 const TEST_USER_PASSWORD = 'Teste@123456';
 
-test.describe('Usuários (Manager — Alexandre)', () => {
+test.describe.serial('Usuários (Manager — Alexandre)', () => {
   test.describe.configure({ timeout: 60000 });
   test('página /users carrega e exibe tabela', async ({ page }) => {
     await page.goto('/cadastros/usuarios');
@@ -36,7 +36,9 @@ test.describe('Usuários (Manager — Alexandre)', () => {
     expect(options).not.toContain('Director');
     expect(options).not.toContain('Admin Master');
 
-    await page.click('button:has-text("Cancelar")');
+    // Recarregar página para garantir estado limpo
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('h1', { hasText: 'Usuários' })).toBeVisible({ timeout: 10000 });
   });
 
   test('cria usuário com papel Fleet Assistant', async ({ page }) => {
@@ -55,7 +57,8 @@ test.describe('Usuários (Manager — Alexandre)', () => {
     await modal.locator('input[type="password"]').fill(TEST_USER_PASSWORD);
     await modal.locator('select').selectOption('Fleet Assistant');
 
-    await modal.locator('button[type="submit"]').click();
+    // Submeter formulário com Enter (botão pode estar fora do viewport)
+    await modal.locator('input[type="password"]').press('Enter');
 
     await expect(modal.locator('h2', { hasText: 'Novo Usuário' })).not.toBeVisible({ timeout: 45000 });
     await expect(page.locator('table').getByText(TEST_USER_NAME)).toBeVisible({ timeout: 8000 });

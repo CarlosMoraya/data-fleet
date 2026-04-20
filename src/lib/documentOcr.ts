@@ -17,10 +17,11 @@ import {
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 // ─────────────────────────────────────────────────────────────
-// Debug logging — ative com localStorage.setItem('ocr_debug','1')
+// Debug logging — ative com VITE_DEBUG_OCR=1 no .env
 // ─────────────────────────────────────────────────────────────
+const DEBUG = import.meta.env.VITE_DEBUG_OCR === '1';
 const ocrDebug = (...args: unknown[]) => {
-  if (localStorage.getItem('ocr_debug') === '1') console.log('[OCR]', ...args);
+  if (DEBUG) console.log('[OCR]', ...args);
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -397,14 +398,16 @@ export async function extractCrlvData(file: File): Promise<ExtractionResult<Vehi
     // Imagens ou PDF com regex insuficiente → IA Vision
     ocrDebug('Chamando IA Vision...');
     const data = await extractCrlvViaIA(file);
+    const { count, missing } = countFields(data, CRLV_FIELDS);
     return {
       data,
-      fieldCount: countFields(data, CRLV_FIELDS).count,
+      fieldCount: count,
       totalFields,
       method: 'gemini', // Mantemos 'gemini' no tipo por agora, mas o motor é dinâmico
-      warnings: countFields(data, CRLV_FIELDS).missing,
+      warnings: missing,
     };
-  } catch (err) { console.error("OCR FALHOU:", err);
+  } catch (err) {
+    console.error("OCR FALHOU:", err);
     return {
       data: {},
       fieldCount: 0,
@@ -451,14 +454,16 @@ export async function extractCnhData(file: File): Promise<ExtractionResult<Drive
     // Imagens ou PDF com regex insuficiente → IA Vision
     ocrDebug('Chamando IA Vision...');
     const data = await extractCnhViaIA(file);
+    const { count, missing } = countFields(data, CNH_FIELDS);
     return {
       data,
-      fieldCount: countFields(data, CNH_FIELDS).count,
+      fieldCount: count,
       totalFields,
       method: 'gemini',
-      warnings: countFields(data, CNH_FIELDS).missing,
+      warnings: missing,
     };
-  } catch (err) { console.error("OCR FALHOU:", err);
+  } catch (err) {
+    console.error("OCR FALHOU:", err);
     return {
       data: {},
       fieldCount: 0,

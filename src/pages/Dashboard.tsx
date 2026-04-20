@@ -6,11 +6,8 @@ import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import OperationalPanel from '../components/dashboard/OperationalPanel';
 import CostPanel from '../components/dashboard/CostPanel';
-import type {
-  VehicleRow,
-  MaintenanceOrderDashboard,
-  DashboardFilters,
-} from '../components/dashboard/OperationalPanel';
+import type { VehicleRow, DashboardFilters } from '../components/dashboard/OperationalPanel';
+import type { MaintenanceOrderDashboard } from '../types/maintenance';
 
 type TabType = 'operacional' | 'custos';
 
@@ -120,8 +117,8 @@ export default function Dashboard() {
             row.vehicles && typeof row.vehicles === 'object' && !Array.isArray(row.vehicles)
               ? (row.vehicles as Record<string, unknown>).type as string | null
               : Array.isArray(row.vehicles) && row.vehicles.length > 0
-              ? (row.vehicles[0] as Record<string, unknown>).type as string | null
-              : null,
+                ? (row.vehicles[0] as Record<string, unknown>).type as string | null
+                : null,
         }));
       },
       enabled: !!user,

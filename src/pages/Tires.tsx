@@ -10,6 +10,7 @@ import { generatePositions, generatePositionsFromConfig } from '../lib/tirePosit
 import TireForm from '../components/TireForm';
 import TireBatchForm from '../components/TireBatchForm';
 import TireHistoryModal from '../components/TireHistoryModal';
+import { saveTire, toggleTireActive, deleteTire } from '../services/tireService';
 
 const ROLES_CAN_VIEW_TIRES = [
   'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager',
@@ -20,9 +21,9 @@ const ROLES_CAN_DELETE_TIRES = ['Admin Master'];
 
 function classificationBadge(classification: Tire['visualClassification']) {
   switch (classification) {
-    case 'Novo':      return 'bg-emerald-100 text-emerald-800';
+    case 'Novo': return 'bg-emerald-100 text-emerald-800';
     case 'Meia vida': return 'bg-yellow-100 text-yellow-800';
-    case 'Troca':     return 'bg-red-100 text-red-800';
+    case 'Troca': return 'bg-red-100 text-red-800';
   }
 }
 
@@ -311,15 +312,30 @@ export default function Tires() {
   const [selectedVehicle, setSelectedVehicle] = React.useState<{
     id: string; licensePlate: string; model: string; type: string; eixos?: number;
     axleConfig?: AxleConfigEntry[]; stepsCount?: number;
-  } | null>(null);
-  const [tireFormOpen, setTireFormOpen] = React.useState(false);
-  const [editingTire, setEditingTire] = React.useState<Tire | null>(null);
+  } | null>(() => {
+    const saved = sessionStorage.getItem('tireFormVehicle');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [tireFormOpen, setTireFormOpen] = React.useState<boolean>(() =>
+    sessionStorage.getItem('tireFormOpen') === 'true'
+  );
+  const [editingTire, setEditingTire] = React.useState<Tire | null>(() => {
+    const saved = sessionStorage.getItem('tireFormEditing');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [batchFormOpen, setBatchFormOpen] = React.useState(false);
   const [historyTire, setHistoryTire] = React.useState<Tire | null>(null);
   const [toggleTire, setToggleTire] = React.useState<Tire | null>(null);
   const [tireToDelete, setTireToDelete] = React.useState<Tire | null>(null);
   const [fullVehicleAlert, setFullVehicleAlert] = React.useState<string | null>(null);
   const [reactivateBlockedTire, setReactivateBlockedTire] = React.useState<Tire | null>(null);
+
+  // Sincronizar estado do formulário de pneu com sessionStorage
+  React.useEffect(() => {
+    sessionStorage.setItem('tireFormOpen', String(tireFormOpen));
+    sessionStorage.setItem('tireFormEditing', JSON.stringify(editingTire));
+    sessionStorage.setItem('tireFormVehicle', JSON.stringify(selectedVehicle));
+  }, [tireFormOpen, editingTire, selectedVehicle]);
 
   // ── Queries ──────────────────────────────────────────────────────────────
   const { data: tires = [], isLoading: tiresLoading } = useQuery({
@@ -372,11 +388,8 @@ export default function Tires() {
   // ── Toggle ativo ──────────────────────────────────────────────────────────
   const toggleMutation = useMutation({
     mutationFn: async (tire: Tire) => {
-      const { error } = await supabase
-        .from('tires')
-        .update({ active: !tire.active, updated_by: profile?.id ?? null })
-        .eq('id', tire.id);
-      if (error) throw error;
+      if (!profile) throw new Error('Sessão inválida');
+      await toggleTireActive({ tire, profileId: profile.id });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tires', currentClient?.id] });
@@ -387,8 +400,7 @@ export default function Tires() {
   // ── Excluir pneu ──────────────────────────────────────────────────────────
   const deleteMutation = useMutation({
     mutationFn: async (tire: Tire) => {
-      const { error } = await supabase.from('tires').delete().eq('id', tire.id);
-      if (error) throw error;
+      await deleteTire(tire.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tires', currentClient?.id] });
@@ -408,105 +420,22 @@ export default function Tires() {
       odometerKm?: number;
     }) => {
       if (!currentClient || !profile) throw new Error('Sessão inválida');
-
-      if (Array.isArray(tireData)) {
-        // Inserção em lote (modo "todos os pneus")
-        const rows = tireData.map(t => ({
-          client_id: currentClient.id,
-          vehicle_id: t.vehicleId,
-          tire_code: t.tireCode,
-          specification: t.specification,
-          dot: t.dot ?? null,
-          fire_marking: t.fireMarking ?? null,
-          manufacturer: t.manufacturer ?? null,
-          brand: t.brand ?? null,
-          rotation_interval_km: t.rotationIntervalKm ?? null,
-          useful_life_km: t.usefulLifeKm ?? null,
-          retread_interval_km: t.retreadIntervalKm ?? null,
-          visual_classification: t.visualClassification,
-          current_position: t.currentPosition,
-          last_position: null,
-          position_type: t.positionType,
-          active: true,
-          created_by: profile.id,
-        }));
-
-        const { data: inserted, error } = await supabase
-          .from('tires')
-          .insert(rows)
-          .select('id, vehicle_id, current_position');
-        if (error) throw error;
-
-        if (inserted && inserted.length > 0) {
-          const historyRows = (inserted as any[]).map(t => ({
-            client_id: currentClient.id,
-            tire_id: t.id,
-            vehicle_id: t.vehicle_id,
-            previous_position: null,
-            new_position: t.current_position,
-            moved_by: profile.id,
-            moved_at: new Date().toISOString(),
-            odometer_km: odometerKm ?? null,
-          }));
-          for (let i = 0; i < historyRows.length; i += 100) {
-            await supabase.from('tire_position_history').insert(historyRows.slice(i, i + 100));
-          }
-        }
-        return;
-      }
-
-      // Inserção/atualização individual
-      const payload: any = {
-        client_id: currentClient.id,
-        vehicle_id: tireData.vehicleId,
-        tire_code: tireData.tireCode,
-        specification: tireData.specification,
-        dot: tireData.dot ?? null,
-        fire_marking: tireData.fireMarking ?? null,
-        manufacturer: tireData.manufacturer ?? null,
-        brand: tireData.brand ?? null,
-        rotation_interval_km: tireData.rotationIntervalKm ?? null,
-        useful_life_km: tireData.usefulLifeKm ?? null,
-        retread_interval_km: tireData.retreadIntervalKm ?? null,
-        visual_classification: tireData.visualClassification,
-        current_position: tireData.currentPosition,
-        last_position: tireData.lastPosition ?? null,
-        position_type: tireData.positionType,
-        active: tireData.active ?? true,
-      };
-
-      let tireId = tireData.id;
-
-      if (tireId) {
-        payload.updated_by = profile.id;
-        const { error } = await supabase.from('tires').update(payload).eq('id', tireId);
-        if (error) throw error;
-      } else {
-        payload.created_by = profile.id;
-        const { data, error } = await supabase.from('tires').insert(payload).select('id').single();
-        if (error) throw error;
-        tireId = data.id;
-      }
-
-      const positionChanged = !tireData.id || previousPosition !== tireData.currentPosition;
-      if (positionChanged && tireId && tireData.currentPosition) {
-        await supabase.from('tire_position_history').insert({
-          client_id: currentClient.id,
-          tire_id: tireId,
-          vehicle_id: tireData.vehicleId,
-          previous_position: previousPosition ?? null,
-          new_position: tireData.currentPosition,
-          moved_by: profile.id,
-          moved_at: new Date().toISOString(),
-          odometer_km: odometerKm ?? null,
-        });
-      }
+      return saveTire({
+        tireData,
+        profileId: profile.id,
+        currentClientId: currentClient.id,
+        previousPosition,
+        odometerKm,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tires', currentClient?.id] });
       setTireFormOpen(false);
       setEditingTire(null);
       setSelectedVehicle(null);
+      sessionStorage.removeItem('tireFormOpen');
+      sessionStorage.removeItem('tireFormEditing');
+      sessionStorage.removeItem('tireFormVehicle');
     },
   });
 
@@ -771,7 +700,14 @@ export default function Tires() {
           onSave={async (tireData: Partial<Tire> | Partial<Tire>[], previousPosition?: string, odometerKm?: number) => {
             await saveMutation.mutateAsync({ tireData, previousPosition, odometerKm });
           }}
-          onClose={() => { setTireFormOpen(false); setEditingTire(null); setSelectedVehicle(null); }}
+          onClose={() => {
+            setTireFormOpen(false);
+            setEditingTire(null);
+            setSelectedVehicle(null);
+            sessionStorage.removeItem('tireFormOpen');
+            sessionStorage.removeItem('tireFormEditing');
+            sessionStorage.removeItem('tireFormVehicle');
+          }}
           isSaving={saveMutation.isPending}
           saveError={saveMutation.error instanceof Error ? saveMutation.error.message : undefined}
         />

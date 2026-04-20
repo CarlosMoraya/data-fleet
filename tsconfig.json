@@ -22,8 +22,17 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "types": ["vite/client"]
+    "types": [
+      "vite/client",
+      "vitest/globals"
+    ]
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", "supabase/functions"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "supabase/functions"
+  ]
 }

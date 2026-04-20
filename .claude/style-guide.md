@@ -40,6 +40,41 @@
 4. Submit handler: operação CRUD + fecha modal
 5. **Atenção**: aguardar 300ms antes de preencher em testes (race condition do useEffect)
 
+### Persistência de Estado de Formulário (2026-04-12)
+
+**Padrão no nível da página (CRUD):**
+- Página persiste `isFormOpen` + `editingItem` em `sessionStorage` para que ao navegar e voltar, o formulário reabre
+- Sincroniza automaticamente via `useEffect` quando esses estados mudam
+- Limpa `sessionStorage` ao fechar ou salvar (não persiste entre sessões)
+
+**Padrão no componente do formulário:**
+- Formulário persiste seu estado interno (`formData`) em `sessionStorage` independentemente
+- Inicializa do `sessionStorage` na montagem (usuário pode navegar sem perder dados preenchidos)
+- Limpa ao salvar/cancelar
+
+**Exemplo (página):**
+```tsx
+const [isFormOpen, setIsFormOpen] = useState<boolean>(() =>
+  sessionStorage.getItem('vehicleFormOpen') === 'true'
+);
+const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(() => {
+  const saved = sessionStorage.getItem('vehicleFormEditing');
+  return saved ? JSON.parse(saved) : null;
+});
+useEffect(() => {
+  sessionStorage.setItem('vehicleFormOpen', String(isFormOpen));
+  sessionStorage.setItem('vehicleFormEditing', JSON.stringify(editingVehicle));
+}, [isFormOpen, editingVehicle]);
+```
+
+**Segurança:**
+- `sessionStorage` é destruído ao fechar a aba ou fazer logout
+- Nunca persistir dados sensíveis a localStorage
+- Dados de negócio (formulários CRUD) são seguros em sessionStorage porque:
+  - Não sobrevivem ao reload automático do browser
+  - Não sobrevivem ao logout
+  - Dispositivos compartilhados (comum em frotas) não veem dados de outras sessões
+
 ## Padrão Multi-Tenancy
 
 - Toda entidade carrega `clientId` (frontend) / `client_id` (banco)

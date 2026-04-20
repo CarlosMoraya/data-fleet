@@ -1,29 +1,12 @@
-import { MaintenanceOrder, MaintenanceStatus, MaintenanceType } from '../pages/Maintenance';
+import {
+  MaintenanceOrder,
+  BudgetItem,
+  MaintenanceOrderRow,
+  MaintenanceBudgetItemRow,
+} from '../types/maintenance';
 
-export type BudgetStatus = 'sem_orcamento' | 'pendente' | 'aprovado' | 'reprovado';
-
-export interface BudgetItem {
-  id?: string;
-  maintenanceOrderId?: string;
-  clientId?: string;
-  itemName: string;
-  system: string;
-  quantity: number;
-  value: number;
-  sortOrder: number;
-}
-
-export interface MaintenanceBudgetItemRow {
-  id: string;
-  maintenance_order_id: string;
-  client_id: string;
-  item_name: string;
-  system: string | null;
-  quantity: number;
-  value: number;
-  sort_order: number;
-  created_at: string;
-}
+// Re-export para compatibilidade com código que importa daqui
+export type { BudgetItem, MaintenanceBudgetItemRow, MaintenanceOrderRow };
 
 export function budgetItemFromRow(row: MaintenanceBudgetItemRow): BudgetItem {
   return {
@@ -40,42 +23,6 @@ export function budgetItemFromRow(row: MaintenanceBudgetItemRow): BudgetItem {
 
 export function calcBudgetSubtotal(items: BudgetItem[]): number {
   return items.reduce((sum, i) => sum + i.quantity * i.value, 0);
-}
-
-export interface MaintenanceOrderRow {
-  id: string;
-  client_id: string;
-  vehicle_id: string;
-  workshop_id: string;
-  os_number: string;
-  entry_date: string;
-  expected_exit_date: string | null;
-  actual_exit_date: string | null;
-  type: MaintenanceType;
-  status: MaintenanceStatus;
-  description: string | null;
-  mechanic_name: string | null;
-  estimated_cost: number;
-  approved_cost: number | null;
-  created_by_id: string;
-  notes: string | null;
-  workshop_os_number: string | null;
-  current_km: number | null;
-  budget_pdf_url: string | null;
-  budget_status: BudgetStatus | null;
-  budget_reviewed_by: string | null;
-  budget_reviewed_at: string | null;
-  cancelled_at: string | null;
-  cancelled_by_id: string | null;
-  created_at: string;
-  updated_at: string;
-
-  // Joins
-  vehicles?: { license_plate: string };
-  workshops?: { name: string };
-  profiles?: { name: string };
-  budget_reviewer?: { name: string };
-  clients?: { name: string };
 }
 
 export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {

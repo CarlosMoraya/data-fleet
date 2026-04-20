@@ -17,8 +17,10 @@ async function prepareFile(file: File): Promise<File> {
     const img = new Image();
     const url = URL.createObjectURL(file);
 
+    const cleanup = () => URL.revokeObjectURL(url);
+
     img.onload = () => {
-      URL.revokeObjectURL(url);
+      cleanup();
 
       // Target max dimension of 1920px, maintaining aspect ratio
       const MAX_DIMENSION = 1920;
@@ -46,9 +48,11 @@ async function prepareFile(file: File): Promise<File> {
       canvas.toBlob(
         (blob) => {
           if (!blob) {
+            cleanup(); // cleanup on toBlob failure
             resolve(file); // fallback
             return;
           }
+          cleanup(); // cleanup on toBlob success
           resolve(new File([blob], file.name, { type: 'image/jpeg' }));
         },
         'image/jpeg',

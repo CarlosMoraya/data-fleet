@@ -33,8 +33,19 @@ export default function ChecklistTemplates() {
   const [filterCategory, setFilterCategory] = useState<TemplateCategory | 'Todos'>('Todos');
   const [filterContext, setFilterContext] = useState<ChecklistContext | 'Todos'>('Todos');
 
-  const [showForm, setShowForm] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<ChecklistTemplate | null>(null);
+  const [showForm, setShowForm] = useState<boolean>(() =>
+    sessionStorage.getItem('checklistTemplateFormOpen') === 'true'
+  );
+  const [editingTemplate, setEditingTemplate] = useState<ChecklistTemplate | null>(() => {
+    const saved = sessionStorage.getItem('checklistTemplateFormEditing');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  // Sincronizar estado do formulário com sessionStorage
+  React.useEffect(() => {
+    sessionStorage.setItem('checklistTemplateFormOpen', String(showForm));
+    sessionStorage.setItem('checklistTemplateFormEditing', JSON.stringify(editingTemplate));
+  }, [showForm, editingTemplate]);
 
   const [confirmAction, setConfirmAction] = useState<{
     type: 'publish' | 'deprecate' | 'delete' | 'new-version';
@@ -345,8 +356,19 @@ export default function ChecklistTemplates() {
       {showForm && (
         <ChecklistTemplateForm
           template={editingTemplate}
-          onClose={() => setShowForm(false)}
-          onSaved={() => { setShowForm(false); queryClient.invalidateQueries({ queryKey: ['checklistTemplates', currentClient?.id] }); }}
+          onClose={() => {
+            setShowForm(false);
+            setEditingTemplate(null);
+            sessionStorage.removeItem('checklistTemplateFormOpen');
+            sessionStorage.removeItem('checklistTemplateFormEditing');
+          }}
+          onSaved={() => {
+            setShowForm(false);
+            setEditingTemplate(null);
+            sessionStorage.removeItem('checklistTemplateFormOpen');
+            sessionStorage.removeItem('checklistTemplateFormEditing');
+            queryClient.invalidateQueries({ queryKey: ['checklistTemplates', currentClient?.id] });
+          }}
         />
       )}
 

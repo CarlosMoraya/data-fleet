@@ -86,32 +86,6 @@ export function tireFromRow(row: TireRow): Tire {
   };
 }
 
-export function tireToRow(
-  tire: Partial<Tire>,
-  clientId: string,
-): Omit<TireRow, 'id' | 'vehicles' | 'created_at' | 'updated_at'> {
-  return {
-    client_id: clientId,
-    vehicle_id: tire.vehicleId ?? '',
-    tire_code: tire.tireCode ?? '',
-    specification: tire.specification ?? '',
-    dot: tire.dot ?? null,
-    fire_marking: tire.fireMarking ?? null,
-    manufacturer: tire.manufacturer ?? null,
-    brand: tire.brand ?? null,
-    rotation_interval_km: tire.rotationIntervalKm ?? null,
-    useful_life_km: tire.usefulLifeKm ?? null,
-    retread_interval_km: tire.retreadIntervalKm ?? null,
-    visual_classification: tire.visualClassification ?? 'Novo',
-    current_position: tire.currentPosition ?? '',
-    last_position: tire.lastPosition ?? null,
-    position_type: tire.positionType ?? 'single',
-    active: tire.active ?? true,
-    created_by: tire.createdBy ?? null,
-    updated_by: tire.updatedBy ?? null,
-  };
-}
-
 export function tireHistoryFromRow(row: TirePositionHistoryRow): TirePositionHistory {
   return {
     id: row.id,

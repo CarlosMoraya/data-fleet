@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Wrench, Loader2, FileText, ExternalLink, AlertTriangle } from 'lucide-react';
-import { MaintenanceOrder, MaintenanceStatus, MaintenanceType } from '../pages/Maintenance';
+import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType } from '../types/maintenance';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import type { BudgetItem } from '../lib/maintenanceMappers';
@@ -67,11 +67,11 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
     const initial = order
       ? { ...order }
       : {
-          type: 'Preventiva' as MaintenanceType,
-          status: 'Aguardando orçamento' as MaintenanceStatus,
-          estimatedCost: 0,
-          ...prefill,
-        };
+        type: 'Preventiva' as MaintenanceType,
+        status: 'Aguardando orçamento' as MaintenanceStatus,
+        estimatedCost: 0,
+        ...prefill,
+      };
     setFormData(initial);
     sessionStorage.setItem('maintenanceFormData', JSON.stringify(initial));
   }, [order, prefill]);

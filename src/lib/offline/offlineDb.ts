@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { ChecklistContext, ResponseStatus } from '../../types';
+import type { TireInspectionResponseStatus } from '../../types/tireInspection';
 
 // ─── Sync operation types ─────────────────────────────────────────────────────
 
@@ -27,6 +28,30 @@ export type SyncOperation =
       templateContext: ChecklistContext | null;
       workshopId?: string;
       vehicleId?: string;
+    }
+  | {
+      type: 'save_tire_response';
+      positionCode: string;
+      tireId?: string;
+      dot?: string;
+      fireMarking?: string;
+      manufacturer: string;
+      brand: string;
+      photoUrl: string;
+      pendingPhotoKey?: string;
+      photoTimestamp: string;
+      status: TireInspectionResponseStatus;
+      observation?: string;
+      respondedAt: string;
+    }
+  | {
+      type: 'confirm_tire_km';
+      odometerKm: number;
+    }
+  | {
+      type: 'finish_tire_inspection';
+      completedAt: string;
+      vehicleId: string;
     };
 
 // ─── Table row types ──────────────────────────────────────────────────────────
@@ -34,7 +59,10 @@ export type SyncOperation =
 export interface SyncQueueEntry {
   id?: number;
   createdAt: number;
+  /** ID do checklist regular. Para operações de inspeção de pneus, use inspectionId. */
   checklistId: string;
+  /** ID da inspeção de pneus. Preenchido apenas para operações save_tire_response, confirm_tire_km e finish_tire_inspection. */
+  inspectionId?: string;
   op: SyncOperation;
   status: 'pending' | 'syncing' | 'error';
   errorMessage?: string;
@@ -60,6 +88,11 @@ class OfflineDb extends Dexie {
     super('betafleet-offline-v1');
     this.version(1).stores({
       syncQueue: '++id, checklistId, status, createdAt',
+      photoBlobs: 'key, checklistId',
+    });
+    // v2: adiciona índice em inspectionId (campo opcional, sem migration de dados)
+    this.version(2).stores({
+      syncQueue: '++id, checklistId, inspectionId, status, createdAt',
       photoBlobs: 'key, checklistId',
     });
   }

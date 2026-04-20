@@ -7,6 +7,7 @@ import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
 import { checklistItemFromRow, type ChecklistItemRow } from '../lib/checklistTemplateMappers';
 import { uploadChecklistPhoto } from '../lib/checklistStorageHelpers';
 import { enqueueOperation, enqueuePhoto } from '../lib/offline/syncService';
+import { autoCompleteWorkshopSchedule } from '../lib/workshopScheduleUtils';
 import CameraCapture from '../components/CameraCapture';
 import OfflineBanner from '../components/OfflineBanner';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -298,26 +299,12 @@ export default function ChecklistFill() {
 
       // Auto-concluir agendamento de oficina
       if (templateContext === 'Entrada em Oficina' && checklist.workshopId && checklist.vehicleId) {
-        const { data: matchingSchedule } = await supabase
-          .from('workshop_schedules')
-          .select('id')
-          .eq('vehicle_id', checklist.vehicleId)
-          .eq('workshop_id', checklist.workshopId)
-          .eq('status', 'scheduled')
-          .order('scheduled_date', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-
-        if (matchingSchedule) {
-          await supabase
-            .from('workshop_schedules')
-            .update({
-              status: 'completed',
-              completed_at: completedAt,
-              checklist_id: checklistId,
-            })
-            .eq('id', matchingSchedule.id);
-        }
+        await autoCompleteWorkshopSchedule(
+          checklist.vehicleId,
+          checklist.workshopId,
+          completedAt,
+          checklistId,
+        );
       }
     },
     onSuccess: () => {
@@ -466,201 +453,201 @@ export default function ChecklistFill() {
       {/* Scrollable content area */}
       <div className="flex-1 overflow-y-auto">
 
-      <OfflineBanner isOnline={isOnline} pendingCount={pendingCount} />
+        <OfflineBanner isOnline={isOnline} pendingCount={pendingCount} />
 
-      {/* Workshop selector (for Entrada/Saída de Oficina) */}
-      {needsWorkshop && (
-        <div className="px-4 py-4 max-w-2xl mx-auto w-full">
-          <div className={cn(
-            'rounded-2xl border p-4 space-y-3',
-            workshopSaved ? 'bg-green-50 border-green-200' : 'bg-white border-orange-200',
-          )}>
-            <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-orange-500 flex-shrink-0" />
-              <p className="text-sm font-semibold text-zinc-800">
-                {workshopSaved ? `Oficina: ${workshops.find(w => w.id === selectedWorkshopId)?.name ?? checklist?.workshopName ?? '—'}` : 'Selecione a oficina'}
-              </p>
-            </div>
-            {!workshopSaved && (
-              <>
-                <select
-                  value={selectedWorkshopId}
-                  onChange={e => setSelectedWorkshopId(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-                >
-                  <option value="">— Selecione uma oficina —</option>
-                  {workshops.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
-                <button
-                  disabled={!selectedWorkshopId}
-                  onClick={() => confirmWorkshopMutation.mutate(selectedWorkshopId)}
-                  className="w-full py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 disabled:opacity-40"
-                >
-                  Confirmar oficina
-                </button>
-                <p className="text-xs text-zinc-500 text-center">Selecione a oficina para liberar os itens do checklist</p>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Odometer KM */}
-      {workshopReady && (
-        <div className="px-4 py-4 max-w-2xl mx-auto w-full">
-          <div className={cn(
-            'rounded-2xl border p-4 space-y-3',
-            kmConfirmed ? 'bg-green-50 border-green-200' : 'bg-white border-orange-200',
-          )}>
-            <div className="flex items-center gap-2">
-              <Gauge className="h-4 w-4 text-orange-500 flex-shrink-0" />
-              <p className="text-sm font-semibold text-zinc-800">
-                {kmConfirmed
-                  ? `Hodômetro: ${parseInt(kmInput).toLocaleString('pt-BR')} km`
-                  : 'Informe o hodômetro'}
-              </p>
-            </div>
-            {referenceKm !== null && (
-              <p className="text-xs text-zinc-500">
-                Último Km registrado: {referenceKm.toLocaleString('pt-BR')} km
-              </p>
-            )}
-            {!kmConfirmed && (
-              <>
-                {kmError && <p className="text-xs text-red-600">{kmError}</p>}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={kmInput}
-                    onChange={e => setKmInput(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Ex: 45000"
-                    className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-                  />
-                  <span className="text-sm text-zinc-500 flex-shrink-0">km</span>
-                </div>
-                <button
-                  disabled={confirmKmMutation.isPending}
-                  onClick={handleConfirmKm}
-                  className="w-full py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 disabled:opacity-40 flex items-center justify-center gap-2"
-                >
-                  {confirmKmMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Confirmar hodômetro
-                </button>
-                <p className="text-xs text-zinc-500 text-center">Informe o hodômetro para liberar os itens do checklist</p>
-              </>
-            )}
-            {kmConfirmed && (
-              <button onClick={() => setKmConfirmed(false)} className="text-xs text-orange-500 hover:underline">
-                Alterar
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Items */}
-      {canShowItems && (
-        <div className="flex-1 px-4 py-4 max-w-2xl mx-auto w-full space-y-3">
-          {itemStates.map((s, idx) => (
-            <div
-              key={s.item.id}
-              className={cn(
-                'bg-white rounded-2xl border p-4 space-y-3 transition-colors',
-                s.status === 'ok' && 'border-green-300 bg-green-50/30',
-                s.status === 'issue' && 'border-red-300 bg-red-50/30',
-                s.status === 'not_applicable' && 'border-zinc-300 bg-zinc-50/30',
-                !s.status && 'border-zinc-200',
+        {/* Workshop selector (for Entrada/Saída de Oficina) */}
+        {needsWorkshop && (
+          <div className="px-4 py-4 max-w-2xl mx-auto w-full">
+            <div className={cn(
+              'rounded-2xl border p-4 space-y-3',
+              workshopSaved ? 'bg-green-50 border-green-200' : 'bg-white border-orange-200',
+            )}>
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                <p className="text-sm font-semibold text-zinc-800">
+                  {workshopSaved ? `Oficina: ${workshops.find(w => w.id === selectedWorkshopId)?.name ?? checklist?.workshopName ?? '—'}` : 'Selecione a oficina'}
+                </p>
+              </div>
+              {!workshopSaved && (
+                <>
+                  <select
+                    value={selectedWorkshopId}
+                    onChange={e => setSelectedWorkshopId(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  >
+                    <option value="">— Selecione uma oficina —</option>
+                    {workshops.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                  </select>
+                  <button
+                    disabled={!selectedWorkshopId}
+                    onClick={() => confirmWorkshopMutation.mutate(selectedWorkshopId)}
+                    className="w-full py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 disabled:opacity-40"
+                  >
+                    Confirmar oficina
+                  </button>
+                  <p className="text-xs text-zinc-500 text-center">Selecione a oficina para liberar os itens do checklist</p>
+                </>
               )}
-            >
-              <div className="flex items-start gap-2">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-zinc-900">
-                    {idx + 1}. {s.item.title}
-                    {s.item.isMandatory && (
-                      <Lock className="inline ml-1 h-3 w-3 text-zinc-400" title="Obrigatório" />
+            </div>
+          </div>
+        )}
+
+        {/* Odometer KM */}
+        {workshopReady && (
+          <div className="px-4 py-4 max-w-2xl mx-auto w-full">
+            <div className={cn(
+              'rounded-2xl border p-4 space-y-3',
+              kmConfirmed ? 'bg-green-50 border-green-200' : 'bg-white border-orange-200',
+            )}>
+              <div className="flex items-center gap-2">
+                <Gauge className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                <p className="text-sm font-semibold text-zinc-800">
+                  {kmConfirmed
+                    ? `Hodômetro: ${parseInt(kmInput).toLocaleString('pt-BR')} km`
+                    : 'Informe o hodômetro'}
+                </p>
+              </div>
+              {referenceKm !== null && (
+                <p className="text-xs text-zinc-500">
+                  Último Km registrado: {referenceKm.toLocaleString('pt-BR')} km
+                </p>
+              )}
+              {!kmConfirmed && (
+                <>
+                  {kmError && <p className="text-xs text-red-600">{kmError}</p>}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={kmInput}
+                      onChange={e => setKmInput(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Ex: 45000"
+                      className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    />
+                    <span className="text-sm text-zinc-500 flex-shrink-0">km</span>
+                  </div>
+                  <button
+                    disabled={confirmKmMutation.isPending}
+                    onClick={handleConfirmKm}
+                    className="w-full py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 disabled:opacity-40 flex items-center justify-center gap-2"
+                  >
+                    {confirmKmMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Confirmar hodômetro
+                  </button>
+                  <p className="text-xs text-zinc-500 text-center">Informe o hodômetro para liberar os itens do checklist</p>
+                </>
+              )}
+              {kmConfirmed && (
+                <button onClick={() => setKmConfirmed(false)} className="text-xs text-orange-500 hover:underline">
+                  Alterar
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Items */}
+        {canShowItems && (
+          <div className="flex-1 px-4 py-4 max-w-2xl mx-auto w-full space-y-3">
+            {itemStates.map((s, idx) => (
+              <div
+                key={s.item.id}
+                className={cn(
+                  'bg-white rounded-2xl border p-4 space-y-3 transition-colors',
+                  s.status === 'ok' && 'border-green-300 bg-green-50/30',
+                  s.status === 'issue' && 'border-red-300 bg-red-50/30',
+                  s.status === 'not_applicable' && 'border-zinc-300 bg-zinc-50/30',
+                  !s.status && 'border-zinc-200',
+                )}
+              >
+                <div className="flex items-start gap-2">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-zinc-900">
+                      {idx + 1}. {s.item.title}
+                      {s.item.isMandatory && (
+                        <Lock className="inline ml-1 h-3 w-3 text-zinc-400" title="Obrigatório" />
+                      )}
+                      {s.item.canBlockVehicle && (
+                        <span className="inline ml-1.5 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium">⚠ Bloqueio</span>
+                      )}
+                    </p>
+                    {s.item.description && (
+                      <p className="text-xs text-zinc-500 mt-0.5">{s.item.description}</p>
                     )}
                     {s.item.canBlockVehicle && (
-                      <span className="inline ml-1.5 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium">⚠ Bloqueio</span>
+                      <p className="text-xs text-red-500 mt-0.5">Este item pode bloquear o veículo se reprovado</p>
                     )}
-                  </p>
-                  {s.item.description && (
-                    <p className="text-xs text-zinc-500 mt-0.5">{s.item.description}</p>
-                  )}
-                  {s.item.canBlockVehicle && (
-                    <p className="text-xs text-red-500 mt-0.5">Este item pode bloquear o veículo se reprovado</p>
-                  )}
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex gap-2">
-                {(
-                  [
-                    { val: 'ok', label: 'OK', Icon: CheckCircle, active: 'bg-green-500 text-white border-green-500', inactive: 'border-zinc-200 text-zinc-500 hover:border-green-400 hover:text-green-600' },
-                    { val: 'issue', label: 'Problema', Icon: XCircle, active: 'bg-red-500 text-white border-red-500', inactive: 'border-zinc-200 text-zinc-500 hover:border-red-400 hover:text-red-600' },
-                    { val: 'not_applicable', label: 'N/A', Icon: MinusCircle, active: 'bg-zinc-400 text-white border-zinc-400', inactive: 'border-zinc-200 text-zinc-400 hover:border-zinc-400' },
-                  ] as const
-                ).map(({ val, label, Icon, active, inactive }) => (
-                  <button
-                    key={val}
-                    onClick={() => handleStatusChange(idx, val)}
-                    className={cn(
-                      'flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium flex-1 justify-center min-h-[44px] transition-colors',
-                      s.status === val ? active : inactive,
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="hidden sm:inline">{label}</span>
-                  </button>
-                ))}
-              </div>
-
-              {s.status === 'issue' && (
-                <div className="space-y-2">
-                  <textarea
-                    value={s.observation}
-                    onChange={e => updateItemLocal(s.item.id, { observation: e.target.value })}
-                    onBlur={() => handleObservationBlur(idx)}
-                    placeholder="Descreva o problema observado..."
-                    rows={2}
-                    className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
-                  />
-
-                  {s.item.canBlockVehicle && (
-                    <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
-                      <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
-                      <p className="text-xs text-red-700">Item crítico de segurança — será registrado para alerta de bloqueio</p>
-                    </div>
-                  )}
-
-                  {s.photoUrl ? (
-                    <div className="flex items-center gap-2">
-                      <img src={s.photoUrl} alt="foto" className="h-16 w-16 rounded-lg object-cover" />
-                      <button onClick={() => setCameraItemIdx(idx)} className="text-xs text-orange-500 hover:underline">Refazer foto</button>
-                      {s.item.requirePhotoIfIssue && (
-                        <span className="text-xs text-green-600 font-medium">✓ Foto registrada</span>
-                      )}
-                    </div>
-                  ) : (
+                <div className="flex gap-2">
+                  {(
+                    [
+                      { val: 'ok', label: 'OK', Icon: CheckCircle, active: 'bg-green-500 text-white border-green-500', inactive: 'border-zinc-200 text-zinc-500 hover:border-green-400 hover:text-green-600' },
+                      { val: 'issue', label: 'Problema', Icon: XCircle, active: 'bg-red-500 text-white border-red-500', inactive: 'border-zinc-200 text-zinc-500 hover:border-red-400 hover:text-red-600' },
+                      { val: 'not_applicable', label: 'N/A', Icon: MinusCircle, active: 'bg-zinc-400 text-white border-zinc-400', inactive: 'border-zinc-200 text-zinc-400 hover:border-zinc-400' },
+                    ] as const
+                  ).map(({ val, label, Icon, active, inactive }) => (
                     <button
-                      onClick={() => setCameraItemIdx(idx)}
+                      key={val}
+                      onClick={() => handleStatusChange(idx, val)}
                       className={cn(
-                        'flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-colors',
-                        s.item.requirePhotoIfIssue
-                          ? 'border-red-400 text-red-600 bg-red-50 hover:bg-red-100'
-                          : 'border-zinc-300 text-zinc-600 hover:bg-zinc-50',
+                        'flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium flex-1 justify-center min-h-[44px] transition-colors',
+                        s.status === val ? active : inactive,
                       )}
                     >
-                      {s.uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                      {s.item.requirePhotoIfIssue ? 'Foto obrigatória' : 'Tirar foto'}
+                      <Icon className="h-4 w-4" />
+                      <span className="hidden sm:inline">{label}</span>
                     </button>
-                  )}
+                  ))}
                 </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+
+                {s.status === 'issue' && (
+                  <div className="space-y-2">
+                    <textarea
+                      value={s.observation}
+                      onChange={e => updateItemLocal(s.item.id, { observation: e.target.value })}
+                      onBlur={() => handleObservationBlur(idx)}
+                      placeholder="Descreva o problema observado..."
+                      rows={2}
+                      className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                    />
+
+                    {s.item.canBlockVehicle && (
+                      <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
+                        <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                        <p className="text-xs text-red-700">Item crítico de segurança — será registrado para alerta de bloqueio</p>
+                      </div>
+                    )}
+
+                    {s.photoUrl ? (
+                      <div className="flex items-center gap-2">
+                        <img src={s.photoUrl} alt="foto" className="h-16 w-16 rounded-lg object-cover" />
+                        <button onClick={() => setCameraItemIdx(idx)} className="text-xs text-orange-500 hover:underline">Refazer foto</button>
+                        {s.item.requirePhotoIfIssue && (
+                          <span className="text-xs text-green-600 font-medium">✓ Foto registrada</span>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setCameraItemIdx(idx)}
+                        className={cn(
+                          'flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-colors',
+                          s.item.requirePhotoIfIssue
+                            ? 'border-red-400 text-red-600 bg-red-50 hover:bg-red-100'
+                            : 'border-zinc-300 text-zinc-600 hover:bg-zinc-50',
+                        )}
+                      >
+                        {s.uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                        {s.item.requirePhotoIfIssue ? 'Foto obrigatória' : 'Tirar foto'}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
       </div>{/* end scrollable area */}
 

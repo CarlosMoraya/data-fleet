@@ -1,13 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle, Disc } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
 import { templateFromRow, type ChecklistTemplateRow } from '../lib/checklistTemplateMappers';
-import type { Checklist, ChecklistTemplate } from '../types';
+import { tireInspectionFromRow, type TireInspectionRow } from '../lib/tireInspectionMappers';
+import type { Checklist, ChecklistTemplate, TireInspection } from '../types';
 import ChecklistDetailModal from '../components/ChecklistDetailModal';
+import TireInspectionDetailModal from '../components/TireInspectionDetailModal';
 import CreateActionPlanModal from '../components/CreateActionPlanModal';
+import {
+  validateTireInspectionEligibility,
+  createTireInspection,
+} from '../services/tireInspectionService';
 import { cn } from '../lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -38,8 +44,11 @@ export default function Checklists() {
   // Local UI state
   const [starting, setStarting] = useState<string | null>(null);
   const [viewChecklist, setViewChecklist] = useState<Checklist | null>(null);
+  const [viewTireInspection, setViewTireInspection] = useState<TireInspection | null>(null);
   const [createPlanChecklist, setCreatePlanChecklist] = useState<Checklist | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Checklist | null>(null);
+  const [tireInspectionError, setTireInspectionError] = useState<string | null>(null);
+  const [startingTireInspection, setStartingTireInspection] = useState(false);
 
   // ── Queries for Driver ────────────────────────────────────────────────────
   const { data: vehicleInfo, isLoading: loadingVehicleInfo } = useQuery({
@@ -177,6 +186,75 @@ export default function Checklists() {
     },
     enabled: isAssistantPlus && checklists.length > 0
   });
+
+  // ── Tire inspection queries ───────────────────────────────────────────────
+  const { data: tireInspections = [] } = useQuery({
+    queryKey: ['tireInspections', currentClient?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tire_inspections')
+        .select('*, vehicles(license_plate), profiles(name)')
+        .eq('client_id', currentClient!.id)
+        .order('started_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map(r => tireInspectionFromRow(r as TireInspectionRow));
+    },
+    enabled: !!currentClient?.id,
+  });
+
+  const { data: pneusDayInterval = 7 } = useQuery({
+    queryKey: ['pneusDayInterval', currentClient?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('checklist_day_intervals')
+        .select('pneus_day_interval')
+        .eq('client_id', currentClient!.id)
+        .maybeSingle();
+      return data?.pneus_day_interval ?? 7;
+    },
+    enabled: !!currentClient?.id,
+  });
+
+  const startTireInspectionMutation = useMutation({
+    mutationFn: async (vehicleId: string) => {
+      const { data: veh, error: vehErr } = await supabase
+        .from('vehicles')
+        .select('axle_config, steps_count, type')
+        .eq('id', vehicleId)
+        .single();
+      if (vehErr) throw vehErr;
+
+      const axleConfig = veh.axle_config ?? [];
+      const stepsCount = veh.steps_count ?? 0;
+      const vehicleType = veh.type ?? '';
+
+      await validateTireInspectionEligibility(vehicleId, axleConfig, stepsCount, vehicleType, pneusDayInterval);
+
+      return createTireInspection({
+        clientId: currentClient!.id,
+        vehicleId,
+        filledBy: user!.id,
+        axleConfig,
+        stepsCount,
+        deviceInfo: navigator.userAgent,
+      });
+    },
+    onSuccess: (inspectionId) => {
+      queryClient.invalidateQueries({ queryKey: ['tireInspections', currentClient?.id] });
+      setStartingTireInspection(false);
+      navigate(`/inspecao-pneus/${inspectionId}`);
+    },
+    onError: (e: Error) => {
+      setTireInspectionError(e.message);
+      setStartingTireInspection(false);
+    },
+  });
+
+  const handleStartTireInspection = (vehicleId: string) => {
+    setTireInspectionError(null);
+    setStartingTireInspection(true);
+    startTireInspectionMutation.mutate(vehicleId);
+  };
 
   const startMutation = useMutation({
     mutationFn: async ({ template, vehicleId }: { template: ChecklistTemplate; vehicleId: string }) => {
@@ -335,6 +413,21 @@ export default function Checklists() {
                 ) : (
                   <p className="text-xs text-zinc-400 italic">Nenhum template publicado para {vehicleInfo.category}</p>
                 )}
+
+                {/* Inspeção de Pneus */}
+                {tireInspectionError && (
+                  <p className="text-xs text-red-600 mt-2">{tireInspectionError}</p>
+                )}
+                <div className="mt-3 pt-3 border-t border-zinc-100">
+                  <button
+                    disabled={startingTireInspection || !!openChecklist}
+                    onClick={() => handleStartTireInspection(vehicleInfo.id)}
+                    className="flex items-center gap-1.5 px-3 py-2 border border-blue-300 text-blue-600 text-xs font-medium rounded-lg hover:bg-blue-50 disabled:opacity-50 w-full justify-center"
+                  >
+                    {startingTireInspection ? <Loader2 className="h-3 w-3 animate-spin" /> : <Disc className="h-3 w-3" />}
+                    Inspeção de Pneus
+                  </button>
+                </div>
               </>
             ) : (
               <p className="text-sm text-zinc-400 italic">Nenhum veículo associado ao seu perfil.</p>
@@ -437,6 +530,23 @@ export default function Checklists() {
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Inspeção de Pneus — Auditor */}
+            {selectedVehicleId && (
+              <div className="pt-2 border-t border-zinc-100 space-y-1">
+                {tireInspectionError && (
+                  <p className="text-xs text-red-600">{tireInspectionError}</p>
+                )}
+                <button
+                  disabled={startingTireInspection || !!openChecklist}
+                  onClick={() => handleStartTireInspection(selectedVehicleId)}
+                  className="flex items-center gap-1.5 px-3 py-2 border border-blue-300 text-blue-600 text-xs font-medium rounded-lg hover:bg-blue-50 disabled:opacity-50 w-full justify-center"
+                >
+                  {startingTireInspection ? <Loader2 className="h-3 w-3 animate-spin" /> : <Disc className="h-3 w-3" />}
+                  Inspeção de Pneus
+                </button>
               </div>
             )}
           </div>
@@ -547,6 +657,31 @@ export default function Checklists() {
                       </td>
                     </tr>
                   ))}
+                  {/* Inspeções de pneus */}
+                  {!onlyWithIssues && tireInspections.map(ti => (
+                    <tr key={`ti-${ti.id}`} className="hover:bg-blue-50/30">
+                      <td className="px-4 py-3 text-sm text-zinc-900">
+                        <div className="flex items-center gap-1.5">
+                          <Disc className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
+                          Inspeção de Pneus
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-blue-500 font-medium">Inspeção de Pneus</td>
+                      <td className="px-4 py-3 text-sm text-zinc-600">{ti.vehicleLicensePlate ?? '—'}</td>
+                      <td className="px-4 py-3 text-sm text-zinc-600">{ti.filledByName ?? '—'}</td>
+                      <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(ti.startedAt)}</td>
+                      <td className="px-4 py-3">
+                        <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', STATUS_COLOR[ti.status])}>
+                          {STATUS_LABEL[ti.status]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => setViewTireInspection(ti)} className="p-1.5 rounded hover:bg-zinc-100" title="Visualizar">
+                          <Eye className="h-4 w-4 text-zinc-400" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -556,6 +691,10 @@ export default function Checklists() {
 
       {viewChecklist && (
         <ChecklistDetailModal checklist={viewChecklist} onClose={() => setViewChecklist(null)} />
+      )}
+
+      {viewTireInspection && (
+        <TireInspectionDetailModal inspection={viewTireInspection} onClose={() => setViewTireInspection(null)} />
       )}
 
       {createPlanChecklist && (

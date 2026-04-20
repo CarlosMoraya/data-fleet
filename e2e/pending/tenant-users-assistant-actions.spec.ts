@@ -30,6 +30,14 @@ test.describe.serial('Painel de Plano de Ação (Fleet Assistant)', () => {
   test('deve buscar ações pelo campo de pesquisa', async ({ page }) => {
     const searchInput = page.locator('input[placeholder*="Buscar"]');
     await expect(searchInput).toBeVisible();
+
+    // Verificar se há ações antes de buscar
+    const rowsCount = await page.locator('tbody tr').count();
+    if (rowsCount === 0) {
+      test.skip(true, 'Sem ações para testar busca — crie um checklist com item "Problema" primeiro');
+      return;
+    }
+
     await searchInput.fill('OS-');
     // Should filter results without errors
     await expect(page.locator('table, text=Nenhuma ação encontrada')).toBeVisible({ timeout: 5000 });

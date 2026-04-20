@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import path from 'path';
+
+const ASSETS_PATH = path.resolve('e2e/assets');
 
 /**
  * TESTES E2E — PERFIL 1: ADMINISTRADOR MASTER (Carlos Moraya)
@@ -19,7 +22,7 @@ test.describe('Admin Master — Auditoria Sistemática', () => {
     test('A.1 Acesso total a áreas administrativas', async ({ page }) => {
       await page.goto('/');
       await expect(page).toHaveURL('/');
-      
+
       // Sidebar deve mostrar itens de Admin
       await expect(page.locator('text=Admin').first()).toBeVisible();
       await expect(page.locator('a[href="/admin/clients"]')).toBeVisible();
@@ -29,12 +32,12 @@ test.describe('Admin Master — Auditoria Sistemática', () => {
     test('A.2 Logout e redirecionamento', async ({ page }) => {
       await page.goto('/');
       await page.waitForLoadState('domcontentloaded');
-      
+
       // Tentar clicar no botão que contém o texto "Logout"
       await page.getByRole('button', { name: /Logout/i }).click({ timeout: 10000 });
-      
+
       await expect(page).toHaveURL(/.*login.*/, { timeout: 20000 });
-      
+
       // Tentar voltar sem auth deve redirecionar
       await page.goto('/cadastros/veiculos');
       await expect(page).toHaveURL(/.*login.*/, { timeout: 10000 });
@@ -45,32 +48,32 @@ test.describe('Admin Master — Auditoria Sistemática', () => {
     test('B.1 Gestão de Clientes (Multi-tenancy)', async ({ page }) => {
       await page.goto('/admin/clients');
       await expect(page.getByRole('heading', { name: 'Clientes' })).toBeVisible();
-      
+
       // IMPORTANTE: Garantir que "Todos os Clientes" está selecionado no Topbar
       const topbarSelect = page.locator('header select');
       await page.waitForTimeout(2000);
       await expect(topbarSelect).toBeVisible({ timeout: 15000 });
-      
+
       await expect(async () => {
         await topbarSelect.selectOption('');
         await expect(topbarSelect).toHaveValue('');
       }).toPass({ timeout: 5000 });
-      
+
       await page.waitForTimeout(1000);
-      
+
       // Criar cliente teste
       const clientName = `Audit Client ${Date.now()}`;
       await page.getByRole('button', { name: 'Novo Cliente' }).click();
-      
+
       const modal = page.getByRole('heading', { name: 'Novo Cliente' });
       await expect(modal).toBeVisible();
-      
+
       await page.fill('input[placeholder*="Ex: Acme"]', clientName);
       await page.getByRole('button', { name: 'Salvar' }).click();
-      
+
       // Aguardar modal fechar
       await expect(modal).not.toBeVisible({ timeout: 10000 });
-      
+
       // Tenta buscar para garantir visibilidade
       await page.fill('input[placeholder="Buscar por nome..."]', clientName);
       await expect(page.locator('table').getByText(clientName)).toBeVisible({ timeout: 15000 });
@@ -79,7 +82,7 @@ test.describe('Admin Master — Auditoria Sistemática', () => {
     test('B.2 Gestão Global de Usuários', async ({ page }) => {
       await page.goto('/admin/users');
       await expect(page.getByRole('heading', { name: 'Usuários' })).toBeVisible();
-      
+
       // Deve ver o seletor de clientes (exclusivo Admin Master) no Topbar
       const clientSelector = page.locator('select').first();
       await expect(clientSelector).toBeVisible();
@@ -97,7 +100,7 @@ test.describe('Admin Master — Auditoria Sistemática', () => {
 
       // Identificação (sempre obrigatórios)
       await modal.locator('input[name="licensePlate"]').fill(plate);
-      await modal.locator('select[name="type"]').selectOption('Cavalo');
+      await modal.locator('select[name="type"]').selectOption('Passeio');
       await modal.locator('input[name="brand"]').fill('VOLVO');
       await modal.locator('input[name="model"]').fill('FH 540');
       await modal.locator('input[name="year"]').fill('2024');
@@ -106,7 +109,7 @@ test.describe('Admin Master — Auditoria Sistemática', () => {
       await modal.locator('input[name="chassi"]').fill('12345678901234567');
       await modal.locator('input[name="detranUF"]').fill('SP');
 
-      // Propriedade (campos que costumam ser obrigatórios por padrão)
+      // Propriedade
       await modal.locator('select[name="acquisition"]').selectOption('Owned');
       await modal.locator('input[name="owner"]').fill('Frota Admin E2E');
       await modal.locator('input[name="fipePrice"]').fill('250000');
@@ -114,11 +117,15 @@ test.describe('Admin Master — Auditoria Sistemática', () => {
       await modal.locator('input[name="antt"]').fill('12345678');
       await modal.locator('input[name="autonomy"]').fill('800');
 
+      // Upload CRLV (obrigatório por padrão)
+      const pdfPath = path.join(ASSETS_PATH, 'test-document.pdf');
+      await modal.locator('input[name="crlvUpload"]').setInputFiles(pdfPath);
+
       await modal.locator('button:has-text("Salvar Veículo")').click();
 
-      // Aguarda modal fechar e tabela atualizar
-      await expect(modal).not.toBeVisible({ timeout: 15000 });
-      await expect(page.locator('table').getByText(plate)).toBeVisible({ timeout: 10000 });
+      // Aguarda modal fechar (uploads + OCR podem ser lentos)
+      await expect(modal).not.toBeVisible({ timeout: 60000 });
+      await expect(page.locator('table').getByText(plate)).toBeVisible({ timeout: 20000 });
     });
   });
 

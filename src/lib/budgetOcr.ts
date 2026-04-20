@@ -5,8 +5,9 @@ import { performOcr } from './ocr/ocrEngine';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
+const DEBUG = import.meta.env.VITE_DEBUG_OCR === '1';
 const debug = (...args: unknown[]) => {
-  if (localStorage.getItem('ocr_debug') === '1') console.log('[BudgetOCR]', ...args);
+  if (DEBUG) console.log('[BudgetOCR]', ...args);
 };
 
 export interface BudgetExtractionResult {
@@ -36,15 +37,6 @@ async function extractPdfText(file: File): Promise<string> {
   const fullText = pages.join('\n');
   debug('Texto extraído:\n', fullText);
   return fullText;
-}
-
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(',')[1]);
-    reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
-    reader.readAsDataURL(file);
-  });
 }
 
 // ─────────────────────────────────────────────────────────────

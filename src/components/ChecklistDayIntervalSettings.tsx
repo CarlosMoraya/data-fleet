@@ -13,6 +13,7 @@ interface IntervalRow {
   client_id: string;
   rotina_day_interval: number | null;
   seguranca_day_interval: number | null;
+  pneus_day_interval: number | null;
 }
 
 export default function ChecklistDayIntervalSettings({ clientId, userId }: Props) {
@@ -20,6 +21,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
 
   const [rotinaDays, setRotinaDays] = useState<string>('');
   const [segurancaDays, setSegurancaDays] = useState<string>('');
+  const [pneusDays, setPneusDays] = useState<string>('7');
   const [isDirty, setIsDirty] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -28,6 +30,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
   useEffect(() => {
     setRotinaDays('');
     setSegurancaDays('');
+    setPneusDays('7');
     setIsDirty(false);
     setSaveSuccess(false);
     setSaveError(null);
@@ -38,7 +41,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
     queryFn: async () => {
       const { data, error } = await supabase
         .from('checklist_day_intervals')
-        .select('id, client_id, rotina_day_interval, seguranca_day_interval')
+        .select('id, client_id, rotina_day_interval, seguranca_day_interval, pneus_day_interval')
         .eq('client_id', clientId)
         .maybeSingle();
       if (error) throw error;
@@ -52,6 +55,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
     if (query.isSuccess) {
       setRotinaDays(query.data?.rotina_day_interval != null ? String(query.data.rotina_day_interval) : '');
       setSegurancaDays(query.data?.seguranca_day_interval != null ? String(query.data.seguranca_day_interval) : '');
+      setPneusDays(query.data?.pneus_day_interval != null ? String(query.data.pneus_day_interval) : '7');
       setIsDirty(false);
     }
   }, [query.data, query.isSuccess]);
@@ -68,10 +72,12 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      const pneusVal = pneusDays === '' ? 7 : Math.max(7, parseInt(pneusDays, 10));
       const row = {
         client_id: clientId,
         rotina_day_interval: rotinaDays === '' ? null : parseInt(rotinaDays, 10),
         seguranca_day_interval: segurancaDays === '' ? null : parseInt(segurancaDays, 10),
+        pneus_day_interval: pneusVal,
         updated_by: userId,
         updated_at: new Date().toISOString(),
       };
@@ -163,6 +169,35 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
               value={segurancaDays}
               onChange={handleChange(setSegurancaDays)}
               placeholder="—"
+              className="w-24 h-9 rounded-lg border border-zinc-200 px-3 text-sm text-right text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors"
+            />
+            <span className="text-xs text-zinc-400 w-8">dias</span>
+          </div>
+        </div>
+
+        {/* Pneus */}
+        <div className="flex items-center justify-between py-5">
+          <div>
+            <span className="text-sm font-medium text-zinc-800">Pneus (Inspeção)</span>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Intervalo mínimo entre inspeções de pneus consecutivas. Mínimo de 7 dias.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              type="number"
+              min="7"
+              value={pneusDays}
+              onChange={e => {
+                const v = e.target.value;
+                if (v === '' || (/^\d+$/.test(v) && parseInt(v, 10) >= 1)) {
+                  setPneusDays(v);
+                  setIsDirty(true);
+                  setSaveSuccess(false);
+                }
+              }}
+              placeholder="7"
+              title="Mínimo: 7 dias"
               className="w-24 h-9 rounded-lg border border-zinc-200 px-3 text-sm text-right text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors"
             />
             <span className="text-xs text-zinc-400 w-8">dias</span>

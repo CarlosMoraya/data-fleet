@@ -150,18 +150,6 @@ export function generatePositionsFromConfig(
   return positions;
 }
 
-// ─── classifyPositionType ─────────────────────────────────────────────────────
-/**
- * Classifica automaticamente o tipo de posição a partir do código.
- */
-export function classifyPositionType(position: string): TirePositionType {
-  if (position.startsWith('Step ')) return 'spare';
-  if (position.endsWith('IN')) return 'dual_internal';
-  if (position.endsWith('EX')) return 'dual_external';
-  if (position.endsWith('M') && position.length > 2) return 'triple_middle';
-  return 'single';
-}
-
 // ─── validatePositionAssignment ───────────────────────────────────────────────
 /**
  * Verifica se a posição está disponível para o veículo.

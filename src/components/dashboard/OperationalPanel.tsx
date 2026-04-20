@@ -3,6 +3,7 @@ import { Truck, Wrench, CalendarDays, FileWarning, UserX, Loader2 } from 'lucide
 import DashboardKpiCard from './DashboardKpiCard';
 import VehicleTypeBarChart from './VehicleTypeBarChart';
 import MaintenanceTypeDonutChart from './MaintenanceTypeDonutChart';
+import type { MaintenanceOrderDashboard } from '../../types/maintenance';
 
 export interface VehicleRow {
   id: string;
@@ -12,16 +13,6 @@ export interface VehicleRow {
   initial_km?: number | null;
   shipper_name?: string | null;
   operational_unit_name?: string | null;
-}
-
-export interface MaintenanceOrderDashboard {
-  id: string;
-  vehicle_id: string;
-  type: 'Corretiva' | 'Preventiva' | 'Preditiva';
-  status: string;
-  approved_cost: number | null;
-  current_km: number | null;
-  vehicle_type: string | null;
 }
 
 export interface DashboardFilters {
@@ -85,8 +76,8 @@ export default function OperationalPanel({
   const currentYear = new Date().getFullYear().toString();
   const expiredCrlv = filters.vehicleType
     ? filteredVehicles.filter(
-        (v) => v.crlv_year !== null && v.crlv_year < currentYear
-      ).length
+      (v) => v.crlv_year !== null && v.crlv_year < currentYear
+    ).length
     : expiredCrlvCount;
 
   // Bar chart: vehicles por tipo
@@ -116,11 +107,11 @@ export default function OperationalPanel({
   // Donut: ordens por tipo de manutenção (filtrado por vehicleType se ativo)
   const ordersForDonut = filters.vehicleType
     ? maintenanceOrders.filter((o) => {
-        const vIds = new Set(
-          vehicles.filter((v) => v.type === filters.vehicleType).map((v) => v.id)
-        );
-        return vIds.has(o.vehicle_id);
-      })
+      const vIds = new Set(
+        vehicles.filter((v) => v.type === filters.vehicleType).map((v) => v.id)
+      );
+      return vIds.has(o.vehicle_id);
+    })
     : maintenanceOrders;
 
   const maintenanceTypeData = MAINTENANCE_TYPES.map((t) => ({
@@ -200,7 +191,7 @@ export default function OperationalPanel({
           <VehicleTypeBarChart
             data={vehicleByShipperData}
             activeFilter={null}
-            onFilterChange={() => {}}
+            onFilterChange={() => { }}
             title="Frota por Embarcador"
           />
         )}
@@ -208,7 +199,7 @@ export default function OperationalPanel({
           <VehicleTypeBarChart
             data={vehicleByOpUnitData}
             activeFilter={null}
-            onFilterChange={() => {}}
+            onFilterChange={() => { }}
             title="Frota por Unidade Operacional"
           />
         )}

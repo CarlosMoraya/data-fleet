@@ -58,7 +58,6 @@ export default defineConfig({
       },
       dependencies: ['setup-mariana'],
       testMatch: [/tenant-users(-analyst.*)?\.spec\.ts/, /audit-admin-tenant\.spec\.ts/],
-      testIgnore: /seed/,
     },
     {
       name: 'assistant',

@@ -2,7 +2,7 @@ import React from 'react';
 import { X, Wrench, Building2, Calendar, User, FileText, DollarSign, Clock, ExternalLink, BadgeCheck } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
-import type { MaintenanceOrder } from '../pages/Maintenance';
+import type { MaintenanceOrder } from '../types/maintenance';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import BudgetItemsTable from './BudgetItemsTable';
@@ -15,29 +15,29 @@ interface Props {
 
 function statusColor(status: MaintenanceOrder['status']) {
   switch (status) {
-    case 'Aguardando orçamento':  return 'bg-yellow-100 text-yellow-800';
-    case 'Aguardando aprovação':  return 'bg-orange-100 text-orange-800';
-    case 'Orçamento aprovado':    return 'bg-blue-100 text-blue-800';
-    case 'Serviço em execução':   return 'bg-orange-100 text-orange-800';
-    case 'Concluído':             return 'bg-green-100 text-green-800';
-    case 'Cancelado':             return 'bg-zinc-100 text-zinc-500';
+    case 'Aguardando orçamento': return 'bg-yellow-100 text-yellow-800';
+    case 'Aguardando aprovação': return 'bg-orange-100 text-orange-800';
+    case 'Orçamento aprovado': return 'bg-blue-100 text-blue-800';
+    case 'Serviço em execução': return 'bg-orange-100 text-orange-800';
+    case 'Concluído': return 'bg-green-100 text-green-800';
+    case 'Cancelado': return 'bg-zinc-100 text-zinc-500';
   }
 }
 
 function budgetStatusLabel(status: string) {
   switch (status) {
-    case 'pendente':   return { label: 'Aguardando Aprovação', cls: 'bg-yellow-100 text-yellow-800' };
-    case 'aprovado':   return { label: 'Aprovado', cls: 'bg-green-100 text-green-800' };
-    case 'reprovado':  return { label: 'Reprovado', cls: 'bg-red-100 text-red-800' };
-    default:           return { label: 'Sem Orçamento', cls: 'bg-zinc-100 text-zinc-500' };
+    case 'pendente': return { label: 'Aguardando Aprovação', cls: 'bg-yellow-100 text-yellow-800' };
+    case 'aprovado': return { label: 'Aprovado', cls: 'bg-green-100 text-green-800' };
+    case 'reprovado': return { label: 'Reprovado', cls: 'bg-red-100 text-red-800' };
+    default: return { label: 'Sem Orçamento', cls: 'bg-zinc-100 text-zinc-500' };
   }
 }
 
 function typeColor(type: MaintenanceOrder['type']) {
   switch (type) {
-    case 'Corretiva':  return 'bg-red-100 text-red-800';
+    case 'Corretiva': return 'bg-red-100 text-red-800';
     case 'Preventiva': return 'bg-blue-100 text-blue-800';
-    case 'Preditiva':  return 'bg-purple-100 text-purple-800';
+    case 'Preditiva': return 'bg-purple-100 text-purple-800';
   }
 }
 

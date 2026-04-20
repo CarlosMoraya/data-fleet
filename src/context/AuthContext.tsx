@@ -259,7 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const canSwitchClient =
-    allClients.length > 1 &&
+    (user?.role === 'Admin Master' ? allClients.length >= 1 : allClients.length > 1) &&
     (user?.role === 'Manager' ||
       user?.role === 'Coordinator' ||
       user?.role === 'Director' ||

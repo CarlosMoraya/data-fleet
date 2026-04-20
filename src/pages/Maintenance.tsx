@@ -6,42 +6,17 @@ import MaintenanceDetailModal from '../components/MaintenanceDetailModal';
 import MaintenanceForm from '../components/MaintenanceForm';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import { maintenanceFromRow, MaintenanceOrderRow, BudgetStatus, BudgetItem } from '../lib/maintenanceMappers';
-import { uploadMaintenanceBudget } from '../lib/storageHelpers';
+import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
 import { useAuth } from '../context/AuthContext';
+import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus } from '../types/maintenance';
+import {
+  saveMaintenanceOrder,
+  updateMaintenanceStatus,
+  cancelMaintenanceOrder,
+} from '../services/maintenanceService';
 
-export type MaintenanceStatus = 'Aguardando orçamento' | 'Aguardando aprovação' | 'Orçamento aprovado' | 'Serviço em execução' | 'Concluído' | 'Cancelado';
-export type MaintenanceType = 'Preventiva' | 'Preditiva' | 'Corretiva';
-
-export interface MaintenanceOrder {
-  id: string;
-  os: string;
-  licensePlate: string;
-  workshop: string;
-  vehicleId: string;
-  workshopId: string;
-  entryDate: string;
-  expectedExitDate: string;
-  type: MaintenanceType;
-  status: MaintenanceStatus;
-  description: string;
-  mechanicName: string;
-  estimatedCost: number;
-  approvedCost?: number;
-  createdBy: string;
-  createdAt: string;
-  notes?: string;
-  workshopOs?: string;
-  currentKm?: number;
-  budgetPdfUrl?: string;
-  budgetStatus?: BudgetStatus;
-  budgetReviewedBy?: string;
-  budgetReviewedAt?: string;
-  cancelledAt?: string;
-  cancelledById?: string;
-  clientName?: string; // Populado quando Workshop vê múltiplas transportadoras
-  clientId?: string;   // client_id da OS; necessário para Workshop no modo "Todos os Clientes"
-}
+// Re-export para compatibilidade com componentes que importam daqui
+export type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus };
 
 type StatusFilter = MaintenanceStatus | 'all';
 
@@ -59,23 +34,23 @@ function statusColor(status: MaintenanceStatus) {
   switch (status) {
     case 'Aguardando orçamento': return 'bg-yellow-100 text-yellow-800';
     case 'Aguardando aprovação': return 'bg-orange-100 text-orange-800';
-    case 'Orçamento aprovado':   return 'bg-blue-100 text-blue-800';
-    case 'Serviço em execução':  return 'bg-purple-100 text-purple-800';
-    case 'Concluído':            return 'bg-green-100 text-green-800';
-    case 'Cancelado':            return 'bg-zinc-100 text-zinc-500';
+    case 'Orçamento aprovado': return 'bg-blue-100 text-blue-800';
+    case 'Serviço em execução': return 'bg-purple-100 text-purple-800';
+    case 'Concluído': return 'bg-green-100 text-green-800';
+    case 'Cancelado': return 'bg-zinc-100 text-zinc-500';
   }
 }
 
 function budgetStatusBadge(budgetStatus?: BudgetStatus, pdfUrl?: string) {
   if (!budgetStatus || budgetStatus === 'sem_orcamento') return null;
   const colors: Record<string, string> = {
-    pendente:  'bg-yellow-100 text-yellow-800',
-    aprovado:  'bg-green-100 text-green-800',
+    pendente: 'bg-yellow-100 text-yellow-800',
+    aprovado: 'bg-green-100 text-green-800',
     reprovado: 'bg-red-100 text-red-800',
   };
   const labels: Record<string, string> = {
-    pendente:  'Aguardando',
-    aprovado:  'Aprovado',
+    pendente: 'Aguardando',
+    aprovado: 'Aprovado',
     reprovado: 'Reprovado',
   };
   return (
@@ -101,9 +76,9 @@ function budgetStatusBadge(budgetStatus?: BudgetStatus, pdfUrl?: string) {
 
 function typeColor(type: MaintenanceType) {
   switch (type) {
-    case 'Corretiva':  return 'bg-red-100 text-red-800';
+    case 'Corretiva': return 'bg-red-100 text-red-800';
     case 'Preventiva': return 'bg-blue-100 text-blue-800';
-    case 'Preditiva':  return 'bg-purple-100 text-purple-800';
+    case 'Preditiva': return 'bg-purple-100 text-purple-800';
   }
 }
 
@@ -126,12 +101,23 @@ export default function Maintenance() {
   const [selectedOrder, setSelectedOrder] = React.useState<MaintenanceOrder | null>(null);
 
   const location = useLocation();
-  const [isFormOpen, setIsFormOpen] = React.useState(false);
-  const [orderToEdit, setOrderToEdit] = React.useState<MaintenanceOrder | null>(null);
+  const [isFormOpen, setIsFormOpen] = React.useState<boolean>(() =>
+    sessionStorage.getItem('maintenanceFormOpen') === 'true'
+  );
+  const [orderToEdit, setOrderToEdit] = React.useState<MaintenanceOrder | null>(() => {
+    const saved = sessionStorage.getItem('maintenanceFormEditing');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [prefillData, setPrefillData] = React.useState<Partial<MaintenanceOrder> | undefined>(
     () => (location.state as any)?.prefillMaintenance ?? undefined
   );
   const [orderToCancel, setOrderToCancel] = React.useState<MaintenanceOrder | null>(null);
+
+  // Sincronizar estado do formulário com sessionStorage
+  React.useEffect(() => {
+    sessionStorage.setItem('maintenanceFormOpen', String(isFormOpen));
+    sessionStorage.setItem('maintenanceFormEditing', JSON.stringify(orderToEdit));
+  }, [isFormOpen, orderToEdit]);
 
   // Abrir form automaticamente se vier do fluxo agendamento → manutenção
   React.useEffect(() => {
@@ -187,11 +173,7 @@ export default function Maintenance() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: MaintenanceStatus }) => {
-      const { error } = await supabase
-        .from('maintenance_orders')
-        .update({ status, actual_exit_date: status === 'Concluído' ? new Date().toISOString() : null })
-        .eq('id', id);
-      if (error) throw error;
+      await updateMaintenanceStatus(id, status);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
@@ -200,15 +182,7 @@ export default function Maintenance() {
 
   const cancelMutation = useMutation({
     mutationFn: async (order: MaintenanceOrder) => {
-      const { error } = await supabase
-        .from('maintenance_orders')
-        .update({
-          status: 'Cancelado',
-          cancelled_at: new Date().toISOString(),
-          cancelled_by_id: profile?.id ?? null,
-        })
-        .eq('id', order.id);
-      if (error) throw error;
+      await cancelMaintenanceOrder(order.id, profile?.id ?? null);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
@@ -227,114 +201,37 @@ export default function Maintenance() {
       budgetItems: BudgetItem[];
       budgetFile: File | null;
     }) => {
-      const isWorkshopSave = profile?.role === 'Workshop';
-      // Para Workshop no modo "Todos os Clientes", currentClient pode ser null.
-      // Usamos o client_id da própria OS (data.clientId) para upload e budget items.
-      const effectiveClientId = isWorkshopSave ? (data.clientId ?? currentClient?.id) : currentClient?.id;
-      if (!effectiveClientId || !profile) throw new Error('Sessão inválida');
-
-      const commonFields: any = {
-        client_id: effectiveClientId,
-        vehicle_id: data.vehicleId,
-        workshop_id: data.workshopId,
-        entry_date: data.entryDate,
-        expected_exit_date: data.expectedExitDate || null,
-        type: data.type,
-        status: data.status,
-        description: data.description || null,
-        mechanic_name: data.mechanicName || null,
-        estimated_cost: data.estimatedCost || 0,
-        approved_cost: data.approvedCost || null,
-        notes: data.notes || null,
-        workshop_os_number: data.workshopOs || null,
-        current_km: data.currentKm || null,
-      };
-
-      let orderId: string;
-
-      if (data.id) {
-        // UPDATE — os_number é imutável, nunca atualizar
-        // Workshop faz partial update: apenas os campos de sua responsabilidade
-        const updateFields = profile?.role === 'Workshop'
-          ? {
-              expected_exit_date: data.expectedExitDate || null,
-              workshop_os_number: data.workshopOs || null,
-              mechanic_name: data.mechanicName || null,
-              current_km: data.currentKm || null,
-            }
-          : commonFields;
-        const { error } = await supabase.from('maintenance_orders').update(updateFields).eq('id', data.id);
-        if (error) throw error;
-        orderId = data.id;
-      } else {
-        // INSERT — gerar OS Interna automaticamente
-        const d = new Date();
-        const yy = d.getFullYear().toString().slice(-2);
-        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
-        const rand = Math.floor(1000 + Math.random() * 9000);
-        const osNumber = `OS-${yy}${mm}-${rand}`;
-        const { data: inserted, error } = await supabase
-          .from('maintenance_orders')
-          .insert([{ ...commonFields, os_number: osNumber, created_by_id: profile.id }])
-          .select('id')
-          .single();
-        if (error) throw error;
-        orderId = inserted.id;
-      }
-
-      // Passo 2: se há PDF, fazer upload e atualizar campos de orçamento
-      if (budgetFile) {
-        const pdfUrl = await uploadMaintenanceBudget(effectiveClientId, orderId, budgetFile);
-        const { error: updateErr } = await supabase
-          .from('maintenance_orders')
-          .update({
-            budget_pdf_url: pdfUrl,
-            budget_status: 'pendente',
-            status: 'Aguardando aprovação',
-          })
-          .eq('id', orderId);
-        if (updateErr) throw updateErr;
-      }
-
-      // Passo 3: substituir itens de orçamento
-      const hasSignificantItems = budgetItems.some(i => i.itemName.trim().length > 0);
-      if (hasSignificantItems || budgetFile) {
-        await supabase.from('maintenance_budget_items').delete().eq('maintenance_order_id', orderId);
-        const significantItems = budgetItems.filter(i => i.itemName.trim().length > 0);
-        if (significantItems.length > 0) {
-          const rows = significantItems.map((item, idx) => ({
-            maintenance_order_id: orderId,
-            client_id: effectiveClientId,
-            item_name: item.itemName,
-            system: item.system || null,
-            quantity: item.quantity,
-            value: item.value,
-            sort_order: idx,
-          }));
-          const { error: insertErr } = await supabase.from('maintenance_budget_items').insert(rows);
-          if (insertErr) throw insertErr;
-        }
-      }
+      if (!profile) throw new Error('Sessão inválida');
+      return saveMaintenanceOrder({
+        data,
+        budgetItems,
+        budgetFile,
+        profileId: profile.id,
+        currentClientId: currentClient?.id,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
       queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
       setIsFormOpen(false);
       setOrderToEdit(null);
+      sessionStorage.removeItem('maintenanceFormOpen');
+      sessionStorage.removeItem('maintenanceFormEditing');
+      sessionStorage.removeItem('maintenanceFormData');
     },
   });
 
   const counts = React.useMemo(() => {
     return {
-      all:                      orders.length,
-      'Aguardando orçamento':   orders.filter(o => o.status === 'Aguardando orçamento').length,
-      'Aguardando aprovação':   orders.filter(o => o.status === 'Aguardando aprovação').length,
-      'Orçamento aprovado':     orders.filter(o => o.status === 'Orçamento aprovado').length,
-      'Serviço em execução':    orders.filter(o => o.status === 'Serviço em execução').length,
-      'Concluído':              orders.filter(o => o.status === 'Concluído').length,
-      'Cancelado':              orders.filter(o => o.status === 'Cancelado').length,
-      corretiva:                orders.filter(o => o.type === 'Corretiva').length,
-      preventiva:               orders.filter(o => o.type === 'Preventiva').length,
+      all: orders.length,
+      'Aguardando orçamento': orders.filter(o => o.status === 'Aguardando orçamento').length,
+      'Aguardando aprovação': orders.filter(o => o.status === 'Aguardando aprovação').length,
+      'Orçamento aprovado': orders.filter(o => o.status === 'Orçamento aprovado').length,
+      'Serviço em execução': orders.filter(o => o.status === 'Serviço em execução').length,
+      'Concluído': orders.filter(o => o.status === 'Concluído').length,
+      'Cancelado': orders.filter(o => o.status === 'Cancelado').length,
+      corretiva: orders.filter(o => o.type === 'Corretiva').length,
+      preventiva: orders.filter(o => o.type === 'Preventiva').length,
     };
   }, [orders]);
 
@@ -625,10 +522,13 @@ export default function Maintenance() {
             setIsFormOpen(false);
             setOrderToEdit(null);
             setPrefillData(undefined);
+            sessionStorage.removeItem('maintenanceFormOpen');
+            sessionStorage.removeItem('maintenanceFormEditing');
+            sessionStorage.removeItem('maintenanceFormData');
           }}
-          onSave={async (data, budgetItems, budgetFile) =>
-            saveMutation.mutateAsync({ data, budgetItems, budgetFile })
-          }
+          onSave={async (data, budgetItems, budgetFile) => {
+            await saveMutation.mutateAsync({ data, budgetItems, budgetFile });
+          }}
         />
       )}
 

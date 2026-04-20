@@ -3,25 +3,7 @@ import { Driver, DriverFieldSettings } from '../types';
 import { X, FileText, ExternalLink, Loader2, UserPlus } from 'lucide-react';
 import { validateFile } from '../lib/storageHelpers';
 import { isDriverFieldRequired } from '../lib/driverFieldSettingsMappers';
-import { supabase } from '../lib/supabase';
-
-const invokeFn = async (fnName: string, body: object) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Sessão expirada. Faça login novamente.');
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(json?.error ?? json?.message ?? `HTTP ${res.status}`);
-  return json;
-};
+import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
 import {
   filterDigitsOnly,
   filterText,
@@ -205,7 +187,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
 
       // No modo criação: primeiro cria o usuário no sistema
       if (isCreating) {
-        const data = await invokeFn('create-user', {
+        const data = await invokeEdgeFunction('create-user', {
           email: email.trim().toLowerCase(),
           password,
           name: formData.name ?? '',

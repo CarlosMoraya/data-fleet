@@ -6,24 +6,7 @@ import { Pencil, Trash2, Plus, Search, X, Loader2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Role } from '../types';
 import { capitalizeWords } from '../lib/inputHelpers';
-
-const invokeFn = async (fnName: string, body: object) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Sessão expirada. Faça login novamente.');
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(json?.error ?? json?.message ?? `HTTP ${res.status}`);
-  return json;
-};
+import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
 
 const ROLE_RANK: Record<Role, number> = {
   'Driver': 1,
@@ -44,16 +27,16 @@ const ALL_ROLES: Role[] = [
 ];
 
 const ROLE_COLORS: Record<Role, string> = {
-  'Driver':          'bg-zinc-100 text-zinc-700',
-  'Workshop':        'bg-orange-100 text-orange-700',
-  'Yard Auditor':    'bg-amber-100 text-amber-700',
+  'Driver': 'bg-zinc-100 text-zinc-700',
+  'Workshop': 'bg-orange-100 text-orange-700',
+  'Yard Auditor': 'bg-amber-100 text-amber-700',
   'Fleet Assistant': 'bg-blue-100 text-blue-700',
-  'Fleet Analyst':   'bg-indigo-100 text-indigo-700',
-  'Supervisor':      'bg-violet-100 text-violet-700',
-  'Manager':         'bg-green-100 text-green-700',
-  'Coordinator':     'bg-emerald-100 text-emerald-700',
-  'Director':        'bg-purple-100 text-purple-700',
-  'Admin Master':    'bg-orange-100 text-orange-700',
+  'Fleet Analyst': 'bg-indigo-100 text-indigo-700',
+  'Supervisor': 'bg-violet-100 text-violet-700',
+  'Manager': 'bg-green-100 text-green-700',
+  'Coordinator': 'bg-emerald-100 text-emerald-700',
+  'Director': 'bg-purple-100 text-purple-700',
+  'Admin Master': 'bg-orange-100 text-orange-700',
 };
 
 /** Retorna os papéis que o usuário com `myRole` pode criar. */
@@ -131,19 +114,11 @@ function CreateUserModal({
 
   const createMutation = useMutation({
     mutationFn: async (payload: any) => {
-      const data = await invokeFn('create-user', payload);
-
-      if (canManagePermissions && form.budgetLimit) {
-        const budgetLimit = parseFloat(form.budgetLimit) || 0;
-        const profileId = typeof data === 'object' && data?.profileId ? data.profileId : null;
-        if (profileId) {
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ budget_approval_limit: budgetLimit })
-            .eq('id', profileId);
-          if (updateError) throw new Error(updateError.message);
-        }
-      }
+      const budgetLimit = canManagePermissions ? (parseFloat(form.budgetLimit) || 0) : 0;
+      await invokeEdgeFunction('create-user', {
+        ...payload,
+        budget_approval_limit: budgetLimit,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', currentClient?.id] });
@@ -567,7 +542,7 @@ export default function Users() {
 
   const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
-      await invokeFn('create-user', { action: 'delete', user_id: userId });
+      await invokeEdgeFunction('create-user', { action: 'delete', user_id: userId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', currentClient?.id] });
@@ -625,56 +600,56 @@ export default function Users() {
           </div>
         ) : (
           <div className="flex-1 overflow-auto">
-          <table className="min-w-full divide-y divide-zinc-200">
-            <thead className="bg-zinc-50 sticky top-0 z-10">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Usuário</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cargo</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cadastrado em</th>
-                <th className="px-6 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {filtered.map((u) => (
-                <tr key={u.id} className="hover:bg-zinc-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <UserInitials name={u.name} />
-                      <span className="truncate text-sm font-medium text-zinc-900">{u.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <RoleBadge role={u.role} />
-                  </td>
-                  <td className="px-6 py-4 text-sm text-zinc-500">
-                    {new Date(u.created_at).toLocaleDateString('pt-BR')}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {u.id !== user.id && (
-                        <button
-                          onClick={() => setEditingUser(u)}
-                          className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
-                          title="Editar"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                      )}
-                      {u.id !== user.id && (
-                        <button
-                          onClick={() => handleDelete(u)}
-                          className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                          title="Excluir"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
+            <table className="min-w-full divide-y divide-zinc-200">
+              <thead className="bg-zinc-50 sticky top-0 z-10">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Usuário</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cargo</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cadastrado em</th>
+                  <th className="px-6 py-3" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {filtered.map((u) => (
+                  <tr key={u.id} className="hover:bg-zinc-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <UserInitials name={u.name} />
+                        <span className="truncate text-sm font-medium text-zinc-900">{u.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <RoleBadge role={u.role} />
+                    </td>
+                    <td className="px-6 py-4 text-sm text-zinc-500">
+                      {new Date(u.created_at).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {u.id !== user.id && (
+                          <button
+                            onClick={() => setEditingUser(u)}
+                            className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                            title="Editar"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        )}
+                        {u.id !== user.id && (
+                          <button
+                            onClick={() => handleDelete(u)}
+                            className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                            title="Excluir"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -684,7 +659,7 @@ export default function Users() {
         availableRoles={available}
         currentUserRole={user.role}
         onClose={() => setCreateOpen(false)}
-        onCreated={() => {}} // queryClient handles invalidation in the modal itself
+        onCreated={() => { }} // queryClient handles invalidation in the modal itself
       />
 
       <EditUserModal
@@ -692,7 +667,7 @@ export default function Users() {
         user={editingUser}
         currentUserRole={user.role}
         onClose={() => setEditingUser(null)}
-        onSaved={() => {}} // queryClient handles invalidation in the modal itself
+        onSaved={() => { }} // queryClient handles invalidation in the modal itself
       />
     </div>
   );

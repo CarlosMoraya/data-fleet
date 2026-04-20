@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X, Link2, Copy, Check, Loader2, Trash2, Building2, RefreshCw } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { WorkshopInvitation, WorkshopPartnership } from '../types';
 import { workshopInvitationFromRow, workshopPartnershipFromRow } from '../lib/workshopAccountMappers';
+import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
 
 interface Props {
   onClose: () => void;
@@ -47,29 +48,10 @@ export default function InviteWorkshopModal({ onClose }: Props) {
     enabled: !!currentClient?.id,
   });
 
-  const invokeFn = async (fnName: string, body: object) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error('Sessão expirada. Faça login novamente.');
-
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify(body),
-    });
-    const json = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(json?.error ?? json?.message ?? json?.msg ?? `HTTP ${res.status}: ${JSON.stringify(json)}`);
-    return json;
-  };
-
   // Gerar novo convite
   const createMutation = useMutation({
     mutationFn: async () => {
-      return invokeFn('workshop-invitation', { action: 'create', client_id: currentClient?.id });
+      return invokeEdgeFunction('workshop-invitation', { action: 'create', client_id: currentClient?.id });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workshopInvitations', currentClient?.id] });
@@ -79,7 +61,7 @@ export default function InviteWorkshopModal({ onClose }: Props) {
   // Revogar convite
   const revokeMutation = useMutation({
     mutationFn: async (invitationId: string) => {
-      return invokeFn('workshop-invitation', { action: 'revoke', invitation_id: invitationId });
+      return invokeEdgeFunction('workshop-invitation', { action: 'revoke', invitation_id: invitationId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workshopInvitations', currentClient?.id] });
@@ -89,7 +71,7 @@ export default function InviteWorkshopModal({ onClose }: Props) {
   // Desativar partnership
   const deactivateMutation = useMutation({
     mutationFn: async (partnershipId: string) => {
-      return invokeFn('workshop-partnership-manage', { action: 'deactivate', partnership_id: partnershipId });
+      return invokeEdgeFunction('workshop-partnership-manage', { action: 'deactivate', partnership_id: partnershipId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workshopPartnerships', currentClient?.id] });

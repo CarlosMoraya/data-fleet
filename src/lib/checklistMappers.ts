@@ -78,32 +78,3 @@ export function checklistResponseFromRow(row: ChecklistResponseRow): ChecklistRe
   };
 }
 
-// ─── toRow converters ─────────────────────────────────────────────────────────
-
-export function checklistToRow(c: Partial<Checklist>): Partial<ChecklistRow> {
-  const row: Partial<ChecklistRow> = {};
-  if (c.clientId !== undefined)      row.client_id = c.clientId;
-  if (c.templateId !== undefined)    row.template_id = c.templateId;
-  if (c.versionNumber !== undefined) row.version_number = c.versionNumber;
-  if (c.vehicleId !== undefined)     row.vehicle_id = c.vehicleId ?? null;
-  if (c.filledBy !== undefined)      row.filled_by = c.filledBy;
-  if (c.completedAt !== undefined)   row.completed_at = c.completedAt ?? null;
-  if (c.status !== undefined)        row.status = c.status;
-  if (c.latitude !== undefined)      row.latitude = c.latitude ?? null;
-  if (c.longitude !== undefined)     row.longitude = c.longitude ?? null;
-  if (c.deviceInfo !== undefined)    row.device_info = c.deviceInfo ?? null;
-  if (c.notes !== undefined)         row.notes = c.notes ? normalizeTrim(c.notes) : null;
-  if (c.workshopId !== undefined)    row.workshop_id = c.workshopId ?? null;
-  if (c.odometerKm !== undefined)    row.odometer_km = c.odometerKm ?? null;
-  return row;
-}
-
-export function checklistResponseToRow(r: Partial<ChecklistResponse>): Partial<ChecklistResponseRow> {
-  const row: Partial<ChecklistResponseRow> = {};
-  if (r.checklistId !== undefined)  row.checklist_id = r.checklistId;
-  if (r.itemId !== undefined)       row.item_id = r.itemId;
-  if (r.status !== undefined)       row.status = r.status;
-  if (r.observation !== undefined)  row.observation = r.observation ? normalizeTrim(r.observation) : null;
-  if (r.photoUrl !== undefined)     row.photo_url = r.photoUrl ?? null;
-  return row;
-}

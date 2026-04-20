@@ -1,7 +1,7 @@
 # Relatório E2E — Tire Management (Manager)
-Data: 05/04/2026, 19:31:34
+Data: 05/04/2026, 22:06:32
 
-**Resumo:** 14 passaram · 0 falharam · 0 pulados
+**Resumo:** 9 passaram · 1 falharam · 4 pulados
 
 ## Resultados
 
@@ -16,12 +16,12 @@ Data: 05/04/2026, 19:31:34
 | 07 | tabela: pneu cadastrado aparece com classificação e status "Ativo" | ✅ PASSOU | — |
 | 08 | busca: filtrar por especificação funciona | ✅ PASSOU | — |
 | 09 | TireHistoryModal: abre ao clicar botão Histórico | ✅ PASSOU | — |
-| 10 | TireHistoryModal: exibe código do pneu e tabela de histórico | ✅ PASSOU | — |
-| 11 | TireForm (edição): abre ao clicar Editar, campo Especificação editável | ✅ PASSOU | — |
-| 12 | TireForm (edição): salvar alteração persiste na tabela | ✅ PASSOU | — |
-| 13 | toggle Desativar: modal de confirmação abre e desativa pneu | ✅ PASSOU | — |
-| 14 | AddModeModal: opção "Por Modelo (Lote)" abre TireBatchForm | ✅ PASSOU | — |
+| 10 | TireHistoryModal: exibe código do pneu e tabela de histórico | ❌ FALHOU | [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed |
+| 11 | TireForm (edição): abre ao clicar Editar, campo Especificação editável | ⏭️ PULADO | — |
+| 12 | TireForm (edição): salvar alteração persiste na tabela | ⏭️ PULADO | — |
+| 13 | toggle Desativar: modal de confirmação abre e desativa pneu | ⏭️ PULADO | — |
+| 14 | AddModeModal: opção "Por Modelo (Lote)" abre TireBatchForm | ⏭️ PULADO | — |
 
 ## Bugs Encontrados
 
-_Nenhum bug encontrado._
+- **Teste 10 — TireHistoryModal: exibe código do pneu e tabela de histórico**: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed

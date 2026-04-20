@@ -1,553 +1,61 @@
-export type Role = 'Driver' | 'Yard Auditor' | 'Workshop' | 'Fleet Assistant' | 'Fleet Analyst' | 'Supervisor' | 'Manager' | 'Coordinator' | 'Director' | 'Admin Master';
+// ─── Re-export de todos os tipos para compatibilidade ─────────────────────────
+// Este arquivo mantém os imports existentes (`from '../types'`) funcionando.
+// TODO: após migração completa de todos os imports, remover este arquivo.
 
-// ─── Checklist types ──────────────────────────────────────────────────────────
-
-export type VehicleCategory = 'Leve' | 'Médio' | 'Pesado' | 'Elétrico';
-export type TemplateCategory = VehicleCategory;
-export type ChecklistContext = 'Rotina' | 'Auditoria' | 'Reboque' | 'Entrada em Oficina' | 'Saída de Oficina' | 'Segurança';
-export const WORKSHOP_CONTEXTS: ChecklistContext[] = ['Entrada em Oficina', 'Saída de Oficina'];
-export type TemplateStatus = 'draft' | 'published' | 'deprecated';
-export type ChecklistStatus = 'in_progress' | 'completed';
-export type ResponseStatus = 'ok' | 'issue' | 'skipped' | 'not_applicable';
-export type ActionPlanStatus = 'pending' | 'in_progress' | 'awaiting_conclusion' | 'completed' | 'cancelled';
-
-export interface ChecklistItemSuggestion {
-  id: string;
-  vehicleCategory: VehicleCategory;
-  title: string;
-  description?: string;
-  isMandatory: boolean;
-  requirePhotoIfIssue: boolean;
-  defaultAction?: string;
-  orderNumber: number;
-}
-
-export interface ChecklistTemplate {
-  id: string;
-  clientId: string;
-  vehicleCategory: VehicleCategory;
-  context: ChecklistContext;
-  name: string;
-  description?: string;
-  currentVersion: number;
-  status: TemplateStatus;
-  createdBy?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface ChecklistTemplateVersion {
-  id: string;
-  templateId: string;
-  versionNumber: number;
-  publishedAt: string;
-  publishedBy?: string;
-}
-
-export interface ChecklistItem {
-  id: string;
-  templateId: string;
-  versionNumber: number;
-  title: string;
-  description?: string;
-  isMandatory: boolean;
-  requirePhotoIfIssue: boolean;
-  canBlockVehicle: boolean;
-  defaultAction?: string;
-  orderNumber: number;
-}
-
-export interface Checklist {
-  id: string;
-  clientId: string;
-  templateId: string;
-  templateName?: string; // from join
-  templateContext?: ChecklistContext; // from join
-  versionNumber: number;
-  vehicleId?: string;
-  vehicleLicensePlate?: string; // from join
-  filledBy: string;
-  filledByName?: string; // from join
-  startedAt: string;
-  completedAt?: string;
-  status: ChecklistStatus;
-  latitude?: number;
-  longitude?: number;
-  deviceInfo?: string;
-  notes?: string;
-  workshopId?: string;
-  workshopName?: string; // from join
-  odometerKm?: number;
-}
-
-export interface ChecklistResponse {
-  id: string;
-  checklistId: string;
-  itemId: string;
-  itemTitle?: string; // from join
-  status: ResponseStatus;
-  observation?: string;
-  photoUrl?: string;
-  respondedAt: string;
-}
-
-export interface ActionPlan {
-  id: string;
-  clientId: string;
-  checklistId: string;
-  checklistResponseId?: string;
-  vehicleId?: string;
-  vehicleLicensePlate?: string; // from join
-  reportedBy?: string;
-  reportedByName?: string; // from join
-  suggestedAction: string;
-  observedIssue?: string;
-  photoUrl?: string;
-  status: ActionPlanStatus;
-  // v2 fields
-  name?: string;
-  responsibleId?: string;
-  responsibleName?: string; // from join
-  dueDate?: string;
-  assignedBy?: string;
-  assignedByName?: string; // from join
-  claimedBy?: string;
-  claimedByName?: string; // from join
-  claimedAt?: string;
-  conclusionEvidenceUrl?: string;
-  // completion
-  completionNotes?: string;
-  completedBy?: string;
-  completedByName?: string; // from join
-  completedAt?: string;
-  latitude?: number;
-  longitude?: number;
-  createdAt?: string;
-  updatedAt?: string;
-  // from join
-  itemTitle?: string;
-  templateName?: string;
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: Role;
-  clientId: string | null; // null para Workshop no novo modelo (multi-transportadora)
-  canDeleteVehicles: boolean;
-  canDeleteDrivers: boolean;
-  canDeleteWorkshops: boolean;
-  budgetApprovalLimit: number;
-  workshopId?: string; // Populado quando role = 'Workshop' (modelo legado)
-  workshopAccountId?: string; // Populado quando role = 'Workshop' (novo modelo)
-}
-
-// ─── Workshop Partnership Types ───────────────────────────────────────────────
-
-/** Conta independente de oficina, desacoplada de client_id */
-export interface WorkshopAccount {
-  id: string;
-  profileId: string;
-  name: string;
-  cnpj: string;
-  phone?: string;
-  email?: string;
-  contactPerson?: string;
-  addressStreet?: string;
-  addressNumber?: string;
-  addressComplement?: string;
-  addressNeighborhood?: string;
-  addressCity?: string;
-  addressState?: string;
-  addressZip?: string;
-  specialties?: string[];
-  notes?: string;
-  active: boolean;
-}
-
-/** Vínculo M:N entre uma oficina e uma transportadora */
-export interface WorkshopPartnership {
-  id: string;
-  workshopAccountId: string;
-  clientId: string;
-  clientName?: string;
-  clientLogoUrl?: string;
-  legacyWorkshopId?: string;
-  status: 'active' | 'inactive';
-  invitedAt?: string;
-  acceptedAt?: string;
-}
-
-/** Convite gerado por uma transportadora para uma oficina */
-export interface WorkshopInvitation {
-  id: string;
-  clientId: string;
-  clientName?: string;
-  token: string;
-  status: 'pending' | 'accepted' | 'expired' | 'revoked';
-  expiresAt: string;
-  createdAt: string;
-}
-
-export interface Client {
-  id: string;
-  name: string;
-  logoUrl?: string;
-}
-
-export interface Vehicle {
-  id: string;
-  clientId: string;
-  type: 'Passeio' | 'Utilitário' | 'Van' | 'Moto' | 'Vuc' | 'Toco' | 'Truck' | 'Cavalo';
-  energySource: 'Combustão' | 'Elétrico' | 'Híbrido';
-  coolingEquipment: boolean;
-  
-  // Conditional fields
-  semiReboque?: boolean;
-  placaSemiReboque?: string;
-  fuelType?: string;
-  tankCapacity?: number;
-  avgConsumption?: number;
-  coolingBrand?: string;
-
-  // Additional fields
-  licensePlate: string;
-  renavam: string;
-  chassi: string;
-  detranUF: string;
-  brand: string;
-  model: string;
-  year: number;
-  color: string;
-  acquisition: 'Owned' | 'Rented' | 'Agregado';
-  fipePrice: number;
-  tracker: string;
-  antt: string;
-  owner: string;
-  autonomy: number;
-  acquisitionDate?: string;
-  crlvUpload?: string;
-  crlvYear?: string;
-  status?: 'Available' | 'In Use' | 'Maintenance';
-
-  // New fields
-  tag?: string;
-  sanitaryInspectionUpload?: string;
-  spareKey?: boolean;
-  vehicleManual?: boolean;
-  grUpload?: string;
-  grExpirationDate?: string;
-  category?: 'Leve' | 'Médio' | 'Pesado' | 'Elétrico';
-
-  // Especificações de peso/capacidade
-  pbt?: number;   // Peso Bruto Total (t)
-  cmt?: number;   // Capacidade Máxima de Tração (t)
-  eixos?: number; // Número de eixos
-
-  // Associação motorista (1:1)
-  driverId?: string;    // FK → drivers.id (nullable)
-  driverName?: string;  // Nome do motorista (vem do JOIN, não persistido diretamente)
-  shipperId?: string;              // FK → shippers.id (nullable)
-  shipperName?: string;            // from JOIN
-  operationalUnitId?: string;      // FK → operational_units.id (nullable)
-  operationalUnitName?: string;    // from JOIN
-
-  // Garantia & Revisões
-  warranty?: boolean;
-  warrantyEndDate?: string;
-  firstRevisionMaxKm?: number;
-  firstRevisionDeadline?: string;
-  coolingFirstRevisionDeadline?: string;
-
-  // Seguro & Contrato de Manutenção
-  hasInsurance?: boolean;
-  insurancePolicyUpload?: string;
-  hasMaintenanceContract?: boolean;
-  maintenanceContractUpload?: string;
-
-  // Finalidade
-  vehicleUsage?: 'Operação' | 'Uso Administrativo' | 'Uso por Lideranças' | 'Outros';
-
-  // Hodômetro
-  initialKm?: number;
-
-  // Configuração detalhada de eixos
-  axleConfig?: AxleConfigEntry[];
-  stepsCount?: number;  // Estepes de fábrica
-}
-
-export interface Driver {
-  id: string;
-  clientId: string;
-  profileId?: string; // FK → profiles.id — todo motorista é um usuário do sistema
-
-  // Core identity (sempre obrigatórios)
-  name: string;
-  cpf: string;
-
-  // CNH
-  issueDate?: string;
-  expirationDate?: string;
-  cnhUpload?: string;
-  registrationNumber?: string;
-  category?: string; // A, B, AB, AE, etc.
-  renach?: string;
-
-  // GR do motorista
-  grUpload?: string;
-  grExpirationDate?: string;
-
-  // Certificados
-  certificate1Upload?: string;
-  courseName1?: string;
-  certificate2Upload?: string;
-  courseName2?: string;
-  certificate3Upload?: string;
-  courseName3?: string;
-}
-
-export interface Workshop {
-  id: string;
-  clientId: string;
-  name: string;
-  cnpj: string;
-  phone?: string;
-  email?: string;
-  contactPerson?: string;
-  addressStreet?: string;
-  addressNumber?: string;
-  addressComplement?: string;
-  addressNeighborhood?: string;
-  addressCity?: string;
-  addressState?: string;
-  addressZip?: string;
-  specialties?: string[];
-  notes?: string;
-  active: boolean;
-  profileId?: string; // Auth account linked to this workshop (for Workshop login)
-}
-
-export interface Shipper {
-  id: string;
-  clientId: string;
-  name: string;
-  cnpj?: string;
-  phone?: string;
-  email?: string;
-  contactPerson?: string;
-  notes?: string;
-  active: boolean;
-}
-
-export interface OperationalUnit {
-  id: string;
-  clientId: string;
-  shipperId: string;       // FK obrigatória → Shipper
-  shipperName?: string;    // from JOIN
-  name: string;
-  code?: string;
-  city?: string;
-  state?: string;
-  notes?: string;
-  active: boolean;
-}
-
-/** Configuração per-client de quais campos de motorista são opcionais.
- *  `true` = opcional, `false` = obrigatório. Default: tudo obrigatório. */
-export interface DriverFieldSettings {
-  id: string;
-  clientId: string;
-
-  // CNH
-  issueDateOptional: boolean;
-  expirationDateOptional: boolean;
-  cnhUploadOptional: boolean;
-  registrationNumberOptional: boolean;
-  categoryOptional: boolean;
-  renachOptional: boolean;
-
-  // GR
-  grUploadOptional: boolean;
-  grExpirationDateOptional: boolean;
-
-  // Certificados
-  certificate1UploadOptional: boolean;
-  courseName1Optional: boolean;
-  certificate2UploadOptional: boolean;
-  courseName2Optional: boolean;
-  certificate3UploadOptional: boolean;
-  courseName3Optional: boolean;
-}
-
-/** Configuração per-client de quais campos de veículo são opcionais.
- *  `true` = opcional, `false` = obrigatório. Default: tudo obrigatório. */
-export interface VehicleFieldSettings {
-  id: string;
-  clientId: string;
-
-  // Identificação
-  renavamOptional: boolean;
-  chassiOptional: boolean;
-  detranUFOptional: boolean;
-  colorOptional: boolean;
-
-  // Propriedade & Rastreamento
-  ownerOptional: boolean;
-  fipePriceOptional: boolean;
-  trackerOptional: boolean;
-  anttOptional: boolean;
-  autonomyOptional: boolean;
-  acquisitionDateOptional: boolean;
-  tagOptional: boolean;
-  categoryOptional: boolean;
-
-  // Documentos
-  crlvUploadOptional: boolean;
-  sanitaryInspectionOptional: boolean;
-  grUploadOptional: boolean;
-  grExpirationDateOptional: boolean;
-
-  // Condicionais
-  fuelTypeOptional: boolean;
-  tankCapacityOptional: boolean;
-  avgConsumptionOptional: boolean;
-  coolingBrandOptional: boolean;
-  placaSemiReboqueOptional: boolean;
-
-  // Peso & Capacidade
-  pbtOptional: boolean;
-  cmtOptional: boolean;
-  eixosOptional: boolean;
-
-  // Garantia & Revisões
-  warrantyEndDateOptional: boolean;
-  firstRevisionMaxKmOptional: boolean;
-  firstRevisionDeadlineOptional: boolean;
-  coolingFirstRevisionDeadlineOptional: boolean;
-
-  // Seguro & Contrato
-  insurancePolicyUploadOptional: boolean;
-  maintenanceContractUploadOptional: boolean;
-
-  // Finalidade
-  vehicleUsageOptional: boolean;
-
-  // Hodômetro
-  initialKmOptional: boolean;
-}
-
-export type WorkshopScheduleStatus = 'scheduled' | 'completed' | 'cancelled';
-
-export interface WorkshopSchedule {
-  id: string;
-  clientId: string;
-  vehicleId: string;
-  vehicleLicensePlate?: string;       // from JOIN vehicles
-  workshopId: string;
-  workshopName?: string;              // from JOIN workshops
-  workshopAddressStreet?: string;
-  workshopAddressNumber?: string;
-  workshopAddressComplement?: string;
-  workshopAddressNeighborhood?: string;
-  workshopAddressCity?: string;
-  workshopAddressState?: string;
-  workshopAddressZip?: string;
-  scheduledDate: string;              // DATE as 'YYYY-MM-DD'
-  status: WorkshopScheduleStatus;
-  completedAt?: string;
-  checklistId?: string;
-  notes?: string;
-  createdBy: string;
-  createdByName?: string;             // from JOIN profiles
-  createdAt?: string;
-}
-
-// ─── Vehicle KM Intervals ──────────────────────────────────────────────────────
-
-export interface VehicleKmInterval {
-  id: string;
-  clientId: string;
-  vehicleId: string;
-  kmInterval: number | null;
-  updatedAt?: string;
-  updatedBy?: string;
-}
-
-// ─── Checklist Day Intervals ────────────────────────────────────────────────
-
-export interface ChecklistDayInterval {
-  id: string;
-  clientId: string;
-  rotinaDayInterval: number | null;
-  segurancaDayInterval: number | null;
-  updatedAt?: string;
-  updatedBy?: string;
-}
-
-// ─── Tire Management ─────────────────────────────────────────────────────────
-
-export type TireVisualClassification = 'Novo' | 'Meia vida' | 'Troca';
-export type TirePositionType = 'single' | 'dual_external' | 'dual_internal' | 'triple_external' | 'triple_middle' | 'triple_internal' | 'spare';
-
-// ─── Axle Configuration ───────────────────────────────────────────────────────
-
-export type AxleType = 'direcional' | 'simples' | 'duplo' | 'duplo_tandem' | 'triplo_tandem' | 'elevacao';
-export type RodagemType = 'simples' | 'dupla' | 'tripla';
-
-export interface AxleConfigEntry {
-  order: number;          // 1-based sequential order
-  type: AxleType;
-  rodagem: RodagemType;
-  physicalAxles: number;  // 1 for direcional/simples/elevacao, 2 for duplo/duplo_tandem, 3 for triplo_tandem
-}
-
-export interface Tire {
-  id: string;
-  clientId: string;
-  vehicleId: string;
-  tireCode: string;
-  specification: string;
-  dot?: string;
-  fireMarking?: string;
-  manufacturer?: string;
-  brand?: string;
-  rotationIntervalKm?: number;
-  usefulLifeKm?: number;
-  retreadIntervalKm?: number;
-  visualClassification: TireVisualClassification;
-  currentPosition: string;
-  lastPosition?: string;
-  positionType: TirePositionType;
-  active: boolean;
-  createdBy?: string;
-  updatedBy?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  // Campos de JOIN
-  vehicleLicensePlate?: string;
-  vehicleModel?: string;
-  vehicleType?: string;
-}
-
-export interface TirePositionHistory {
-  id: string;
-  clientId: string;
-  tireId: string;
-  vehicleId: string;
-  previousPosition?: string;
-  newPosition: string;
-  movedAt: string;
-  movedBy: string;
-  movedByName?: string;
-  reason?: string;
-  odometerKm?: number;
-}
-
-export interface VehicleTireConfig {
-  id: string;
-  vehicleType: string;
-  defaultAxles: number;
-  defaultSpareCount: number;
-  dualAxles: number[];
-}
+export type { Role } from './types/role';
+export type { User, Client } from './types/user';
+export type { Vehicle, VehicleFieldSettings, VehicleKmInterval } from './types/vehicle';
+export type { Driver, DriverFieldSettings } from './types/driver';
+export type {
+  MaintenanceStatus,
+  MaintenanceType,
+  BudgetStatus,
+  MaintenanceOrder,
+  BudgetItem,
+  MaintenanceOrderRow,
+  MaintenanceBudgetItemRow,
+  MaintenanceOrderDashboard,
+} from './types/maintenance';
+export type {
+  VehicleCategory,
+  TemplateCategory,
+  ChecklistContext,
+  TemplateStatus,
+  ChecklistStatus,
+  ResponseStatus,
+  ActionPlanStatus,
+  ChecklistItemSuggestion,
+  ChecklistTemplate,
+  ChecklistTemplateVersion,
+  ChecklistItem,
+  Checklist,
+  ChecklistResponse,
+  ActionPlan,
+  ChecklistDayInterval,
+} from './types/checklist';
+export { WORKSHOP_CONTEXTS } from './types/checklist';
+export type {
+  TireVisualClassification,
+  TirePositionType,
+  AxleType,
+  RodagemType,
+  AxleConfigEntry,
+  Tire,
+  TirePositionHistory,
+  VehicleTireConfig,
+} from './types/tire';
+export type {
+  Workshop,
+  WorkshopAccount,
+  WorkshopPartnership,
+  WorkshopInvitation,
+  WorkshopScheduleStatus,
+  WorkshopSchedule,
+} from './types/workshop';
+export type { Shipper, OperationalUnit } from './types/shipper';
+export type {
+  TireInspectionStatus,
+  TireInspectionResponseStatus,
+  TireInspection,
+  TireInspectionResponse,
+} from './types/tireInspection';

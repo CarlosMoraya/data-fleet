@@ -1,5 +1,5 @@
 # Relatório E2E — Tire Management (Fleet Assistant)
-Data: 05/04/2026, 19:38:23
+Data: 06/04/2026, 04:51:34
 
 **Resumo:** 2 passaram · 0 falharam · 0 pulados
 

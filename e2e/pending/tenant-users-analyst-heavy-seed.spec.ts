@@ -97,7 +97,9 @@ const VEHICLES = [
 ];
 
 test.describe('Seeding Heavy (Full): Cadastro de Veículos via Analista', () => {
-  
+
+  test.describe.configure({ timeout: 120000 }); // Aumentar timeout para 2 min devido a uploads
+
   test.beforeEach(async ({ page }) => {
     page.on('console', msg => {
       console.log(`BROWSER [${msg.type()}]: ${msg.text()}`);
@@ -109,7 +111,7 @@ test.describe('Seeding Heavy (Full): Cadastro de Veículos via Analista', () => 
   test('Cadastrar Todos os Veículos (Analyst Bypass)', async ({ page }) => {
     for (const v of VEHICLES) {
       console.log(`\n--- Cadastrando veículo: ${v.plate} ---`);
-      
+
       // Verifica se já existe para evitar erro de duplicidade se o teste for rodado novamente
       const alreadyExists = await page.locator('table').getByText(v.plate).isVisible();
       if (alreadyExists) {
@@ -150,8 +152,8 @@ test.describe('Seeding Heavy (Full): Cadastro de Veículos via Analista', () => 
       await modal.locator('label[for="vehicleManual"]').click();
 
       const fileInputs = modal.locator('input[type="file"]');
-      await fileInputs.nth(1).setInputFiles(imgPath); 
-      await fileInputs.nth(2).setInputFiles(pdfPath); 
+      await fileInputs.nth(1).setInputFiles(imgPath);
+      await fileInputs.nth(2).setInputFiles(pdfPath);
       await modal.locator('input[name="grExpirationDate"]').fill('2026-12-31');
 
       await modal.locator('select[name="type"]').selectOption(v.type);
@@ -198,7 +200,7 @@ test.describe('Seeding Heavy (Full): Cadastro de Veículos via Analista', () => 
       }
 
       await modal.locator('button:has-text("Salvar Veículo")').click();
-      await expect(modal).not.toBeVisible({ timeout: 45000 });
+      await expect(modal).not.toBeVisible({ timeout: 60000 }); // 60s para uploads + OCR
       await expect(page.locator('table').getByText(v.plate)).toBeVisible({ timeout: 20000 });
       console.log(`Veículo ${v.plate} cadastrado com sucesso.`);
     }

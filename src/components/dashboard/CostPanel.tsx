@@ -3,11 +3,8 @@ import { DollarSign, Truck, Gauge, Loader2 } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
 import VehicleTypeBarChart from './VehicleTypeBarChart';
 import MaintenanceTypeDonutChart from './MaintenanceTypeDonutChart';
-import type {
-  VehicleRow,
-  MaintenanceOrderDashboard,
-  DashboardFilters,
-} from './OperationalPanel';
+import type { VehicleRow, DashboardFilters } from './OperationalPanel';
+import type { MaintenanceOrderDashboard } from '../../types/maintenance';
 
 const VEHICLE_TYPES = ['Passeio', 'Utilitário', 'Van', 'Moto', 'Vuc', 'Toco', 'Truck', 'Cavalo'];
 const MAINTENANCE_TYPES = ['Corretiva', 'Preventiva', 'Preditiva'] as const;
@@ -161,11 +158,11 @@ export default function CostPanel({
   // Donut: custo por tipo de manutenção
   const ordersForDonut = filters.vehicleType
     ? maintenanceOrders.filter((o) => {
-        const vIds = new Set(
-          vehicles.filter((v) => v.type === filters.vehicleType).map((v) => v.id)
-        );
-        return vIds.has(o.vehicle_id);
-      })
+      const vIds = new Set(
+        vehicles.filter((v) => v.type === filters.vehicleType).map((v) => v.id)
+      );
+      return vIds.has(o.vehicle_id);
+    })
     : maintenanceOrders;
 
   const costByMaintenanceTypeData = MAINTENANCE_TYPES.map((t) => ({
@@ -243,7 +240,7 @@ export default function CostPanel({
           <VehicleTypeBarChart
             data={costByShipperData}
             activeFilter={null}
-            onFilterChange={() => {}}
+            onFilterChange={() => { }}
             title="Custo por Embarcador"
             valueFormatter={formatCurrency}
             yAxisLabel="R$"
@@ -253,7 +250,7 @@ export default function CostPanel({
           <VehicleTypeBarChart
             data={costByOpUnitData}
             activeFilter={null}
-            onFilterChange={() => {}}
+            onFilterChange={() => { }}
             title="Custo por Unidade Operacional"
             valueFormatter={formatCurrency}
             yAxisLabel="R$"

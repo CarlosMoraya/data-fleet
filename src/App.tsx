@@ -31,6 +31,7 @@ import WorkshopSchedules from './pages/WorkshopSchedules';
 import BudgetApprovals from './pages/BudgetApprovals';
 import Tires from './pages/Tires';
 import WorkshopJoin from './pages/WorkshopJoin';
+import TireInspectionFill from './pages/TireInspectionFill';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -75,6 +76,7 @@ export default function App() {
               <Route path="users" element={<Navigate to="/cadastros/usuarios" replace />} />
               <Route path="checklists" element={<Checklists />} />
               <Route path="checklists/preencher/:checklistId" element={<ChecklistFill />} />
+              <Route path="inspecao-pneus/:inspectionId" element={<TireInspectionFill />} />
               <Route path="checklist-templates" element={<ChecklistTemplates />} />
               <Route path="acoes" element={<ActionPlans />} />
               <Route path="agendamentos" element={<WorkshopSchedules />} />

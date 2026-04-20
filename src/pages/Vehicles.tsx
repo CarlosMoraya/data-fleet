@@ -3,13 +3,14 @@ import { Navigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { Vehicle, VehicleFieldSettings } from '../types';
-import { Plus, Search, Filter, Edit2, Trash2, Truck, User, Eye } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Truck, User, Eye } from 'lucide-react';
 import VehicleForm from '../components/VehicleForm';
 import VehicleDetailModal from '../components/VehicleDetailModal';
 import { supabase } from '../lib/supabase';
-import { vehicleFromRow, vehicleToRow, VehicleRow } from '../lib/vehicleMappers';
-import { uploadVehicleDocument, deleteVehicleDocument } from '../lib/storageHelpers';
+import { vehicleFromRow, VehicleRow } from '../lib/vehicleMappers';
 import { fieldSettingsFromRow, defaultFieldSettings, VehicleFieldSettingsRow } from '../lib/fieldSettingsMappers';
+import { saveVehicle, deleteVehicle } from '../services/vehicleService';
+import type { VehicleFiles } from '../services/vehicleService';
 
 interface AvailableDriver {
   id: string;
@@ -151,61 +152,10 @@ export default function Vehicles() {
   const saveMutation = useMutation({
     mutationFn: async ({ vehicle, files }: {
       vehicle: Partial<Vehicle>;
-      files: { crlv: File | null; sanitaryInspection: File | null; gr: File | null; insurancePolicy: File | null; maintenanceContract: File | null };
+      files: VehicleFiles;
     }) => {
       if (!currentClient?.id) throw new Error('Sessão inválida');
-      const row = vehicleToRow(vehicle, currentClient.id);
-
-      let savedId = editingVehicle?.id;
-
-      if (editingVehicle) {
-        const { error: updateError } = await supabase
-          .from('vehicles')
-          .update(row)
-          .eq('id', editingVehicle.id);
-        if (updateError) throw updateError;
-      } else {
-        const { data: inserted, error: insertError } = await supabase
-          .from('vehicles')
-          .insert(row)
-          .select('id')
-          .single();
-        if (insertError) throw insertError;
-        savedId = inserted.id;
-      }
-
-      if (savedId) {
-        const urlUpdates: Record<string, string> = {};
-
-        if (files.crlv) {
-          if (vehicle.crlvUpload) await deleteVehicleDocument(vehicle.crlvUpload);
-          urlUpdates.crlv_upload = await uploadVehicleDocument(currentClient.id, savedId, files.crlv, 'crlv');
-        }
-        if (files.sanitaryInspection) {
-          if (vehicle.sanitaryInspectionUpload) await deleteVehicleDocument(vehicle.sanitaryInspectionUpload);
-          urlUpdates.sanitary_inspection_upload = await uploadVehicleDocument(currentClient.id, savedId, files.sanitaryInspection, 'sanitary-inspection');
-        }
-        if (files.gr) {
-          if (vehicle.grUpload) await deleteVehicleDocument(vehicle.grUpload);
-          urlUpdates.gr_upload = await uploadVehicleDocument(currentClient.id, savedId, files.gr, 'gr');
-        }
-        if (files.insurancePolicy) {
-          if (vehicle.insurancePolicyUpload) await deleteVehicleDocument(vehicle.insurancePolicyUpload);
-          urlUpdates.insurance_policy_upload = await uploadVehicleDocument(currentClient.id, savedId, files.insurancePolicy, 'insurance-policy');
-        }
-        if (files.maintenanceContract) {
-          if (vehicle.maintenanceContractUpload) await deleteVehicleDocument(vehicle.maintenanceContractUpload);
-          urlUpdates.maintenance_contract_upload = await uploadVehicleDocument(currentClient.id, savedId, files.maintenanceContract, 'maintenance-contract');
-        }
-
-        if (Object.keys(urlUpdates).length > 0) {
-          const { error: updateUrlError } = await supabase
-            .from('vehicles')
-            .update(urlUpdates)
-            .eq('id', savedId);
-          if (updateUrlError) throw updateUrlError;
-        }
-      }
+      return saveVehicle(currentClient.id, vehicle, files, editingVehicle?.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vehicles', currentClient?.id] });
@@ -220,24 +170,14 @@ export default function Vehicles() {
 
   const handleSave = async (
     vehicle: Partial<Vehicle>,
-    files: { crlv: File | null; sanitaryInspection: File | null; gr: File | null; insurancePolicy: File | null; maintenanceContract: File | null }
+    files: VehicleFiles
   ): Promise<void> => {
     await saveMutation.mutateAsync({ vehicle, files });
   };
 
   const deleteMutation = useMutation({
     mutationFn: async (vehicle: Vehicle) => {
-      if (vehicle.crlvUpload) await deleteVehicleDocument(vehicle.crlvUpload);
-      if (vehicle.sanitaryInspectionUpload) await deleteVehicleDocument(vehicle.sanitaryInspectionUpload);
-      if (vehicle.grUpload) await deleteVehicleDocument(vehicle.grUpload);
-      if (vehicle.insurancePolicyUpload) await deleteVehicleDocument(vehicle.insurancePolicyUpload);
-      if (vehicle.maintenanceContractUpload) await deleteVehicleDocument(vehicle.maintenanceContractUpload);
-
-      const { error: deleteError } = await supabase
-        .from('vehicles')
-        .delete()
-        .eq('id', vehicle.id);
-      if (deleteError) throw deleteError;
+      await deleteVehicle(vehicle);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vehicles', currentClient?.id] });
@@ -277,7 +217,7 @@ export default function Vehicles() {
         {canCreate && (
           <button
             onClick={() => {
-              sessionStorage.removeItem('vehicleFormData'); 
+              sessionStorage.removeItem('vehicleFormData');
               sessionStorage.setItem('vehicleFormOpen', 'true');
               sessionStorage.removeItem('vehicleFormEditing');
               setEditingVehicle(null);
@@ -304,10 +244,6 @@ export default function Vehicles() {
             placeholder="Buscar por placa, modelo ou chassi..."
           />
         </div>
-        <button className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 transition-colors">
-          <Filter className="-ml-1 mr-2 h-5 w-5 text-zinc-400" aria-hidden="true" />
-          Filtros
-        </button>
       </div>
 
       {vehiclesError && (

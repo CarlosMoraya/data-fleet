@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Driver, DriverFieldSettings } from '../types';
@@ -6,28 +6,11 @@ import { Plus, Search, Edit2, Trash2, UserCircle, Truck, Eye } from 'lucide-reac
 import DriverForm from '../components/DriverForm';
 import DriverDetailModal from '../components/DriverDetailModal';
 import { supabase } from '../lib/supabase';
-
-const invokeFn = async (fnName: string, body: object) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Sessão expirada. Faça login novamente.');
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(json?.error ?? json?.message ?? `HTTP ${res.status}`);
-  return json;
-};
-import { driverFromRow, driverToRow, DriverRow } from '../lib/driverMappers';
-import { uploadDriverDocument, deleteDriverDocument } from '../lib/storageHelpers';
+import { driverFromRow, DriverRow } from '../lib/driverMappers';
 import { driverFieldSettingsFromRow, defaultDriverFieldSettings, DriverFieldSettingsRow } from '../lib/driverFieldSettingsMappers';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { saveDriver, deleteDriver } from '../services/driverService';
+import type { DriverFiles } from '../services/driverService';
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -114,65 +97,12 @@ export default function Drivers() {
 
   const handleSave = async (
     driver: Partial<Driver>,
-    files: { cnh: File | null; gr: File | null; certificate1: File | null; certificate2: File | null; certificate3: File | null }
+    files: DriverFiles
   ): Promise<void> => {
     if (!currentClient?.id) return;
-    const row = driverToRow(driver, currentClient.id);
-
-    let savedId = editingDriver?.id;
-
-    if (editingDriver) {
-      const { error: updateError } = await supabase
-        .from('drivers')
-        .update(row)
-        .eq('id', editingDriver.id);
-      if (updateError) throw updateError;
-    } else {
-      const { data: inserted, error: insertError } = await supabase
-        .from('drivers')
-        .insert(row)
-        .select('id')
-        .single();
-      if (insertError) throw insertError;
-      savedId = inserted.id;
-    }
-
-    if (savedId) {
-      const urlUpdates: Record<string, string> = {};
-
-      if (files.cnh) {
-        if (driver.cnhUpload) await deleteDriverDocument(driver.cnhUpload);
-        urlUpdates.cnh_upload = await uploadDriverDocument(currentClient.id, savedId, files.cnh, 'cnh');
-      }
-      if (files.gr) {
-        if (driver.grUpload) await deleteDriverDocument(driver.grUpload);
-        urlUpdates.gr_upload = await uploadDriverDocument(currentClient.id, savedId, files.gr, 'gr');
-      }
-      if (files.certificate1) {
-        if (driver.certificate1Upload) await deleteDriverDocument(driver.certificate1Upload);
-        urlUpdates.certificate1_upload = await uploadDriverDocument(currentClient.id, savedId, files.certificate1, 'certificate-1');
-      }
-      if (files.certificate2) {
-        if (driver.certificate2Upload) await deleteDriverDocument(driver.certificate2Upload);
-        urlUpdates.certificate2_upload = await uploadDriverDocument(currentClient.id, savedId, files.certificate2, 'certificate-2');
-      }
-      if (files.certificate3) {
-        if (driver.certificate3Upload) await deleteDriverDocument(driver.certificate3Upload);
-        urlUpdates.certificate3_upload = await uploadDriverDocument(currentClient.id, savedId, files.certificate3, 'certificate-3');
-      }
-
-      if (Object.keys(urlUpdates).length > 0) {
-        const { error: updateUrlError } = await supabase
-          .from('drivers')
-          .update(urlUpdates)
-          .eq('id', savedId);
-        if (updateUrlError) throw updateUrlError;
-      }
-    }
-
+    await saveDriver(currentClient.id, driver, files, editingDriver?.id);
     queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] });
     queryClient.invalidateQueries({ queryKey: ['driverVehicleMap', currentClient?.id] });
-    
     setIsFormOpen(false);
     setEditingDriver(null);
     sessionStorage.removeItem('driverFormOpen');
@@ -184,25 +114,7 @@ export default function Drivers() {
     if (!window.confirm(`Excluir o motorista ${driver.name}? Esta ação não pode ser desfeita.`)) return;
 
     try {
-      // Delete documents from Storage first
-      if (driver.cnhUpload) await deleteDriverDocument(driver.cnhUpload);
-      if (driver.grUpload) await deleteDriverDocument(driver.grUpload);
-      if (driver.certificate1Upload) await deleteDriverDocument(driver.certificate1Upload);
-      if (driver.certificate2Upload) await deleteDriverDocument(driver.certificate2Upload);
-      if (driver.certificate3Upload) await deleteDriverDocument(driver.certificate3Upload);
-
-      const { error: deleteError } = await supabase
-        .from('drivers')
-        .delete()
-        .eq('id', driver.id);
-
-      if (deleteError) throw deleteError;
-
-      // Delete associated user account (profile + auth.users)
-      if (driver.profileId) {
-        await invokeFn('create-user', { action: 'delete', user_id: driver.profileId });
-      }
-
+      await deleteDriver(driver);
       queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] });
       queryClient.invalidateQueries({ queryKey: ['driverVehicleMap', currentClient?.id] });
     } catch (err) {

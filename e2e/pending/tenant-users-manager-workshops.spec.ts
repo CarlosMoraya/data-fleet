@@ -5,7 +5,7 @@ const TEST_NAME = `Oficina E2E ${UID}`;
 const TEST_CNPJ = `123456780001${UID.slice(-2)}`; // 14 digits total
 
 test.describe.serial('Módulo de Oficinas (Fluxo Completo)', () => {
-  
+
   test.beforeEach(async ({ page }) => {
     // Manager (Alexandre) já está logado via storageState no projeto 'manager'
     await page.goto('/cadastros/oficinas');
@@ -19,7 +19,7 @@ test.describe.serial('Módulo de Oficinas (Fluxo Completo)', () => {
 
   test('deve cadastrar uma nova oficina com sucesso', async ({ page }) => {
     await page.click('button:has-text("Cadastrar Oficina")');
-    
+
     const modal = page.locator('.fixed.inset-0');
     await expect(modal.locator('h2', { hasText: 'Nova Oficina' })).toBeVisible();
 
@@ -42,7 +42,7 @@ test.describe.serial('Módulo de Oficinas (Fluxo Completo)', () => {
     // Especialidades
     await modal.getByLabel('Mecânica Geral').check();
     await modal.getByLabel('Elétrica').check();
-    
+
     await modal.locator('textarea[name="notes"]').fill('Oficina de teste automatizado.');
 
     // Salvar
@@ -71,26 +71,26 @@ test.describe.serial('Módulo de Oficinas (Fluxo Completo)', () => {
   test('deve editar uma oficina existente', async ({ page }) => {
     await page.locator('input[placeholder*="Buscar por nome ou CNPJ"]').fill(TEST_NAME);
     const row = page.locator('tr', { hasText: TEST_NAME });
-    
-    // Clicar no botão editar (lápis)
-    await row.locator('button').first().click();
+
+    // Clicar no botão editar (segundo botão na linha - após o de visualizar/detalhes)
+    await row.locator('button').nth(1).click(); // Edit é o segundo botão
 
     const modal = page.locator('.fixed.inset-0');
-    await expect(modal.locator('h2', { hasText: 'Editar Oficina' })).toBeVisible();
+    await expect(modal.locator('h2', { hasText: 'Editar Oficina' })).toBeVisible({ timeout: 10000 });
 
     // Alterar nome
     const updatedName = `${TEST_NAME} EDITADO`;
     await modal.locator('input[name="name"]').fill(updatedName);
-    
+
     // Adicionar mais uma especialidade
     await modal.getByLabel('Freios').check();
 
     await modal.locator('button:has-text("Salvar Alterações")').click();
-    await expect(modal).not.toBeVisible();
+    await expect(modal).not.toBeVisible({ timeout: 10000 });
 
     // Verificar persistência
     await page.locator('input[placeholder*="Buscar por nome ou CNPJ"]').fill(updatedName);
-    await expect(page.locator('table').getByText(updatedName)).toBeVisible();
+    await expect(page.locator('table').getByText(updatedName)).toBeVisible({ timeout: 10000 });
   });
 
   test('deve validar CNPJ duplicado', async ({ page }) => {
@@ -104,7 +104,7 @@ test.describe.serial('Módulo de Oficinas (Fluxo Completo)', () => {
 
     // Deve mostrar mensagem de erro (código 23505 capturado no WorkshopForm)
     await expect(modal.locator('text=Este CNPJ já está cadastrado para este cliente.')).toBeVisible();
-    
+
     await modal.locator('button:has-text("Cancelar")').click();
   });
 

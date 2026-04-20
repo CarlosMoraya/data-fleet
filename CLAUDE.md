@@ -1,6 +1,13 @@
 # CLAUDE.md — Context Router
 
 > **Instrução de Entrada**: Sempre leia este índice antes de qualquer ação. Identifique a categoria da tarefa e carregue o módulo de contexto correspondente ANTES de codificar.
+>
+> ⚠️ **PROTOCOLO DE NOVO MÓDULO/FUNCIONALIDADE (LEIA SEMPRE)**:
+> Se o usuário pedir para **criar** qualquer coisa nova (módulo, página, funcionalidade, CRUD, relatório, formulário, etc.),
+> **NÃO comece a codar**. Leia `NovoModulo.md` primeiro e siga TODAS as fases descritas lá.
+> Palavras-gatilho que ativam este protocolo: `criar`, `novo`, `novo módulo`, `nova página`, `nova funcionalidade`,
+> `quero um módulo de`, `adicione`, `implemente do zero`, `construa`.
+> Isso é obrigatório — sem exceção.
 
 ---
 

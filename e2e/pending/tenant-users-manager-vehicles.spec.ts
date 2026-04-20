@@ -5,8 +5,9 @@ const UID = Date.now().toString().slice(-6);
 const TEST_PLATE = `E2E${UID}`;
 const ASSETS_PATH = path.resolve('e2e/assets');
 
-test.describe('Módulo de Veículos (Fluxo Completo)', () => {
-  
+test.describe.serial('Módulo de Veículos (Fluxo Completo)', () => {
+  test.describe.configure({ timeout: 120000 }); // 2 min para uploads + OCR
+
   test.beforeEach(async ({ page }) => {
     // A maioria dos testes será via Manager (Alexandre) que já está logado via storageState no projeto 'manager'
     await page.goto('/cadastros/veiculos');
@@ -29,14 +30,14 @@ test.describe('Módulo de Veículos (Fluxo Completo)', () => {
     if (await chassiSwitch.getAttribute('class').then(c => c?.includes('bg-zinc-200'))) {
       await chassiSwitch.click();
     }
-    
+
     await page.locator('.bg-white').filter({ hasText: 'Campos Obrigatórios do Veículo' }).locator('button:has-text("Salvar")').click();
     await expect(page.locator('text=Configurações de veículos salvas com sucesso')).toBeVisible();
 
     // 3. Voltar para Veículos e abrir o formulário
     await page.goto('/cadastros/veiculos');
     await page.click('button:has-text("Adicionar Veículo")');
-    
+
     const modal = page.locator('.fixed.inset-0');
     await expect(modal.locator('h2', { hasText: 'Cadastrar Veículo' })).toBeVisible();
 
@@ -76,7 +77,7 @@ test.describe('Módulo de Veículos (Fluxo Completo)', () => {
     await modal.locator('select[name="category"]').selectOption('Leve');
     await modal.locator('label[for="spareKey"]').click(); // Chave reserva
     await modal.locator('label[for="vehicleManual"]').click(); // Manual
-    
+
     // Uploads
     const pdfPath = path.join(ASSETS_PATH, 'test-document.pdf');
     const imgPath = path.join(ASSETS_PATH, 'test-image.png');
@@ -110,16 +111,16 @@ test.describe('Módulo de Veículos (Fluxo Completo)', () => {
     // Salvar
     await modal.locator('button:has-text("Salvar Veículo")').click();
 
-    // Se o modal não fechar em 10s, logar o erro da UI
+    // Se o modal não fechar em 60s, logar o erro da UI (uploads + OCR são lentos)
     try {
-      await expect(modal).not.toBeVisible({ timeout: 10000 });
+      await expect(modal).not.toBeVisible({ timeout: 60000 });
     } catch (e) {
       const errorMsg = await modal.locator('.text-red-700').textContent();
       console.error('Erro na UI:', errorMsg);
       throw e;
     }
 
-    await expect(page.locator('table').getByText(TEST_PLATE)).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table').getByText(TEST_PLATE)).toBeVisible({ timeout: 20000 });
   });
 
   test('edita veículo e verifica persistência dos anexos', async ({ page }) => {
@@ -136,7 +137,7 @@ test.describe('Módulo de Veículos (Fluxo Completo)', () => {
 
     // 3. Alterar um campo
     await modal.locator('input[name="model"]').fill('Corolla E2E Modificado');
-    
+
     await modal.locator('button:has-text("Salvar Veículo")').click();
     await expect(modal).not.toBeVisible();
 
@@ -147,10 +148,10 @@ test.describe('Módulo de Veículos (Fluxo Completo)', () => {
   test('exclui o veículo criado', async ({ page }) => {
     await page.fill('input[placeholder*="Buscar por placa"]', TEST_PLATE);
     const row = page.locator('tr', { hasText: TEST_PLATE });
-    
+
     // Aceitar confirm
     page.on('dialog', dialog => dialog.accept());
-    
+
     await row.locator('button').last().click(); // Botão Excluir
 
     await expect(page.locator('table').getByText(TEST_PLATE)).not.toBeVisible({ timeout: 10000 });

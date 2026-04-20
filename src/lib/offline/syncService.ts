@@ -1,6 +1,7 @@
 import { offlineDb, type SyncOperation, type SyncQueueEntry } from './offlineDb';
 import { supabase } from '../supabase';
 import { uploadChecklistPhoto } from '../checklistStorageHelpers';
+import { autoCompleteWorkshopSchedule } from '../workshopScheduleUtils';
 
 // ─── Concurrency guard ────────────────────────────────────────────────────────
 
@@ -11,10 +12,12 @@ let isFlushRunning = false;
 export async function enqueueOperation(
   op: SyncOperation,
   checklistId: string,
+  inspectionId?: string,
 ): Promise<number> {
   return offlineDb.syncQueue.add({
     createdAt: Date.now(),
     checklistId,
+    inspectionId,
     op,
     status: 'pending',
     retryCount: 0,
@@ -84,7 +87,7 @@ export async function flushQueue(): Promise<void> {
 // ─── Process a single entry ───────────────────────────────────────────────────
 
 async function processEntry(entry: SyncQueueEntry): Promise<void> {
-  const { op, checklistId } = entry;
+  const { op, checklistId, inspectionId } = entry;
 
   switch (op.type) {
     case 'save_response': {
@@ -145,40 +148,80 @@ async function processEntry(entry: SyncQueueEntry): Promise<void> {
         .eq('id', checklistId);
       if (chkErr) throw chkErr;
 
-      // Auto-concluir agendamento de oficina (mesma lógica do finishMutation online)
+      // Auto-concluir agendamento de oficina
       if (op.templateContext === 'Entrada em Oficina' && op.workshopId && op.vehicleId) {
-        const { data: matchingSchedule } = await supabase
-          .from('workshop_schedules')
-          .select('id')
-          .eq('vehicle_id', op.vehicleId)
-          .eq('workshop_id', op.workshopId)
-          .eq('status', 'scheduled')
-          .order('scheduled_date', { ascending: true })
-          .limit(1)
-          .maybeSingle();
+        await autoCompleteWorkshopSchedule(
+          op.vehicleId,
+          op.workshopId,
+          op.completedAt,
+          checklistId,
+        );
+      }
+      break;
+    }
 
-        if (matchingSchedule) {
-          await supabase
-            .from('workshop_schedules')
-            .update({
-              status: 'completed',
-              completed_at: op.completedAt,
-              checklist_id: checklistId,
-            })
-            .eq('id', matchingSchedule.id);
+    // ── Tire inspection operations ──────────────────────────────────────────
+
+    case 'save_tire_response': {
+      if (!inspectionId) throw new Error('inspectionId missing for save_tire_response');
+
+      let photoUrl = op.photoUrl;
+
+      if (op.pendingPhotoKey) {
+        const photoRecord = await offlineDb.photoBlobs.get(op.pendingPhotoKey);
+        if (photoRecord) {
+          const safeCode = op.positionCode.replace(/\s+/g, '_');
+          const path = `${photoRecord.clientId}/tire-inspections/${inspectionId}/${safeCode}/${Date.now()}.jpg`;
+          const { error: upErr } = await supabase.storage
+            .from('checklist-photos')
+            .upload(path, photoRecord.blob, { contentType: 'image/jpeg', upsert: true });
+          if (upErr) throw upErr;
+          photoUrl = supabase.storage.from('checklist-photos').getPublicUrl(path).data.publicUrl;
+          await offlineDb.photoBlobs.delete(op.pendingPhotoKey);
         }
       }
+
+      const { error: respErr } = await supabase.from('tire_inspection_responses').upsert(
+        {
+          inspection_id: inspectionId,
+          position_code: op.positionCode,
+          position_label: op.positionCode,
+          tire_id: op.tireId ?? null,
+          dot: op.dot ?? null,
+          fire_marking: op.fireMarking ?? null,
+          manufacturer: op.manufacturer,
+          brand: op.brand,
+          photo_url: photoUrl,
+          photo_timestamp: op.photoTimestamp,
+          status: op.status,
+          observation: op.observation ?? null,
+          responded_at: op.respondedAt,
+        },
+        { onConflict: 'inspection_id,position_code' },
+      );
+      if (respErr) throw respErr;
+      break;
+    }
+
+    case 'confirm_tire_km': {
+      if (!inspectionId) throw new Error('inspectionId missing for confirm_tire_km');
+      const { error: kmErr } = await supabase
+        .from('tire_inspections')
+        .update({ odometer_km: op.odometerKm })
+        .eq('id', inspectionId);
+      if (kmErr) throw kmErr;
+      break;
+    }
+
+    case 'finish_tire_inspection': {
+      if (!inspectionId) throw new Error('inspectionId missing for finish_tire_inspection');
+      const { error: finErr } = await supabase
+        .from('tire_inspections')
+        .update({ status: 'completed', completed_at: op.completedAt })
+        .eq('id', inspectionId);
+      if (finErr) throw finErr;
       break;
     }
   }
 }
 
-// ─── Pending count (for external use without Dexie liveQuery) ─────────────────
-
-export async function getPendingCount(checklistId: string): Promise<number> {
-  return offlineDb.syncQueue
-    .where('checklistId')
-    .equals(checklistId)
-    .and(e => e.status === 'pending' || e.status === 'syncing')
-    .count();
-}

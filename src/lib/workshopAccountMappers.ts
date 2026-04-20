@@ -54,28 +54,6 @@ export interface WorkshopInvitationRow {
 
 // ─── Conversores: banco → frontend ───────────────────────────────────────────
 
-export function workshopAccountFromRow(row: WorkshopAccountRow): WorkshopAccount {
-  return {
-    id: row.id,
-    profileId: row.profile_id,
-    name: row.name,
-    cnpj: row.cnpj,
-    phone: row.phone ?? undefined,
-    email: row.email ?? undefined,
-    contactPerson: row.contact_person ?? undefined,
-    addressStreet: row.address_street ?? undefined,
-    addressNumber: row.address_number ?? undefined,
-    addressComplement: row.address_complement ?? undefined,
-    addressNeighborhood: row.address_neighborhood ?? undefined,
-    addressCity: row.address_city ?? undefined,
-    addressState: row.address_state ?? undefined,
-    addressZip: row.address_zip ?? undefined,
-    specialties: row.specialties ?? undefined,
-    notes: row.notes ?? undefined,
-    active: row.active,
-  };
-}
-
 export function workshopPartnershipFromRow(row: WorkshopPartnershipRow): WorkshopPartnership {
   return {
     id: row.id,

@@ -44,10 +44,6 @@ export function totalPhysicalAxles(entries: AxleConfigEntry[]): number {
   return entries.reduce((sum, e) => sum + e.physicalAxles, 0);
 }
 
-export function isConfigComplete(entries: AxleConfigEntry[], targetAxles: number): boolean {
-  return totalPhysicalAxles(entries) === targetAxles;
-}
-
 // ─── Label helpers ─────────────────────────────────────────────────────────────
 
 export const AXLE_TYPE_LABELS: Record<AxleType, string> = {

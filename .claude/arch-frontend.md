@@ -315,3 +315,72 @@ dashboard-drivers     → drivers: id, expiration_date
 ### `src/lib/tireMappers.ts`
 - `TireRow`, `TirePositionHistoryRow`, `VehicleTireConfigRow` (snake_case)
 - `tireFromRow()`, `tireToRow()`, `tireHistoryFromRow()`, `vehicleTireConfigFromRow()`
+
+## React Query & State Persistence (2026-04-12)
+
+### React Query Configuration (`src/lib/react-query.ts`)
+
+Global defaults de cache para melhorar UX de navegação:
+```ts
+QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 3,      // 3 minutos — dados considerados frescos por 3 min
+      gcTime: 1000 * 60 * 15,        // 15 minutos — cache na memória por sessão típica
+      retry: 1,                       // 1 tentativa em falhas
+      refetchOnWindowFocus: true,     // Revalida ao voltar para a aba se dados > 3 min
+    },
+  },
+});
+```
+
+**Comportamento:**
+- **< 3 min entre navegações**: dados retornam instantaneamente da cache (sem refetch)
+- **3-15 min entre navegações**: dados aparecem imediatamente da cache + revalidação silenciosa em background (sem spinner)
+- **> 15 min**: cache expira, próxima query dispara refetch normal
+- **Troca de aba/browser focus**: refetch automático apenas se dados tiverem > 3 min de idade
+
+**Exceções (staleTime/gcTime maiores):**
+- `Dashboard.tsx`: staleTime 5 min, gcTime 30 min (dados menos volateis, atualização menos crítica)
+- `ChecklistFill.tsx`: gcTime Infinity, networkMode 'offlineFirst' (suporte offline com sincronização)
+
+### Form State Persistence via sessionStorage
+
+**Padrão:** Páginas de CRUD (Maintenance, Tires, ChecklistTemplates, etc.) persistem estado de formulários abertos no `sessionStorage` para que ao navegar e voltar, o formulário reabre com dados preenchidos.
+
+**Implementação em cada página:**
+
+```tsx
+// Inicializar estado do formulário a partir de sessionStorage
+const [isFormOpen, setIsFormOpen] = useState<boolean>(() =>
+  sessionStorage.getItem('maintenanceFormOpen') === 'true'
+);
+const [editingOrder, setEditingOrder] = useState<MaintenanceOrder | null>(() => {
+  const saved = sessionStorage.getItem('maintenanceFormEditing');
+  return saved ? JSON.parse(saved) : null;
+});
+
+// Sincronizar mudanças automaticamente
+useEffect(() => {
+  sessionStorage.setItem('maintenanceFormOpen', String(isFormOpen));
+  sessionStorage.setItem('maintenanceFormEditing', JSON.stringify(editingOrder));
+}, [isFormOpen, editingOrder]);
+
+// Limpar sessionStorage ao fechar/salvar
+const handleFormClose = () => {
+  setIsFormOpen(false);
+  setEditingOrder(null);
+  sessionStorage.removeItem('maintenanceFormOpen');
+  sessionStorage.removeItem('maintenanceFormEditing');
+  sessionStorage.removeItem('maintenanceFormData'); // Chave usada pelo próprio componente do formulário
+};
+```
+
+**Páginas com persistência:**
+- `Maintenance.tsx`: `maintenanceFormOpen`, `maintenanceFormEditing`
+- `Tires.tsx`: `tireFormOpen`, `tireFormEditing`, `tireFormVehicle`
+- `ChecklistTemplates.tsx`: `checklistTemplateFormOpen`, `checklistTemplateFormEditing`
+
+**Componentes de formulário** (VehicleForm, DriverForm, MaintenanceForm, etc.) já persistem seu estado interno (`formData`) em sessionStorage independentemente. A página persiste apenas `isFormOpen` + `editingItem`, o formulário cuida do resto.
+
+**Segurança:** sessionStorage é destruído ao fechar a aba/logout — nunca persiste dados sensíveis a disco. Não usamos localStorage para dados de negócio (risco em dispositivos compartilhados, comum em garagens de frota).

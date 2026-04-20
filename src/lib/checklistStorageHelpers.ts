@@ -77,14 +77,3 @@ export async function uploadChecklistPhoto(
   return data.publicUrl;
 }
 
-// ─── Delete ───────────────────────────────────────────────────────────────────
-
-export async function deleteChecklistPhoto(url: string): Promise<void> {
-  if (!url) return;
-  const marker = `/${BUCKET}/`;
-  const idx = url.indexOf(marker);
-  if (idx === -1) return;
-  const path = url.slice(idx + marker.length);
-  const { error } = await supabase.storage.from(BUCKET).remove([path]);
-  if (error) console.warn('Erro ao deletar foto de checklist:', error.message);
-}

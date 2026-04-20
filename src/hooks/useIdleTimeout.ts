@@ -5,7 +5,7 @@ const DEFAULT_TIMEOUT = 60 * 60 * 1000; // 60 minutos
 
 export function useIdleTimeout(timeoutMs: number = DEFAULT_TIMEOUT) {
   const { logout, user } = useAuth();
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleLogout = useCallback(async () => {
     if (user) {

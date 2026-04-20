@@ -65,10 +65,9 @@ serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { action } = body;
 
-    // ─── AÇÃO: DELETAR USUÁRIO ───────────────────────────────────────
-    if (action === "delete") {
+    // ── Ação: deletar usuário ──────────────────────────────────────────────────
+    if (body.action === "delete") {
       const { user_id } = body;
       if (!user_id) return json({ error: "user_id é obrigatório." }, 400);
 
@@ -93,16 +92,29 @@ serve(async (req: Request) => {
         return json({ error: "Você não tem permissão para excluir usuários de outro cliente." }, 403);
       }
 
-      // Deletar perfil
-      await supabaseAdmin.from("profiles").delete().eq("id", user_id);
-      // Deletar conta auth
-      await supabaseAdmin.auth.admin.deleteUser(user_id);
+      // Deletar perfil primeiro (FK constraint)
+      const { error: profileDeleteError } = await supabaseAdmin
+        .from("profiles")
+        .delete()
+        .eq("id", user_id);
 
-      return json({ success: true }, 200);
+      if (profileDeleteError) {
+        console.error(`[delete] Erro ao deletar perfil: ${profileDeleteError.message}`);
+        return json({ error: profileDeleteError.message }, 500);
+      }
+
+      // Deletar conta auth
+      const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
+      if (authDeleteError && authDeleteError.message !== "User not found") {
+        console.error(`[delete] Erro ao deletar auth user: ${authDeleteError.message}`);
+      }
+
+      console.log(`[delete] Usuário deletado com sucesso: ${user_id}`);
+      return json({ success: true, user_id }, 200);
     }
 
-    // ─── AÇÃO: CRIAR USUÁRIO (padrão) ────────────────────────────────
-    const { email, password, name, role, client_id, can_delete_vehicles, can_delete_drivers, can_delete_workshops } = body;
+    // ── Ação: criar usuário (padrão) ──────────────────────────────────────────
+    const { email, password, name, role, client_id, can_delete_vehicles, can_delete_drivers, can_delete_workshops, budget_approval_limit } = body;
 
     if (!email || !password || !name || !role) {
       return json({ error: "Todos os campos são obrigatórios." }, 400);
@@ -152,7 +164,16 @@ serve(async (req: Request) => {
     // Criar perfil na tabela profiles
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
-      .insert({ id: newUser.user.id, name, role, client_id: targetClientId, can_delete_vehicles: can_delete_vehicles ?? false, can_delete_drivers: can_delete_drivers ?? false, can_delete_workshops: can_delete_workshops ?? false });
+      .insert({
+        id: newUser.user.id,
+        name,
+        role,
+        client_id: targetClientId,
+        can_delete_vehicles: can_delete_vehicles ?? false,
+        can_delete_drivers: can_delete_drivers ?? false,
+        can_delete_workshops: can_delete_workshops ?? false,
+        budget_approval_limit: budget_approval_limit ?? 0,
+      });
 
     if (profileError) {
       // Rollback: deletar o auth user criado
