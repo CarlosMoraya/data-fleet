@@ -364,6 +364,7 @@ function countFields<T>(data: Partial<T>, fields: (keyof T)[]): { count: number;
 
 export async function extractCrlvData(file: File): Promise<ExtractionResult<Vehicle>> {
   const totalFields = CRLV_FIELDS.length;
+  let partialRegexData: Partial<Vehicle> = {};
 
   try {
     // PDFs: tenta regex primeiro
@@ -374,6 +375,7 @@ export async function extractCrlvData(file: File): Promise<ExtractionResult<Vehi
         if (text.trim().length > 50) {
           const regexData = extractCrlvFromText(text);
           const { count, missing } = countFields(regexData, CRLV_FIELDS);
+          partialRegexData = regexData;
           ocrDebug(`CRLV regex: ${count}/${totalFields} campos (mínimo 8). Faltando: ${missing.join(', ') || 'nenhum'}`);
           // Se extraiu pelo menos 8 de 12 campos, considera suficiente
           if (count >= 8) {
@@ -408,6 +410,11 @@ export async function extractCrlvData(file: File): Promise<ExtractionResult<Vehi
     };
   } catch (err) {
     console.error("OCR FALHOU:", err);
+    const { count, missing } = countFields(partialRegexData, CRLV_FIELDS);
+    if (count > 0) {
+      ocrDebug('CRLV: IA falhou, retornando resultado parcial do regex');
+      return { data: partialRegexData, fieldCount: count, totalFields, method: 'regex', warnings: missing };
+    }
     return {
       data: {},
       fieldCount: 0,
@@ -420,6 +427,7 @@ export async function extractCrlvData(file: File): Promise<ExtractionResult<Vehi
 
 export async function extractCnhData(file: File): Promise<ExtractionResult<Driver>> {
   const totalFields = CNH_FIELDS.length;
+  let partialRegexData: Partial<Driver> = {};
 
   try {
     // PDFs: tenta regex primeiro
@@ -430,6 +438,7 @@ export async function extractCnhData(file: File): Promise<ExtractionResult<Drive
         if (text.trim().length > 50) {
           const regexData = extractCnhFromText(text);
           const { count, missing } = countFields(regexData, CNH_FIELDS);
+          partialRegexData = regexData;
           ocrDebug(`CNH regex: ${count}/${totalFields} campos (mínimo 5). Faltando: ${missing.join(', ') || 'nenhum'}`);
           // Se extraiu pelo menos 5 de 7 campos, considera suficiente
           if (count >= 5) {
@@ -464,6 +473,11 @@ export async function extractCnhData(file: File): Promise<ExtractionResult<Drive
     };
   } catch (err) {
     console.error("OCR FALHOU:", err);
+    const { count, missing } = countFields(partialRegexData, CNH_FIELDS);
+    if (count > 0) {
+      ocrDebug('CNH: IA falhou, retornando resultado parcial do regex');
+      return { data: partialRegexData, fieldCount: count, totalFields, method: 'regex', warnings: missing };
+    }
     return {
       data: {},
       fieldCount: 0,

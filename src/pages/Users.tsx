@@ -147,6 +147,7 @@ function CreateUserModal({
       password: form.password,
       name: capitalizeWords(form.name),
       role: form.role,
+      client_id: currentClient?.id,
       can_delete_vehicles: form.canDeleteVehicles,
       can_delete_drivers: form.canDeleteDrivers,
       can_delete_workshops: form.canDeleteWorkshops,
