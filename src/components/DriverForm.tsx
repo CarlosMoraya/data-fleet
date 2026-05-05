@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Driver, DriverFieldSettings } from '../types';
-import { X, FileText, ExternalLink, Loader2, UserPlus } from 'lucide-react';
+import { X, FileText, ExternalLink, Loader2, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { validateFile } from '../lib/storageHelpers';
 import { isDriverFieldRequired } from '../lib/driverFieldSettingsMappers';
 import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
@@ -60,6 +60,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
     return { ...driver };
   });
   const [saving, setSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCnhFile, setSelectedCnhFile] = useState<File | null>(null);
   const [cnhExtractionStatus, setCnhExtractionStatus] = useState<ExtractionStatus>('idle');
@@ -323,15 +324,26 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     <label className="block text-sm font-medium text-zinc-700">
                       Senha temporária<span className="text-red-500 ml-0.5">*</span>
                     </label>
-                    <input
-                      type="password"
-                      required
-                      minLength={6}
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder="Mínimo 6 caracteres"
-                      className={inputClass}
-                    />
+                    <div className="relative">
+                      <input
+                        data-testid="password-input"
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        minLength={6}
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder="Mínimo 6 caracteres"
+                        className={`${inputClass} pr-10`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(prev => !prev)}
+                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-zinc-600 transition-colors"
+                        aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                     <p className="mt-1 text-xs text-zinc-400">O motorista deverá alterar a senha no primeiro acesso.</p>
                   </div>
                 </div>

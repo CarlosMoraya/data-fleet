@@ -51,7 +51,7 @@ test.describe.serial('1. Driver-User Integration (Analyst Profile)', () => {
     await emailInput.fill(driverEmail);
 
     // Senha (obrigatório)
-    const passwordInput = page.locator('input[type="password"]').first();
+    const passwordInput = page.locator('[data-testid="password-input"]');
     await expect(passwordInput).toBeVisible();
     await passwordInput.fill(driverPassword);
 
