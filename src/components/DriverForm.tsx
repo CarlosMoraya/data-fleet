@@ -42,8 +42,12 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
 
 export default function DriverForm({ driver, fieldSettings, clientId, onClose, onSave }: DriverFormProps) {
   const isCreating = !driver;
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(() => {
+    return sessionStorage.getItem('driverFormEmail') ?? '';
+  });
+  const [password, setPassword] = useState(() => {
+    return sessionStorage.getItem('driverFormPassword') ?? '';
+  });
   const [formData, setFormData] = useState<Partial<Driver>>(() => {
     try {
       const savedData = sessionStorage.getItem('driverFormData');
@@ -78,6 +82,18 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
   useEffect(() => {
     sessionStorage.setItem('driverFormData', JSON.stringify(formData));
   }, [formData]);
+
+  useEffect(() => {
+    if (isCreating) {
+      sessionStorage.setItem('driverFormEmail', email);
+    }
+  }, [email, isCreating]);
+
+  useEffect(() => {
+    if (isCreating) {
+      sessionStorage.setItem('driverFormPassword', password);
+    }
+  }, [password, isCreating]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -226,6 +242,8 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
     sessionStorage.removeItem('driverFormOpen');
     sessionStorage.removeItem('driverFormEditing');
     sessionStorage.removeItem('driverFormData');
+    sessionStorage.removeItem('driverFormEmail');
+    sessionStorage.removeItem('driverFormPassword');
     onClose();
   };
 

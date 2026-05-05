@@ -108,6 +108,8 @@ export default function Drivers() {
     sessionStorage.removeItem('driverFormOpen');
     sessionStorage.removeItem('driverFormEditing');
     sessionStorage.removeItem('driverFormData');
+    sessionStorage.removeItem('driverFormEmail');
+    sessionStorage.removeItem('driverFormPassword');
   };
 
   const handleDelete = async (driver: Driver) => {
