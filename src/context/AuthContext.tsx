@@ -181,7 +181,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (['Admin Master', 'Director', 'Manager', 'Coordinator'].includes(profile.role)) {
         const { data: clients } = await supabase.from('clients').select('id, name, logo_url');
-        if (clients) setAllClients(clients.map((c: any) => ({ id: c.id, name: c.name, logoUrl: c.logo_url ?? undefined })));
+        if (clients) {
+          const clientList = clients.map((c: any) => ({ id: c.id, name: c.name, logoUrl: c.logo_url ?? undefined }));
+          setAllClients(clientList);
+          if (profile.role === 'Admin Master') {
+            const savedClientId = localStorage.getItem('adminMasterActiveClient');
+            if (savedClientId) {
+              const savedClient = clients.find((c: any) => c.id === savedClientId);
+              if (savedClient) {
+                setCurrentClient({
+                  id: savedClient.id,
+                  name: savedClient.name,
+                  logoUrl: savedClient.logo_url ?? undefined,
+                });
+              }
+            }
+          }
+        }
       }
     }
   };
@@ -212,6 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setActiveWorkshopId(null);
         localStorage.removeItem('dashboard_date_filter');
         localStorage.removeItem('workshop_active_client');
+        localStorage.removeItem('adminMasterActiveClient');
       }
     });
 
@@ -236,6 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCurrentClient(null);
       setActiveWorkshopId(null);
       localStorage.removeItem('workshop_active_client');
+      localStorage.removeItem('adminMasterActiveClient');
       return;
     }
 
@@ -255,7 +273,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const client = allClients.find((c) => c.id === clientId);
-    if (client) setCurrentClient(client);
+    if (client) {
+      setCurrentClient(client);
+      if (user?.role === 'Admin Master') {
+        localStorage.setItem('adminMasterActiveClient', clientId);
+      }
+    }
   };
 
   const canSwitchClient =

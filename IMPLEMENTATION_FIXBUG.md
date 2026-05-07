@@ -1,11 +1,9 @@
 # IMPLEMENTATION_FIXBUG.md
-Gerado em: 2026-05-05 06:13
-Sessão: correção de bug — persistência de email/senha no formulário de cadastro de motorista
-Tipo de bug: Tipo A — Isolado
+Gerado em: 2026-05-06 21:45
+Sessão: correção de bug — filtro de cliente e dados do formulário de motorista se perdem ao alternar abas
+Tipo de bug: Tipo B — Bug com dependências
 Causa raiz confirmada: sim
-Baseado em: docs/MEMORY.md (2026-04-11)
-
----
+Baseado em: docs/MEMORY.md (auditoria 11/04/2026)
 
 ## GUARDRAIL — leia antes de qualquer ação
 
@@ -14,269 +12,301 @@ Este documento é a especificação completa e fechada desta correção. O agent
 - NÃO modifica arquivos além dos listados aqui
 - NÃO refatora código não relacionado ao bug
 - NÃO "melhora" código que não está causando o problema
-- NÃO instala dependências novas sem comunicar
+- NÃO instala dependências novas
 - NÃO altera testes para fazê-los passar — corrige o código
 - SE encontrar algo que parece errado mas não está neste documento: registra como observação no MEMORY.md e continua sem corrigir
 - SE encontrar ambiguidade em qualquer passo: para, informa o usuário e aguarda instrução
 
----
-
 ## Contexto necessário
 Antes de implementar, leia:
 - `agent/AGENT.md` — regras universais do projeto
-- `agent/AGENT-FRONTEND.md` — padrão de persistência via sessionStorage
-
----
+- `agent/AGENT-FRONTEND.md` — padrões de estado e persistência
 
 ## O bug
+**Comportamento atual:** O Admin Master seleciona o cliente "Deluna" no filtro do topo e abre o formulário de cadastro de motorista. Ao alternar para outra aba do navegador e retornar (situação em que o navegador descarrega a aba por pressão de memória e a página recarrega), o filtro volta para "Todos os Clientes" e os arquivos inseridos no formulário (CNH, GR) são perdidos.
 
-**Comportamento atual:** Ao preencher o formulário de cadastro de motorista (nome, CPF, CNH, e-mail, senha) e navegar para outra página da aplicação, ao retornar à página de motoristas o formulário reabre (estado `driverFormOpen` é restaurado do sessionStorage), mas os campos **E-mail** e **Senha temporária** estão vazios.
-
-**Comportamento esperado:** Todos os campos preenchidos — incluindo E-mail e Senha temporária — devem ser restaurados exatamente como estavam antes da navegação.
+**Comportamento esperado:** Ao recarregar a página, o filtro deve restaurar o cliente que estava selecionado ("Deluna") — exatamente como já funciona para o role Workshop. O formulário deve reabrir com os dados textuais preservados.
 
 **Condições de reprodução:**
-1. Ir até `/cadastros/motoristas`
-2. Clicar em "Adicionar Motorista"
-3. Preencher E-mail, Senha temporária, Nome e CPF
-4. Navegar para outra rota (ex: Dashboard)
-5. Voltar para `/cadastros/motoristas`
-6. Observar: o formulário reabre, mas E-mail e Senha temporária estão vazios
+1. Logar como Admin Master
+2. Selecionar o cliente "Deluna" no filtro do topo (Topbar)
+3. Abrir o formulário de cadastro de motorista (botão "Adicionar Motorista")
+4. Preencher campos de texto e selecionar arquivos (CNH, GR)
+5. Alternar para outra aba do navegador — aguardar alguns minutos (navegador pode suspender a aba)
+6. Retornar para a aba do Beta Fleet
+7. Resultado atual: filtro mostra "Todos os Clientes", formulário reabriu mas arquivos foram perdidos
+8. Resultado esperado: filtro mostra "Deluna", formulário reabriu com campos de texto preservados
 
-**Impacto:** Todos os usuários que criam motoristas. Perda de dados digitados a cada navegação acidental durante o preenchimento.
-
----
+**Impacto:** Qualquer Admin Master que precise multitarefa perde o contexto de cliente e precisa refazer a seleção manualmente. Se havia arquivos selecionados (CNH, GR), esses não podem ser restaurados e devem ser selecionados novamente — pois objetos `File` do navegador não podem ser serializados em `sessionStorage`.
 
 ## Causa raiz identificada
+Em `src/context/AuthContext.tsx`, função `switchClient` (linhas 257-258):
 
-Em `src/components/DriverForm.tsx`, os campos `email` (linha 45) e `password` (linha 46) são declarados como `useState('')` simples:
-
-```ts
-const [email, setEmail] = useState('');
-const [password, setPassword] = useState('');
+```tsx
+const client = allClients.find((c) => c.id === clientId);
+if (client) setCurrentClient(client);
 ```
 
-O mecanismo de persistência existente salva apenas `formData` (campos do tipo `Driver`) no sessionStorage. Os campos `email` e `password` ficam de fora completamente — não são lidos na inicialização do componente nem gravados quando mudam.
+Esta linha apenas atualiza o estado em memória. Quando a aba recarrega, `fetchProfile` é executado novamente. O Admin Master tem `profile.client_id = null` no banco → `setCurrentClient(null)` é chamado (linha 179) → o cliente selecionado é perdido.
 
-Quando o usuário navega para outra rota, o componente desmonta e esses dois valores são perdidos. Ao retornar, o componente remonta com `email = ''` e `password = ''`.
+**Por que isso é a causa:** O role Workshop já tem o mesmo problema resolvido com o padrão:
+- Ao selecionar: `localStorage.setItem('workshop_active_client', clientId)` (linha 252)
+- Ao restaurar: `localStorage.getItem('workshop_active_client')` em `fetchProfile` (linha 116)
+- Ao deslogar: `localStorage.removeItem('workshop_active_client')` (linha 214)
 
-Por que `formData` funciona e esses dois não: `formData` usa um initializer lazy (`useState(() => sessionStorage.getItem(...))`) e um `useEffect` que grava a cada mudança. Os campos `email` e `password` nunca receberam o mesmo tratamento.
-
----
+O Admin Master não recebeu o mesmo tratamento.
 
 ## Estado dos testes antes da correção — baseline
-
-- **Testes de fumaça (E2E):** 6 setups de autenticação falhando — não conseguem logar em `localhost:3000`. 266 testes não rodaram. **PRÉ-EXISTENTE**, registrado em `docs/MEMORY.md` como tarefa em andamento. Não relacionado a este bug.
-- **Typecheck:** PASSOU — sem erros
-- **Lint:** PASSOU — (`lint = tsc --noEmit`)
-- **Testes falhando relacionados ao bug:** nenhum (comportamento não estava coberto por testes)
-- **Testes falhando não relacionados ao bug:** 6 setups E2E — não são responsabilidade desta correção e não devem piorar
-
----
+- Testes de fumaça: executados via `npx playwright test e2e/completed/` ✅
+- TypeCheck: ✅ zero erros (confirmado via `tsc --noEmit`)
+- Lint: não executado
+- Testes falhando relacionados ao bug: nenhum teste específico existia para este fluxo
+- Testes passando (baseline confirmado):
+  - Admin Master setup ✓
+  - Controle de Acesso: 4/4 ✓
+  - Admin → Clientes (criar, editar, excluir, filtrar): 5/5 ✓
+  - Admin → Usuários: 6/6 ✓
+  - Autenticação: 3/3 ✓
+- Testes falhando não relacionados ao bug (baseline pré-existente — não são responsabilidade desta correção):
+  - `setup/alexandre.setup.ts` — `Invalid login credentials` para Manager Alexandre (senha desatualizada no `.env.local`)
+  - `setup/pedro.setup.ts` — mesmo problema para Fleet Assistant Pedro
+  - Em cascata: `driver-user-integration`, `new-roles-audit` (Coordinator/Supervisor), `shippers-operational-units`, `tire-inspection-assistant`
+  - Ação pendente separada: atualizar senhas de teste no `.env.local` para Alexandre, Pedro e demais roles
 
 ## Dependências mapeadas
+**Arquivo modificado:** `src/context/AuthContext.tsx`
 
-**Arquivo `src/components/DriverForm.tsx`** é consumido exclusivamente por `src/pages/Drivers.tsx`. A mudança adicionará leitura/escrita no sessionStorage para duas chaves novas (`driverFormEmail`, `driverFormPassword`). Isso não altera nenhuma prop, nenhum tipo exportado, nenhum contrato de interface. O componente `DriverDetailModal.tsx` e o serviço `driverService.ts` não são afetados.
+Consumidores de `currentClient`:
+- `src/pages/Drivers.tsx` — usa `currentClient?.id` como filtro de query e `clientId` para salvar
+- `src/pages/Maintenance.tsx` — usa `currentClient?.id` como filtro de query
+- `src/pages/Tires.tsx` — usa `currentClient?.id` como filtro de query
+- `src/pages/Vehicles.tsx` — usa `currentClient?.id` como filtro de query
+- `src/pages/Dashboard.tsx` — usa `currentClient?.id` para métricas
+- `src/components/Topbar.tsx` — exibe `currentClient?.name` e renderiza o select de filtro
+- E outros módulos de listagem
 
-**Arquivo `src/pages/Drivers.tsx`** receberá limpeza das duas novas chaves de sessionStorage na função `handleSave` (após salvar com sucesso). Nenhuma lógica de negócio, query ou estado de UI será alterado.
-
----
+**Garantia de não-regressão:** A correção apenas adiciona `localStorage.setItem/removeItem` em 4 pontos isolados do `AuthContext`. Não altera a assinatura de `switchClient`, não altera `currentClient` para outros roles, não altera o fluxo de Workshop. Todos os consumidores continuam recebendo `currentClient` exatamente como antes — a única diferença é que, após um reload, o Admin Master terá `currentClient` populado em vez de null.
 
 ## O que NÃO fazer — restrições absolutas
-
-- Não modificar `src/lib/driverMappers.ts` — a causa raiz não está no mapper
-- Não modificar `src/services/driverService.ts` — a causa raiz não está no serviço
-- Não alterar o tipo `Driver` em `src/types` para incluir email/password — esses campos não pertencem ao modelo de domínio do motorista
-- Não refatorar o mecanismo de sessionStorage para uma abstração genérica — isso é escopo futuro com `evolucao.md`
-- Não alterar testes E2E existentes para fazê-los passar — a falha de autenticação é pré-existente e não é escopo desta correção
-
----
+- Não modificar `src/pages/Drivers.tsx` — a persistência do estado do formulário já está implementada (sessionStorage) e não é a causa raiz do filtro resetar
+- Não modificar `src/components/DriverForm.tsx` — dados textuais do formulário já são persistidos corretamente
+- Não alterar o comportamento para roles Workshop — eles já têm seu próprio mecanismo e chave `workshop_active_client`
+- Não aplicar a persistência para Director, Manager, Coordinator — esses roles têm `client_id` no profile e o comportamento correto é restaurar o cliente do profile, não a última seleção manual
+- Não alterar a chave `workshop_active_client` já existente
+- Não refatorar a função `fetchProfile` além do bloco específico descrito
 
 ## Correção
 
-### Passo 1 — Persistir email e password no sessionStorage (DriverForm.tsx)
+### Passo 1 — Limpar a chave ao deslogar
+**Arquivo:** `src/context/AuthContext.tsx`
+**Causa que justifica tocar neste arquivo:** é aqui que `currentClient` é gerenciado para todos os roles
+**O que mudar:** no handler `SIGNED_OUT` do `onAuthStateChange`, adicionar remoção da chave `adminMasterActiveClient` junto às outras remoções já existentes
+**O que NÃO mudar neste arquivo:** não alterar as remoções de `dashboard_date_filter` e `workshop_active_client` já existentes
+**Impacto em dependências:** nenhum — é apenas limpeza de storage no logout
 
-**Arquivo:** `src/components/DriverForm.tsx`
-
-**Causa que justifica tocar neste arquivo:** É aqui que `email` e `password` são declarados e onde o mecanismo de sessionStorage já existe para `formData`.
-
-**O que mudar:**
-
-1. Alterar a inicialização de `email` (linha 45) para ler do sessionStorage:
-```ts
-// ANTES
-const [email, setEmail] = useState('');
-
-// DEPOIS
-const [email, setEmail] = useState(() => {
-  return sessionStorage.getItem('driverFormEmail') ?? '';
-});
+Localizar o bloco:
+```tsx
+localStorage.removeItem('dashboard_date_filter');
+localStorage.removeItem('workshop_active_client');
 ```
 
-2. Alterar a inicialização de `password` (linha 46) para ler do sessionStorage:
-```ts
-// ANTES
-const [password, setPassword] = useState('');
-
-// DEPOIS
-const [password, setPassword] = useState(() => {
-  return sessionStorage.getItem('driverFormPassword') ?? '';
-});
+Alterar para:
+```tsx
+localStorage.removeItem('dashboard_date_filter');
+localStorage.removeItem('workshop_active_client');
+localStorage.removeItem('adminMasterActiveClient');
 ```
-
-3. Adicionar dois `useEffect` para gravar as mudanças, logo após o `useEffect` existente que grava `formData` (após a linha 80):
-```ts
-useEffect(() => {
-  if (isCreating) {
-    sessionStorage.setItem('driverFormEmail', email);
-  }
-}, [email, isCreating]);
-
-useEffect(() => {
-  if (isCreating) {
-    sessionStorage.setItem('driverFormPassword', password);
-  }
-}, [password, isCreating]);
-```
-
-> **Nota:** os `useEffect` só gravam em modo de criação (`isCreating = true`) porque os campos email/password não aparecem no modo de edição. Gravar em modo de edição seria inócuo mas poderia causar confusão futura.
-
-4. Adicionar limpeza das novas chaves na função `handleClose` (após linha 228, dentro do bloco existente):
-```ts
-const handleClose = () => {
-  sessionStorage.removeItem('driverFormOpen');
-  sessionStorage.removeItem('driverFormEditing');
-  sessionStorage.removeItem('driverFormData');
-  sessionStorage.removeItem('driverFormEmail');    // ADICIONAR
-  sessionStorage.removeItem('driverFormPassword'); // ADICIONAR
-  onClose();
-};
-```
-
-**O que NÃO mudar neste arquivo:** Todo o restante — lógica de upload, OCR, validação de campos obrigatórios, `formData`, `handleSubmit`, estilos, componentes internos.
-
-**Impacto em dependências:** Nenhum. As novas chaves de sessionStorage são isoladas ao ciclo de vida deste componente. Não há outros componentes lendo `driverFormEmail` ou `driverFormPassword`.
 
 **Como verificar este passo:**
 ```
-1. Abrir localhost:3000/cadastros/motoristas
-2. Clicar "Adicionar Motorista"
-3. Preencher E-mail: "teste@empresa.com" e Senha: "senha123"
-4. Preencher Nome: "João Teste"
-5. Navegar para o Dashboard (sidebar)
-6. Voltar para /cadastros/motoristas
-7. Resultado esperado: formulário reabre com E-mail "teste@empresa.com", Senha "senha123" e Nome "João Teste" preenchidos
+Logar como Admin Master → selecionar Deluna → deslogar → inspecionar localStorage no DevTools
+→ confirmar que a chave 'adminMasterActiveClient' não existe mais
 ```
 
 ---
 
-### Passo 2 — Limpar as novas chaves após salvar com sucesso (Drivers.tsx)
+### Passo 2 — Limpar a chave ao selecionar "Todos os Clientes"
+**Arquivo:** `src/context/AuthContext.tsx`
+**Causa que justifica tocar neste arquivo:** quando o Admin Master seleciona "Todos os Clientes" (clientId vazio), a chave persistida deve ser removida para que o reload não restaure um cliente que o usuário explicitamente desselecionou
+**O que mudar:** no bloco `if (!clientId)` da função `switchClient`, adicionar remoção da nova chave
+**O que NÃO mudar neste arquivo:** não alterar `setCurrentClient(null)` e `setActiveWorkshopId(null)` existentes
+**Impacto em dependências:** nenhum — é apenas limpeza de storage
 
-**Arquivo:** `src/pages/Drivers.tsx`
-
-**Causa que justifica tocar neste arquivo:** A função `handleSave` (linha 98) já faz a limpeza das chaves existentes de sessionStorage após um save bem-sucedido. As novas chaves precisam ser incluídas nessa limpeza para não persistirem após o cadastro ser concluído.
-
-**O que mudar:**
-
-Na função `handleSave` (linhas 108-110), adicionar as novas remoções:
-```ts
-// ANTES
-sessionStorage.removeItem('driverFormOpen');
-sessionStorage.removeItem('driverFormEditing');
-sessionStorage.removeItem('driverFormData');
-
-// DEPOIS
-sessionStorage.removeItem('driverFormOpen');
-sessionStorage.removeItem('driverFormEditing');
-sessionStorage.removeItem('driverFormData');
-sessionStorage.removeItem('driverFormEmail');    // ADICIONAR
-sessionStorage.removeItem('driverFormPassword'); // ADICIONAR
+Localizar o bloco:
+```tsx
+if (!clientId) {
+  setCurrentClient(null);
+  setActiveWorkshopId(null);
+  localStorage.removeItem('workshop_active_client');
+  return;
+}
 ```
 
-**O que NÃO mudar neste arquivo:** Queries, estado `isFormOpen`, `editingDriver`, lógica de deleção, permissões por role, tabela de motoristas.
-
-**Impacto em dependências:** Nenhum. A mudança é apenas a remoção de chaves de sessionStorage após o save já concluído.
+Alterar para:
+```tsx
+if (!clientId) {
+  setCurrentClient(null);
+  setActiveWorkshopId(null);
+  localStorage.removeItem('workshop_active_client');
+  localStorage.removeItem('adminMasterActiveClient');
+  return;
+}
+```
 
 **Como verificar este passo:**
 ```
-1. Preencher e salvar um motorista com sucesso
-2. Verificar no DevTools > Application > Session Storage
-3. Resultado esperado: as chaves driverFormEmail e driverFormPassword NÃO existem mais após o save
+Logar como Admin Master → selecionar Deluna → selecionar "Todos os Clientes"
+→ inspecionar localStorage → confirmar que 'adminMasterActiveClient' foi removida
+```
+
+---
+
+### Passo 3 — Persistir o cliente selecionado pelo Admin Master
+**Arquivo:** `src/context/AuthContext.tsx`
+**Causa que justifica tocar neste arquivo:** este é o passo que resolve o bug — ao selecionar um cliente, a seleção deve ser salva para sobreviver a reloads
+**O que mudar:** após o bloco `if (client) setCurrentClient(client)` no final de `switchClient`, envolver em bloco para também persistir quando o role for Admin Master
+**O que NÃO mudar neste arquivo:** não alterar o bloco de Workshop acima que já possui sua própria lógica
+**Impacto em dependências:** nenhum — `currentClient` continua sendo atualizado da mesma forma; a única adição é a persistência no localStorage para o role Admin Master
+
+Localizar:
+```tsx
+const client = allClients.find((c) => c.id === clientId);
+if (client) setCurrentClient(client);
+```
+
+Alterar para:
+```tsx
+const client = allClients.find((c) => c.id === clientId);
+if (client) {
+  setCurrentClient(client);
+  if (user?.role === 'Admin Master') {
+    localStorage.setItem('adminMasterActiveClient', clientId);
+  }
+}
+```
+
+**Como verificar este passo:**
+```
+Logar como Admin Master → selecionar Deluna
+→ inspecionar localStorage → confirmar que 'adminMasterActiveClient' = '<id do cliente Deluna>' está presente
+```
+
+---
+
+### Passo 4 — Restaurar o cliente ao carregar a sessão
+**Arquivo:** `src/context/AuthContext.tsx`
+**Causa que justifica tocar neste arquivo:** sem este passo, o localStorage seria salvo mas nunca lido — a restauração é o outro lado do par save/restore
+**O que mudar:** dentro do bloco `if (['Admin Master', 'Director', 'Manager', 'Coordinator'].includes(profile.role))` em `fetchProfile`, após popular `allClients`, adicionar a lógica de restauração exclusivamente para Admin Master
+**O que NÃO mudar neste arquivo:** não alterar o `setCurrentClient` das linhas 164-179 (que trata roles com `client_id` no profile); não alterar o comportamento para Director, Manager, Coordinator
+**Impacto em dependências:** `currentClient` será populado durante `fetchProfile` em vez de ficar null — todos os consumidores já tratam `currentClient` como nullable, então receber um valor não-null é sempre seguro
+
+Localizar:
+```tsx
+if (['Admin Master', 'Director', 'Manager', 'Coordinator'].includes(profile.role)) {
+  const { data: clients } = await supabase.from('clients').select('id, name, logo_url');
+  if (clients) setAllClients(clients.map((c: any) => ({ id: c.id, name: c.name, logoUrl: c.logo_url ?? undefined })));
+}
+```
+
+Alterar para:
+```tsx
+if (['Admin Master', 'Director', 'Manager', 'Coordinator'].includes(profile.role)) {
+  const { data: clients } = await supabase.from('clients').select('id, name, logo_url');
+  if (clients) {
+    const clientList = clients.map((c: any) => ({ id: c.id, name: c.name, logoUrl: c.logo_url ?? undefined }));
+    setAllClients(clientList);
+    if (profile.role === 'Admin Master') {
+      const savedClientId = localStorage.getItem('adminMasterActiveClient');
+      if (savedClientId) {
+        const savedClient = clients.find((c: any) => c.id === savedClientId);
+        if (savedClient) {
+          setCurrentClient({
+            id: savedClient.id,
+            name: savedClient.name,
+            logoUrl: savedClient.logo_url ?? undefined,
+          });
+        }
+      }
+    }
+  }
+}
+```
+
+**Como verificar este passo:**
+```
+Logar como Admin Master → selecionar Deluna → pressionar F5 (reload)
+→ Resultado esperado: filtro continua mostrando "Deluna" após o reload
 ```
 
 ---
 
 ## Testes novos a escrever
 
-**Teste de regressão — persistência do formulário de motorista durante navegação**
-
-Camada: E2E (depende de navegação real entre rotas, autenticação e estado de componente)
-
-Arquivo sugerido: `e2e/completed/driver-form-persistence.spec.ts`
-
-O que valida: garantir que nenhum campo do formulário de cadastro de motorista (incluindo email e senha temporária) seja perdido ao navegar para outra rota e retornar.
-
-Cenários a cobrir:
-1. **Persistência completa:** preencher email, senha, nome e CPF → navegar para Dashboard → voltar → todos os campos devem estar preenchidos
-2. **Limpeza após cancelar:** preencher campos → clicar Cancelar → reabrir formulário → formulário deve estar vazio
-3. **Limpeza após salvar:** preencher e salvar → abrir novo formulário → campos vazios (não contaminados pelo cadastro anterior)
-
----
+**Teste 1 — Persistência do cliente selecionado pelo Admin Master após reload**
+- Nome sugerido: `e2e/completed/admin-master-client-persistence.spec.ts`
+- O que valida: que o filtro de cliente sobrevive a um reload de página
+- Cenários a cobrir:
+  1. Admin Master seleciona cliente X → recarrega página → filtro exibe cliente X (não "Todos os Clientes")
+  2. Admin Master seleciona cliente X → seleciona "Todos os Clientes" → recarrega → filtro exibe "Todos os Clientes"
+  3. Admin Master seleciona cliente X → faz logout → faz login novamente → filtro exibe "Todos os Clientes" (a seleção deve ser descartada no logout)
 
 ## Verificação final
-
 Após todos os passos:
 
-1. Rode o teste específico do bug (manual — E2E de persistência ainda não existe):
-```
-1. localhost:3000/cadastros/motoristas
-2. Adicionar Motorista → preencher todos os campos incluindo E-mail e Senha
-3. Navegar para outra rota e voltar
-4. Resultado esperado: todos os campos restaurados, incluindo E-mail e Senha
-```
-
-2. Rode o typecheck:
+1. Rode o typecheck:
 ```
 npx tsc --noEmit
 ```
-Resultado esperado: zero erros.
+Resultado esperado: zero erros
 
-3. Execute os testes existentes de driver (quando o ambiente de autenticação estiver funcional):
+2. Rode a suite de testes E2E:
 ```
-npx playwright test e2e/completed/driver-user-integration.spec.ts
+npx playwright test
 ```
-Resultado esperado: todos os testes que passavam antes devem continuar passando. A correção não altera nenhum fluxo de criação ou edição de motorista.
+Resultado esperado: os testes que passavam antes continuam passando. Testes de movimentação de pneus com falhas de timing são pré-existentes e não são responsabilidade desta correção.
 
-Se qualquer verificação falhar: pare, informe o usuário com o resultado exato e aguarde instrução. Não tente corrigir por conta própria sem comunicar.
+3. Execute os testes de fumaça do docs/MEMORY.md e confirme que todos passam.
 
----
+4. Validação manual do fluxo corrigido:
+```
+1. Logar como Admin Master
+2. Selecionar cliente "Deluna" no filtro do topo
+3. Abrir formulário "Adicionar Motorista"
+4. Preencher nome, CPF e outros campos de texto
+5. Pressionar F5 para forçar reload
+Resultado esperado: filtro mostra "Deluna", formulário reabre com campos de texto preservados
+```
+
+Se qualquer verificação falhar: pare, informe o usuário com o resultado exato e aguarde instrução.
 
 ## Observações para sessões futuras
 
-1. **Mecanismo de persistência de formulários não é padronizado:** cada formulário que usa sessionStorage (Manutenção, Pneus, ChecklistTemplates, agora Motoristas) implementa as mesmas 3 linhas de forma duplicada. Uma abstração genérica `useFormPersistence(key, initialValue)` eliminaria esse padrão repetido. Tratar com `evolucao.md` em sessão futura.
+**Observação 1 — `onClose` em `Drivers.tsx` não limpa `sessionStorage`**
+`src/pages/Drivers.tsx`, handler `onClose` (linhas 302-305): quando o usuário fecha o formulário pelo botão X ou Cancelar, `sessionStorage` permanece com `driverFormOpen = 'true'`. Isso faz o formulário reabrir inesperadamente se a página recarregar depois que o formulário foi fechado. Não é o bug reportado agora — é um comportamento adjacente. Tratar em sessão futura com `evolucao.md` ou nova sessão `Fixbugs.md`.
 
-2. **Armazenamento de senha em sessionStorage:** a senha temporária é definida pelo administrador (não é a senha pessoal do usuário logado). O risco é baixo dado que sessionStorage é tab-scoped e limpo ao fechar o navegador. Ainda assim, para uma camada extra de segurança futura, considerar criptografar antes de armazenar, ou não persistir senha e apenas persistir email.
-
-3. **Falhas nos setups de autenticação E2E:** os 6 setups estão falhando por não conseguir logar em localhost:3000. Isso pode indicar que as credenciais de teste expiraram ou que o seeding de usuários precisa ser refeito. Já registrado em MEMORY.md como tarefa em andamento.
-
----
+**Observação 2 — Arquivos (CNH, GR) não podem ser restaurados após reload**
+Por limitação do navegador, objetos `File` não podem ser serializados em `sessionStorage`. Após um reload, os campos de arquivo estarão vazios mesmo que o formulário reabra com os dados textuais. Isso é comportamento esperado e não tem solução sem upload incremental ou draft salvo no servidor. Registrar para avaliação futura de UX.
 
 ## Registro para o docs/MEMORY.md
 Após a correção confirmada, adicione ao docs/MEMORY.md:
 
 ```
-Bug corrigido: campos email e senha temporária não persistiam no formulário de cadastro de motorista ao navegar entre rotas
-Causa raiz: useState('') simples para email e password, sem initializer de sessionStorage e sem useEffect de persistência, ao contrário do formData que já tinha esse mecanismo
-Correção aplicada: adicionados initializers lazy de sessionStorage e useEffects de persistência para email e password; limpeza adicionada em handleClose e handleSave
-Arquivos modificados: src/components/DriverForm.tsx, src/pages/Drivers.tsx
-Testes adicionados: e2e/completed/driver-form-persistence.spec.ts (a criar)
+Bug corrigido: Filtro de cliente do Admin Master resetava para "Todos os Clientes" após reload de aba
+Causa raiz: switchClient em AuthContext não persistia seleção no localStorage para Admin Master (padrão já existia para Workshop)
+Correção aplicada: 4 mudanças cirúrgicas em AuthContext — save ao selecionar, remove ao desselecionar, remove no logout, restore no fetchProfile
+Arquivos modificados: src/context/AuthContext.tsx
+Testes adicionados: e2e/completed/admin-master-client-persistence.spec.ts (a criar)
 ```
-
----
 
 ## Sugestão de commit
-Quando todos os critérios de conclusão estiverem atendidos e você confirmar que o bug foi corrigido:
+Quando todos os critérios de conclusão estiverem atendidos:
 
 ```
-git add src/components/DriverForm.tsx src/pages/Drivers.tsx
-git commit -m "fix: persistir email e senha temporária no formulário de motorista durante navegação"
+git add src/context/AuthContext.tsx
+git commit -m "fix: persistir cliente selecionado pelo Admin Master entre reloads de aba
+
+Ao selecionar um cliente no filtro, Admin Master perdia a seleção
+ao recarregar a página pois switchClient não persistia no localStorage.
+Workshop já tinha esse mecanismo (workshop_active_client); aplicado o
+mesmo padrão para Admin Master com chave adminMasterActiveClient."
 ```
