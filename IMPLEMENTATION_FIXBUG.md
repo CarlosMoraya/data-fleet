@@ -1,9 +1,11 @@
 # IMPLEMENTATION_FIXBUG.md
-Gerado em: 2026-05-06 21:45
-Sessão: correção de bug — filtro de cliente e dados do formulário de motorista se perdem ao alternar abas
-Tipo de bug: Tipo B — Bug com dependências
+Gerado em: 2026-05-06 22:38
+Sessão: correção de bug — CPF truncado ao colar valor formatado no formulário de motorista
+Tipo de bug: Tipo A — Bug isolado
 Causa raiz confirmada: sim
-Baseado em: docs/MEMORY.md (auditoria 11/04/2026)
+Baseado em: docs/MEMORY.md (2026-05-06)
+
+---
 
 ## GUARDRAIL — leia antes de qualquer ação
 
@@ -12,301 +14,249 @@ Este documento é a especificação completa e fechada desta correção. O agent
 - NÃO modifica arquivos além dos listados aqui
 - NÃO refatora código não relacionado ao bug
 - NÃO "melhora" código que não está causando o problema
-- NÃO instala dependências novas
+- NÃO instala dependências não listadas aqui
 - NÃO altera testes para fazê-los passar — corrige o código
 - SE encontrar algo que parece errado mas não está neste documento: registra como observação no MEMORY.md e continua sem corrigir
 - SE encontrar ambiguidade em qualquer passo: para, informa o usuário e aguarda instrução
 
+---
+
 ## Contexto necessário
 Antes de implementar, leia:
 - `agent/AGENT.md` — regras universais do projeto
-- `agent/AGENT-FRONTEND.md` — padrões de estado e persistência
+- `agent/AGENT-FRONTEND.md` — padrões de interface e React
+
+---
 
 ## O bug
-**Comportamento atual:** O Admin Master seleciona o cliente "Deluna" no filtro do topo e abre o formulário de cadastro de motorista. Ao alternar para outra aba do navegador e retornar (situação em que o navegador descarrega a aba por pressão de memória e a página recarrega), o filtro volta para "Todos os Clientes" e os arquivos inseridos no formulário (CNH, GR) são perdidos.
+**Comportamento atual:** Ao colar um CPF formatado (ex.: `187.182.207-62`) no campo CPF do formulário de motorista, os últimos 2 dígitos verificadores são perdidos. O campo exibe `187182207` (9 dígitos) em vez de `18718220762` (11 dígitos).
 
-**Comportamento esperado:** Ao recarregar a página, o filtro deve restaurar o cliente que estava selecionado ("Deluna") — exatamente como já funciona para o role Workshop. O formulário deve reabrir com os dados textuais preservados.
+**Comportamento esperado:** Ao colar um CPF de qualquer fonte externa (planilha, documento, sistema), todos os 11 dígitos devem ser preservados após a normalização automática do campo.
 
 **Condições de reprodução:**
-1. Logar como Admin Master
-2. Selecionar o cliente "Deluna" no filtro do topo (Topbar)
-3. Abrir o formulário de cadastro de motorista (botão "Adicionar Motorista")
-4. Preencher campos de texto e selecionar arquivos (CNH, GR)
-5. Alternar para outra aba do navegador — aguardar alguns minutos (navegador pode suspender a aba)
-6. Retornar para a aba do Beta Fleet
-7. Resultado atual: filtro mostra "Todos os Clientes", formulário reabriu mas arquivos foram perdidos
-8. Resultado esperado: filtro mostra "Deluna", formulário reabriu com campos de texto preservados
+1. Abrir o formulário de cadastro ou edição de motorista
+2. Copiar um CPF no formato `NNN.NNN.NNN-DD` de qualquer fonte externa (ex.: planilha Excel)
+3. Colar no campo CPF do formulário
+4. Observar: os 2 dígitos verificadores (após o traço) desaparecem
 
-**Impacto:** Qualquer Admin Master que precise multitarefa perde o contexto de cliente e precisa refazer a seleção manualmente. Se havia arquivos selecionados (CNH, GR), esses não podem ser restaurados e devem ser selecionados novamente — pois objetos `File` do navegador não podem ser serializados em `sessionStorage`.
+**Impacto:** Todo usuário que tenta cadastrar um motorista colando o CPF de uma planilha ou documento. O CPF fica com 9 dígitos — inválido para o banco de dados e para validação. Severidade alta: bloqueia o cadastro correto de motoristas.
+
+---
 
 ## Causa raiz identificada
-Em `src/context/AuthContext.tsx`, função `switchClient` (linhas 257-258):
 
-```tsx
-const client = allClients.find((c) => c.id === clientId);
-if (client) setCurrentClient(client);
+O campo CPF no componente `src/components/DriverForm.tsx` (linha 380) possui o atributo `maxLength={11}`.
+
+O `maxLength` do HTML opera sobre o valor **bruto** do input — ou seja, sobre a string com pontos e traço — antes de qualquer evento `onChange` ser disparado. Quando o usuário cola `187.182.207-62` (14 caracteres), o browser trunca silenciosamente para os primeiros 11 caracteres: `187.182.207`. Somente então o `onChange` dispara com esse valor já truncado. A função `filterCPF` recebe `187.182.207`, remove os pontos, e produz `187182207` — apenas 9 dígitos.
+
+A função `filterCPF` em `src/lib/inputHelpers.ts` (linha 96-98) já possui seu próprio `.slice(0, 11)` que limita corretamente a 11 dígitos **após** a limpeza de caracteres especiais. O `maxLength={11}` no HTML é, portanto, não apenas redundante, mas destrutivo para o caso de paste de CPF formatado.
+
+```typescript
+// inputHelpers.ts — funciona corretamente, não precisa de alteração
+export function filterCPF(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 11);
+}
 ```
 
-Esta linha apenas atualiza o estado em memória. Quando a aba recarrega, `fetchProfile` é executado novamente. O Admin Master tem `profile.client_id = null` no banco → `setCurrentClient(null)` é chamado (linha 179) → o cliente selecionado é perdido.
+**Por que essa é a causa:** Se `filterCPF` recebe o string completo `187.182.207-62`, remove todos os não-dígitos e obtém `18718220762` (11 dígitos) — correto. O problema está 100% no `maxLength={11}` que impede o string completo de chegar à função.
 
-**Por que isso é a causa:** O role Workshop já tem o mesmo problema resolvido com o padrão:
-- Ao selecionar: `localStorage.setItem('workshop_active_client', clientId)` (linha 252)
-- Ao restaurar: `localStorage.getItem('workshop_active_client')` em `fetchProfile` (linha 116)
-- Ao deslogar: `localStorage.removeItem('workshop_active_client')` (linha 214)
-
-O Admin Master não recebeu o mesmo tratamento.
+---
 
 ## Estado dos testes antes da correção — baseline
-- Testes de fumaça: executados via `npx playwright test e2e/completed/` ✅
-- TypeCheck: ✅ zero erros (confirmado via `tsc --noEmit`)
-- Lint: não executado
-- Testes falhando relacionados ao bug: nenhum teste específico existia para este fluxo
-- Testes passando (baseline confirmado):
-  - Admin Master setup ✓
-  - Controle de Acesso: 4/4 ✓
-  - Admin → Clientes (criar, editar, excluir, filtrar): 5/5 ✓
-  - Admin → Usuários: 6/6 ✓
-  - Autenticação: 3/3 ✓
-- Testes falhando não relacionados ao bug (baseline pré-existente — não são responsabilidade desta correção):
-  - `setup/alexandre.setup.ts` — `Invalid login credentials` para Manager Alexandre (senha desatualizada no `.env.local`)
-  - `setup/pedro.setup.ts` — mesmo problema para Fleet Assistant Pedro
-  - Em cascata: `driver-user-integration`, `new-roles-audit` (Coordinator/Supervisor), `shippers-operational-units`, `tire-inspection-assistant`
-  - Ação pendente separada: atualizar senhas de teste no `.env.local` para Alexandre, Pedro e demais roles
+
+- **Suite unitária:** 107 testes passando, 0 falhando
+- **Typecheck (`tsc --noEmit`):** 0 erros
+- **Testes de fumaça:** não executados (usuário optou por pular — bug e correção são isolados e de baixo risco)
+- **Testes relacionados ao bug:** nenhum teste existente cobre a interação maxLength + filterCPF no DOM — este é o gap de cobertura que será fechado
+
+O teste existente em `src/lib/inputHelpers.test.ts` (linha 106-111) já valida que `filterCPF('123.456.789-01')` → `'12345678901'`, provando que a função em si está correta. O bug não está na função — está no atributo HTML que impede a função de receber o input completo.
+
+---
 
 ## Dependências mapeadas
-**Arquivo modificado:** `src/context/AuthContext.tsx`
 
-Consumidores de `currentClient`:
-- `src/pages/Drivers.tsx` — usa `currentClient?.id` como filtro de query e `clientId` para salvar
-- `src/pages/Maintenance.tsx` — usa `currentClient?.id` como filtro de query
-- `src/pages/Tires.tsx` — usa `currentClient?.id` como filtro de query
-- `src/pages/Vehicles.tsx` — usa `currentClient?.id` como filtro de query
-- `src/pages/Dashboard.tsx` — usa `currentClient?.id` para métricas
-- `src/components/Topbar.tsx` — exibe `currentClient?.name` e renderiza o select de filtro
-- E outros módulos de listagem
+**Arquivo a ser modificado:** `src/components/DriverForm.tsx`
 
-**Garantia de não-regressão:** A correção apenas adiciona `localStorage.setItem/removeItem` em 4 pontos isolados do `AuthContext`. Não altera a assinatura de `switchClient`, não altera `currentClient` para outros roles, não altera o fluxo de Workshop. Todos os consumidores continuam recebendo `currentClient` exatamente como antes — a única diferença é que, após um reload, o Admin Master terá `currentClient` populado em vez de null.
+Este componente é usado exclusivamente em `src/pages/Drivers.tsx` para criação e edição de motoristas. O campo CPF afetado não tem dependências em outros módulos.
+
+A remoção do `maxLength={11}` não afeta:
+- O `filterCPF` (que já limita a 11 dígitos internamente)
+- O `driverToRow` mapper (que recebe o valor já filtrado)
+- O banco de dados (a coluna `cpf` aceita a string normalizada de 11 dígitos)
+- Qualquer outro campo do formulário
+
+---
 
 ## O que NÃO fazer — restrições absolutas
-- Não modificar `src/pages/Drivers.tsx` — a persistência do estado do formulário já está implementada (sessionStorage) e não é a causa raiz do filtro resetar
-- Não modificar `src/components/DriverForm.tsx` — dados textuais do formulário já são persistidos corretamente
-- Não alterar o comportamento para roles Workshop — eles já têm seu próprio mecanismo e chave `workshop_active_client`
-- Não aplicar a persistência para Director, Manager, Coordinator — esses roles têm `client_id` no profile e o comportamento correto é restaurar o cliente do profile, não a última seleção manual
-- Não alterar a chave `workshop_active_client` já existente
-- Não refatorar a função `fetchProfile` além do bloco específico descrito
+
+- **Não modificar `src/lib/inputHelpers.ts`** — a função `filterCPF` está correta e seus 107 testes passam
+- **Não adicionar máscara visual de CPF** — fora do escopo desta correção; o campo exibe dígitos puros intencionalmente
+- **Não alterar o `maxLength` para um número maior (ex.: 14)** — a solução correta é remover o atributo, não ajustar o número
+- **Não modificar outros campos do formulário** — apenas o campo `cpf` é afetado por este bug
+- **Não refatorar o `handleChange` ou o `FIELD_FILTERS`** — estão corretos e não contribuem para o bug
+
+---
 
 ## Correção
 
-### Passo 1 — Limpar a chave ao deslogar
-**Arquivo:** `src/context/AuthContext.tsx`
-**Causa que justifica tocar neste arquivo:** é aqui que `currentClient` é gerenciado para todos os roles
-**O que mudar:** no handler `SIGNED_OUT` do `onAuthStateChange`, adicionar remoção da chave `adminMasterActiveClient` junto às outras remoções já existentes
-**O que NÃO mudar neste arquivo:** não alterar as remoções de `dashboard_date_filter` e `workshop_active_client` já existentes
-**Impacto em dependências:** nenhum — é apenas limpeza de storage no logout
+### Passo 1 — Remover `maxLength={11}` do campo CPF em DriverForm.tsx
 
-Localizar o bloco:
+**Arquivo:** `src/components/DriverForm.tsx`
+
+**Causa que justifica tocar neste arquivo:** É aqui que o atributo `maxLength={11}` está definido — a única causa do bug.
+
+**O que mudar:** Remover o atributo `maxLength={11}` do `<input>` do campo CPF.
+
+Localizar o bloco (linha 375):
+
 ```tsx
-localStorage.removeItem('dashboard_date_filter');
-localStorage.removeItem('workshop_active_client');
+<input
+  type="text"
+  name="cpf"
+  required
+  inputMode="numeric"
+  maxLength={11}
+  value={formData.cpf || ''}
+  onChange={handleChange}
+  className={inputClass}
+  placeholder="Somente números"
+/>
 ```
 
-Alterar para:
+Substituir por:
+
 ```tsx
-localStorage.removeItem('dashboard_date_filter');
-localStorage.removeItem('workshop_active_client');
-localStorage.removeItem('adminMasterActiveClient');
+<input
+  type="text"
+  name="cpf"
+  required
+  inputMode="numeric"
+  value={formData.cpf || ''}
+  onChange={handleChange}
+  className={inputClass}
+  placeholder="Somente números"
+/>
 ```
+
+**O que NÃO mudar neste arquivo:** Todos os outros campos, handlers, e lógica de estado devem permanecer intactos.
+
+**Impacto em dependências:** Nenhum. O `filterCPF` já garante que `formData.cpf` nunca terá mais de 11 dígitos. O input nunca exibirá mais de 11 caracteres após o primeiro `onChange`.
 
 **Como verificar este passo:**
 ```
-Logar como Admin Master → selecionar Deluna → deslogar → inspecionar localStorage no DevTools
-→ confirmar que a chave 'adminMasterActiveClient' não existe mais
+1. Abrir o formulário de motorista no browser
+2. Colar "187.182.207-62" no campo CPF
+3. Resultado esperado: campo exibe "18718220762" (11 dígitos, sem pontos ou traço)
+4. Colar "123.456.789-09" no campo CPF
+5. Resultado esperado: campo exibe "12345678909" (11 dígitos)
+6. Digitar manualmente mais de 11 dígitos
+7. Resultado esperado: o campo para de aceitar após o 11º dígito (filterCPF limita via slice)
 ```
 
 ---
 
-### Passo 2 — Limpar a chave ao selecionar "Todos os Clientes"
-**Arquivo:** `src/context/AuthContext.tsx`
-**Causa que justifica tocar neste arquivo:** quando o Admin Master seleciona "Todos os Clientes" (clientId vazio), a chave persistida deve ser removida para que o reload não restaure um cliente que o usuário explicitamente desselecionou
-**O que mudar:** no bloco `if (!clientId)` da função `switchClient`, adicionar remoção da nova chave
-**O que NÃO mudar neste arquivo:** não alterar `setCurrentClient(null)` e `setActiveWorkshopId(null)` existentes
-**Impacto em dependências:** nenhum — é apenas limpeza de storage
+### Passo 2 — Adicionar teste de regressão em inputHelpers.test.ts
 
-Localizar o bloco:
-```tsx
-if (!clientId) {
-  setCurrentClient(null);
-  setActiveWorkshopId(null);
-  localStorage.removeItem('workshop_active_client');
-  return;
-}
+**Arquivo:** `src/lib/inputHelpers.test.ts`
+
+**Causa que justifica tocar neste arquivo:** O caso específico do CPF com dígitos verificadores colado de planilha não está documentado como caso de teste explícito. Este teste serve como proteção e documentação do comportamento esperado.
+
+**O que mudar:** Adicionar um novo caso de teste dentro do bloco `describe('filterCPF', ...)` existente (linha 106).
+
+Localizar o bloco atual:
+
+```typescript
+describe('filterCPF', () => {
+  it('mantém apenas 11 dígitos', () => {
+    expect(filterCPF('123.456.789-01')).toBe('12345678901');
+    expect(filterCPF('12345678901234567890')).toBe('12345678901');
+  });
+});
 ```
 
-Alterar para:
-```tsx
-if (!clientId) {
-  setCurrentClient(null);
-  setActiveWorkshopId(null);
-  localStorage.removeItem('workshop_active_client');
-  localStorage.removeItem('adminMasterActiveClient');
-  return;
-}
+Substituir por:
+
+```typescript
+describe('filterCPF', () => {
+  it('mantém apenas 11 dígitos', () => {
+    expect(filterCPF('123.456.789-01')).toBe('12345678901');
+    expect(filterCPF('12345678901234567890')).toBe('12345678901');
+  });
+
+  it('preserva os dígitos verificadores ao processar CPF colado de planilha', () => {
+    expect(filterCPF('187.182.207-62')).toBe('18718220762');
+    expect(filterCPF('000.000.001-91')).toBe('00000000191');
+  });
+});
 ```
+
+**O que NÃO mudar neste arquivo:** Os casos de teste existentes e todos os outros `describe` blocks.
+
+**Impacto em dependências:** Nenhum. É apenas adição de testes.
 
 **Como verificar este passo:**
+```bash
+npm run test:unit
 ```
-Logar como Admin Master → selecionar Deluna → selecionar "Todos os Clientes"
-→ inspecionar localStorage → confirmar que 'adminMasterActiveClient' foi removida
-```
+Resultado esperado: 109 testes passando (107 anteriores + 2 novos), 0 falhando.
 
 ---
-
-### Passo 3 — Persistir o cliente selecionado pelo Admin Master
-**Arquivo:** `src/context/AuthContext.tsx`
-**Causa que justifica tocar neste arquivo:** este é o passo que resolve o bug — ao selecionar um cliente, a seleção deve ser salva para sobreviver a reloads
-**O que mudar:** após o bloco `if (client) setCurrentClient(client)` no final de `switchClient`, envolver em bloco para também persistir quando o role for Admin Master
-**O que NÃO mudar neste arquivo:** não alterar o bloco de Workshop acima que já possui sua própria lógica
-**Impacto em dependências:** nenhum — `currentClient` continua sendo atualizado da mesma forma; a única adição é a persistência no localStorage para o role Admin Master
-
-Localizar:
-```tsx
-const client = allClients.find((c) => c.id === clientId);
-if (client) setCurrentClient(client);
-```
-
-Alterar para:
-```tsx
-const client = allClients.find((c) => c.id === clientId);
-if (client) {
-  setCurrentClient(client);
-  if (user?.role === 'Admin Master') {
-    localStorage.setItem('adminMasterActiveClient', clientId);
-  }
-}
-```
-
-**Como verificar este passo:**
-```
-Logar como Admin Master → selecionar Deluna
-→ inspecionar localStorage → confirmar que 'adminMasterActiveClient' = '<id do cliente Deluna>' está presente
-```
-
----
-
-### Passo 4 — Restaurar o cliente ao carregar a sessão
-**Arquivo:** `src/context/AuthContext.tsx`
-**Causa que justifica tocar neste arquivo:** sem este passo, o localStorage seria salvo mas nunca lido — a restauração é o outro lado do par save/restore
-**O que mudar:** dentro do bloco `if (['Admin Master', 'Director', 'Manager', 'Coordinator'].includes(profile.role))` em `fetchProfile`, após popular `allClients`, adicionar a lógica de restauração exclusivamente para Admin Master
-**O que NÃO mudar neste arquivo:** não alterar o `setCurrentClient` das linhas 164-179 (que trata roles com `client_id` no profile); não alterar o comportamento para Director, Manager, Coordinator
-**Impacto em dependências:** `currentClient` será populado durante `fetchProfile` em vez de ficar null — todos os consumidores já tratam `currentClient` como nullable, então receber um valor não-null é sempre seguro
-
-Localizar:
-```tsx
-if (['Admin Master', 'Director', 'Manager', 'Coordinator'].includes(profile.role)) {
-  const { data: clients } = await supabase.from('clients').select('id, name, logo_url');
-  if (clients) setAllClients(clients.map((c: any) => ({ id: c.id, name: c.name, logoUrl: c.logo_url ?? undefined })));
-}
-```
-
-Alterar para:
-```tsx
-if (['Admin Master', 'Director', 'Manager', 'Coordinator'].includes(profile.role)) {
-  const { data: clients } = await supabase.from('clients').select('id, name, logo_url');
-  if (clients) {
-    const clientList = clients.map((c: any) => ({ id: c.id, name: c.name, logoUrl: c.logo_url ?? undefined }));
-    setAllClients(clientList);
-    if (profile.role === 'Admin Master') {
-      const savedClientId = localStorage.getItem('adminMasterActiveClient');
-      if (savedClientId) {
-        const savedClient = clients.find((c: any) => c.id === savedClientId);
-        if (savedClient) {
-          setCurrentClient({
-            id: savedClient.id,
-            name: savedClient.name,
-            logoUrl: savedClient.logo_url ?? undefined,
-          });
-        }
-      }
-    }
-  }
-}
-```
-
-**Como verificar este passo:**
-```
-Logar como Admin Master → selecionar Deluna → pressionar F5 (reload)
-→ Resultado esperado: filtro continua mostrando "Deluna" após o reload
-```
-
----
-
-## Testes novos a escrever
-
-**Teste 1 — Persistência do cliente selecionado pelo Admin Master após reload**
-- Nome sugerido: `e2e/completed/admin-master-client-persistence.spec.ts`
-- O que valida: que o filtro de cliente sobrevive a um reload de página
-- Cenários a cobrir:
-  1. Admin Master seleciona cliente X → recarrega página → filtro exibe cliente X (não "Todos os Clientes")
-  2. Admin Master seleciona cliente X → seleciona "Todos os Clientes" → recarrega → filtro exibe "Todos os Clientes"
-  3. Admin Master seleciona cliente X → faz logout → faz login novamente → filtro exibe "Todos os Clientes" (a seleção deve ser descartada no logout)
 
 ## Verificação final
+
 Após todos os passos:
 
-1. Rode o typecheck:
+1. Rode a suite unitária completa:
+```bash
+npm run test:unit
 ```
-npx tsc --noEmit
-```
-Resultado esperado: zero erros
+Resultado esperado: 109 testes passando. Nenhum teste que passava antes deve estar falhando.
 
-2. Rode a suite de testes E2E:
+2. Rode o typecheck:
+```bash
+npm run lint
 ```
-npx playwright test
-```
-Resultado esperado: os testes que passavam antes continuam passando. Testes de movimentação de pneus com falhas de timing são pré-existentes e não são responsabilidade desta correção.
+Resultado esperado: nenhum erro de tipo.
 
-3. Execute os testes de fumaça do docs/MEMORY.md e confirme que todos passam.
-
-4. Validação manual do fluxo corrigido:
+3. Validação manual no browser:
 ```
-1. Logar como Admin Master
-2. Selecionar cliente "Deluna" no filtro do topo
-3. Abrir formulário "Adicionar Motorista"
-4. Preencher nome, CPF e outros campos de texto
-5. Pressionar F5 para forçar reload
-Resultado esperado: filtro mostra "Deluna", formulário reabre com campos de texto preservados
+a. Abrir /cadastros/motoristas
+b. Abrir formulário de criação ou edição de motorista
+c. Colar "187.182.207-62" no campo CPF
+d. Verificar: campo exibe "18718220762"
+e. Tentar digitar um 12º dígito manualmente
+f. Verificar: o campo não aceita o 12º dígito (filterCPF limita via slice)
 ```
 
-Se qualquer verificação falhar: pare, informe o usuário com o resultado exato e aguarde instrução.
+Se qualquer verificação falhar: pare, informe o usuário com o resultado exato e aguarde instrução. Não tente corrigir por conta própria sem comunicar.
+
+---
 
 ## Observações para sessões futuras
 
-**Observação 1 — `onClose` em `Drivers.tsx` não limpa `sessionStorage`**
-`src/pages/Drivers.tsx`, handler `onClose` (linhas 302-305): quando o usuário fecha o formulário pelo botão X ou Cancelar, `sessionStorage` permanece com `driverFormOpen = 'true'`. Isso faz o formulário reabrir inesperadamente se a página recarregar depois que o formulário foi fechado. Não é o bug reportado agora — é um comportamento adjacente. Tratar em sessão futura com `evolucao.md` ou nova sessão `Fixbugs.md`.
+**Máscara de CPF no campo:** O campo exibe os dígitos sem formatação (sem pontos e traço). Seria mais amigável exibir `187.182.207-62` enquanto o usuário digita ou após a colagem. Esta é uma melhoria de UX, não um bug — deve ser tratada em sessão separada com `evolucao.md`.
 
-**Observação 2 — Arquivos (CNH, GR) não podem ser restaurados após reload**
-Por limitação do navegador, objetos `File` não podem ser serializados em `sessionStorage`. Após um reload, os campos de arquivo estarão vazios mesmo que o formulário reabra com os dados textuais. Isso é comportamento esperado e não tem solução sem upload incremental ou draft salvo no servidor. Registrar para avaliação futura de UX.
+**Outros campos com maxLength potencialmente problemático:** Outros campos numéricos do projeto que aceitam formatos com separadores (ex.: CNPJ, telefone, CEP) devem ser auditados para verificar se possuem o mesmo padrão de `maxLength` igual ao número de dígitos (sem contar os separadores). Não é escopo desta correção — registrar para revisão futura.
+
+---
 
 ## Registro para o docs/MEMORY.md
-Após a correção confirmada, adicione ao docs/MEMORY.md:
+Após a correção confirmada, adicionar ao docs/MEMORY.md:
 
 ```
-Bug corrigido: Filtro de cliente do Admin Master resetava para "Todos os Clientes" após reload de aba
-Causa raiz: switchClient em AuthContext não persistia seleção no localStorage para Admin Master (padrão já existia para Workshop)
-Correção aplicada: 4 mudanças cirúrgicas em AuthContext — save ao selecionar, remove ao desselecionar, remove no logout, restore no fetchProfile
-Arquivos modificados: src/context/AuthContext.tsx
-Testes adicionados: e2e/completed/admin-master-client-persistence.spec.ts (a criar)
+Bug corrigido: CPF truncado ao colar valor formatado no formulário de motorista
+Causa raiz: maxLength={11} no input HTML truncava o texto colado antes do filterCPF processar — browser aplica maxLength sobre o string bruto (com pontos/traço), não sobre os dígitos
+Correção aplicada: remoção do atributo maxLength={11} do campo CPF em DriverForm.tsx; filterCPF já limita a 11 dígitos internamente via .slice(0, 11)
+Arquivos modificados: src/components/DriverForm.tsx, src/lib/inputHelpers.test.ts
+Testes adicionados: 2 novos casos em describe('filterCPF') no inputHelpers.test.ts
 ```
+
+---
 
 ## Sugestão de commit
-Quando todos os critérios de conclusão estiverem atendidos:
+Quando todos os critérios de conclusão estiverem atendidos e você confirmar que o bug foi corrigido:
 
 ```
-git add src/context/AuthContext.tsx
-git commit -m "fix: persistir cliente selecionado pelo Admin Master entre reloads de aba
-
-Ao selecionar um cliente no filtro, Admin Master perdia a seleção
-ao recarregar a página pois switchClient não persistia no localStorage.
-Workshop já tinha esse mecanismo (workshop_active_client); aplicado o
-mesmo padrão para Admin Master com chave adminMasterActiveClient."
+git add src/components/DriverForm.tsx src/lib/inputHelpers.test.ts
+git commit -m "fix: preservar dígitos verificadores ao colar CPF formatado no formulário de motorista"
 ```

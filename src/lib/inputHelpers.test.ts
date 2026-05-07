@@ -108,6 +108,11 @@ describe('filterCPF', () => {
     expect(filterCPF('123.456.789-01')).toBe('12345678901');
     expect(filterCPF('12345678901234567890')).toBe('12345678901');
   });
+
+  it('preserva os dígitos verificadores ao processar CPF colado de planilha', () => {
+    expect(filterCPF('187.182.207-62')).toBe('18718220762');
+    expect(filterCPF('000.000.001-91')).toBe('00000000191');
+  });
 });
 
 describe('filterCNHCategory', () => {

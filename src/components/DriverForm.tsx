@@ -377,7 +377,6 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     name="cpf"
                     required
                     inputMode="numeric"
-                    maxLength={11}
                     value={formData.cpf || ''}
                     onChange={handleChange}
                     className={inputClass}
