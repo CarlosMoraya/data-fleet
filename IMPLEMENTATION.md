@@ -1,8 +1,8 @@
 # IMPLEMENTATION.md
-Gerado em: 2026-05-05 08:45
-Sessão: Toggle de visibilidade de senha no formulário de cadastro do motorista
-Tipo de mudança: Tipo 2 — Adição com integração ao sistema existente
-Baseado em: agent/AGENT-FRONTEND.md + agent/AGENT-DESIGN.md + docs/MEMORY.md (2026-05-05)
+Gerado em: 2026-05-11 09:45
+Sessão: Toggle de visibilidade de senha na tela de login
+Tipo de mudança: Tipo 1 — Adição sem impacto em código existente
+Baseado em: agent/AGENT-FRONTEND.md + docs/MEMORY.md (2026-05-11)
 
 ---
 
@@ -25,227 +25,224 @@ Qualquer decisão não prevista aqui deve ser tratada como: parar, informar o us
 ## Contexto necessário
 Antes de implementar, leia obrigatoriamente:
 - `agent/AGENT.md` — regras universais do projeto
-- `agent/AGENT-FRONTEND.md` — padrões de interface e React
-- `agent/AGENT-DESIGN.md` — design system, tokens, estética premium
+- `agent/AGENT-FRONTEND.md` — stack e padrões de frontend
 
 ---
 
 ## O produto e a mudança
-**O que é este produto:** βetaFleet é um sistema SaaS de gestão de frota de transporte — veículos, motoristas, manutenção, pneus e checklists offline-first.
-**O que será implementado:** Adicionar um botão de toggle (olho) ao campo "Senha temporária" no formulário de cadastro do motorista, permitindo que o usuário alterne a visibilidade da senha digitada. A mudança ocorre exclusivamente no frontend, em um único arquivo.
+**O que é este produto:** βetaFleet é um sistema SaaS de gestão de frotas com múltiplos perfis de acesso (Admin Master, Manager, Analyst, Driver, etc.), construído com React 19 + Vite + Tailwind CSS v4 + Supabase.
+
+**O que será implementado:** Adição de um botão de toggle (ícone Eye/EyeOff) ao campo de senha da tela de login, permitindo que o usuário alterne entre visualizar e ocultar a senha digitada. A única mudança é em `src/pages/Login.tsx`.
 
 ---
 
 ## Padrões de mercado aplicados
-- **Password Visibility Toggle**: estado booleano local que alterna o atributo `type` do input entre `"password"` e `"text"`. Ícones `Eye`/`EyeOff` indicam o estado atual. Padrão amplamente adotado (Google, GitHub, Stripe). Justificativa: evita erro de digitação em senha temporária sem expor a senha por padrão.
+- **Controlled Input with Toggle**: alternância do atributo `type` do input entre `"password"` e `"text"` via estado local React. Padrão amplamente adotado para visibilidade de senha, sem dependências extras.
 
 ---
 
 ## Pré-condições
-- TypeScript sem erros (`npm run lint` — confirmado ✅)
-- 107 testes unitários passando (`npm run test:unit` — confirmado ✅)
-- Dependência `lucide-react` já instalada no projeto (sem instalação necessária)
+- TypeCheck passando: ✅ confirmado (2026-05-11)
+- Testes de autenticação passando: ✅ confirmado — 33 testes passando, falhas são pré-existentes e não relacionadas
+- `lucide-react ^0.546.0` já instalado no projeto — ícones `Eye` e `EyeOff` disponíveis
 
 ---
 
 ## Funções e módulos reutilizados
-- `src/components/DriverForm.tsx` → ícones de `lucide-react` já importados no arquivo (`X`, `FileText`, `ExternalLink`, `Loader2`, `UserPlus`) — `Eye` e `EyeOff` serão adicionados à mesma importação existente
-- Classe `inputClass` já definida na linha 250 — será reutilizada no input com ajuste de padding-right
+- `lucide-react` → ícones `Eye` e `EyeOff` — importados diretamente, sem wrapper adicional
+- `useState` do React — já importado em `src/pages/Login.tsx`
 
 ---
 
 ## Restrições absolutas — o que NÃO fazer
-- Não modificar nenhum outro arquivo além dos dois listados neste documento
-- Não alterar o comportamento de salvamento da senha no `sessionStorage` — isso já existe e está fora do escopo
-- Não adicionar toggle de senha à tela de Login (`src/pages/Login.tsx`) — fora do escopo desta sessão
-- Não instalar nenhuma biblioteca nova — `lucide-react` já contém os ícones necessários
-- Não alterar a lógica de validação (`minLength={6}`) nem o `onChange` do campo senha
-- Não refatorar nenhuma outra parte do formulário
+- Não criar nenhum componente novo — a mudança é autocontida em Login.tsx
+- Não instalar nenhuma dependência nova — lucide-react já está no projeto
+- Não alterar os campos de email, o botão de submit, a lógica de autenticação, o layout de fundo (vídeo/imagem) nem nenhum outro elemento da tela
+- Não adicionar tooltip, label extra ou texto ao botão do toggle — apenas o ícone
+- Não refatorar a estrutura do componente Login além do especificado aqui
+- Não modificar `e2e/completed/auth.spec.ts` — os testes existentes continuam válidos porque o toggle inicia com senha oculta (`type="password"`)
 
 ---
 
 ## Etapas de implementação
 
-### Etapa 1 — Adicionar estado e ícones em DriverForm.tsx
+### Etapa 1 — Adicionar estado e importação dos ícones
 
-**Padrão aplicado:** Password Visibility Toggle
+**Padrão aplicado:** Controlled Input with Toggle
 
-**Arquivo a modificar:** `src/components/DriverForm.tsx`
+**O que fazer:**
+No arquivo `src/pages/Login.tsx`:
 
-**O que muda:**
+1. Adicionar novo import na linha 1 (após os imports existentes):
+   ```
+   import { Eye, EyeOff } from 'lucide-react';
+   ```
 
-**1.1 — Importação dos ícones**
+2. Dentro do componente `Login`, após a declaração do estado `imageFailed` (linha 11), adicionar o novo estado:
+   ```
+   const [showPassword, setShowPassword] = useState(false);
+   ```
 
-Localizar a linha de importação existente:
-```
-import { X, FileText, ExternalLink, Loader2, UserPlus } from 'lucide-react';
-```
-Substituir por:
-```
-import { X, FileText, ExternalLink, Loader2, UserPlus, Eye, EyeOff } from 'lucide-react';
-```
+**Arquivos a modificar:**
+- `src/pages/Login.tsx`
+  - O que muda: adição de 1 import e 1 declaração de estado
+  - O que permanece: toda a lógica de autenticação, todos os outros estados, o layout completo
+  - Por que este arquivo: é o único arquivo que contém o campo de senha do login
 
-**1.2 — Novo estado local**
-
-Localizar o bloco de declarações de estado (após `const isCreating = !driver;`, antes do primeiro `useState`). Adicionar imediatamente após a linha `const [saving, setSaving] = useState(false);`:
-```tsx
-const [showPassword, setShowPassword] = useState(false);
-```
-
-**1.3 — Substituição do campo senha**
-
-Localizar o bloco exato do campo senha temporária (dentro da seção `{isCreating && (...)}`, sub-div sem `sm:col-span-2`):
-
-```tsx
-<div>
-  <label className="block text-sm font-medium text-zinc-700">
-    Senha temporária<span className="text-red-500 ml-0.5">*</span>
-  </label>
-  <input
-    type="password"
-    required
-    minLength={6}
-    value={password}
-    onChange={e => setPassword(e.target.value)}
-    placeholder="Mínimo 6 caracteres"
-    className={inputClass}
-  />
-  <p className="mt-1 text-xs text-zinc-400">O motorista deverá alterar a senha no primeiro acesso.</p>
-</div>
-```
-
-Substituir por:
-```tsx
-<div>
-  <label className="block text-sm font-medium text-zinc-700">
-    Senha temporária<span className="text-red-500 ml-0.5">*</span>
-  </label>
-  <div className="relative">
-    <input
-      data-testid="password-input"
-      type={showPassword ? 'text' : 'password'}
-      required
-      minLength={6}
-      value={password}
-      onChange={e => setPassword(e.target.value)}
-      placeholder="Mínimo 6 caracteres"
-      className={`${inputClass} pr-10`}
-    />
-    <button
-      type="button"
-      onClick={() => setShowPassword(prev => !prev)}
-      className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-zinc-600 transition-colors"
-      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-    >
-      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-    </button>
-  </div>
-  <p className="mt-1 text-xs text-zinc-400">O motorista deverá alterar a senha no primeiro acesso.</p>
-</div>
-```
-
-**O que permanece inalterado neste arquivo:** toda a lógica de salvamento, sessionStorage, validações, OCR, upload de arquivos, outros campos do formulário.
-
-**Funções a implementar:**
-- Nenhuma função nova — a lógica é inline: `() => setShowPassword(prev => !prev)` — estimativa: 1 linha
+**Como verificar:**
+O arquivo deve compilar sem erros de TypeScript. Rode `npx tsc --noEmit` — resultado esperado: sem output (zero erros).
 
 ---
 
-### Etapa 2 — Atualizar seletor no teste E2E de integração do motorista
+### Etapa 2 — Modificar o campo de senha com o toggle
 
-**Arquivo a modificar:** `e2e/completed/driver-user-integration.spec.ts`
+**Padrão aplicado:** Controlled Input with Toggle
 
-**O que muda:**
+**O que fazer:**
+Substituir o bloco atual do campo "Senha" em `src/pages/Login.tsx` pelo seguinte.
 
-Localizar as linhas que usam o seletor `input[type="password"]` para o campo de senha do formulário de cadastro:
-```ts
-const passwordInput = page.locator('input[type="password"]').first();
-await expect(passwordInput).toBeVisible();
-await passwordInput.fill(driverPassword);
+**Bloco atual a substituir** (identificado pelo label "Senha" — atualmente linhas 95–107):
+```jsx
+<div>
+  <label className="block text-sm font-medium text-zinc-700">Senha</label>
+  <div className="mt-1">
+    <input
+      type="password"
+      required
+      value={password}
+      onChange={(e) => setPassword(e.target.value)}
+      className="block w-full appearance-none rounded-xl border border-zinc-200 px-3 py-2 placeholder-zinc-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+      placeholder="••••••••"
+    />
+  </div>
+</div>
 ```
 
-Substituir por:
-```ts
-const passwordInput = page.locator('[data-testid="password-input"]');
-await expect(passwordInput).toBeVisible();
-await passwordInput.fill(driverPassword);
+**Substituir por:**
+```jsx
+<div>
+  <label className="block text-sm font-medium text-zinc-700">Senha</label>
+  <div className="relative mt-1">
+    <input
+      type={showPassword ? 'text' : 'password'}
+      required
+      value={password}
+      onChange={(e) => setPassword(e.target.value)}
+      className="block w-full appearance-none rounded-xl border border-zinc-200 px-3 py-2 pr-10 placeholder-zinc-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+      placeholder="••••••••"
+    />
+    <button
+      type="button"
+      onClick={() => setShowPassword((prev) => !prev)}
+      className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-zinc-600 transition-colors"
+      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+    >
+      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+    </button>
+  </div>
+</div>
 ```
 
-**Por que este arquivo:** o seletor `input[type="password"]` quebraria caso o toggle esteja ativo (`type="text"`) durante a execução do teste. O `data-testid` é estável independentemente do estado do toggle.
+**Detalhes de cada mudança:**
+- `type={showPassword ? 'text' : 'password'}` — alterna a visibilidade da senha
+- `pr-10` adicionado ao `className` do input — garante que o texto digitado não sobreponha o ícone
+- `<div className="relative mt-1">` — muda de `<div className="mt-1">` para habilitar o posicionamento absoluto do botão
+- `<button type="button">` — `type="button"` é obrigatório para evitar que o clique submeta o formulário
+- `aria-label` — acessibilidade: anuncia a ação correta para leitores de tela
+- `<Eye size={18} />` quando senha oculta (estado inicial), `<EyeOff size={18} />` quando visível
 
-**O que permanece inalterado:** toda a lógica do teste, demais seletores, asserts e fluxo de criação do motorista.
+**Arquivos a modificar:**
+- `src/pages/Login.tsx`
+  - O que muda: o bloco do campo "Senha" conforme especificado acima
+  - O que permanece: tudo o que não é o campo "Senha"
 
-**Como verificar:** após a mudança, rodar `npx playwright test e2e/completed/driver-user-integration.spec.ts` e confirmar que o teste encontra o campo sem erro.
+**Estimativa de linhas adicionadas:** 12 linhas no JSX. Dentro do limite de 30 linhas.
+
+**Como verificar:**
+1. A aplicação renderiza sem erros no console
+2. O ícone de olho (Eye) aparece à direita do campo "Senha"
+3. Ao clicar no ícone: a senha digitada fica visível e o ícone muda para EyeOff (olho riscado)
+4. Ao clicar novamente: a senha fica oculta e o ícone volta para Eye
+5. Clicar no ícone NÃO submete o formulário
 
 ---
 
 ## Segurança
-- O toggle expõe a senha visualmente apenas sob ação explícita do usuário (clique intencional) — risco de shoulder surfing aceito, comportamento padrão de mercado
-- O atributo `type="button"` no botão de toggle é obrigatório para evitar que ele submeta o formulário acidentalmente
-- O campo mantém `minLength={6}` e `required` independentemente do estado do toggle
-- Nenhum dado de senha é enviado para log ou analytics
+- **Sem risco**: a alternância `type="password"` ↔ `type="text"` é um comportamento padrão do DOM. A senha nunca é transmitida de forma diferente — a mudança é puramente visual no cliente.
+- **`type="button"` obrigatório**: sem ele, qualquer clique dentro do `<form>` dispararia o submit. Está especificado explicitamente acima.
+- **Sem armazenamento adicional**: `showPassword` é estado efêmero — não persiste em sessionStorage, localStorage nem em nenhum outro mecanismo.
 
 ---
 
 ## Tratamento de erros
-Não há operações assíncronas nesta etapa. O toggle é puramente local — não há casos de falha a tratar.
+Não há operações que possam falhar nesta implementação. O toggle é uma operação de estado local síncrona sem chamadas externas.
+
+---
+
+## Validação manual guiada
+
+Esta mudança é puramente visual e depende de interação com o browser. Não é necessário escrever teste unitário ou E2E novo porque a lógica é trivial (alternância de um boolean) e o fluxo de login já está coberto por `e2e/completed/auth.spec.ts`.
+
+Execute manualmente após a implementação:
+
+1. Abra `http://localhost:3000/login`
+2. **Cenário 1 — Estado inicial:** o campo "Senha" exibe o ícone Eye à direita; ao digitar, os caracteres aparecem como `•`
+3. **Cenário 2 — Mostrar senha:** clique no ícone Eye → caracteres ficam visíveis → ícone muda para EyeOff
+4. **Cenário 3 — Ocultar novamente:** clique no ícone EyeOff → caracteres voltam a `•` → ícone volta para Eye
+5. **Cenário 4 — Sem impacto no submit:** com o campo preenchido, clique no ícone → formulário NÃO é submetido
+6. **Cenário 5 — Login funcional após toggle:** deixe a senha visível e clique em "Entrar" → login ocorre normalmente e redireciona para `/`
 
 ---
 
 ## Suite completa ao final
-Após as duas etapas implementadas, execute:
+Após todas as etapas implementadas, execute:
 ```
-npm run lint && npm run test:unit
+npx tsc --noEmit
 ```
-Resultado esperado: 0 erros de TypeScript, 107 testes unitários passando.
+Resultado esperado: sem output (zero erros de tipo).
 
-Validação manual obrigatória:
-1. Abrir `http://localhost:3000/cadastros/motoristas`
-2. Clicar em "Cadastrar Motorista"
-3. Rolar até o campo "Senha temporária"
-4. Digitar uma senha qualquer (ex: `abc123`)
-5. Clicar no ícone de olho — confirmar que a senha aparece em texto claro e o ícone muda para `EyeOff`
-6. Clicar novamente — confirmar que a senha volta a ser ocultada e o ícone muda para `Eye`
-7. Confirmar que o botão de olho NÃO submete o formulário ao ser clicado
-8. Confirmar que o campo continua validando `minLength={6}`
+```
+npx playwright test e2e/completed/auth.spec.ts --reporter=list
+```
+Resultado esperado: 3 testes passando, 0 falhando.
 
 ---
 
 ## Critérios de conclusão
 A implementação está completa quando:
-- [ ] `npm run lint` passa sem erros
-- [ ] `npm run test:unit` passa com 107 testes (0 falhando)
-- [ ] Validação manual dos 8 passos acima confirmada
-- [ ] O ícone alterna corretamente entre `Eye` e `EyeOff` ao clicar
-- [ ] O botão de toggle NÃO submete o formulário
-- [ ] O seletor do teste E2E foi atualizado para `data-testid="password-input"`
+- [ ] `npx tsc --noEmit` passa sem erros
+- [ ] Os 3 testes de `auth.spec.ts` passam (os mesmos que passavam antes)
+- [ ] A validação manual dos 5 cenários acima está concluída
+- [ ] O ícone está visualmente alinhado ao campo, sem sobreposição de texto
+- [ ] Clicar no ícone não submete o formulário
 
 Se algum critério não for atendido: pare, informe o usuário e aguarde instrução. Não tente corrigir por conta própria sem comunicar.
 
 ---
 
 ## Decisões tomadas nesta sessão
-- **`data-testid` no campo senha:** adicionado para estabilizar o seletor do teste E2E existente, que usava `input[type="password"]` — seletor frágil após o toggle
-- **Toggle apenas na criação:** o campo senha só existe no modo `isCreating`. O toggle foi implementado apenas nesse contexto — não há campo de senha no modo edição
+- **Sem componente separado**: a lógica é simples o suficiente para permanecer inline no Login.tsx. Criar um `PasswordInput` reutilizável introduziria abstração prematura — não há outro campo de senha no projeto que se beneficiaria dela no momento.
+- **`size={18}`**: tamanho equilibrado para não dominar o campo visualmente e manter proporção com o padding `pr-10`.
+- **Teste E2E não criado**: o comportamento do toggle é um boolean local sem lógica de negócio. A cobertura existente do fluxo de login (`auth.spec.ts`) é suficiente. A validação manual guiada cobre os cenários visuais que não fazem sentido em teste automatizado.
 
 ---
 
 ## Observações para sessões futuras
-- A tela de Login (`src/pages/Login.tsx`) também tem campo de senha sem toggle — pode ser uma melhoria futura consistente com esta mudança
-- Nenhum outro formulário do projeto possui campo de senha — escopo restrito ao DriverForm por ora
+- Se futuramente houver campo de senha em outros formulários (cadastro, troca de senha), considerar extrair um componente `PasswordInput` reutilizável.
+- O teste `auth.spec.ts` usa o seletor `input[type="password"]` — se algum dia o toggle precisar persistir o estado "visível" entre navegações, esse seletor precisaria ser atualizado.
 
 ---
 
 ## Após a implementação
 Quando todos os critérios de conclusão estiverem atendidos:
 
-1. Atualize o `docs/MEMORY.md` com o estado atual
+1. Atualize o `docs/MEMORY.md` — registre que o toggle de senha foi adicionado ao login
 2. Mova os detalhes desta sessão para `docs/MEMORY-HISTORY.md`
-3. Apresente sugestão de commit:
+3. Sugestão de commit:
 
 ```
-git add src/components/DriverForm.tsx e2e/completed/driver-user-integration.spec.ts
-git commit -m "feat: adiciona toggle de visibilidade de senha no cadastro do motorista"
+git add src/pages/Login.tsx
+git commit -m "feat: adicionar toggle de visibilidade de senha na tela de login"
 ```
 
-O commit só deve ser executado pelo usuário após validar que o resultado está como esperado.
+O commit só deve ser executado após validar que o resultado está como esperado.
