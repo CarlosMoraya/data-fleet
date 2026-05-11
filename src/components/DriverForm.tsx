@@ -10,6 +10,7 @@ import {
   filterAlphanumeric,
   filterCPF,
   filterCNHCategory,
+  filterPhone,
 } from '../lib/inputHelpers';
 import { extractCnhData, ExtractionStatus, ExtractionResult } from '../lib/documentOcr';
 
@@ -38,6 +39,7 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
   courseName1: filterText,
   courseName2: filterText,
   courseName3: filterText,
+  phone: filterPhone,
 };
 
 export default function DriverForm({ driver, fieldSettings, clientId, onClose, onSave }: DriverFormProps) {
@@ -378,6 +380,20 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     required
                     inputMode="numeric"
                     value={formData.cpf || ''}
+                    onChange={handleChange}
+                    className={inputClass}
+                    placeholder="Somente números"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700">
+                    Telefone de Contato
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    inputMode="numeric"
+                    value={formData.phone || ''}
                     onChange={handleChange}
                     className={inputClass}
                     placeholder="Somente números"

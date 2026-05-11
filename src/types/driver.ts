@@ -8,6 +8,7 @@ export interface Driver {
   // Core identity (sempre obrigatórios)
   name: string;
   cpf: string;
+  phone?: string;
 
   // CNH
   issueDate?: string;

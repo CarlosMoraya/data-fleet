@@ -56,6 +56,14 @@ function formatDate(dateStr?: string | null): string | undefined {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR');
 }
 
+function formatPhone(phone?: string | null): string | undefined {
+  if (!phone) return undefined;
+  const d = phone.replace(/\D/g, '');
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return phone;
+}
+
 export default function DriverDetailModal({ driver, vehiclePlate, onClose }: Props) {
   return (
     <div
@@ -91,6 +99,7 @@ export default function DriverDetailModal({ driver, vehiclePlate, onClose }: Pro
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
               <DetailField label="Nome" value={driver.name} />
               <DetailField label="CPF" value={formatCPF(driver.cpf)} />
+              <DetailField label="Telefone de Contato" value={formatPhone(driver.phone)} />
             </div>
           </div>
 

@@ -25,6 +25,16 @@ describe('driverToRow', () => {
     expect(row.cnh_upload).toBeNull();
     expect(row.gr_upload).toBeNull();
   });
+
+  it('inclui phone quando fornecido', () => {
+    const row = driverToRow({ name: 'João', cpf: '12345678901', phone: '11999999999' }, 'c1');
+    expect(row.phone).toBe('11999999999');
+  });
+
+  it('define phone como null quando ausente', () => {
+    const row = driverToRow({ name: 'João', cpf: '12345678901' }, 'c1');
+    expect(row.phone).toBeNull();
+  });
 });
 
 describe('driverFromRow', () => {
@@ -45,5 +55,18 @@ describe('driverFromRow', () => {
     expect(driver.cpf).toBe('12345678901');
     expect(driver.category).toBe('AB');
     expect(driver.expirationDate).toBe('2030-12-31');
+  });
+
+  it('mapeia phone corretamente', () => {
+    const row = {
+      id: 'd1',
+      client_id: 'c1',
+      name: 'João Silva',
+      cpf: '12345678901',
+      phone: '11999999999',
+    } as unknown as DriverRow;
+
+    const driver = driverFromRow(row);
+    expect(driver.phone).toBe('11999999999');
   });
 });
