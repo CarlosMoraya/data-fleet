@@ -92,9 +92,23 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('pt-BR');
 }
 
+export function shouldEnableMaintenanceOrdersQuery(params: {
+  isWorkshopUser: boolean;
+  isMultiWorkshop: boolean;
+  activeWorkshopId?: string | null;
+  workshopId?: string | null;
+  currentClientId?: string | null;
+  role?: string | null;
+}) {
+  return params.isWorkshopUser
+    ? (params.isMultiWorkshop || !!(params.activeWorkshopId ?? params.workshopId))
+    : params.role === 'Admin Master' || !!params.currentClientId;
+}
+
 export default function Maintenance() {
   const { currentClient, user: profile } = useAuth();
   const isWorkshopUser = profile?.role === 'Workshop';
+  const isAdminMaster = profile?.role === 'Admin Master';
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = React.useState<StatusFilter>('all');
   const [search, setSearch] = React.useState('');
@@ -132,7 +146,7 @@ export default function Maintenance() {
   const isMultiWorkshop = isWorkshopUser && workshopPartnerships.length > 1;
 
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['maintenanceOrders', currentClient?.id, activeWorkshopId],
+    queryKey: ['maintenanceOrders', currentClient?.id ?? 'all-clients', activeWorkshopId, profile?.role],
     queryFn: async () => {
       let query = supabase
         .from('maintenance_orders')
@@ -166,9 +180,14 @@ export default function Maintenance() {
       if (error) throw error;
       return (data as MaintenanceOrderRow[]).map(maintenanceFromRow);
     },
-    enabled: isWorkshopUser
-      ? (isMultiWorkshop || !!(activeWorkshopId ?? profile?.workshopId))
-      : !!currentClient?.id,
+    enabled: shouldEnableMaintenanceOrdersQuery({
+      isWorkshopUser,
+      isMultiWorkshop,
+      activeWorkshopId,
+      workshopId: profile?.workshopId,
+      currentClientId: currentClient?.id,
+      role: isAdminMaster ? profile.role : profile?.role,
+    }),
   });
 
   const updateStatusMutation = useMutation({
