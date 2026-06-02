@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, Ban, RotateCcw } from 'lucide-react';
 import { cn } from '../lib/utils';
 import MaintenanceDetailModal from '../components/MaintenanceDetailModal';
@@ -9,11 +9,13 @@ import { supabase } from '../lib/supabase';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
 import { useAuth } from '../context/AuthContext';
 import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus } from '../types/maintenance';
+import type { Role } from '../types';
 import {
   saveMaintenanceOrder,
   updateMaintenanceStatus,
   cancelMaintenanceOrder,
 } from '../services/maintenanceService';
+import { isOperationsManager } from '../lib/rolePermissions';
 
 // Re-export para compatibilidade com componentes que importam daqui
 export type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus };
@@ -109,21 +111,39 @@ export default function Maintenance() {
   const { currentClient, user: profile } = useAuth();
   const isWorkshopUser = profile?.role === 'Workshop';
   const isAdminMaster = profile?.role === 'Admin Master';
+  const operationsManager = isOperationsManager(profile?.role);
+  const canWriteMaintenance = !operationsManager && !isWorkshopUser;
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = React.useState<StatusFilter>('all');
   const [search, setSearch] = React.useState('');
   const [selectedOrder, setSelectedOrder] = React.useState<MaintenanceOrder | null>(null);
+  const allowedRoles: Role[] = [
+    'Workshop',
+    'Fleet Assistant',
+    'Fleet Analyst',
+    'Supervisor',
+    'Operations Manager',
+    'Manager',
+    'Coordinator',
+    'Director',
+    'Admin Master',
+  ];
 
   const location = useLocation();
+  if (profile && !allowedRoles.includes(profile.role)) {
+    return <Navigate to={profile.role === 'Driver' || profile.role === 'Yard Auditor' ? '/checklists' : '/'} replace />;
+  }
+
   const [isFormOpen, setIsFormOpen] = React.useState<boolean>(() =>
-    sessionStorage.getItem('maintenanceFormOpen') === 'true'
+    !operationsManager && sessionStorage.getItem('maintenanceFormOpen') === 'true'
   );
   const [orderToEdit, setOrderToEdit] = React.useState<MaintenanceOrder | null>(() => {
+    if (operationsManager) return null;
     const saved = sessionStorage.getItem('maintenanceFormEditing');
     return saved ? JSON.parse(saved) : null;
   });
   const [prefillData, setPrefillData] = React.useState<Partial<MaintenanceOrder> | undefined>(
-    () => (location.state as any)?.prefillMaintenance ?? undefined
+    () => (operationsManager ? undefined : (location.state as any)?.prefillMaintenance ?? undefined)
   );
   const [orderToCancel, setOrderToCancel] = React.useState<MaintenanceOrder | null>(null);
 
@@ -135,12 +155,12 @@ export default function Maintenance() {
 
   // Abrir form automaticamente se vier do fluxo agendamento → manutenção
   React.useEffect(() => {
-    if (prefillData) {
+    if (prefillData && !operationsManager) {
       setOrderToEdit(null);
       setIsFormOpen(true);
       window.history.replaceState({}, document.title);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [prefillData, operationsManager]);
 
   const { activeWorkshopId, workshopPartnerships } = useAuth();
   const isMultiWorkshop = isWorkshopUser && workshopPartnerships.length > 1;
@@ -279,7 +299,7 @@ export default function Maintenance() {
           <p className="text-sm text-zinc-500 mt-1">Acompanhe as ordens de serviço e o status dos veículos em manutenção</p>
         </div>
 
-        {!isWorkshopUser && (
+        {canWriteMaintenance && (
           <button
             onClick={() => {
               setOrderToEdit(null);
@@ -468,7 +488,7 @@ export default function Maintenance() {
                           >
                             <Eye className="h-4 w-4" />
                           </button>
-                          {o.status !== 'Concluído' && o.status !== 'Cancelado' && (
+                          {canWriteMaintenance && o.status !== 'Concluído' && o.status !== 'Cancelado' && (
                             <button
                               onClick={() => {
                                 setOrderToEdit(o);
@@ -480,7 +500,7 @@ export default function Maintenance() {
                               <Edit className="h-4 w-4" />
                             </button>
                           )}
-                          {o.status !== 'Concluído' && o.status !== 'Cancelado' && !isWorkshopUser && (
+                          {canWriteMaintenance && o.status !== 'Concluído' && o.status !== 'Cancelado' && (
                             <button
                               onClick={(e) => handleComplete(o.id, e)}
                               title="Marcar como Concluído"
@@ -489,7 +509,7 @@ export default function Maintenance() {
                               <CheckCircle2 className="h-4 w-4" />
                             </button>
                           )}
-                          {o.status !== 'Concluído' && o.status !== 'Cancelado' && !isWorkshopUser && (
+                          {canWriteMaintenance && o.status !== 'Concluído' && o.status !== 'Cancelado' && (
                             <button
                               onClick={(e) => { e.stopPropagation(); setOrderToCancel(o); }}
                               title="Cancelar OS"
@@ -498,7 +518,7 @@ export default function Maintenance() {
                               <Ban className="h-4 w-4" />
                             </button>
                           )}
-                          {o.status === 'Cancelado' && !isWorkshopUser && (
+                          {canWriteMaintenance && o.status === 'Cancelado' && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -532,7 +552,7 @@ export default function Maintenance() {
         />
       )}
 
-      {isFormOpen && (
+      {isFormOpen && canWriteMaintenance && (
         <MaintenanceForm
           order={orderToEdit}
           prefill={prefillData}

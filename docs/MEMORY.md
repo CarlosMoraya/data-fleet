@@ -81,3 +81,37 @@ Causa raiz: `useQuery` em `src/pages/Maintenance.tsx` ficava desabilitado para u
 Correcao aplicada: query de manutencao passa a ser habilitada quando o perfil e `Admin Master`, mesmo sem cliente selecionado, preservando o filtro por `client_id` quando um cliente especifico existe.
 Arquivos modificados: `src/pages/Maintenance.tsx`, `src/pages/Maintenance.query-scope.test.ts`, `docs/MEMORY.md`
 Testes adicionados: `src/pages/Maintenance.query-scope.test.ts`
+
+## 🆕 Atualização de Sessão (01/06/2026) — Gestor de Operações
+- Feature implementada: novo role persistido como `Operations Manager` e exibido como `Gestor de Operações`.
+- Migration criada: `supabase/migrations/20260601000000_add_operations_manager_role_and_scope.sql`.
+- Banco/RLS:
+  - criadas as tabelas `profile_shipper_scopes` e `profile_operational_unit_scopes`;
+  - adicionadas validações por trigger para garantir consistência entre perfil, embarcadores e bases;
+  - habilitada leitura restrita por escopo em `shippers`, `operational_units`, `vehicles`, `workshop_schedules`, `maintenance_orders`, `maintenance_budget_items` e leitura de `workshops` somente quando referenciadas por registros visíveis.
+- Frontend:
+  - `Users.tsx` agora permite criar/editar `Gestor de Operações` para `Coordinator+`, com embarcadores e bases obrigatórios;
+  - `AdminUsers.tsx` renderiza corretamente o role, mas continua sem expor criação/edição desse perfil;
+  - `App.tsx`, `Layout.tsx`, `Sidebar.tsx`, `Topbar.tsx` e `AuthContext.tsx` passaram a tratar redirect, bloqueio de rota e navegação restrita para `/agendamentos` e `/manutencao`;
+  - `WorkshopSchedules.tsx` e `Maintenance.tsx` foram ajustadas para leitura apenas, sem ações mutáveis para o novo role.
+- Backend:
+  - `supabase/functions/create-user/index.ts` agora valida `shipper_ids` e `operational_unit_ids`, força payload read-only e sincroniza escopo em modo replace-all;
+  - `supabase/functions/delete-user/index.ts` bloqueia exclusão por `Operations Manager`.
+- Helpers e testes adicionados:
+  - `src/lib/operationsManagerScope.ts`
+  - `src/lib/operationsManagerScope.test.ts`
+  - `src/pages/Users.operations-manager.test.ts`
+  - `src/pages/Maintenance.query-scope.test.ts`
+  - `e2e/pending/operations-manager-readonly-scope.spec.ts`
+- Correcao posterior:
+  - criada `supabase/migrations/20260602000000_fix_operations_manager_schedule_rls.sql` para remover `Operations Manager` dos blocos tenant-wide por rank e evitar subquery RLS em `vehicles` dentro da policy de `workshop_schedules`;
+  - criada `supabase/migrations/20260602000100_fix_workshop_schedules_driver_rls_recursion.sql` para remover também a subquery direta de `vehicles` no ramo `Driver` da mesma policy;
+  - criada `supabase/migrations/20260602000200_fix_admin_master_rls_regression.sql` para corrigir regressao de RLS no Admin Master em Dashboard, Veiculos e Oficinas, movendo checks cruzados de Workshop/Gestor para funcoes `SECURITY DEFINER` e recompondo `vehicles_select`, `workshops_select` e `maintenance_select`;
+  - a tela `Agendamentos` foi ajustada para buscar `workshop_schedules` sem joins aninhados e hidratar `vehicles`, `workshops` e `profiles` separadamente.
+- Validações executadas nesta entrega:
+  - `npm run lint` ✅
+  - `npm run test:unit` ✅ (`128` testes passando)
+- Limitações remanescentes:
+  - a suíte E2E completa já falhava antes desta mudança no setup de `Jorge` (`e2e/setup/jorge.setup.ts`, permanência em `/login` em vez de redirect esperado);
+  - por isso, o aceite automatizado final desta feature permanece dependente de validação manual guiada ou execução E2E em ambiente funcional do usuário;
+  - smoke visual completo via sandbox continua não validado por indisponibilidade de acesso útil a `localhost:3000`.

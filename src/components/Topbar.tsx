@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ChevronDown, User as UserIcon, Menu } from 'lucide-react';
+import { getRoleLabel } from '../lib/rolePermissions';
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -74,7 +75,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         <div className="flex items-center gap-3 border-l border-zinc-200 pl-4">
           <div className="flex flex-col items-end">
             <span className="text-sm font-medium text-zinc-900">{user?.name}</span>
-            <span className="text-xs text-zinc-500">{user?.role}</span>
+            <span className="text-xs text-zinc-500">{getRoleLabel(user?.role)}</span>
           </div>
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 border border-zinc-200">
             <UserIcon className="h-5 w-5 text-zinc-600" />

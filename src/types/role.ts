@@ -1,1 +1,12 @@
-export type Role = 'Driver' | 'Yard Auditor' | 'Workshop' | 'Fleet Assistant' | 'Fleet Analyst' | 'Supervisor' | 'Manager' | 'Coordinator' | 'Director' | 'Admin Master';
+export type Role =
+  | 'Driver'
+  | 'Yard Auditor'
+  | 'Workshop'
+  | 'Fleet Assistant'
+  | 'Fleet Analyst'
+  | 'Supervisor'
+  | 'Operations Manager'
+  | 'Manager'
+  | 'Coordinator'
+  | 'Director'
+  | 'Admin Master';

@@ -7,24 +7,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Role } from '../types';
 import { capitalizeWords } from '../lib/inputHelpers';
 import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
+import { ROLE_COLORS, getRoleLabel } from '../lib/rolePermissions';
 
 const ALL_ROLES: Role[] = [
   'Driver', 'Yard Auditor', 'Fleet Assistant',
   'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master',
 ];
-
-const ROLE_COLORS: Record<Role, string> = {
-  'Driver': 'bg-zinc-100 text-zinc-700',
-  'Workshop': 'bg-orange-100 text-orange-700',
-  'Yard Auditor': 'bg-amber-100 text-amber-700',
-  'Fleet Assistant': 'bg-blue-100 text-blue-700',
-  'Fleet Analyst': 'bg-indigo-100 text-indigo-700',
-  'Supervisor': 'bg-violet-100 text-violet-700',
-  'Manager': 'bg-green-100 text-green-700',
-  'Coordinator': 'bg-emerald-100 text-emerald-700',
-  'Director': 'bg-purple-100 text-purple-700',
-  'Admin Master': 'bg-orange-100 text-orange-700',
-};
 
 interface UserRow {
   id: string;
@@ -54,7 +42,7 @@ function UserInitials({ name }: { name: string }) {
 function RoleBadge({ role }: { role: Role }) {
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${ROLE_COLORS[role]}`}>
-      {role}
+      {getRoleLabel(role)}
     </span>
   );
 }

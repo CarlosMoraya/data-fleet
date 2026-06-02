@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { WorkshopSchedule } from '../types';
+import { isOperationsManager } from '../lib/rolePermissions';
 import {
   WorkshopScheduleRow,
   scheduleFromRow,
@@ -34,6 +35,7 @@ const ROLES_WITH_ACCESS = [
   'Fleet Assistant',
   'Fleet Analyst',
   'Supervisor',
+  'Operations Manager',
   'Manager',
   'Coordinator',
   'Director',
@@ -44,6 +46,7 @@ const ROLES_ASSISTANT_PLUS = [
   'Fleet Assistant',
   'Fleet Analyst',
   'Supervisor',
+  'Operations Manager',
   'Manager',
   'Coordinator',
   'Director',
@@ -74,13 +77,75 @@ const STATUS_BADGE: Record<string, string> = {
   cancelled: 'bg-zinc-100 text-zinc-500',
 };
 
+async function hydrateWorkshopScheduleRows(rows: WorkshopScheduleRow[]): Promise<WorkshopScheduleRow[]> {
+  if (rows.length === 0) return rows;
+
+  const vehicleIds = Array.from(new Set(rows.map((row) => row.vehicle_id).filter(Boolean)));
+  const workshopIds = Array.from(new Set(rows.map((row) => row.workshop_id).filter(Boolean)));
+  const profileIds = Array.from(new Set(rows.map((row) => row.created_by).filter(Boolean)));
+
+  const [vehiclesResult, workshopsResult, profilesResult] = await Promise.all([
+    vehicleIds.length > 0
+      ? supabase
+          .from('vehicles')
+          .select('id, license_plate')
+          .in('id', vehicleIds)
+      : Promise.resolve({ data: [], error: null }),
+    workshopIds.length > 0
+      ? supabase
+          .from('workshops')
+          .select('id, name, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_zip')
+          .in('id', workshopIds)
+      : Promise.resolve({ data: [], error: null }),
+    profileIds.length > 0
+      ? supabase
+          .from('profiles')
+          .select('id, name')
+          .in('id', profileIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const vehicleMap = new Map(
+    ((vehiclesResult.data as any[]) ?? []).map((vehicle) => [vehicle.id, vehicle])
+  );
+  const workshopMap = new Map(
+    ((workshopsResult.data as any[]) ?? []).map((workshop) => [workshop.id, workshop])
+  );
+  const profileMap = new Map(
+    ((profilesResult.data as any[]) ?? []).map((profile) => [profile.id, profile])
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    vehicles: vehicleMap.get(row.vehicle_id)
+      ? { license_plate: vehicleMap.get(row.vehicle_id).license_plate }
+      : null,
+    workshops: workshopMap.get(row.workshop_id)
+      ? {
+          name: workshopMap.get(row.workshop_id).name,
+          address_street: workshopMap.get(row.workshop_id).address_street,
+          address_number: workshopMap.get(row.workshop_id).address_number,
+          address_complement: workshopMap.get(row.workshop_id).address_complement,
+          address_neighborhood: workshopMap.get(row.workshop_id).address_neighborhood,
+          address_city: workshopMap.get(row.workshop_id).address_city,
+          address_state: workshopMap.get(row.workshop_id).address_state,
+          address_zip: workshopMap.get(row.workshop_id).address_zip,
+        }
+      : null,
+    profiles: profileMap.get(row.created_by)
+      ? { name: profileMap.get(row.created_by).name }
+      : null,
+  }));
+}
+
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
 export default function WorkshopSchedules() {
-  const { user, currentClient } = useAuth();
+  const { user } = useAuth();
 
   const isDriver = user?.role === 'Driver';
-  const isAssistantPlus = ROLES_ASSISTANT_PLUS.includes(user?.role ?? '');
+  const operationsManager = isOperationsManager(user?.role);
+  const isAssistantPlus = ROLES_ASSISTANT_PLUS.includes(user?.role ?? '') && !operationsManager;
   const canDelete = ROLES_CAN_DELETE.includes(user?.role ?? '');
 
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
@@ -169,15 +234,16 @@ function DriverView() {
   const { data: schedules = [], isLoading: loadingSchedules } = useQuery({
     queryKey: ['workshopSchedules', driverVehicle],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('workshop_schedules')
-        .select(
-          '*, vehicles(license_plate), workshops(name, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_zip), profiles!created_by(name)'
-        )
+        .select('*')
         .eq('vehicle_id', driverVehicle)
         .order('scheduled_date', { ascending: true });
 
-      return (data ?? []).map((r) => scheduleFromRow(r as WorkshopScheduleRow));
+      if (error) throw error;
+
+      const hydratedRows = await hydrateWorkshopScheduleRows((data ?? []) as WorkshopScheduleRow[]);
+      return hydratedRows.map((row) => scheduleFromRow(row));
     },
     enabled: !!driverVehicle
   });
@@ -308,8 +374,11 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
   const { user, currentClient } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const operationsManager = isOperationsManager(user?.role);
+  const canWriteSchedules = !operationsManager && isAssistantPlus;
 
   const handleGenerateMaintenance = (schedule: WorkshopSchedule) => {
+    if (!canWriteSchedules) return;
     navigate('/manutencao', {
       state: {
         prefillMaintenance: {
@@ -326,8 +395,9 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [isFormOpen, setIsFormOpen] = useState(() => sessionStorage.getItem('scheduleFormOpen') === 'true');
+  const [isFormOpen, setIsFormOpen] = useState(() => !operationsManager && sessionStorage.getItem('scheduleFormOpen') === 'true');
   const [editingSchedule, setEditingSchedule] = useState<WorkshopSchedule | null>(() => {
+    if (operationsManager) return null;
     try {
       const saved = sessionStorage.getItem('scheduleFormEditing');
       return saved ? JSON.parse(saved) : null;
@@ -339,14 +409,13 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
     queryFn: async () => {
       const { data, error } = await supabase
         .from('workshop_schedules')
-        .select(
-          '*, vehicles(license_plate), workshops(name, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_zip), profiles!created_by(name)'
-        )
+        .select('*')
         .eq('client_id', currentClient!.id)
         .order('scheduled_date', { ascending: false });
 
       if (error) throw error;
-      return (data ?? []).map((r) => scheduleFromRow(r as WorkshopScheduleRow));
+      const hydratedRows = await hydrateWorkshopScheduleRows((data ?? []) as WorkshopScheduleRow[]);
+      return hydratedRows.map((row) => scheduleFromRow(row));
     },
     enabled: !!currentClient?.id
   });
@@ -429,7 +498,9 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Agendamentos</h1>
-        <p className="text-sm text-zinc-500 mt-1">Gerencie os agendamentos de visita às oficinas.</p>
+        <p className="text-sm text-zinc-500 mt-1">
+          {operationsManager ? 'Visualize os agendamentos dentro do seu escopo.' : 'Gerencie os agendamentos de visita às oficinas.'}
+        </p>
       </div>
 
       {/* Barra de ações */}
@@ -444,7 +515,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
             className="w-full rounded-xl border border-zinc-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
-        {isAssistantPlus && (
+        {canWriteSchedules && (
           <button
             onClick={() => {
               sessionStorage.removeItem('scheduleFormData');
@@ -500,7 +571,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
           <p className="text-sm font-medium text-zinc-500">
             {search || statusFilter !== 'all' ? 'Nenhum agendamento encontrado' : 'Nenhum agendamento cadastrado'}
           </p>
-          {!search && statusFilter === 'all' && isAssistantPlus && (
+          {!search && statusFilter === 'all' && canWriteSchedules && (
             <p className="text-xs text-zinc-400 mt-1">Clique em "Novo Agendamento" para começar.</p>
           )}
         </div>
@@ -523,18 +594,18 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
                   key={s.id}
                   schedule={s}
                   canDelete={canDelete}
-                  isAssistantPlus={isAssistantPlus}
-                  onEdit={() => {
+                  canWriteSchedules={canWriteSchedules}
+                  onEdit={canWriteSchedules ? () => {
                     sessionStorage.setItem('scheduleFormEditing', JSON.stringify(s));
                     sessionStorage.setItem('scheduleFormOpen', 'true');
                     sessionStorage.setItem('scheduleFormData', JSON.stringify(s));
                     setEditingSchedule(s);
                     setIsFormOpen(true);
-                  }}
-                  onComplete={() => updateStatusMutation.mutate({ id: s.id, status: 'completed', completedAt: new Date().toISOString() })}
-                  onCancel={() => updateStatusMutation.mutate({ id: s.id, status: 'cancelled' })}
-                  onDelete={() => deleteMutation.mutate(s.id)}
-                  onGenerateMaintenance={() => handleGenerateMaintenance(s)}
+                  } : undefined}
+                  onComplete={canWriteSchedules ? () => updateStatusMutation.mutate({ id: s.id, status: 'completed', completedAt: new Date().toISOString() }) : undefined}
+                  onCancel={canWriteSchedules ? () => updateStatusMutation.mutate({ id: s.id, status: 'cancelled' }) : undefined}
+                  onDelete={canWriteSchedules && canDelete ? () => deleteMutation.mutate(s.id) : undefined}
+                  onGenerateMaintenance={canWriteSchedules ? () => handleGenerateMaintenance(s) : undefined}
                 />
               ))}
             </tbody>
@@ -565,13 +636,13 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
 const ScheduleRow: React.FC<{
   schedule: WorkshopSchedule;
   canDelete: boolean;
-  isAssistantPlus: boolean;
-  onEdit: () => void;
-  onComplete: () => void;
-  onCancel: () => void;
-  onDelete: () => void;
-  onGenerateMaintenance: () => void;
-}> = ({ schedule, canDelete, isAssistantPlus, onEdit, onComplete, onCancel, onDelete, onGenerateMaintenance }) => {
+  canWriteSchedules: boolean;
+  onEdit?: () => void;
+  onComplete?: () => void;
+  onCancel?: () => void;
+  onDelete?: () => void;
+  onGenerateMaintenance?: () => void;
+}> = ({ schedule, canDelete, canWriteSchedules, onEdit, onComplete, onCancel, onDelete, onGenerateMaintenance }) => {
   const isScheduled = schedule.status === 'scheduled';
   const address = formatWorkshopAddress(schedule);
   const mapsUrl = buildGoogleMapsUrl(schedule);
@@ -609,7 +680,7 @@ const ScheduleRow: React.FC<{
       <td className="px-4 py-3 text-zinc-500 text-xs hidden md:table-cell">{schedule.createdByName ?? '-'}</td>
       <td className="px-4 py-3">
         <div className="flex items-center justify-end gap-1">
-          {isAssistantPlus && isScheduled && (
+          {canWriteSchedules && isScheduled && onEdit && onComplete && onCancel && (
             <>
               <button
                 onClick={onEdit}
@@ -634,7 +705,7 @@ const ScheduleRow: React.FC<{
               </button>
             </>
           )}
-          {isAssistantPlus && schedule.status !== 'cancelled' && (
+          {canWriteSchedules && schedule.status !== 'cancelled' && onGenerateMaintenance && (
             <button
               onClick={onGenerateMaintenance}
               title="Gerar OS de Manutenção"
@@ -643,7 +714,7 @@ const ScheduleRow: React.FC<{
               <ClipboardList className="h-4 w-4" />
             </button>
           )}
-          {canDelete && !isScheduled && (
+          {canDelete && canWriteSchedules && !isScheduled && onDelete && (
             <button
               onClick={onDelete}
               title="Excluir"

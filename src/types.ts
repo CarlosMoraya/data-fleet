@@ -3,7 +3,7 @@
 // TODO: após migração completa de todos os imports, remover este arquivo.
 
 export type { Role } from './types/role';
-export type { User, Client } from './types/user';
+export type { User, Client, OperationsManagerScope } from './types/user';
 export type { Vehicle, VehicleFieldSettings, VehicleKmInterval } from './types/vehicle';
 export type { Driver, DriverFieldSettings } from './types/driver';
 export type {

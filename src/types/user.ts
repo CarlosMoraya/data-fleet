@@ -1,5 +1,10 @@
 import type { Role } from './role';
 
+export interface OperationsManagerScope {
+  shipperIds: string[];
+  operationalUnitIds: string[];
+}
+
 export interface User {
   id: string;
   name: string;
@@ -12,6 +17,7 @@ export interface User {
   budgetApprovalLimit: number;
   workshopId?: string; // Populado quando role = 'Workshop' (modelo legado)
   workshopAccountId?: string; // Populado quando role = 'Workshop' (novo modelo)
+  operationsScope?: OperationsManagerScope;
 }
 
 export interface Client {

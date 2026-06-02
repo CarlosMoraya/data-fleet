@@ -14,17 +14,136 @@ function json(body: unknown, status: number) {
 }
 
 const ROLE_RANK: Record<string, number> = {
-  "Driver": 1,
-  "Workshop": 1,
-  "Yard Auditor": 2,
+  "Driver": 0,
+  "Yard Auditor": 1,
+  "Workshop": 2,
   "Fleet Assistant": 3,
   "Fleet Analyst": 4,
   "Supervisor": 5,
+  "Operations Manager": 5,
   "Coordinator": 6,
   "Manager": 7,
   "Director": 8,
   "Admin Master": 9,
 };
+
+const OPERATIONS_MANAGER_ROLE = "Operations Manager";
+
+function isOperationsManager(role: string | null | undefined): boolean {
+  return role === OPERATIONS_MANAGER_ROLE;
+}
+
+function canManageOperationsManagerScope(role: string): boolean {
+  return role === "Coordinator" || role === "Manager" || role === "Director" || role === "Admin Master";
+}
+
+async function validateOperationsManagerScope(params: {
+  supabaseAdmin: ReturnType<typeof createClient>;
+  targetClientId: string | null;
+  shipperIds: string[];
+  operationalUnitIds: string[];
+}) {
+  const { supabaseAdmin, targetClientId, shipperIds, operationalUnitIds } = params;
+
+  if (!targetClientId) {
+    throw new Error("Não foi possível determinar o client_id de destino para o Gestor de Operações.");
+  }
+
+  if (!Array.isArray(shipperIds) || shipperIds.length === 0) {
+    throw new Error("shipper_ids é obrigatório para Operations Manager.");
+  }
+
+  if (!Array.isArray(operationalUnitIds) || operationalUnitIds.length === 0) {
+    throw new Error("operational_unit_ids é obrigatório para Operations Manager.");
+  }
+
+  const { data: shippers, error: shippersError } = await supabaseAdmin
+    .from("shippers")
+    .select("id, client_id")
+    .in("id", shipperIds);
+
+  if (shippersError) throw new Error(shippersError.message);
+  if ((shippers ?? []).length !== shipperIds.length) {
+    throw new Error("Um ou mais embarcadores informados não existem.");
+  }
+
+  if ((shippers ?? []).some((shipper: any) => shipper.client_id !== targetClientId)) {
+    throw new Error("Todos os embarcadores devem pertencer ao client_id do usuário que será criado/editado.");
+  }
+
+  const { data: units, error: unitsError } = await supabaseAdmin
+    .from("operational_units")
+    .select("id, client_id, shipper_id")
+    .in("id", operationalUnitIds);
+
+  if (unitsError) throw new Error(unitsError.message);
+  if ((units ?? []).length !== operationalUnitIds.length) {
+    throw new Error("Uma ou mais bases operacionais informadas não existem.");
+  }
+
+  const shipperIdSet = new Set(shipperIds);
+  for (const unit of units ?? []) {
+    if (unit.client_id !== targetClientId) {
+      throw new Error("Todas as bases operacionais devem pertencer ao client_id do usuário que será criado/editado.");
+    }
+
+    if (!shipperIdSet.has(unit.shipper_id)) {
+      throw new Error("Toda base operacional associada deve pertencer a um embarcador selecionado.");
+    }
+  }
+
+  return {
+    shipperIds,
+    operationalUnitIds,
+  };
+}
+
+async function syncOperationsManagerScope(params: {
+  supabaseAdmin: ReturnType<typeof createClient>;
+  profileId: string;
+  clientId: string;
+  createdBy: string;
+  shipperIds: string[];
+  operationalUnitIds: string[];
+}) {
+  const { supabaseAdmin, profileId, clientId, createdBy, shipperIds, operationalUnitIds } = params;
+
+  const { error: deleteUnitsError } = await supabaseAdmin
+    .from("profile_operational_unit_scopes")
+    .delete()
+    .eq("profile_id", profileId);
+  if (deleteUnitsError) throw new Error(deleteUnitsError.message);
+
+  const { error: deleteShippersError } = await supabaseAdmin
+    .from("profile_shipper_scopes")
+    .delete()
+    .eq("profile_id", profileId);
+  if (deleteShippersError) throw new Error(deleteShippersError.message);
+
+  const { error: shipperInsertError } = await supabaseAdmin
+    .from("profile_shipper_scopes")
+    .insert(
+      shipperIds.map((shipperId) => ({
+        profile_id: profileId,
+        shipper_id: shipperId,
+        client_id: clientId,
+        created_by: createdBy,
+      }))
+    );
+  if (shipperInsertError) throw new Error(shipperInsertError.message);
+
+  const { error: unitInsertError } = await supabaseAdmin
+    .from("profile_operational_unit_scopes")
+    .insert(
+      operationalUnitIds.map((operationalUnitId) => ({
+        profile_id: profileId,
+        operational_unit_id: operationalUnitId,
+        client_id: clientId,
+        created_by: createdBy,
+      }))
+    );
+  if (unitInsertError) throw new Error(unitInsertError.message);
+}
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -38,7 +157,6 @@ serve(async (req: Request) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // Autenticar o caller
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ error: "Não autorizado" }, 401);
 
@@ -46,7 +164,6 @@ serve(async (req: Request) => {
     const { data: { user: caller }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !caller) return json({ error: "Token inválido" }, 401);
 
-    // Buscar perfil do caller (role + client_id)
     const { data: callerProfile } = await supabaseAdmin
       .from("profiles")
       .select("role, client_id")
@@ -56,22 +173,20 @@ serve(async (req: Request) => {
     if (!callerProfile) return json({ error: "Perfil não encontrado" }, 403);
 
     const callerRank = ROLE_RANK[callerProfile.role] ?? 0;
-    console.log(`Caller: ${caller.email} (${callerProfile.role}, rank ${callerRank})`);
-
-    // Apenas Fleet Assistant ou superior pode criar usuários
     if (callerRank < ROLE_RANK["Fleet Assistant"]) {
-      console.error(`Acesso negado: ${callerProfile.role} tentou criar usuário.`);
       return json({ error: "Acesso negado. Papel insuficiente." }, 403);
+    }
+
+    if (isOperationsManager(callerProfile.role)) {
+      return json({ error: "Operations Manager não pode criar, editar escopo ou excluir usuários." }, 403);
     }
 
     const body = await req.json();
 
-    // ── Ação: deletar usuário ──────────────────────────────────────────────────
     if (body.action === "delete") {
       const { user_id } = body;
       if (!user_id) return json({ error: "user_id é obrigatório." }, 400);
 
-      // Buscar perfil do target para validar hierarquia
       const { data: targetProfile } = await supabaseAdmin
         .from("profiles")
         .select("role, client_id")
@@ -81,59 +196,118 @@ serve(async (req: Request) => {
       if (!targetProfile) return json({ error: "Usuário não encontrado." }, 404);
 
       const targetRank = ROLE_RANK[targetProfile.role] ?? 0;
-
-      // Caller deve ter rank estritamente maior que o target
       if (callerRank <= targetRank) {
         return json({ error: "Você não tem permissão para excluir este usuário." }, 403);
       }
 
-      // Multi-tenancy: Admin Master pode deletar de qualquer cliente; outros só do próprio
       if (callerProfile.role !== "Admin Master" && targetProfile.client_id !== callerProfile.client_id) {
         return json({ error: "Você não tem permissão para excluir usuários de outro cliente." }, 403);
       }
 
-      // Deletar perfil primeiro (FK constraint)
       const { error: profileDeleteError } = await supabaseAdmin
         .from("profiles")
         .delete()
         .eq("id", user_id);
 
       if (profileDeleteError) {
-        console.error(`[delete] Erro ao deletar perfil: ${profileDeleteError.message}`);
         return json({ error: profileDeleteError.message }, 500);
       }
 
-      // Deletar conta auth
       const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
       if (authDeleteError && authDeleteError.message !== "User not found") {
         console.error(`[delete] Erro ao deletar auth user: ${authDeleteError.message}`);
       }
 
-      console.log(`[delete] Usuário deletado com sucesso: ${user_id}`);
       return json({ success: true, user_id }, 200);
     }
 
-    // ── Ação: criar usuário (padrão) ──────────────────────────────────────────
-    const { email, password, name, role, client_id, can_delete_vehicles, can_delete_drivers, can_delete_workshops, budget_approval_limit } = body;
+    if (body.action === "sync_operations_scope") {
+      const { target_user_id, shipper_ids = [], operational_unit_ids = [] } = body;
+
+      if (!canManageOperationsManagerScope(callerProfile.role)) {
+        return json({ error: "Apenas Coordinator+ podem editar o escopo do Operations Manager." }, 403);
+      }
+
+      if (!target_user_id) {
+        return json({ error: "target_user_id é obrigatório." }, 400);
+      }
+
+      const { data: targetProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("id, role, client_id")
+        .eq("id", target_user_id)
+        .single();
+
+      if (!targetProfile) return json({ error: "Usuário alvo não encontrado." }, 404);
+      if (!isOperationsManager(targetProfile.role)) {
+        return json({ error: "O usuário alvo precisa ter role Operations Manager." }, 400);
+      }
+      if (callerProfile.role !== "Admin Master" && targetProfile.client_id !== callerProfile.client_id) {
+        return json({ error: "Você só pode editar o escopo de usuários do seu próprio cliente." }, 403);
+      }
+
+      const validatedScope = await validateOperationsManagerScope({
+        supabaseAdmin,
+        targetClientId: targetProfile.client_id,
+        shipperIds: shipper_ids,
+        operationalUnitIds: operational_unit_ids,
+      });
+
+      await syncOperationsManagerScope({
+        supabaseAdmin,
+        profileId: targetProfile.id,
+        clientId: targetProfile.client_id,
+        createdBy: caller.id,
+        shipperIds: validatedScope.shipperIds,
+        operationalUnitIds: validatedScope.operationalUnitIds,
+      });
+
+      return json({ success: true }, 200);
+    }
+
+    const {
+      email,
+      password,
+      name,
+      role,
+      client_id,
+      can_delete_vehicles,
+      can_delete_drivers,
+      can_delete_workshops,
+      budget_approval_limit,
+      shipper_ids = [],
+      operational_unit_ids = [],
+    } = body;
 
     if (!email || !password || !name || !role) {
       return json({ error: "Todos os campos são obrigatórios." }, 400);
     }
 
     const targetRank = ROLE_RANK[role] ?? 0;
-
-    // Validar hierarquia: só pode criar papéis estritamente abaixo do seu
-    // EXCEÇÃO: Admin Master pode criar outro Admin Master
     if (targetRank > callerRank || (targetRank === callerRank && callerProfile.role !== "Admin Master")) {
       return json({ error: `Você não tem permissão para criar usuários com o papel "${role}".` }, 403);
     }
 
-    // Admin Master pode especificar client_id; demais usam o próprio
+    if (isOperationsManager(role)) {
+      if (!canManageOperationsManagerScope(callerProfile.role)) {
+        return json({ error: "Apenas Coordinator+ podem criar Operations Manager." }, 403);
+      }
+    }
+
     const targetClientId = callerProfile.role === "Admin Master" && client_id
       ? client_id
       : callerProfile.client_id;
 
-    // Criar conta no Supabase Auth
+    let validatedScope: { shipperIds: string[]; operationalUnitIds: string[] } | null = null;
+    if (isOperationsManager(role)) {
+      validatedScope = await validateOperationsManagerScope({
+        supabaseAdmin,
+        targetClientId,
+        shipperIds: shipper_ids,
+        operationalUnitIds: operational_unit_ids,
+      });
+    }
+
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -143,7 +317,6 @@ serve(async (req: Request) => {
     if (createError) {
       const isEmailConflict = createError.message.toLowerCase().includes("already");
       if (isEmailConflict && (role === "Driver" || role === "Workshop")) {
-        // get-or-create semântico: retornar profileId do usuário existente se for Driver/Workshop do mesmo client
         const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
         const existing = users.find((u: { email?: string; id: string }) => u.email === email.toLowerCase());
         if (existing) {
@@ -153,7 +326,6 @@ serve(async (req: Request) => {
             .eq("id", existing.id)
             .single();
           if (existingProfile?.role === role && existingProfile?.client_id === targetClientId) {
-            console.log(`${role} já existe: ${email} — retornando profileId existente.`);
             return json({ id: existing.id, profileId: existing.id }, 200);
           }
         }
@@ -161,7 +333,6 @@ serve(async (req: Request) => {
       return json({ error: createError.message }, 400);
     }
 
-    // Criar perfil na tabela profiles
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .insert({
@@ -169,16 +340,32 @@ serve(async (req: Request) => {
         name,
         role,
         client_id: targetClientId,
-        can_delete_vehicles: can_delete_vehicles ?? false,
-        can_delete_drivers: can_delete_drivers ?? false,
-        can_delete_workshops: can_delete_workshops ?? false,
-        budget_approval_limit: budget_approval_limit ?? 0,
+        can_delete_vehicles: isOperationsManager(role) ? false : can_delete_vehicles ?? false,
+        can_delete_drivers: isOperationsManager(role) ? false : can_delete_drivers ?? false,
+        can_delete_workshops: isOperationsManager(role) ? false : can_delete_workshops ?? false,
+        budget_approval_limit: isOperationsManager(role) ? 0 : budget_approval_limit ?? 0,
       });
 
     if (profileError) {
-      // Rollback: deletar o auth user criado
       await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
       return json({ error: profileError.message }, 400);
+    }
+
+    try {
+      if (validatedScope && targetClientId) {
+        await syncOperationsManagerScope({
+          supabaseAdmin,
+          profileId: newUser.user.id,
+          clientId: targetClientId,
+          createdBy: caller.id,
+          shipperIds: validatedScope.shipperIds,
+          operationalUnitIds: validatedScope.operationalUnitIds,
+        });
+      }
+    } catch (scopeError) {
+      await supabaseAdmin.from("profiles").delete().eq("id", newUser.user.id);
+      await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
+      return json({ error: scopeError instanceof Error ? scopeError.message : String(scopeError) }, 400);
     }
 
     return json({ id: newUser.user.id, profileId: newUser.user.id }, 200);

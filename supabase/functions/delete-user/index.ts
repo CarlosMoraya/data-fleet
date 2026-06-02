@@ -14,12 +14,13 @@ function json(body: unknown, status: number) {
 }
 
 const ROLE_RANK: Record<string, number> = {
-  "Driver": 1,
-  "Workshop": 1,
-  "Yard Auditor": 2,
+  "Driver": 0,
+  "Yard Auditor": 1,
+  "Workshop": 2,
   "Fleet Assistant": 3,
   "Fleet Analyst": 4,
   "Supervisor": 5,
+  "Operations Manager": 5,
   "Coordinator": 6,
   "Manager": 7,
   "Director": 8,
@@ -57,6 +58,10 @@ serve(async (req: Request) => {
 
     const callerRank = ROLE_RANK[callerProfile.role] ?? 0;
     console.log(`[delete-user] Caller: ${caller.email} (${callerProfile.role}, rank ${callerRank})`);
+
+    if (callerProfile.role === "Operations Manager") {
+      return json({ error: "Operations Manager não pode excluir usuários." }, 403);
+    }
 
     // Apenas Fleet Assistant ou superior pode deletar usuários
     if (callerRank < ROLE_RANK["Fleet Assistant"]) {

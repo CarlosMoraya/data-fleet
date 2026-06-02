@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import { useAuth } from '../context/AuthContext';
 import { useIdleTimeout } from '../hooks/useIdleTimeout';
+import { canAccessRoute, isOperationsManager } from '../lib/rolePermissions';
 
 export default function Layout() {
   const { user, loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const location = useLocation();
 
   // Ativa o timeout de inatividade (60 minutos por padrão)
   useIdleTimeout();
@@ -22,6 +24,10 @@ export default function Layout() {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (isOperationsManager(user.role) && !canAccessRoute(user.role, location.pathname)) {
+    return <Navigate to="/agendamentos" replace />;
   }
 
   return (

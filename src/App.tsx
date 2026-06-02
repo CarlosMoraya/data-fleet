@@ -32,14 +32,13 @@ import BudgetApprovals from './pages/BudgetApprovals';
 import Tires from './pages/Tires';
 import WorkshopJoin from './pages/WorkshopJoin';
 import TireInspectionFill from './pages/TireInspectionFill';
+import { getDefaultRouteForRole } from './lib/rolePermissions';
 
 function HomeRedirect() {
   const { user } = useAuth();
-  if (user?.role === 'Driver' || user?.role === 'Yard Auditor') {
-    return <Navigate to="/checklists" replace />;
-  }
-  if (user?.role === 'Workshop') {
-    return <Navigate to="/manutencao" replace />;
+  const defaultRoute = getDefaultRouteForRole(user?.role);
+  if (defaultRoute !== '/') {
+    return <Navigate to={defaultRoute} replace />;
   }
   return <Dashboard />;
 }

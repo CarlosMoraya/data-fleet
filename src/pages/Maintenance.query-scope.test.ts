@@ -84,6 +84,28 @@ describe('shouldEnableMaintenanceOrdersQuery', () => {
     ).toBe(true);
   });
 
+  it('returns true for Operations Manager with selected client', () => {
+    expect(
+      shouldEnableMaintenanceOrdersQuery({
+        isWorkshopUser: false,
+        isMultiWorkshop: false,
+        currentClientId: 'client-1',
+        role: 'Operations Manager',
+      })
+    ).toBe(true);
+  });
+
+  it('returns false for Operations Manager without selected client', () => {
+    expect(
+      shouldEnableMaintenanceOrdersQuery({
+        isWorkshopUser: false,
+        isMultiWorkshop: false,
+        currentClientId: null,
+        role: 'Operations Manager',
+      })
+    ).toBe(false);
+  });
+
   it('returns true for multi-tenant workshop without selected client', () => {
     expect(
       shouldEnableMaintenanceOrdersQuery({

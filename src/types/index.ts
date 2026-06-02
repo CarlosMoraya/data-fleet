@@ -1,7 +1,7 @@
 // ─── Barrel export de todos os tipos ──────────────────────────────────────────
 
 export type { Role } from './role';
-export type { User, Client } from './user';
+export type { User, Client, OperationsManagerScope } from './user';
 export type { Vehicle, VehicleFieldSettings, VehicleKmInterval } from './vehicle';
 export type { Driver, DriverFieldSettings } from './driver';
 export type {

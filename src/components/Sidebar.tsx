@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import type { Role } from '../types';
+import { getRoleLabel, isOperationsManager } from '../lib/rolePermissions';
 
 interface NavItem {
   name: string;
@@ -30,8 +31,8 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'Cadastros', to: '/cadastros', icon: FolderOpen, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Checklists', to: '/checklists', icon: ClipboardCheck, roles: ['Driver', 'Yard Auditor', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Plano de Ação', to: '/acoes', icon: ClipboardList, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
-  { name: 'Agendamentos', to: '/agendamentos', icon: CalendarClock, roles: ['Driver', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
-  { name: 'Manutenção', to: '/manutencao', icon: Wrench, roles: ['Workshop', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
+  { name: 'Agendamentos', to: '/agendamentos', icon: CalendarClock, roles: ['Driver', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
+  { name: 'Manutenção', to: '/manutencao', icon: Wrench, roles: ['Workshop', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Aprovação de Orçamentos', to: '/aprovacao-orcamentos', icon: BadgeCheck, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Templates', to: '/checklist-templates', icon: FileStack, roles: ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Configurações', to: '/settings', icon: Settings, roles: ['Coordinator', 'Manager', 'Director', 'Admin Master'] },
@@ -51,7 +52,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     navigate('/login');
   };
 
-  const visibleNavItems = NAV_ITEMS.filter(item => item.roles.includes(user?.role || ''));
+  const visibleNavItems = isOperationsManager(user?.role)
+    ? NAV_ITEMS.filter((item) => item.to === '/agendamentos' || item.to === '/manutencao')
+    : NAV_ITEMS.filter((item) => item.roles.includes(user?.role || ''));
 
   return (
     <>
@@ -145,6 +148,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         )}
 
         <div className="border-t border-blue-800 p-4">
+          {user?.role && (
+            <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-blue-300">
+              {getRoleLabel(user.role)}
+            </p>
+          )}
           <button
             onClick={handleLogout}
             className="group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium text-blue-200 hover:bg-blue-800 hover:text-white transition-colors"

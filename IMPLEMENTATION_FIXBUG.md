@@ -1,262 +1,313 @@
 # IMPLEMENTATION_FIXBUG.md
-Gerado em: 2026-05-06 22:38
-Sessão: correção de bug — CPF truncado ao colar valor formatado no formulário de motorista
-Tipo de bug: Tipo A — Bug isolado
+Gerado em: 2026-06-01 15:55 America/Sao_Paulo
+Sessao: correcao de bug - Admin Master nao ve manutencoes em "Todos os Clientes"
+Tipo de bug: Tipo A - Bug isolado
 Causa raiz confirmada: sim
-Baseado em: docs/MEMORY.md (2026-05-06)
+Baseado em: docs/MEMORY.md (estado atual lido em 2026-06-01)
 
----
+## GUARDRAIL - leia antes de qualquer acao
 
-## GUARDRAIL — leia antes de qualquer ação
+Este documento e a especificacao completa e fechada desta correcao. O agente de codigo que executar este plano:
 
-Este documento é a especificação completa e fechada desta correção. O agente de código que executar este plano:
+- NAO modifica arquivos alem dos listados aqui
+- NAO refatora codigo nao relacionado ao bug
+- NAO "melhora" codigo que nao esta causando o problema
+- NAO instala dependencias novas
+- NAO altera testes para faze-los passar - corrige o codigo
+- SE encontrar algo que parece errado mas nao esta neste documento: registra como observacao no MEMORY.md e continua sem corrigir
+- SE encontrar ambiguidade em qualquer passo: para, informa o usuario e aguarda instrucao
 
-- NÃO modifica arquivos além dos listados aqui
-- NÃO refatora código não relacionado ao bug
-- NÃO "melhora" código que não está causando o problema
-- NÃO instala dependências não listadas aqui
-- NÃO altera testes para fazê-los passar — corrige o código
-- SE encontrar algo que parece errado mas não está neste documento: registra como observação no MEMORY.md e continua sem corrigir
-- SE encontrar ambiguidade em qualquer passo: para, informa o usuário e aguarda instrução
+## Contexto necessario
 
----
-
-## Contexto necessário
 Antes de implementar, leia:
-- `agent/AGENT.md` — regras universais do projeto
-- `agent/AGENT-FRONTEND.md` — padrões de interface e React
 
----
+- `agent/AGENT.md` - regras universais do projeto
+- `agent/AGENT-FRONTEND.md` - padroes React e React Query
+- `agent/AGENT-DATABASE.md` - regra critica de Admin Master com `client_id = NULL`
+- `docs/MEMORY.md` - baseline recente do projeto
+- `docs/SPEC.md` - arquitetura Supabase/RLS
 
 ## O bug
-**Comportamento atual:** Ao colar um CPF formatado (ex.: `187.182.207-62`) no campo CPF do formulário de motorista, os últimos 2 dígitos verificadores são perdidos. O campo exibe `187182207` (9 dígitos) em vez de `18718220762` (11 dígitos).
 
-**Comportamento esperado:** Ao colar um CPF de qualquer fonte externa (planilha, documento, sistema), todos os 11 dígitos devem ser preservados após a normalização automática do campo.
+**Comportamento atual:** na tela `/manutencao`, o Admin Master ve dados quando seleciona um cliente especifico, mas ve lista vazia quando seleciona "Todos os Clientes".
 
-**Condições de reprodução:**
-1. Abrir o formulário de cadastro ou edição de motorista
-2. Copiar um CPF no formato `NNN.NNN.NNN-DD` de qualquer fonte externa (ex.: planilha Excel)
-3. Colar no campo CPF do formulário
-4. Observar: os 2 dígitos verificadores (após o traço) desaparecem
+**Comportamento esperado:** quando o Admin Master seleciona "Todos os Clientes", a tela deve buscar e exibir todas as ordens de manutencao permitidas pela RLS, sem aplicar filtro de `client_id` no frontend.
 
-**Impacto:** Todo usuário que tenta cadastrar um motorista colando o CPF de uma planilha ou documento. O CPF fica com 9 dígitos — inválido para o banco de dados e para validação. Severidade alta: bloqueia o cadastro correto de motoristas.
+**Condicoes de reproducao:**
 
----
+1. Entrar como usuario `Admin Master`.
+2. Abrir `/manutencao`.
+3. No seletor do topo, escolher um cliente especifico, por exemplo `BetaFleet`.
+4. Confirmar que existem OS na tabela.
+5. Alterar o seletor para `Todos os Clientes`.
+6. Observar que os cards ficam zerados e a tabela mostra "Nenhuma ordem de servico encontrada".
+
+**Impacto:** o Admin Master perde a visao consolidada de manutencoes cross-tenant nessa tela. A selecao por cliente continua funcionando.
 
 ## Causa raiz identificada
 
-O campo CPF no componente `src/components/DriverForm.tsx` (linha 380) possui o atributo `maxLength={11}`.
+A causa esta em `src/pages/Maintenance.tsx`, linhas 134-171.
 
-O `maxLength` do HTML opera sobre o valor **bruto** do input — ou seja, sobre a string com pontos e traço — antes de qualquer evento `onChange` ser disparado. Quando o usuário cola `187.182.207-62` (14 caracteres), o browser trunca silenciosamente para os primeiros 11 caracteres: `187.182.207`. Somente então o `onChange` dispara com esse valor já truncado. A função `filterCPF` recebe `187.182.207`, remove os pontos, e produz `187182207` — apenas 9 dígitos.
+O `Topbar` representa a opcao "Todos os Clientes" com `value=""`, chamando `switchClient('')`. Em `src/context/AuthContext.tsx`, linhas 251-257, isso define `currentClient` como `null`, que e o comportamento correto para uma visao global.
 
-A função `filterCPF` em `src/lib/inputHelpers.ts` (linha 96-98) já possui seu próprio `.slice(0, 11)` que limita corretamente a 11 dígitos **após** a limpeza de caracteres especiais. O `maxLength={11}` no HTML é, portanto, não apenas redundante, mas destrutivo para o caso de paste de CPF formatado.
+Na query de manutencao, o filtro tambem esta correto: em `src/pages/Maintenance.tsx`, linhas 161-163, o frontend so aplica `.eq('client_id', currentClient.id)` quando existe cliente selecionado. Portanto, para Admin Master em "Todos os Clientes", a query deveria rodar sem filtro de cliente.
 
-```typescript
-// inputHelpers.ts — funciona corretamente, não precisa de alteração
-export function filterCPF(value: string): string {
-  return value.replace(/\D/g, '').slice(0, 11);
+O problema esta na opcao `enabled` do `useQuery`, linha 171:
+
+```ts
+: !!currentClient?.id,
+```
+
+Para usuarios que nao sao oficina, essa condicao exige sempre um `currentClient.id`. Como Admin Master em "Todos os Clientes" tem `currentClient = null`, o React Query nao executa a consulta. O resultado padrao fica `orders = []`, zerando cards e tabela.
+
+## Estado dos testes antes da correcao - baseline
+
+- Testes de fumaca: nao existe lista formal de testes de fumaca no `docs/MEMORY.md`. A disponibilidade HTTP foi validada em `http://localhost:3001/` com `HTTP/1.1 200 OK` apos iniciar o Vite, porque a porta 3000 estava ocupada.
+- Suite unitária: `npm run test:unit` passou com 11 arquivos e 111 testes.
+- Typecheck/lint: `npm run lint` passou sem erros. Neste projeto, lint e `tsc --noEmit` sao o mesmo script.
+- Build: `npm run build` passou. Aviso existente: alguns chunks maiores que 500 kB.
+- Suite E2E: `npm run test:e2e` falhou no baseline com 33 passed, 24 failed, 10 skipped, 207 did not run. As falhas principais sao de autenticacao/setup e dados de ambiente, nao deste bug:
+  - setups de Jorge, Carlos, Alexandre, Pedro e Mariana permanecem em `/login`;
+  - `driver-checklist-visibility` falha por `vehicles.renavam` not-null;
+  - varios testes dependentes de storage state ou sessao falham por redirecionamento para `/login`;
+  - `audit-admin-master` B.3 falha por modal de veiculo nao fechar.
+- Testes falhando relacionados ao bug: nenhum teste automatizado existente cobre explicitamente Admin Master em `/manutencao` com `Todos os Clientes`.
+- Testes falhando nao relacionados ao bug: os 24 E2E acima devem permanecer como baseline e nao sao escopo desta correcao.
+
+## Dependencias mapeadas
+
+Arquivo a modificar:
+
+- `src/pages/Maintenance.tsx`
+
+Dependencias e usos relevantes:
+
+- Usa `useAuth()` para ler `currentClient`, `user`, `activeWorkshopId` e `workshopPartnerships`.
+- Usa React Query com chave `['maintenanceOrders', currentClient?.id, activeWorkshopId]`.
+- Usa Supabase diretamente para consultar `maintenance_orders`.
+- Usa `MaintenanceForm`, `MaintenanceDetailModal`, `maintenanceFromRow`, `saveMaintenanceOrder`, `updateMaintenanceStatus` e `cancelMaintenanceOrder`.
+- Invalida queries de manutencao apos salvar, cancelar e concluir.
+
+A correcao afeta apenas quando `profile.role === 'Admin Master'`, `isWorkshopUser === false` e `currentClient` esta vazio. Nao altera:
+
+- filtro por cliente quando um cliente especifico esta selecionado;
+- regra de oficina mono ou multi-transportadora;
+- RLS do Supabase;
+- criacao, edicao, cancelamento ou conclusao de OS;
+- mappers de manutencao;
+- `Topbar` e `AuthContext`.
+
+## O que NAO fazer - restricoes absolutas
+
+- Nao modificar `src/context/AuthContext.tsx`: ele ja representa "Todos os Clientes" corretamente como `currentClient = null`.
+- Nao modificar `src/components/Topbar.tsx`: o `<option value="">Todos os Clientes</option>` esta correto.
+- Nao modificar policies RLS ou migrations: a falha confirmada e a query desabilitada no frontend, nao permissao de banco.
+- Nao modificar `src/services/maintenanceService.ts`: salvar nova OS ainda exige `currentClientId`; criacao em modo global nao e o bug relatado.
+- Nao refatorar a query de manutencao para outro arquivo nesta correcao.
+- Nao alterar testes E2E falhando para faze-los passar.
+
+## Correcao
+
+### Passo 1 - Permitir query global para Admin Master
+
+**Arquivo:** `src/pages/Maintenance.tsx`
+
+**Causa que justifica tocar neste arquivo:** o bloqueio esta na condicao `enabled` do `useQuery` da propria tela de manutencao.
+
+**O que mudar:**
+
+1. Dentro do componente `Maintenance`, logo apos:
+
+```ts
+const isWorkshopUser = profile?.role === 'Workshop';
+```
+
+adicione:
+
+```ts
+const isAdminMaster = profile?.role === 'Admin Master';
+```
+
+2. No `useQuery` de manutencoes, trocar somente o ramo de `enabled` para usuarios que nao sao oficina:
+
+De:
+
+```ts
+enabled: isWorkshopUser
+  ? (isMultiWorkshop || !!(activeWorkshopId ?? profile?.workshopId))
+  : !!currentClient?.id,
+```
+
+Para:
+
+```ts
+enabled: isWorkshopUser
+  ? (isMultiWorkshop || !!(activeWorkshopId ?? profile?.workshopId))
+  : isAdminMaster || !!currentClient?.id,
+```
+
+3. Ajustar a `queryKey` para diferenciar explicitamente a visao global do Admin Master da visao sem cliente de outros perfis:
+
+De:
+
+```ts
+queryKey: ['maintenanceOrders', currentClient?.id, activeWorkshopId],
+```
+
+Para:
+
+```ts
+queryKey: ['maintenanceOrders', currentClient?.id ?? 'all-clients', activeWorkshopId, profile?.role],
+```
+
+**O que NAO mudar neste arquivo:**
+
+- Nao mudar a construcao do filtro `.eq('client_id', currentClient.id)` nas linhas 161-163.
+- Nao mudar a logica de oficina nas linhas 149-160.
+- Nao mudar os mutations de salvar, cancelar ou concluir.
+- Nao mudar textos, layout, cards, tabs ou busca.
+
+**Impacto em dependencias:** a query sem filtro so passa a executar para Admin Master. Para perfis tenant comuns, se `currentClient` estiver ausente, a query continua desabilitada. Para oficina, a condicao existente permanece igual.
+
+**Como verificar este passo:**
+
+```bash
+npm run lint
+npm run test:unit
+npm run build
+```
+
+Resultado esperado: todos continuam passando como no baseline.
+
+## Testes novos a escrever
+
+Criar pelo menos um teste de regressao que proteja a regra de habilitacao da consulta.
+
+### Teste unitario recomendado
+
+**Arquivo:** `tests/unit/maintenance-query-scope.test.ts`
+
+**Ajuste minimo necessario para viabilizar o teste:** extrair de `Maintenance.tsx` uma funcao pura exportada, sem alterar comportamento:
+
+```ts
+export function shouldEnableMaintenanceOrdersQuery(params: {
+  isWorkshopUser: boolean;
+  isMultiWorkshop: boolean;
+  activeWorkshopId?: string | null;
+  workshopId?: string | null;
+  currentClientId?: string | null;
+  role?: string | null;
+}) {
+  return params.isWorkshopUser
+    ? (params.isMultiWorkshop || !!(params.activeWorkshopId ?? params.workshopId))
+    : params.role === 'Admin Master' || !!params.currentClientId;
 }
 ```
 
-**Por que essa é a causa:** Se `filterCPF` recebe o string completo `187.182.207-62`, remove todos os não-dígitos e obtém `18718220762` (11 dígitos) — correto. O problema está 100% no `maxLength={11}` que impede o string completo de chegar à função.
+Usar essa funcao no `enabled` do `useQuery`.
 
----
+**Cenarios obrigatorios:**
 
-## Estado dos testes antes da correção — baseline
+- Admin Master com `currentClientId = null` retorna `true`.
+- Admin Master com `currentClientId` preenchido retorna `true`.
+- usuario comum nao-oficina com `currentClientId = null` retorna `false`.
+- usuario comum nao-oficina com `currentClientId` preenchido retorna `true`.
+- oficina multi-transportadora retorna `true` mesmo sem cliente selecionado.
+- oficina mono com `activeWorkshopId` retorna `true`.
+- oficina mono sem `activeWorkshopId` e sem `workshopId` retorna `false`.
 
-- **Suite unitária:** 107 testes passando, 0 falhando
-- **Typecheck (`tsc --noEmit`):** 0 erros
-- **Testes de fumaça:** não executados (usuário optou por pular — bug e correção são isolados e de baixo risco)
-- **Testes relacionados ao bug:** nenhum teste existente cobre a interação maxLength + filterCPF no DOM — este é o gap de cobertura que será fechado
+**Comando:**
 
-O teste existente em `src/lib/inputHelpers.test.ts` (linha 106-111) já valida que `filterCPF('123.456.789-01')` → `'12345678901'`, provando que a função em si está correta. O bug não está na função — está no atributo HTML que impede a função de receber o input completo.
-
----
-
-## Dependências mapeadas
-
-**Arquivo a ser modificado:** `src/components/DriverForm.tsx`
-
-Este componente é usado exclusivamente em `src/pages/Drivers.tsx` para criação e edição de motoristas. O campo CPF afetado não tem dependências em outros módulos.
-
-A remoção do `maxLength={11}` não afeta:
-- O `filterCPF` (que já limita a 11 dígitos internamente)
-- O `driverToRow` mapper (que recebe o valor já filtrado)
-- O banco de dados (a coluna `cpf` aceita a string normalizada de 11 dígitos)
-- Qualquer outro campo do formulário
-
----
-
-## O que NÃO fazer — restrições absolutas
-
-- **Não modificar `src/lib/inputHelpers.ts`** — a função `filterCPF` está correta e seus 107 testes passam
-- **Não adicionar máscara visual de CPF** — fora do escopo desta correção; o campo exibe dígitos puros intencionalmente
-- **Não alterar o `maxLength` para um número maior (ex.: 14)** — a solução correta é remover o atributo, não ajustar o número
-- **Não modificar outros campos do formulário** — apenas o campo `cpf` é afetado por este bug
-- **Não refatorar o `handleChange` ou o `FIELD_FILTERS`** — estão corretos e não contribuem para o bug
-
----
-
-## Correção
-
-### Passo 1 — Remover `maxLength={11}` do campo CPF em DriverForm.tsx
-
-**Arquivo:** `src/components/DriverForm.tsx`
-
-**Causa que justifica tocar neste arquivo:** É aqui que o atributo `maxLength={11}` está definido — a única causa do bug.
-
-**O que mudar:** Remover o atributo `maxLength={11}` do `<input>` do campo CPF.
-
-Localizar o bloco (linha 375):
-
-```tsx
-<input
-  type="text"
-  name="cpf"
-  required
-  inputMode="numeric"
-  maxLength={11}
-  value={formData.cpf || ''}
-  onChange={handleChange}
-  className={inputClass}
-  placeholder="Somente números"
-/>
+```bash
+npm run test:unit -- tests/unit/maintenance-query-scope.test.ts
 ```
 
-Substituir por:
+Resultado esperado: todos os cenarios passam.
 
-```tsx
-<input
-  type="text"
-  name="cpf"
-  required
-  inputMode="numeric"
-  value={formData.cpf || ''}
-  onChange={handleChange}
-  className={inputClass}
-  placeholder="Somente números"
-/>
+### Validacao manual guiada
+
+Como este bug depende de sessao autenticada e dados reais:
+
+1. Abrir `/manutencao` como Admin Master.
+2. Selecionar `BetaFleet` no topo.
+3. Confirmar que aparecem 2 OS, conforme print de referencia.
+4. Selecionar `Todos os Clientes`.
+5. Confirmar que as OS continuam aparecendo na lista consolidada e que os cards nao ficam zerados indevidamente.
+6. Selecionar novamente `BetaFleet`.
+7. Confirmar que a lista volta a filtrar apenas aquele cliente.
+
+## Verificacao final
+
+Depois da correcao:
+
+1. Rode o teste especifico do bug:
+
+```bash
+npm run test:unit -- tests/unit/maintenance-query-scope.test.ts
 ```
 
-**O que NÃO mudar neste arquivo:** Todos os outros campos, handlers, e lógica de estado devem permanecer intactos.
+Resultado esperado: todos os cenarios passam.
 
-**Impacto em dependências:** Nenhum. O `filterCPF` já garante que `formData.cpf` nunca terá mais de 11 dígitos. O input nunca exibirá mais de 11 caracteres após o primeiro `onChange`.
+2. Rode a suite unitária completa:
 
-**Como verificar este passo:**
-```
-1. Abrir o formulário de motorista no browser
-2. Colar "187.182.207-62" no campo CPF
-3. Resultado esperado: campo exibe "18718220762" (11 dígitos, sem pontos ou traço)
-4. Colar "123.456.789-09" no campo CPF
-5. Resultado esperado: campo exibe "12345678909" (11 dígitos)
-6. Digitar manualmente mais de 11 dígitos
-7. Resultado esperado: o campo para de aceitar após o 11º dígito (filterCPF limita via slice)
-```
-
----
-
-### Passo 2 — Adicionar teste de regressão em inputHelpers.test.ts
-
-**Arquivo:** `src/lib/inputHelpers.test.ts`
-
-**Causa que justifica tocar neste arquivo:** O caso específico do CPF com dígitos verificadores colado de planilha não está documentado como caso de teste explícito. Este teste serve como proteção e documentação do comportamento esperado.
-
-**O que mudar:** Adicionar um novo caso de teste dentro do bloco `describe('filterCPF', ...)` existente (linha 106).
-
-Localizar o bloco atual:
-
-```typescript
-describe('filterCPF', () => {
-  it('mantém apenas 11 dígitos', () => {
-    expect(filterCPF('123.456.789-01')).toBe('12345678901');
-    expect(filterCPF('12345678901234567890')).toBe('12345678901');
-  });
-});
-```
-
-Substituir por:
-
-```typescript
-describe('filterCPF', () => {
-  it('mantém apenas 11 dígitos', () => {
-    expect(filterCPF('123.456.789-01')).toBe('12345678901');
-    expect(filterCPF('12345678901234567890')).toBe('12345678901');
-  });
-
-  it('preserva os dígitos verificadores ao processar CPF colado de planilha', () => {
-    expect(filterCPF('187.182.207-62')).toBe('18718220762');
-    expect(filterCPF('000.000.001-91')).toBe('00000000191');
-  });
-});
-```
-
-**O que NÃO mudar neste arquivo:** Os casos de teste existentes e todos os outros `describe` blocks.
-
-**Impacto em dependências:** Nenhum. É apenas adição de testes.
-
-**Como verificar este passo:**
 ```bash
 npm run test:unit
 ```
-Resultado esperado: 109 testes passando (107 anteriores + 2 novos), 0 falhando.
 
----
+Resultado esperado: pelo menos os 111 testes do baseline continuam passando, alem do novo teste.
 
-## Verificação final
+3. Rode typecheck/lint:
 
-Após todos os passos:
-
-1. Rode a suite unitária completa:
-```bash
-npm run test:unit
-```
-Resultado esperado: 109 testes passando. Nenhum teste que passava antes deve estar falhando.
-
-2. Rode o typecheck:
 ```bash
 npm run lint
 ```
-Resultado esperado: nenhum erro de tipo.
 
-3. Validação manual no browser:
-```
-a. Abrir /cadastros/motoristas
-b. Abrir formulário de criação ou edição de motorista
-c. Colar "187.182.207-62" no campo CPF
-d. Verificar: campo exibe "18718220762"
-e. Tentar digitar um 12º dígito manualmente
-f. Verificar: o campo não aceita o 12º dígito (filterCPF limita via slice)
+Resultado esperado: sem erros.
+
+4. Rode build:
+
+```bash
+npm run build
 ```
 
-Se qualquer verificação falhar: pare, informe o usuário com o resultado exato e aguarde instrução. Não tente corrigir por conta própria sem comunicar.
+Resultado esperado: build passa. O aviso de chunk grande pode permanecer como baseline.
 
----
+5. Rode E2E se o ambiente de autenticacao estiver normalizado:
 
-## Observações para sessões futuras
+```bash
+npm run test:e2e
+```
 
-**Máscara de CPF no campo:** O campo exibe os dígitos sem formatação (sem pontos e traço). Seria mais amigável exibir `187.182.207-62` enquanto o usuário digita ou após a colagem. Esta é uma melhoria de UX, não um bug — deve ser tratada em sessão separada com `evolucao.md`.
+Resultado esperado: nenhuma falha nova relacionada a `/manutencao`. As falhas de baseline listadas neste documento nao sao responsabilidade desta correcao, mas nao devem piorar.
 
-**Outros campos com maxLength potencialmente problemático:** Outros campos numéricos do projeto que aceitam formatos com separadores (ex.: CNPJ, telefone, CEP) devem ser auditados para verificar se possuem o mesmo padrão de `maxLength` igual ao número de dígitos (sem contar os separadores). Não é escopo desta correção — registrar para revisão futura.
+6. Execute a validacao manual guiada acima para confirmar o comportamento visual.
 
----
+Se qualquer verificacao falhar de forma nova, pare, informe o usuario com o resultado exato e aguarde instrucao.
+
+## Observacoes para sessoes futuras
+
+- `docs/MEMORY.md` nao possui lista objetiva de testes de fumaca. Criar uma secao formal de smoke tests reduziria ambiguidade nas proximas sessoes de bugfix.
+- A tela ainda permite abrir `Nova Manutencao` enquanto Admin Master esta em "Todos os Clientes"; salvar sem cliente selecionado tende a falhar por `client_id e obrigatorio`. Isso nao e o bug atual e nao deve ser corrigido nesta sessao.
+- A suite E2E esta com falhas de ambiente/autenticacao e dados obrigatorios (`renavam`) que precisam de uma sessao separada de estabilizacao.
 
 ## Registro para o docs/MEMORY.md
-Após a correção confirmada, adicionar ao docs/MEMORY.md:
 
+Apos a correcao confirmada, adicione ao `docs/MEMORY.md`:
+
+```text
+Bug corrigido: Admin Master nao via ordens de manutencao ao selecionar "Todos os Clientes".
+Causa raiz: `useQuery` em `src/pages/Maintenance.tsx` ficava desabilitado para usuarios nao-oficina quando `currentClient` era `null`; para Admin Master, `currentClient = null` representa a visao global.
+Correcao aplicada: query de manutencao passa a ser habilitada quando o perfil e `Admin Master`, mesmo sem cliente selecionado, preservando o filtro por `client_id` quando um cliente especifico existe.
+Arquivos modificados: `src/pages/Maintenance.tsx`, `tests/unit/maintenance-query-scope.test.ts`, `docs/MEMORY.md`
+Testes adicionados: `tests/unit/maintenance-query-scope.test.ts`
 ```
-Bug corrigido: CPF truncado ao colar valor formatado no formulário de motorista
-Causa raiz: maxLength={11} no input HTML truncava o texto colado antes do filterCPF processar — browser aplica maxLength sobre o string bruto (com pontos/traço), não sobre os dígitos
-Correção aplicada: remoção do atributo maxLength={11} do campo CPF em DriverForm.tsx; filterCPF já limita a 11 dígitos internamente via .slice(0, 11)
-Arquivos modificados: src/components/DriverForm.tsx, src/lib/inputHelpers.test.ts
-Testes adicionados: 2 novos casos em describe('filterCPF') no inputHelpers.test.ts
-```
 
----
+## Sugestao de commit
 
-## Sugestão de commit
-Quando todos os critérios de conclusão estiverem atendidos e você confirmar que o bug foi corrigido:
+Quando todos os criterios de conclusao estiverem atendidos:
 
-```
-git add src/components/DriverForm.tsx src/lib/inputHelpers.test.ts
-git commit -m "fix: preservar dígitos verificadores ao colar CPF formatado no formulário de motorista"
+```bash
+git add src/pages/Maintenance.tsx tests/unit/maintenance-query-scope.test.ts docs/MEMORY.md IMPLEMENTATION_FIXBUG.md
+git commit -m "fix: exibe manutencoes globais para admin master"
+git push
 ```
