@@ -57,6 +57,8 @@ interface CreateForm {
 
 const CAN_MANAGE_PERMISSIONS: Role[] = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 const CAN_MANAGE_USERS: Role[] = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
+const EMPTY_SHIPPERS: Shipper[] = [];
+const EMPTY_OPERATIONAL_UNITS: OperationalUnit[] = [];
 
 export function getCreateUserRoleOptions(role: Role): Role[] {
   return getCreatableRoles(role);
@@ -210,8 +212,8 @@ function useOperationsManagerOptions(enabled: boolean, clientId?: string | null)
   });
 
   return {
-    shippers: shippersQuery.data ?? [],
-    operationalUnits: operationalUnitsQuery.data ?? [],
+    shippers: shippersQuery.data ?? EMPTY_SHIPPERS,
+    operationalUnits: operationalUnitsQuery.data ?? EMPTY_OPERATIONAL_UNITS,
     isLoading: shippersQuery.isLoading || operationalUnitsQuery.isLoading,
   };
 }
@@ -326,7 +328,7 @@ export function CreateUserModal({
       operationalUnitIds: [],
     });
     setError('');
-  }, [open, availableRoles]);
+  }, [open, currentUserRole]);
 
   useEffect(() => {
     if (!isOperationsRole) return;
@@ -862,7 +864,7 @@ export default function Users() {
   if (!user || !CAN_MANAGE_USERS.includes(user.role)) return <Navigate to="/" replace />;
 
   const myRank = getRoleRank(user.role);
-  const availableRoles = getCreateUserRoleOptions(user.role);
+  const availableRoles = useMemo(() => getCreateUserRoleOptions(user.role), [user.role]);
 
   const { data: users = [], isLoading: loading } = useQuery({
     queryKey: ['users', currentClient?.id],
