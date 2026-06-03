@@ -64,6 +64,11 @@ export interface VehicleRow {
   steps_count: number | null;
 }
 
+function normalizeAxleConfig(value: unknown): AxleConfigEntry[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value as AxleConfigEntry[];
+}
+
 /** Converte row do Supabase (snake_case) para interface Vehicle (camelCase) */
 export function vehicleFromRow(row: VehicleRow): Vehicle {
   return {
@@ -122,7 +127,7 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
     maintenanceContractUpload: row.maintenance_contract_upload ?? undefined,
     vehicleUsage: row.vehicle_usage as Vehicle['vehicleUsage'] ?? undefined,
     initialKm: row.initial_km ?? undefined,
-    axleConfig: row.axle_config ?? undefined,
+    axleConfig: normalizeAxleConfig(row.axle_config),
     stepsCount: row.steps_count ?? undefined,
   };
 }

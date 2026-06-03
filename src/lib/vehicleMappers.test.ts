@@ -1,4 +1,5 @@
 import { vehicleToRow, vehicleFromRow, type VehicleRow } from './vehicleMappers';
+import type { AxleConfigEntry } from '../types';
 import type { Vehicle } from '../types/vehicle';
 
 describe('vehicleToRow', () => {
@@ -76,5 +77,50 @@ describe('vehicleFromRow', () => {
     const vehicle = vehicleFromRow(row);
     expect(vehicle.driverName).toBe('João Silva');
     expect(vehicle.shipperName).toBe('Embarcador X');
+  });
+
+  it('mantem axle_config valido como array', () => {
+    const axleConfig: AxleConfigEntry[] = [
+      { order: 1, type: 'direcional', rodagem: 'simples', physicalAxles: 1 },
+      { order: 2, type: 'duplo', rodagem: 'dupla', physicalAxles: 2 },
+    ];
+
+    const row = {
+      id: 'v1',
+      license_plate: 'ABC1D23',
+      brand: 'FIAT',
+      model: 'STRADA',
+      year: 2024,
+      type: 'Utilitário',
+      energy_source: 'Combustão',
+      cooling_equipment: false,
+      acquisition: 'Owned',
+      fipe_price: 0,
+      owner: '',
+      axle_config: axleConfig,
+    } as unknown as VehicleRow;
+
+    const vehicle = vehicleFromRow(row);
+    expect(vehicle.axleConfig).toEqual(axleConfig);
+  });
+
+  it('ignora axle_config invalido para evitar quebra no formulario', () => {
+    const row = {
+      id: 'v1',
+      license_plate: 'ABC1D23',
+      brand: 'FIAT',
+      model: 'STRADA',
+      year: 2024,
+      type: 'Utilitário',
+      energy_source: 'Combustão',
+      cooling_equipment: false,
+      acquisition: 'Owned',
+      fipe_price: 0,
+      owner: '',
+      axle_config: { legacy: true },
+    } as unknown as VehicleRow;
+
+    const vehicle = vehicleFromRow(row);
+    expect(vehicle.axleConfig).toBeUndefined();
   });
 });
