@@ -14,6 +14,8 @@
     "test:unit:coverage": "vitest run --coverage",
     "test:smoke": "playwright test e2e/smoke/app-smoke.spec.ts --project=chromium",
     "test:e2e": "playwright test",
+    "test:e2e:auth": "playwright test e2e/completed/auth-storage-state.spec.ts --project=chromium",
+    "test:e2e:pending": "PLAYWRIGHT_INCLUDE_PENDING=1 playwright test e2e/pending",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
     "test:shippers": "playwright test e2e/shippers-operational-units.spec.ts",

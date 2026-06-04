@@ -1,16 +1,24 @@
 import { test, expect, Browser, Page } from '@playwright/test';
 
+function requireEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`Missing required E2E credential env: ${name}`);
+  }
+  return value;
+}
+
 const users = {
   coordinator: {
-    email: process.env.TEST_COORDINATOR_EMAIL || 'robson@gmail.com',
-    password: process.env.TEST_COORDINATOR_PASSWORD || '123456',
-    name: 'Robson',
+    email: '',
+    password: '',
+    name: 'Beatriz Lima',
     role: 'Coordinator',
   },
   supervisor: {
-    email: process.env.TEST_SUPERVISOR_EMAIL || 'pereira@gmail.com',
-    password: process.env.TEST_SUPERVISOR_PASSWORD || '123456',
-    name: 'Pereira',
+    email: '',
+    password: '',
+    name: 'Camila Torres',
     role: 'Supervisor',
   },
 };
@@ -28,18 +36,20 @@ async function loginAs(browser: Browser, email: string, password: string): Promi
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// BLOCO 1 — COORDINATOR (Robson)
-// Deve espelhar todas as permissões de Manager (rank 5)
+// BLOCO 1 — COORDINATOR (Beatriz Lima)
+// Deve espelhar permissões compatíveis com Coordinator (rank 6)
 // ══════════════════════════════════════════════════════════════════════════════
-test.describe.serial('Coordinator (Robson) — Auditoria de Permissões', () => {
-  let page: Page;
+test.describe.serial('Coordinator (Beatriz Lima) — Auditoria de Permissões', () => {
+  let page: Page | undefined;
 
   test.beforeAll(async ({ browser }) => {
+    users.coordinator.email = requireEnv('TEST_COORDINATOR_EMAIL');
+    users.coordinator.password = requireEnv('TEST_COORDINATOR_PASSWORD');
     page = await loginAs(browser, users.coordinator.email, users.coordinator.password);
   });
 
   test.afterAll(async () => {
-    await page.context().close();
+    await page?.context().close();
   });
 
   // ── 1.1 Autenticação ───────────────────────────────────────────────────────
@@ -49,8 +59,8 @@ test.describe.serial('Coordinator (Robson) — Auditoria de Permissões', () => 
 
   test('1.2 Topbar exibe nome e badge Coordinator', async () => {
     await page.waitForLoadState('networkidle');
-    await expect(page.getByText(/robson/i)).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('Coordinator', { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(users.coordinator.name, { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('banner').getByText(users.coordinator.role, { exact: true })).toBeVisible({ timeout: 10000 });
   });
 
   // ── 1.3 Sidebar ────────────────────────────────────────────────────────────
@@ -154,7 +164,7 @@ test.describe.serial('Coordinator (Robson) — Auditoria de Permissões', () => 
   });
 
   // ── 1.17 Hierarquia de criação de usuários ─────────────────────────────────
-  test('1.17 Modal Novo Usuário — dropdown inclui roles abaixo de rank 5 e exclui rank >= 5', async () => {
+  test('1.17 Modal Novo Usuário — dropdown inclui roles abaixo de rank 6 e exclui rank >= 6', async () => {
     await page.goto('/cadastros/usuarios');
     await page.waitForLoadState('networkidle');
     await page.getByRole('button', { name: /novo usuário/i }).click();
@@ -187,18 +197,20 @@ test.describe.serial('Coordinator (Robson) — Auditoria de Permissões', () => 
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// BLOCO 2 — SUPERVISOR (Pereira)
-// Deve espelhar todas as permissões de Fleet Analyst (rank 4)
+// BLOCO 2 — SUPERVISOR (Camila Torres)
+// Deve espelhar permissões compatíveis com Supervisor (rank 5)
 // ══════════════════════════════════════════════════════════════════════════════
-test.describe.serial('Supervisor (Pereira) — Auditoria de Permissões', () => {
-  let page: Page;
+test.describe.serial('Supervisor (Camila Torres) — Auditoria de Permissões', () => {
+  let page: Page | undefined;
 
   test.beforeAll(async ({ browser }) => {
+    users.supervisor.email = requireEnv('TEST_SUPERVISOR_EMAIL');
+    users.supervisor.password = requireEnv('TEST_SUPERVISOR_PASSWORD');
     page = await loginAs(browser, users.supervisor.email, users.supervisor.password);
   });
 
   test.afterAll(async () => {
-    await page.context().close();
+    await page?.context().close();
   });
 
   // ── 2.1 Autenticação ───────────────────────────────────────────────────────
@@ -208,8 +220,8 @@ test.describe.serial('Supervisor (Pereira) — Auditoria de Permissões', () => 
 
   test('2.2 Topbar exibe nome e badge Supervisor', async () => {
     await page.waitForLoadState('networkidle');
-    await expect(page.getByText(/pereira/i)).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('Supervisor', { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(users.supervisor.name, { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('banner').getByText(users.supervisor.role, { exact: true })).toBeVisible({ timeout: 10000 });
   });
 
   // ── 2.3 Sidebar ────────────────────────────────────────────────────────────
@@ -313,7 +325,7 @@ test.describe.serial('Supervisor (Pereira) — Auditoria de Permissões', () => 
   });
 
   // ── 2.17 Hierarquia de criação de usuários ─────────────────────────────────
-  test('2.17 Modal Novo Usuário — dropdown inclui apenas roles abaixo de rank 4 e exclui rank >= 4', async () => {
+  test('2.17 Modal Novo Usuário — dropdown inclui apenas roles abaixo de rank 5 e exclui rank >= 5', async () => {
     await page.goto('/cadastros/usuarios');
     await page.waitForLoadState('networkidle');
     await page.getByRole('button', { name: /novo usuário/i }).click();
@@ -321,12 +333,12 @@ test.describe.serial('Supervisor (Pereira) — Auditoria de Permissões', () => 
 
     const roleSelect = page.locator('select').filter({ has: page.locator('option[value="Yard Auditor"]') });
 
-    // Deve incluir (rank < 4, exceto Driver que é criado via Motoristas)
+    // Deve incluir (rank < 5, exceto Driver que é criado via Motoristas)
     await expect(roleSelect.locator('option[value="Yard Auditor"]')).toBeAttached();
     await expect(roleSelect.locator('option[value="Fleet Assistant"]')).toBeAttached();
+    await expect(roleSelect.locator('option[value="Fleet Analyst"]')).toBeAttached();
 
-    // NÃO deve incluir (rank >= 4)
-    await expect(roleSelect.locator('option[value="Fleet Analyst"]')).not.toBeAttached();
+    // NÃO deve incluir (rank >= 5)
     await expect(roleSelect.locator('option[value="Supervisor"]')).not.toBeAttached();
     await expect(roleSelect.locator('option[value="Manager"]')).not.toBeAttached();
     await expect(roleSelect.locator('option[value="Coordinator"]')).not.toBeAttached();

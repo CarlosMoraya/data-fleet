@@ -243,13 +243,19 @@ test.describe.serial('Tire Management — Manager (Alexandre)', () => {
         // Selecionar a primeira opção não vazia e não desabilitada
         const options = positionSelect.locator('option');
         const optCount = await options.count();
+        let selectedPosition = false;
         for (let i = 1; i < optCount; i++) {
           const isDisabled = await options.nth(i).getAttribute('disabled');
-          if (!isDisabled) {
+          if (isDisabled === null) {
             const val = await options.nth(i).getAttribute('value');
-            if (val) { await positionSelect.selectOption(val); break; }
+            if (val) {
+              await positionSelect.selectOption(val);
+              selectedPosition = true;
+              break;
+            }
           }
         }
+        expect(selectedPosition, 'Deve existir ao menos uma posição livre para cadastro individual').toBe(true);
       }
 
       await modal.locator('button:has-text("Cadastrar Pneu")').click();
@@ -336,8 +342,8 @@ test.describe.serial('Tire Management — Manager (Alexandre)', () => {
       await expect(modal).toBeVisible({ timeout: 5000 });
 
       // Verificar que existe seção de histórico (De / Para / Responsável)
-      await expect(modal.locator('text=De')).toBeVisible();
-      await expect(modal.locator('text=Para')).toBeVisible();
+      await expect(modal.getByRole('columnheader', { name: 'De', exact: true })).toBeVisible();
+      await expect(modal.getByRole('columnheader', { name: 'Para', exact: true })).toBeVisible();
 
       await modal.locator('button:has-text("Fechar")').click();
       r.pass();

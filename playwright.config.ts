@@ -2,8 +2,14 @@ import { defineConfig, devices } from '@playwright/test';
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 
+const includePending = process.env.PLAYWRIGHT_INCLUDE_PENDING === '1';
+const pendingIgnore = includePending ? [] : [/pending\//];
+
 export default defineConfig({
   testDir: './e2e',
+  testMatch: includePending
+    ? ['**/completed/**/*.spec.ts', '**/pending/**/*.spec.ts', '**/smoke/**/*.spec.ts', '**/setup/**/*.setup.ts']
+    : ['**/completed/**/*.spec.ts', '**/smoke/**/*.spec.ts', '**/setup/**/*.setup.ts'],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -48,7 +54,7 @@ export default defineConfig({
         storageState: 'e2e/.auth/admin.json',
       },
       dependencies: ['setup'],
-      testIgnore: /tenant-users/,
+      testIgnore: [/tenant-users/, ...pendingIgnore],
     },
     {
       name: 'analyst',
@@ -58,6 +64,7 @@ export default defineConfig({
       },
       dependencies: ['setup-mariana'],
       testMatch: [/tenant-users(-analyst.*)?\.spec\.ts/, /audit-admin-tenant\.spec\.ts/],
+      testIgnore: pendingIgnore,
     },
     {
       name: 'assistant',
@@ -67,7 +74,7 @@ export default defineConfig({
       },
       dependencies: ['setup-pedro'],
       testMatch: [/tenant-users-assistant.*\.spec\.ts/, /audit-admin-tenant\.spec\.ts/],
-      testIgnore: /seed/,
+      testIgnore: [/seed/, ...pendingIgnore],
     },
     {
       name: 'assistant-actions',
@@ -77,6 +84,7 @@ export default defineConfig({
       },
       dependencies: ['setup-pedro'],
       testMatch: /tenant-users-assistant-actions\.spec\.ts/,
+      testIgnore: pendingIgnore,
     },
     {
       name: 'manager',
@@ -86,7 +94,7 @@ export default defineConfig({
       },
       dependencies: ['setup-alexandre'],
       testMatch: [/tenant-users-manager.*\.spec\.ts/, /audit-admin-tenant\.spec\.ts/],
-      testIgnore: /seed/,
+      testIgnore: [/seed/, ...pendingIgnore],
     },
     {
       name: 'auditor',
@@ -96,6 +104,7 @@ export default defineConfig({
       },
       dependencies: ['setup-carlos'],
       testMatch: /auditor-flow\.spec\.ts/,
+      testIgnore: pendingIgnore,
     },
     {
       name: 'driver',
@@ -105,6 +114,7 @@ export default defineConfig({
       },
       dependencies: ['setup-jorge'],
       testMatch: /driver-flow\.spec\.ts/,
+      testIgnore: pendingIgnore,
     },
   ],
   webServer: {
