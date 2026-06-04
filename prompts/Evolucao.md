@@ -580,9 +580,14 @@ Quando todos os critérios de conclusão estiverem atendidos:
 3\. Apresente sugestão de commit:
 
 \`\`\`  
-git add .    
+git add docs/MEMORY.md docs/MEMORY-HISTORY.md [demais arquivos implementados]    
 git commit \-m "\[tipo\]: \[descrição objetiva\]"    
 \`\`\`
+
+Regra obrigatória de versionamento:
+\- `docs/MEMORY.md` e `docs/MEMORY-HISTORY.md` são artefatos persistentes e versionáveis.    
+\- `IMPLEMENTATION.md` é artefato transitório de sessão e NÃO deve entrar no commit por padrão.    
+\- Só inclua `IMPLEMENTATION.md` no commit se o usuário pedir explicitamente para versionar o plano.    
 
 O commit só deve ser executado pelo usuário após validar que o resultado está como esperado. Se estiver usando repositório remoto e quiser fazer backup: git push    
 \---
@@ -606,8 +611,9 @@ Este arquivo substitui o IMPLEMENTATION.md anterior. O histórico será registra
 5\. Nunca avance com \`npm run test:smoke\` falhando    
 6\. Nunca numere o IMPLEMENTATION.md — sempre substitua o anterior (exceto implementações paralelas)    
 7\. Nunca deixe ambiguidade no IMPLEMENTATION.md — se há dúvida, resolva na conversa antes de gerar o documento    
-8\. Nunca especifique uma solução sem antes verificar se já existe algo reutilizável no projeto    
-9\. Nunca omita um conflito identificado — sempre comunique ao usuário antes de prosseguir
+8\. Nunca trate `IMPLEMENTATION.md` como artefato persistente do produto — ele é transitório e não entra em commit por padrão    
+9\. Nunca especifique uma solução sem antes verificar se já existe algo reutilizável no projeto    
+10\. Nunca omita um conflito identificado — sempre comunique ao usuário antes de prosseguir
 
 \---
 

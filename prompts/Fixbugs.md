@@ -402,9 +402,14 @@ Testes adicionados: \[lista\]
 Quando todos os critérios de conclusão estiverem atendidos e você confirmar que o bug foi corrigido:
 
 \`\`\`  
-git add .  
+git add docs/MEMORY.md docs/MEMORY-HISTORY.md [arquivos da correção]  
 git commit \-m "fix: \[descrição objetiva do bug corrigido\]"  
 \`\`\`
+
+Regra obrigatória de versionamento:
+\- `docs/MEMORY.md` e `docs/MEMORY-HISTORY.md` são artefatos persistentes e versionáveis.  
+\- `IMPLEMENTATION_FIXBUG.md` é artefato transitório de sessão e NÃO deve entrar no commit por padrão.  
+\- Só inclua `IMPLEMENTATION_FIXBUG.md` no commit se o usuário pedir explicitamente para versionar o plano de correção.  
 
 Execute apenas quando estiver satisfeito com o resultado. Se usar repositório remoto: git push  
 \---

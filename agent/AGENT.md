@@ -41,6 +41,11 @@ Qualquer nova funcionalidade **DEVE** seguir estas fases sequenciais:
 - **Commits**: Mensagens descritivas em Português, focando no "porquê".
 - **Linting**: Preservar comentários e docstrings existentes.
 
+### 4. Política de Artefatos Mutáveis
+- **Persistentes e versionáveis**: `docs/MEMORY.md` e `docs/MEMORY-HISTORY.md` representam a memória operacional compartilhada do projeto. Sempre que mudarem o estado vigente ou registrarem histórico relevante, devem ser considerados artefatos de commit.
+- **Transitórios e não versionáveis por padrão**: `IMPLEMENTATION.md` e `IMPLEMENTATION_FIXBUG.md` são artefatos de sessão. Servem como instrução de execução da tarefa corrente e podem ser sobrescritos na sessão seguinte.
+- **Exceção**: `IMPLEMENTATION.md` e `IMPLEMENTATION_FIXBUG.md` só devem entrar em commit quando o usuário pedir explicitamente para versionar o plano daquela sessão.
+
 ---
 
 ## 🚀 Comandos Rápidos
