@@ -4,6 +4,15 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 
 ## 📜 Histórico de Sessões e Mudanças
 
+### Maio 2026
+- **Telefone no Cadastro de Motoristas (11/05/2026)**:
+  - Adicionada migration aditiva para coluna `phone` em `drivers` (`VARCHAR(20)`, nullable, `DEFAULT NULL`).
+  - Estendido o tipo `Driver` com `phone?: string`.
+  - Atualizados os mappers (`driverFromRow` e `driverToRow`) para sincronizar `phone` entre snake_case e camelCase.
+  - Atualizado `DriverForm` com campo opcional "Telefone de Contato", usando `filterPhone`.
+  - Atualizado `DriverDetailModal` para exibir telefone formatado (`(XX) XXXXX-XXXX` / `(XX) XXXX-XXXX`).
+  - Incluídos 3 testes unitários novos no `driverMappers.test.ts`, totalizando 111 testes passando.
+
 ### Abril 2026
 - **Redesign da Documentação**: Reorganização completa da estrutura de arquivos `.md` para o padrão `agent/` e `docs/`, visando melhor manutenção e clareza para assistentes de IA.
 - **Otimização de Performance**: Limpeza de código morto, unificação de mappers e configuração de cache global via React Query. Build reduzido para ~8s.

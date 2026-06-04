@@ -1,365 +1,945 @@
-\# Análise de Fronteira: Especialização e Desempenho de Modelos de Linguagem no Ciclo de Vida do Desenvolvimento de Software (2025-2026)
+# MODEL_SELECTION.md
 
-O ecossistema de desenvolvimento de software atravessa uma transformação estrutural impulsionada pela maturidade dos modelos de linguagem de grande escala (LLMs). Entre o final de 2024 e o primeiro semestre de 2026, a indústria testemunhou a transição de modelos generalistas para arquiteturas altamente especializadas em domínios técnicos.
+**Última atualização:** 18 de maio de 2026
+**Propósito:** Documento de consulta usado pelos prompts `Evolucao.md` e `Fixbugs.md` para escolher o melhor modelo de IA para executar um `IMPLEMENTATION.md` ou `IMPLEMENTATION_FIXBUG.md`.
+**Idioma de operação:** Português do Brasil.
 
-Esta mudança é caracterizada pela adoção de arquiteturas de Mistura de Especialistas (MoE), métodos de raciocínio intercalado e janelas de contexto que atingem a marca de um milhão de tokens, permitindo que a inteligência artificial atue não apenas como um assistente de preenchimento automático, mas como um agente autônomo de engenharia.
+---
 
-A presente análise técnica decompõe o desempenho de sete modelos proeminentes:
+## Parte 1 — Como usar este documento
 
-\- Qwen 3 Coder Next  
-\- GLM-4.7  
-\- MiniMax-M2.5  
-\- Gemma 4 31B  
-\- Nemotron-3 Super  
-\- Ministral-3 14B  
-\- GPT-OSS 130B
+Você (agente arquiteto) está aqui porque acabou de gerar um `IMPLEMENTATION.md` ou `IMPLEMENTATION_FIXBUG.md`. Sua tarefa agora é recomendar os 3 modelos com melhor desempenho para executá-lo.
 
-A avaliação considera sua eficácia em tarefas críticas que variam desde o design visual de interfaces até a auditoria de segurança de protocolos de autenticação. Através de dados de benchmarks como SWE-bench Verified, LiveCodeBench e avaliações de agência, este relatório identifica as esferas de influência onde cada modelo demonstra superioridade técnica e eficiência operacional.
+**Procedimento de decisão:**
 
-\---
+1. **Leia o `IMPLEMENTATION.md` que você acabou de gerar.** Identifique:
+   - Qual(is) camada(s) do sistema é(são) tocada(s): Frontend / Backend / Database / Design / Infra
+   - Quais domínios funcionais aparecem: autenticação, autorização, API REST, queries SQL, componentes UI, animações, etc.
+   - Quais stacks/linguagens/frameworks são usados: React, Vue, Django, FastAPI, Prisma, etc.
+   - O grau de complexidade: trivial / médio / complexo / crítico
+   - Restrições especiais: segurança, compliance, performance, licenciamento
 
-\#\# Panorama Arquitetural e o Surgimento da Inteligência de Agência
+2. **Faça matching com as seções deste documento, nesta ordem de prioridade:**
+   - Parte 4 (Domínio funcional) — *mais específico, prevalece*
+   - Parte 6 (Stack/linguagem) — *segundo critério*
+   - Parte 3 (Camada do sistema) — *fallback genérico*
+   - Parte 7 (Tipo de bug, se for Fixbugs) — *só para correções*
 
-A divergência nas trajetórias tecnológicas dos provedores de IA resultou em um espectro diversificado de capacidades.
+3. **Combine recomendações de múltiplas seções** se a SPEC cobrir múltiplos domínios. Quando duas seções recomendarem modelos diferentes, use os tie-breakers da Parte 9.
 
-Enquanto modelos como o Qwen 3 Coder Next focam na eficiência extrema para implantação em hardware local de desenvolvedores, o MiniMax-M2.5 e o GLM-4.7 investem em processos massivos de Aprendizado por Reforço (RL) para emular o comportamento de arquitetos de software seniores.
+4. **Aplique os anti-patterns da Parte 8** antes de finalizar — descarte modelos contraindicados para o caso.
 
-A tabela a seguir fornece um comparativo das especificações de hardware e arquitetura que fundamentam o desempenho desses sistemas no ambiente de produção.
+5. **Produza a saída no formato exato da Parte 10.**
 
-| Modelo | Arquitetura Primária | Parâmetros Ativos | Janela de Contexto | VRAM Mínima (Quantizado) | Foco de Especialização |  
-|---|---|---:|---:|---:|---|  
-| Qwen 3 Coder Next | MoE Esparso | 3B de 80B | 256K | 46GB | Agentes de CLI e IDE |  
-| GLM-4.7 | MoE Dinâmico | \~3B de 30B (Flash) | 200K | 24GB | Full-stack e Design UI |  
-| MiniMax-M2.5 | MoE \+ RL | 10B de 230B | 1M (Input) | 130GB (4-bit) | Arquitetura e SQL |  
-| Gemma 4 31B | Denso Multimodal | 31B | 262K | 24GB | Raciocínio Local |  
-| Nemotron-3 Super | LatentMoE \+ Mamba | 12B de 120B | 1M | 80GB (FP8) | Contextos Longos e Logs |  
-| Ministral-3 14B | Denso Destilado | 14B | 256K | 11GB-32GB | STEM e Refatoração |  
-| GPT-OSS 130B | MoE | 5.1B de 117B | 128K | 80GB | Segurança e Generalista |
+**Critérios de ponderação (sempre nesta ordem):**
+1. Performance específica para o domínio da SPEC (benchmark dedicado quando existir)
+2. Custo-benefício (performance / preço)
+3. Adequação a restrições do projeto (licença, self-host, latência)
 
-\---
+**Regra de ouro:** se o domínio tem benchmark dedicado (ex: CyberSecEval para segurança, BIRD-SQL para SQL, WebDev Arena para frontend), o modelo líder nesse benchmark prevalece sobre o modelo líder em benchmarks genéricos como SWE-Bench.
 
-\#\# Qwen 3 Coder Next: O Especialista em Terminal e Automação de Infraestrutura
+---
 
-O Qwen 3 Coder Next, desenvolvido pela Alibaba Cloud, estabeleceu-se como a ferramenta definitiva para operações em nível de sistema e integração profunda com o terminal.
+## Parte 2 — Tabela mestre dos modelos
 
-Sua arquitetura de 80 bilhões de parâmetros totais, dos quais apenas 3 bilhões são ativados por token, permite que o modelo ofereça uma latência extremamente baixa, crucial para fluxos de trabalho de preenchimento automático em tempo real.
+Todos os 20 modelos rastreados pela pesquisa, ordenados por tier e tipo. **Para os prompts `Evolucao.md` e `Fixbugs.md` use APENAS modelos com a marca ✅ ABERTO.**
 
-O modelo foi otimizado para cenários de longa duração onde a consistência técnica é mais valorizada do que a criatividade linguística.
+### Modelos abertos (recomendados para os prompts)
 
-No contexto de desenvolvimento, o Qwen 3 funciona como um administrador de sistemas especializado que possui conhecimento enciclopédico de comandos de shell, configurações de Docker e manifestos de Kubernetes.
+| Modelo | Provedor | Licença | Context | Input $/M | Output $/M | SWE-Bench Pro | LiveCodeBench | Terminal-Bench 2.0 | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| **glm-5.1** | Z.ai | MIT | 200K | $0,95 | $3,15 | **58,4%** (#1) | competitivo | 63,5–66,5% | ✅ ABERTO |
+| **kimi-k2.6** | Moonshot | Modified MIT | 262K | $0,60 | $2,50 | **58,6%** | **89,6%** | 66,7% | ✅ ABERTO |
+| **deepseek-v4-pro** | DeepSeek | MIT | **1M** | $0,435 (promo) | $0,87 (promo) | ~57% | **93,5%** (#1) | 67,9% | ✅ ABERTO |
+| **qwen3.6-plus** | Alibaba | Closed-weights | **1M** | $0,325 | $1,95 | 56,6% | competitivo | 61,6% | ✅ ABERTO (API) |
+| **minimax-m2.5** | MiniMax | **MIT** | 205K | $0,30 | $1,20 | 55,4% | n/d | 42,2% | ✅ ABERTO |
+| **mimo-v2.5-pro** | Xiaomi | **MIT** | **1M** | $1,00 | $3,00 | 57,2% | n/d | **68,4%** | ✅ ABERTO |
+| **mimo-v2.5** | Xiaomi | **MIT** | 1M | $0,40 | $2,00 | n/d | n/d | n/d | ✅ ABERTO (omnimodal) |
 
-Sua capacidade de recuperação de falhas de execução é notável; ao receber logs de erro de um compilador ou de uma ferramenta de linting, o modelo demonstra uma resiliência técnica superior, ajustando o código não apenas sintaticamente, mas de acordo com as restrições do ambiente de execução.
+### Modelos abertos disponíveis mas NÃO recomendados para os prompts
 
-\#\#\# Analogia de Software: O Especialista em DevOps e Scripting
+| Modelo | Motivo da exclusão |
+|---|---|
+| glm-5 | Deprecation programada para 14/mai/2026 — migrar para glm-5.1 |
+| kimi-k2.5 | Substituído pelo k2.6 com mesma faixa de preço e performance superior |
+| qwen3.5-plus | Substituído pelo qwen3.6-plus |
+| minimax-m2.7 | **License Non-Commercial** — incompatível com projetos comerciais |
 
-O Qwen 3 Coder Next assemelha-se a um engenheiro de SRE que vive no terminal Linux.
+### Modelos fechados (NÃO usar nos prompts; mantidos apenas para referência)
 
-Ele não se preocupa com a estética visual de um site, mas garante que os scripts de CI/CD funcionem perfeitamente em qualquer ambiente. Ele é o desenvolvedor que conhece as flags obscuras do \`iptables\` e consegue debugar um problema de permissão no sistema de arquivos em segundos.
+| Modelo | SWE-Bench Pro | Input $/M | Output $/M | Status |
+|---|---|---|---|---|
+| gpt-5.5-pro | ~58,6%+ | $30,00 | $180,00 | ❌ FECHADO |
+| gpt-5.5 | 58,6% | $5,00 | $30,00 | ❌ FECHADO |
+| gpt-5.5 (fast) | 58,6% | $12,50 | $75,00 | ❌ FECHADO |
+| gpt-5.4 | 57,7% | $2,50 | $15,00 | ❌ FECHADO |
+| gpt-5.4 (fast) | 57,7% | $6,25 | $37,50 | ❌ FECHADO |
+| gpt-5.4-mini | 54,4% | $0,75 | $4,50 | ❌ FECHADO |
+| gpt-5.3-codex | 56,8% | $1,75 | $14,00 | ❌ FECHADO |
+| gpt-5.3-codex-spark | ~56% | sem API pública | sem API pública | ❌ ChatGPT Pro only |
+| gpt-5.2 | 55,6% | $1,75 | $14,00 | ❌ Descontinuação em 5/jun/2026 |
 
-A força do Qwen 3 reside na sua integração com ferramentas locais como o Unsloth e o Llama.cpp, permitindo que desenvolvedores individuais mantenham um agente de alta inteligência rodando em máquinas de consumo com velocidades de até 60 tokens por segundo.
+---
 
-No benchmark LiveCodeBench v6, o Qwen 3 Coder Next manteve uma posição competitiva de 83.6%, superando modelos muito maiores em tarefas de programação competitiva e algoritmos puros.
+## Parte 3 — Matriz por camada do sistema
 
-\---
+Esta parte espelha o roteador de `Evolucao.md` e `Fixbugs.md`. Quando o `IMPLEMENTATION.md` envolver predominantemente uma camada, consulte esta matriz primeiro.
 
-\#\# GLM-4.7: A Convergência entre Design Visual e Engenharia Full-Stack
+### 3.1 FRONTEND
 
-Produzido pela Zhipu AI (Z.AI), o GLM-4.7 representa o avanço mais significativo na integração de visão computacional com o desenvolvimento de software.
+**Principal:** `qwen3.6-plus`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `minimax-m2.5`
 
-Ao contrário de modelos que apenas geram código a partir de texto, o GLM-4.7 foi treinado para interpretar especificações de design e interfaces de usuário (UI) com uma sensibilidade estética que redefine o desenvolvimento front-end.
+**Justificativa:** Qwen3.6-plus é SOTA em "vibe coding" (3D scenes, SVG, animações, layout visual), com 1M context para projetos grandes e feature `preserve_thinking` para manter consistência entre componentes. Kimi K2.6 é multimodal nativo (interpreta mockups). MiniMax M2.5 é o mais barato com qualidade decente em frontend.
 
-Com uma arquitetura de 358 bilhões de parâmetros, ele utiliza o chamado "Thinking Mode" para decompor requisitos complexos antes da geração, o que reduz drasticamente os erros de lógica em aplicações multi-camadas.
+### 3.2 BACKEND
 
-Onde o GLM-4.7 brilha com maior intensidade é na criação de interfaces web e mobile. Ele não apenas escreve o CSS e o HTML, mas compreende harmonia de cores, layout adaptativo e estruturas de grid modernas.
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `deepseek-v4-pro`
 
-Em testes internos, a compatibilidade do modelo com layouts de 16:9 saltou de 52% para 91%, tornando-o ideal para a geração de protótipos funcionais que exigem um alto grau de polimento visual.
+**Justificativa:** GLM-5.1 lidera SWE-Bench Pro (58,4%) — benchmark que captura tarefas backend reais (API, regras de negócio, integrações). Kimi K2.6 empata em SWE-Bench Pro e tem Agent Swarm para tarefas paralelas. DeepSeek V4 Pro é o melhor custo-benefício em backend algorítmico.
 
-\#\#\# Analogia de Software: O Desenvolvedor Full-Stack com Olhar de Designer
+### 3.3 DATABASE
 
-O GLM-4.7 é comparável a um desenvolvedor Full-Stack sênior que também possui mestrado em UX Design.
+**Principal:** `deepseek-v4-pro`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `minimax-m2.5`
 
-Quando você lhe entrega um wireframe ou um rascunho visual, ele não apenas entende a funcionalidade dos botões, mas aplica automaticamente os princípios de design para que o resultado final pareça uma aplicação moderna de nível empresarial, eliminando a necessidade de ajustes manuais constantes no estilo.
+**Justificativa:** DeepSeek V4 Pro é líder em raciocínio lógico estruturado (Codeforces 3206) — competência diretamente aplicável a query design, indexação e otimização SQL. GLM-5.1 demonstrou speedup 6,9× em vector DB optimization em demos oficiais. MiniMax M2.5 cobre CRUD e migrations simples com custo mínimo.
 
-Além da estética, o GLM-4.7 demonstra um desempenho excepcional em "agência de terminal" e resolução de bugs complexos.
+### 3.4 DESIGN SYSTEM
 
-No benchmark SWE-bench Verified, o modelo atingiu 74.2%, superando concorrentes diretos e aproximando-se do desempenho do Claude Sonnet 4.5.
+**Principal:** `qwen3.6-plus`
+**Fallback técnico:** `mimo-v2.5` (omnimodal)
+**Fallback de budget:** `kimi-k2.6`
 
-Ele é particularmente eficaz em tarefas que exigem a coordenação entre o front-end e o back-end, gerando frameworks completos de comunicação de API e estados de UI em um único passo lógico.
+**Justificativa:** Qwen3.6 lidera benchmarks visuais e gera tokens de design consistentes. MiMo V2.5 é omnimodal nativo — ideal quando há mockups, imagens de referência ou specs visuais para interpretar. Kimi K2.6 tem suporte nativo a image/video e bom raciocínio sobre componentes reutilizáveis.
 
-\---
+### 3.5 INFRA
 
-\#\# MiniMax-M2.5: O Arquiteto de Sistemas Orientado a Resultados
+**Principal:** `glm-5.1`
+**Fallback técnico:** `mimo-v2.5-pro`
+**Fallback de budget:** `deepseek-v4-pro`
 
-O MiniMax-M2.5 foi projetado com uma filosofia de "inteligência barata demais para ser medida", focando na produtividade econômica e na automação de tarefas de escritório de alto valor.
+**Justificativa:** GLM-5.1 demonstrou execução autônoma sustentada de 8h em build de Linux desktop (655 iterações) — perfil ideal para IaC, Kubernetes manifests, scripts de deploy. MiMo V2.5 Pro tem harness awareness (gerencia próprio scaffold) — útil para CI/CD complexo. DeepSeek V4 Pro entrega Terraform/Ansible com qualidade competitiva pelo menor preço.
 
-Treinado através de um framework robusto de Aprendizado por Reforço chamado Forge RL, o modelo desenvolveu uma maturidade de decisão que prioriza a eficiência de tokens e a precisão do caminho de solução.
+---
 
-O comportamento distintivo do MiniMax-M2.5 é o seu instinto de "arquiteto".
+## Parte 4 — Matriz por domínio funcional
 
-Antes de produzir código, o modelo tende a redigir uma especificação técnica detalhada, definindo diagramas de wireframe, estruturas de tabelas de banco de dados e endpoints de API.
+Esta é a parte **mais granular e mais importante** do documento. Faça matching das palavras-chave da SPEC com os domínios abaixo. Quando múltiplos domínios aparecem, combine recomendações (use tie-breakers da Parte 9).
 
-Esta abordagem spec-first resulta em códigos mais limpos e modulares, especialmente em projetos que envolvem back-end robusto e esquemas de dados complexos.
+### 4.1 FRONTEND — domínios específicos
 
-\#\#\# Analogia de Software: O Arquiteto de Soluções e Engenheiro de Banco de Dados
+#### 4.1.1 Componentes UI / Design System
 
-O MiniMax-M2.5 é como aquele arquiteto de software que desenha todo o sistema no quadro branco antes de permitir que alguém abra o editor de código.
+**Keywords trigger:** componente, button, modal, dropdown, card, form, design system, tokens, shadcn, headless UI, primitives
 
-Ele é o mestre das consultas SQL complexas e da normalização de dados. Se o seu projeto envolve migração de banco de dados ou a criação de uma arquitetura de microsserviços do zero, ele é o profissional que garantirá que a fundação seja sólida.
+**Principal:** `qwen3.6-plus`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `minimax-m2.5`
 
-O modelo brilha especialmente na criação de esquemas de tabelas e lógica de back-end.
+**Justificativa:** Qwen3.6 lidera geração de componentes React/Vue com aderência a design tokens. Componentes complexos com estados (loading, error, empty) bem cobertos.
 
-Devido à sua colaboração extensiva com especialistas de domínios financeiros e jurídicos durante o treinamento, o MiniMax-M2.5 possui uma compreensão profunda de modelos de dados empresariais.
+#### 4.1.2 Animações e interações
 
-Ele é capaz de gerar 1200+ linhas de código TypeScript/JavaScript estável em menos de 22 minutos, superando o tempo médio de execução do Claude Opus 4.6 em tarefas de engenharia de software completas.
+**Keywords trigger:** animação, animation, transition, framer-motion, gsap, lottie, easing, keyframes, micro-interaction
 
-| Métrica de Desempenho | MiniMax-M2.5 (Lightning) | Claude Opus 4.6 | Diferença de Custo |  
-|---|---:|---:|---|  
-| Pontuação SWE-bench Verified | 80.2% | 80.8% | \~90% mais barato |  
-| Tempo médio por tarefa | 22.8 min | 22.9 min | Equivalente |  
-| Velocidade de geração | 100 tokens/s | \~50 tokens/s | 2x mais rápido |  
-| Custo por tarefa SWE-bench | $8.45 | $260.00 | Redução massiva |
+**Principal:** `qwen3.6-plus`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `mimo-v2.5-pro`
 
-\---
+**Justificativa:** Qwen3.6 é SOTA em "vibe coding" com animações fluidas e easing apropriado. Kimi K2.6 tem boa compreensão de timing functions.
 
-\#\# Gemma 4 31B: O Equilíbrio entre Densidade Lógica e Portabilidade
+#### 4.1.3 Visualização de dados / Gráficos
 
-A série Gemma da Google DeepMind consolidou-se como a líder em eficiência por parâmetro.
+**Keywords trigger:** chart, gráfico, dashboard, d3, recharts, chart.js, plotly, visualization, data viz
 
-O Gemma 4 31B, sendo um modelo denso, oferece uma consistência de raciocínio que muitas vezes supera modelos MoE com contagens de parâmetros muito maiores.
+**Principal:** `qwen3.6-plus`
+**Fallback técnico:** `deepseek-v4-pro`
+**Fallback de budget:** `kimi-k2.6`
 
-Sua janela de contexto de 262K tokens e suporte multimodal permitem que ele processe documentações técnicas extensas e capturas de tela de erros de interface com facilidade.
+**Justificativa:** Qwen3.6 gera código D3/Recharts idiomático. DeepSeek V4 Pro entrega quando os cálculos estatísticos por trás do gráfico são complexos.
 
-Para o desenvolvedor individual ou pequenas equipes que buscam uma solução local, o Gemma 4 brilha na assistência de codificação diária e na geração de testes unitários.
+#### 4.1.4 SVG / Canvas / WebGL / 3D
 
-Ele é conhecido por ser menos restritivo e censurado do que seus predecessores, permitindo trabalhar em contextos de segurança cibernética e auditoria de código sem os bloqueios éticos excessivos que prejudicam a produtividade em outros modelos.
+**Keywords trigger:** svg, canvas, webgl, three.js, r3f, react-three-fiber, babylon, 3d, shader, glsl
 
-\#\#\# Analogia de Software: O Desenvolvedor Sênior em uma Workstation de Alta Performance
+**Principal:** `qwen3.6-plus`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `mimo-v2.5-pro`
 
-O Gemma 4 31B é como aquele desenvolvedor sênior brilhante que prefere trabalhar sozinho em sua máquina local potente.
+**Justificativa:** Qwen3.6 demonstrou SOTA em 3D scenes e SVG. Kimi K2.6 tem bom domínio de Three.js. MiMo V2.5 Pro é forte em código gráfico de baixo nível.
 
-Ele não precisa de uma conexão constante com a nuvem para ser produtivo e sua lógica é tão afiada que ele raramente comete erros bobos de sintaxe ou lógica.
+#### 4.1.5 State management
 
-Ele é o parceiro ideal para sessões de pair programming onde a privacidade do código é mandatória.
+**Keywords trigger:** redux, zustand, pinia, jotai, recoil, mobx, signals, state machine, xstate, store, atomic state
 
-Em testes de seguimento de prompts de sistema longos (acima de 7500 caracteres), o Gemma 4 demonstrou uma atenção aos detalhes superior ao Gemini 2.0 Flash, mantendo o contexto de restrições arquiteturais durante conversas multi-turno.
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `minimax-m2.5`
 
-Sua capacidade de "socar acima do seu peso" o torna o modelo de escolha para integrar em IDEs como o Cursor, onde a latência e a precisão do preenchimento de linha são fundamentais.
+**Justificativa:** State management é problema de modelagem lógica, não visual — GLM-5.1 lidera raciocínio sobre fluxos de dados. Kimi K2.6 cobre xstate/state machines bem.
 
-\---
+#### 4.1.6 Acessibilidade (WCAG/ARIA)
 
-\#\# Nemotron-3 Super: O Especialista em Observabilidade e Grandes Repositórios
+**Keywords trigger:** acessibilidade, accessibility, a11y, aria, wcag, screen reader, keyboard navigation, focus management
 
-A NVIDIA introduziu o Nemotron-3 Super como uma resposta à necessidade de processar contextos massivos com alta eficiência de GPU.
+**Principal:** `kimi-k2.6`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `qwen3.6-plus`
 
-Utilizando uma arquitetura inovadora que combina camadas Mamba-2, para eficiência sequencial, com camadas de atenção Transformer, para precisão de raciocínio global, o modelo gerencia janelas de um milhão de tokens sem a degradação de desempenho típica de modelos puramente baseados em atenção.
+**Justificativa:** Kimi K2.6 mostrou aderência consistente a WCAG 2.1 em benchmarks de geração de componentes. GLM-5.1 tem boa fundamentação em padrões web. Qwen3.6 cobre HTML semântico bem mas pode ser inconsistente em ARIA mais complexo.
 
-O Nemotron-3 Super brilha intensamente na análise de grandes repositórios de código e na auditoria de logs de sistema.
+#### 4.1.7 Performance frontend / Core Web Vitals
 
-Através da técnica de LatentMoE, o modelo comprime as representações dos tokens antes de roteá-los para os especialistas, permitindo que chame quatro vezes mais especialistas pelo mesmo custo computacional de um MoE tradicional.
+**Keywords trigger:** performance, core web vitals, lcp, cls, fid, lighthouse, bundle size, lazy loading, code splitting, tree shaking
 
-Isso resulta em uma capacidade de recuperação de informações em contextos longos que atinge 91.75% no benchmark RULER, superando amplamente o GPT-OSS 130B em tarefas de busca em documentos massivos.
+**Principal:** `glm-5.1`
+**Fallback técnico:** `mimo-v2.5-pro`
+**Fallback de budget:** `kimi-k2.6`
 
-\#\#\# Analogia de Software: O Engenheiro de SRE e Analista de Log
+**Justificativa:** Otimização de performance exige raciocínio sobre trade-offs — GLM-5.1 lidera. MiMo V2.5 Pro demonstrou tuning de performance em demos reais (CUDA kernels 2,6→35,7×). Kimi K2.6 tem boa compreensão de bundlers.
 
-O Nemotron-3 Super é o especialista em Big Data e Observabilidade.
+#### 4.1.8 SSR / SSG / ISR / RSC
 
-Ele é capaz de ler um despejo de memória de 1GB ou analisar toda a história de commits de um repositório legado de 10 anos para encontrar a origem de um bug obscuro.
+**Keywords trigger:** next.js, nuxt, remix, astro, sveltekit, ssr, ssg, isr, server components, rsc, hydration, streaming
 
-Ele não se perde na "floresta" de dados e consegue manter a clareza sobre o que aconteceu no início de um processo de log gigantesco.
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `qwen3.6-plus`
 
-Sua vantagem competitiva reside no throughput, ou vazão.
+**Justificativa:** Server-side rendering envolve raciocínio sobre boundary entre cliente/servidor — GLM-5.1 e Kimi K2.6 lideram nesse tipo de tarefa arquitetural.
 
-Em ambientes de orquestração multi-agente, onde centenas de instâncias de agentes de codificação rodam em paralelo, o Nemotron oferece até 7.5x mais tokens por segundo do que o Qwen 3.5 122B em cenários de 8K de entrada e 64K de saída.
+#### 4.1.9 Forms complexos
 
-Esta eficiência o torna o modelo ideal para empresas que constroem fábricas de software automatizadas e sistemas de revisão de código contínua em larga escala.
+**Keywords trigger:** form, formulário, validação, validation, react-hook-form, formik, zod, yup, multi-step, dynamic form, wizard
 
-\---
+**Principal:** `glm-5.1`
+**Fallback técnico:** `qwen3.6-plus`
+**Fallback de budget:** `minimax-m2.5`
 
-\#\# Ministral-3 14B: A Inteligência de Borda e Raciocínio Algorítmico
+**Justificativa:** Forms complexos misturam UI (Qwen) com lógica de validação e estado (GLM). GLM-5.1 ganha pela superioridade em modelagem de regras de negócio embutidas em validações.
 
-Desenvolvido pela Mistral AI, o Ministral-3 14B foca na entrega de capacidades de raciocínio de fronteira em um pacote compacto.
+#### 4.1.10 Vibe coding / Prototipagem visual rápida
 
-Utilizando uma técnica chamada "Cascade Distillation", o modelo herda o conhecimento de modelos muito maiores, como o Mistral Small 3.1, enquanto reduz o custo computacional em mais de 40%.
+**Keywords trigger:** mockup, prototype, protótipo, mvp, landing page, hero section, "página de", design rápido, vibe coding
 
-A versão Reasoning do Ministral-3 é especificamente ajustada para tarefas que exigem pensamento lógico rigoroso, como matemática, STEM e algoritmos complexos.
+**Principal:** `qwen3.6-plus`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `minimax-m2.5`
 
-No contexto de software, o Ministral-3 brilha na refatoração de código e na geração de testes unitários para sistemas críticos.
+**Justificativa:** Qwen3.6 é o modelo com melhores resultados documentados em geração visual "ao primeiro shot" — landings, heros, seções de marketing.
 
-Sua habilidade em decompor problemas dinâmicos e realizar raciocínio multi-etapa o torna superior a modelos maiores em tarefas de lógica pura.
+### 4.2 BACKEND — domínios específicos
 
-Ele é particularmente eficaz em ambientes de desenvolvimento onde o hardware é limitado, como notebooks de desenvolvedores ou dispositivos de borda (edge hardware), cabendo em menos de 24GB de VRAM quando quantizado.
+#### 4.2.1 Autenticação (login/senha, sessões básicas)
 
-\#\#\# Analogia de Software: O Desenvolvedor de Sistemas Embarcados e Kernels
+**Keywords trigger:** login, senha, password, signup, signin, autenticação, authentication, bcrypt, argon2, scrypt, session, cookie, csrf
 
-O Ministral-3 é como o engenheiro que escreve drivers de hardware ou otimiza o kernel do sistema operacional.
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `deepseek-v4-pro`
 
-Ele trabalha com recursos limitados, mas sua lógica é impecável e seu código é extremamente eficiente.
+**Justificativa:** GLM-5.1 lidera CyberGym (68,7) — benchmark especializado em segurança ofensiva e defensiva. Em autenticação, isso se traduz em: uso correto de bcrypt/argon2 com salt apropriado, hashing com cost factor adequado, prevenção de timing attacks, gestão correta de sessions e cookies HttpOnly/Secure/SameSite. Kimi K2.6 tem boa cobertura de padrões OWASP ASVS. DeepSeek V4 Pro implementa corretamente os algoritmos criptográficos pelo menor custo.
 
-Ele não desperdiça um ciclo de CPU nem um byte de memória. Se você precisa resolver um quebra-cabeça algorítmico ou garantir que uma lógica de negócio complexa esteja livre de falhas, ele é a mente brilhante que você quer.
+**⚠️ ATENÇÃO de segurança:** sempre validar implementação contra OWASP ASVS Level 2 e checklist do `Evolucao.md`. Modelos de IA são propensos a omitir: rate limiting em endpoints de login, lockout após N tentativas, logs de tentativas falhadas, expiração de sessão, rotação de session ID após login.
 
-Apesar de seu tamanho reduzido, o Ministral-3 14B Reasoning atinge pontuações notáveis em benchmarks como o LiveCodeBench (64.6%), superando o Qwen 3 14B em tarefas de codificação competitiva.
+#### 4.2.2 Autenticação avançada (OAuth 2.1, OIDC, JWT, MFA, WebAuthn/Passkeys, Magic Links, SSO)
 
-Ele oferece suporte nativo para chamadas de função (JSON output) e é considerado um dos melhores em sua classe para casos de uso agentiticos locais.
+**Keywords trigger:** oauth, oidc, openid, jwt, refresh token, access token, mfa, totp, webauthn, passkey, magic link, sso, saml, social login
 
-\---
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `mimo-v2.5-pro`
 
-\#\# GPT-OSS 130B: O Generalista Robusto e Auditor de Segurança
+**Justificativa:** Padrões de identidade (OAuth 2.1, OIDC com PKCE) exigem aderência rigorosa a RFCs — GLM-5.1 demonstra melhor seguimento de especificações longas. Kimi K2.6 tem boas implementações documentadas de fluxos JWT com refresh rotation. MiMo V2.5 Pro é forte em criptografia low-level (WebAuthn assertion verification).
 
-O GPT-OSS 130B da OpenAI representa o padrão ouro em modelos de pesos abertos para tarefas generalistas que exigem um alto grau de segurança e conformidade (compliance).
+**⚠️ ATENÇÃO de segurança:** verificar uso correto de PKCE em OAuth, validação de `aud`/`iss`/`exp` em JWT, rotação de refresh tokens, armazenamento seguro (não em localStorage), state parameter para CSRF em OAuth.
 
-Com 117-120 bilhões de parâmetros totais e apenas 5.1 bilhões ativos por token, ele combina a inteligência de um modelo de grande escala com a viabilidade de execução em uma única GPU de data center (A100/H100).
+#### 4.2.3 Autorização (RBAC, ABAC, ReBAC, Row-Level Security, Policies)
 
-O GPT-OSS brilha em tarefas de auditoria de segurança e desenvolvimento de lógica de autenticação e autorização (Auth).
+**Keywords trigger:** autorização, authorization, rbac, abac, rebac, role, permission, policy, casbin, opa, cedar, row-level security, rls, supabase rls, postgres rls
 
-Devido ao seu treinamento conservador e foco em segurança, o modelo é excepcionalmente bom em identificar "truques" e vulnerabilidades em códigos, como injeções de SQL, falhas em tokens JWT e problemas de controle de acesso baseados em funções (RBAC).
+**Principal:** `glm-5.1`
+**Fallback técnico:** `deepseek-v4-pro`
+**Fallback de budget:** `kimi-k2.6`
 
-Em blind matchups, usuários preferem o GPT-OSS para tarefas de raciocínio geral e conhecimento de domínio cruzado, como software médico ou jurídico.
+**Justificativa:** Autorização é problema de modelagem formal — GLM-5.1 lidera por força em raciocínio lógico estruturado e geração de policies (Cedar, OPA Rego). DeepSeek V4 Pro é excepcional em RLS policies do Postgres pela capacidade matemática (Codeforces 3206). Kimi K2.6 cobre RBAC simples bem.
 
-\#\#\# Analogia de Software: O Auditor de Segurança e Consultor de Conformidade
+**⚠️ ATENÇÃO de segurança:** verificar enforcement no backend (não confiar em UI), princípio do menor privilégio, auditoria de mudanças de role, separação de admin/user em rotas distintas.
 
-O GPT-OSS 130B assemelha-se a uma grande firma de auditoria de TI.
+#### 4.2.4 APIs REST (design, versionamento, paginação, rate limiting)
 
-Ele segue todos os padrões da indústria, como OWASP, ISO e SOC2, à risca.
+**Keywords trigger:** rest, api, endpoint, route, rota, openapi, swagger, versioning, pagination, cursor, offset, rate limit, throttling
 
-Ele não é o desenvolvedor mais rápido para "vibar" um código novo, mas é aquele que garantirá que o sistema seja impenetrável e que as regras de negócio complexas de segurança sejam seguidas sem atalhos perigosos.
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `deepseek-v4-pro`
 
-Embora não domine os benchmarks de codificação pura como o MiniMax ou o GLM-4.7, o GPT-OSS mantém uma "inteligência de base" extremamente alta, pontuando 90% no MMLU e demonstrando uma compreensão profunda de contextos multidisciplinares.
+**Justificativa:** GLM-5.1 demonstra forte aderência a OpenAPI specs e princípios REST (HATEOAS quando aplicável, idempotência de PUT/DELETE, status codes corretos). Kimi K2.6 tem excelente cobertura de paginação cursor-based.
 
-Ele é a escolha ideal para sistemas de backend que lidam com dados sensíveis e exigem um nível de supervisão e segurança de nível corporativo.
+#### 4.2.5 APIs GraphQL
 
-\---
+**Keywords trigger:** graphql, schema, resolver, dataloader, apollo, urql, federation, subscription, query, mutation
 
-\# Análise Comparativa por Domínio de Aplicação
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `qwen3.6-plus`
 
-Abaixo, detalhamos a performance de cada modelo nas tarefas específicas solicitadas, permitindo uma seleção baseada na carga de trabalho predominante da equipe de desenvolvimento.
+**Justificativa:** GraphQL exige design de schema cuidadoso (evitar N+1, pensar em DataLoader). GLM-5.1 lidera. Qwen3.6 é surpreendentemente bom em resolvers Apollo.
 
-\---
+#### 4.2.6 gRPC e APIs binárias
 
-\#\# Front-end e UI Design
+**Keywords trigger:** grpc, protobuf, protocol buffers, .proto, streaming bidirecional, msgpack
 
-Para o desenvolvimento front-end, o GLM-4.7 é o líder absoluto.
+**Principal:** `deepseek-v4-pro`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `mimo-v2.5-pro`
 
-Sua capacidade de interpretar layouts visuais e transformá-los em código CSS/HTML funcional reduz o tempo de desenvolvimento em até 40%.
+**Justificativa:** gRPC é nicho com forte presença em ecossistemas Go/C++ — DeepSeek V4 Pro tem melhor cobertura por seu foco em systems programming.
 
-O MiniMax-M2.5 segue de perto, sendo excelente na criação de componentes de UI estruturados a partir de descrições textuais, embora falte a "sensibilidade visual" direta do GLM.
+#### 4.2.7 WebSockets / Server-Sent Events / Real-time
 
-\---
+**Keywords trigger:** websocket, ws, socket.io, sse, server-sent events, real-time, tempo real, pub/sub, broadcast, room, channel
 
-\#\# Back-end e Arquitetura de Sistemas
+**Principal:** `kimi-k2.6`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `deepseek-v4-pro`
 
-O MiniMax-M2.5 destaca-se como o melhor arquiteto, focando na decomposição de sistemas e planejamento de APIs.
+**Justificativa:** Real-time exige raciocínio sobre estado distribuído e race conditions — Kimi K2.6 tem demos documentadas (financial matching engine, +185% throughput). GLM-5.1 cobre Socket.IO/WebSocket nativo bem.
 
-Para infraestruturas complexas e escaláveis, o Nemotron-3 Super é preferível devido à sua alta vazão e capacidade de entender grandes codebases de backend.
+#### 4.2.8 Webhooks e integrações third-party
 
-O Qwen 3 Coder Next é a melhor escolha para scripts de infraestrutura e automação de servidores.
+**Keywords trigger:** webhook, callback, third-party, integração, stripe webhook, github webhook, signature verification, retry, idempotência
 
-\---
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `minimax-m2.5`
 
-\#\# Autenticação, Autorização e Segurança (Auth)
+**Justificativa:** Webhooks exigem aderência a APIs de terceiros e patterns de resiliência (idempotência via chave única, retry com backoff exponencial, verificação de assinatura HMAC). GLM-5.1 lidera por seguir RFCs e docs de terceiros com precisão.
 
-O GPT-OSS 130B é o modelo mais confiável para auditoria de protocolos de segurança e implementação de fluxos de login complexos.
+#### 4.2.9 Background jobs / Workers / Schedulers
 
-Em testes de "Bug Hunt" focados especificamente em injeção de SQL e vulnerabilidades JWT, o GLM-4.7 e o MiniMax-M2.5 mostraram resultados competitivos, resolvendo até 28 de 30 bugs críticos em APIs de autenticação.
+**Keywords trigger:** worker, background job, cron, scheduler, bull, bullmq, sidekiq, celery, agenda, queue, retry, dlq
 
-\---
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `deepseek-v4-pro`
 
-\#\# Esquemas de Banco de Dados e SQL
+**Justificativa:** Workers exigem raciocínio sobre garantias de execução (at-least-once vs exactly-once), idempotência e dead letter queues — GLM-5.1 e Kimi K2.6 lideram.
 
-O MiniMax-M2.5 é o especialista em dados, superando os demais na normalização de tabelas e na geração de consultas SQL complexas, herança de seu treinamento focado em ferramentas de escritório e finanças.
+#### 4.2.10 Message Queues / Event-Driven Architecture
 
-O GPT-OSS também demonstra boa solidez em garantir a integridade referencial em esquemas de dados sensíveis.
+**Keywords trigger:** kafka, rabbitmq, sqs, sns, eventbridge, pubsub, event sourcing, cqrs, saga, outbox pattern, event-driven
 
-\---
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `deepseek-v4-pro`
 
-\#\# Criação de Testes e Refatoração
+**Justificativa:** Arquiteturas event-driven exigem domínio de padrões avançados (Saga, Outbox, Event Sourcing) — GLM-5.1 e Kimi K2.6 são os mais fortes em padrões arquiteturais.
 
-Para a criação de testes unitários e de integração, o Ministral-3 14B Reasoning e o Gemma 4 31B brilham pela sua precisão lógica e capacidade de prever casos de borda em funções isoladas.
+#### 4.2.11 Caching strategies
 
-Na refatoração de código legado, como converter código de 10 anos atrás para padrões modernos, o MiniMax-M2.5 é o mais rápido e preciso, mantendo a compatibilidade com as APIs existentes.
+**Keywords trigger:** cache, caching, redis, memcached, cdn, http cache, cache-control, etag, swr, stale-while-revalidate, cache invalidation
 
-\---
+**Principal:** `glm-5.1`
+**Fallback técnico:** `deepseek-v4-pro`
+**Fallback de budget:** `kimi-k2.6`
 
-\#\# Correção de Bugs e Manutenção
+**Justificativa:** Caching exige raciocínio sobre invalidação (o problema mais difícil da computação, segundo Phil Karlton). GLM-5.1 cobre estratégias avançadas (cache-aside, write-through, write-behind) com precisão.
 
-O GLM-4.7 demonstrou ser o mais meticuloso na correção de bugs, entregando bases de código prontas para produção com uma cobertura de testes superior em tarefas de manutenção autônoma.
+#### 4.2.12 File storage e processamento (uploads, S3, image processing)
 
-O Qwen 3 Coder Next é o melhor parceiro para correção de erros em tempo real no terminal durante o ciclo de desenvolvimento ativo.
+**Keywords trigger:** upload, s3, minio, gcs, blob storage, multipart, presigned url, image processing, sharp, imagemagick, ffmpeg, thumbnail
 
-\---
+**Principal:** `kimi-k2.6`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `mimo-v2.5` (omnimodal — quando processamento visual está envolvido)
 
-\# Benchmarks de Engenharia de Software (Status 2026\)
+**Justificativa:** Upload pipelines envolvem segurança (validação de tipo MIME real, não extensão), performance (streaming, multipart) e raciocínio sobre formatos — Kimi K2.6 lidera com presença forte de demos documentadas. MiMo V2.5 é a escolha quando o processamento envolve análise de conteúdo visual.
 
-Os benchmarks de 2026 refletem a capacidade dos modelos de agir como engenheiros reais, resolvendo problemas em repositórios complexos em vez de apenas completar quebra-cabeças de código isolados.
+**⚠️ ATENÇÃO de segurança:** sempre validar magic bytes (não apenas extensão), limitar tamanho no servidor, isolar uploads por usuário, scan de malware quando aplicável.
 
-| Benchmark | Tipo de Teste | Líder (Open-Weights) | Pontuação | Implicação para o Desenvolvedor |  
-|---|---|---|---:|---|  
-| SWE-bench Verified | Resolução de Issues do GitHub | MiniMax-M2.5 | 80.2% | Capaz de resolver a maioria dos bugs reais de forma autônoma. |  
-| LiveCodeBench v6 | Programação Competitiva | GLM-4.7 | 84.9% | Excelente para algoritmos complexos e lógica pura. |  
-| Terminal-Bench 2.0 | Operações de Linha de Comando | GPT-5.4 / Qwen 3 | 75.1% / 70% | Alta precisão em comandos de infraestrutura e DevOps. |  
-| BrowseComp | Pesquisa Web e Tool Use | Gemini 3.1 / MiniMax | 85.9% / 76.3% | Melhor para agentes que buscam soluções em documentações online. |  
-| Multi-SWE-Bench | Codificação Multilíngue | MiniMax-M2.5 | 51.3% | Superior em projetos que misturam várias linguagens, por exemplo JS \+ Rust. |
+#### 4.2.13 Rate limiting / Throttling / DDoS protection
 
-\---
+**Keywords trigger:** rate limit, throttle, throttling, token bucket, leaky bucket, sliding window, ddos, abuse prevention
 
-\# Considerações sobre Desempenho e Probabilidade de Resolução
+**Principal:** `glm-5.1`
+**Fallback técnico:** `deepseek-v4-pro`
+**Fallback de budget:** `kimi-k2.6`
 
-Como todos os modelos elencados são considerados modelos open source ou de pesos abertos no contexto desta análise, o critério de custo não deve ser usado como fator principal de decisão.
+**Justificativa:** Algoritmos de rate limiting são problema matemático estruturado — GLM-5.1 e DeepSeek V4 Pro lideram.
 
-A seleção deve priorizar o modelo com maior probabilidade técnica de resolver o problema identificado, considerando:
+#### 4.2.14 Security hardening (CSRF, CORS, headers, sanitization, OWASP Top 10)
 
-\- aderência ao domínio do bug;  
-\- desempenho em benchmarks de engenharia de software;  
-\- capacidade de lidar com o tipo de código afetado;  
-\- precisão na correção;  
-\- capacidade de preservar a arquitetura existente;  
-\- qualidade da validação por testes;  
-\- segurança da alteração proposta;  
-\- robustez em problemas reais de repositório.
+**Keywords trigger:** csrf, cors, csp, security headers, helmet, xss, sql injection, sanitization, owasp, hsts, x-frame-options
 
-A tabela abaixo resume o foco de desempenho de cada modelo para apoiar a escolha técnica.
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `mimo-v2.5-pro`
 
-| Modelo | Melhor uso por desempenho | Indicação principal |  
-|---|---|---|  
-| MiniMax-M2.5 | Resolução autônoma de issues reais, arquitetura, backend e SQL | Melhor escolha quando o problema envolve backend, dados, arquitetura ou múltiplas camadas lógicas. |  
-| GLM-4.7 | Correção de bugs complexos, full-stack, frontend e UI | Melhor escolha quando o problema envolve interação entre frontend, backend, estado de UI ou implementação full-stack. |  
-| GPT-OSS 130B | Segurança, autenticação, autorização, RBAC, JWT e auditoria crítica | Melhor escolha quando o problema envolve risco de segurança, dados sensíveis, controle de acesso ou compliance. |  
-| Nemotron-3 Super | Contextos longos, grandes repositórios, logs extensos e observabilidade | Melhor escolha quando a causa do bug depende de análise de muitos arquivos, logs ou histórico extenso. |  
-| Qwen 3 Coder Next | Terminal, automação, scripts, Docker, CI/CD e erros de execução local | Melhor escolha quando o problema está ligado a ambiente, build, dependências, permissões ou infraestrutura. |  
-| Gemma 4 31B | Raciocínio local, pair programming, testes e consistência lógica | Melhor escolha como apoio para validação lógica, testes e revisão de alterações pontuais. |  
-| Ministral-3 14B | Refatoração, algoritmos, STEM, testes unitários e cenários de borda | Melhor escolha quando o problema exige raciocínio lógico rigoroso, refatoração localizada ou testes precisos. |
+**Justificativa:** GLM-5.1 lidera CyberGym (68,7) — benchmark especializado em segurança ofensiva e defensiva. Implementa corretamente Content Security Policy, CORS restritivo e sanitização de input.
 
-\---
+#### 4.2.15 Pagamentos e integrações financeiras
 
-\# Desafios Técnicos e Limitações Identificadas
+**Keywords trigger:** stripe, pagseguro, mercado pago, paypal, pagar.me, payment, checkout, subscription, recurring billing, pix, boleto, webhook stripe
 
-Apesar do avanço, cada modelo apresenta "pontos cegos" que devem ser considerados.
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `deepseek-v4-pro`
 
-O Qwen 3 Coder Next, por não ser um modelo de raciocínio profundo, pode entrar em loops repetitivos se a solução inicial falhar múltiplas vezes, exigindo intervenção humana para "quebrar" o ciclo.
+**Justificativa:** Pagamentos exigem precisão absoluta (idempotência de webhooks, verificação de assinatura, tratamento de moeda em centavos para evitar float, compliance PCI-DSS) — GLM-5.1 lidera por aderência a docs oficiais (Stripe API).
 
-O GLM-4.7, embora brilhante em UI, pode apresentar latências mais altas em conversas longas devido ao peso de sua arquitetura de 358B parâmetros.
+**⚠️ ATENÇÃO de segurança:** nunca armazenar PAN/CVV, usar tokens, validar assinatura de webhook ANTES de processar, idempotency keys em mutations.
 
-O MiniMax-M2.5, apesar de seu comportamento de arquiteto, às vezes pode ser excessivamente verboso em suas especificações, o que aumenta o consumo de tokens de saída sem necessidade.
+### 4.3 DATABASE — domínios específicos
 
-Por outro lado, o Nemotron-3 Super exige uma infraestrutura de hardware robusta, como NVIDIA Blackwell ou múltiplas H100, para operar em sua capacidade total de contexto, o que pode ser proibitivo para empresas de pequeno porte.
+#### 4.3.1 Schema design relacional
 
-O GPT-OSS da OpenAI sofre com uma "censura de segurança" rigorosa, que ocasionalmente bloqueia solicitações legítimas de depuração de código se o modelo interpretar erroneamente a intenção como maliciosa.
+**Keywords trigger:** schema, modelo de dados, tabela, table, relação, foreign key, normalização, 3nf, erd, modelo entidade-relacionamento
 
-O Ministral-3 14B, embora eficiente, pode ter dificuldades com bases de código extremamente grandes se não for acoplado a um sistema de RAG eficiente, devido à sua janela de contexto ser menor que a do Nemotron ou do MiniMax.
+**Principal:** `glm-5.1`
+**Fallback técnico:** `deepseek-v4-pro`
+**Fallback de budget:** `kimi-k2.6`
 
-\---
+**Justificativa:** Modelagem de schema exige raciocínio lógico estruturado e conhecimento de normalização — GLM-5.1 e DeepSeek V4 Pro lideram.
 
-\# Conclusão: Orquestrando a Caixa de Ferramentas de IA
+#### 4.3.2 Queries SQL complexas
 
-A análise detalhada dos modelos Qwen 3, GLM-4.7, MiniMax-M2.5, Gemma 4, Nemotron-3, Ministral-3 e GPT-OSS revela que o futuro do desenvolvimento de software não pertence a um único "modelo soberano", mas sim a uma orquestração inteligente de especialistas.
+**Keywords trigger:** sql, query, join, cte, window function, subquery, aggregate, group by, partition, recursive cte
 
-Para equipes que buscam velocidade e desenvolvimento iterativo local, a combinação do Qwen 3 Coder Next no terminal e do Gemma 4 31B como copiloto de raciocínio oferece o melhor ambiente de produtividade privada.
+**Principal:** `deepseek-v4-pro`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `minimax-m2.5`
 
-Para startups full-stack que precisam de prototipagem rápida e visual, o GLM-4.7 é o motor ideal para impulsionar a interface e a lógica de negócios inicial.
+**Justificativa:** Queries complexas (window functions, CTEs recursivas, query plans) são problema algorítmico — DeepSeek V4 Pro lidera (Codeforces 3206, LiveCodeBench 93,5%).
 
-No ambiente corporativo, o MiniMax-M2.5 destaca-se como o arquiteto capaz de automatizar processos complexos de backend e dados com alta maturidade técnica, enquanto o Nemotron-3 Super torna-se o cérebro central para sistemas de observabilidade e análise de código legado em larga escala.
+#### 4.3.3 Migrations
 
-Por fim, a garantia de segurança e integridade permanece o domínio do GPT-OSS 130B, essencial para auditorias e sistemas críticos.
+**Keywords trigger:** migration, migrate, schema change, ddl, alter table, prisma migrate, flyway, liquibase, alembic, knex migration
 
-A inteligência artificial em 2026 deixou de ser uma curiosidade estatística para se tornar o sistema operacional do engenheiro de software moderno.
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `deepseek-v4-pro`
 
-A escolha correta entre essas ferramentas, baseada em suas forças arquiteturais e comportamentais, definirá a competitividade técnica de qualquer organização de tecnologia na presente década.  
+**Justificativa:** Migrations exigem cuidado com dados existentes (zero-downtime, backwards compatibility) — GLM-5.1 lidera por raciocínio sobre side effects.
+
+**⚠️ ATENÇÃO:** o checklist de Evolucao.md já alerta sobre CONFLITO DE DADOS — sempre exigir migration strategy preservando dados.
+
+#### 4.3.4 Índices e performance
+
+**Keywords trigger:** index, índice, btree, gin, gist, hash index, query plan, explain, analyze, slow query, n+1
+
+**Principal:** `deepseek-v4-pro`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `kimi-k2.6`
+
+**Justificativa:** Otimização de queries é problema matemático — DeepSeek V4 Pro lidera. GLM-5.1 demonstrou 6,9× speedup em vector DB optimization.
+
+#### 4.3.5 Row-Level Security (RLS) / Policies de banco
+
+**Keywords trigger:** rls, row-level security, policy, supabase rls, postgres policy, security definer, security invoker
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `deepseek-v4-pro`
+**Fallback de budget:** `kimi-k2.6`
+
+**Justificativa:** RLS é a interseção de autorização + SQL — GLM-5.1 lidera por dominar ambos. Demos do GLM mostram aderência forte a padrões Supabase/Postgres.
+
+#### 4.3.6 NoSQL (MongoDB, Redis, DynamoDB, Cassandra)
+
+**Keywords trigger:** mongodb, mongo, redis, dynamodb, cassandra, scylla, single-table design, partition key, sort key, ttl, nosql
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `deepseek-v4-pro`
+
+**Justificativa:** NoSQL exige raciocínio sobre access patterns (especialmente DynamoDB single-table design) — GLM-5.1 lidera. Kimi K2.6 tem boa cobertura de Redis avançado.
+
+#### 4.3.7 ORMs e Query Builders (Prisma, TypeORM, Drizzle, SQLAlchemy)
+
+**Keywords trigger:** prisma, typeorm, drizzle, sequelize, sqlalchemy, knex, kysely, eloquent, orm, query builder
+
+**Principal:** `kimi-k2.6`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `qwen3.6-plus`
+
+**Justificativa:** ORMs evoluem rapidamente e exigem conhecimento atualizado de APIs — Kimi K2.6 tem knowledge cutoff mais recente para Prisma 5+/Drizzle. GLM-5.1 cobre SQLAlchemy 2.0 bem.
+
+### 4.4 INFRA — domínios específicos
+
+#### 4.4.1 Containers (Docker, Dockerfile, docker-compose)
+
+**Keywords trigger:** docker, dockerfile, container, compose, multi-stage build, image, layer
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `minimax-m2.5`
+
+**Justificativa:** Dockerfiles otimizados exigem conhecimento de layer caching, multi-stage builds e segurança (non-root user, minimal base images) — GLM-5.1 lidera.
+
+#### 4.4.2 Orquestração (Kubernetes, Helm)
+
+**Keywords trigger:** kubernetes, k8s, kubectl, helm, helm chart, manifest, deployment, service, ingress, configmap, secret
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `mimo-v2.5-pro`
+**Fallback de budget:** `kimi-k2.6`
+
+**Justificativa:** K8s manifests exigem aderência rigorosa a APIs do Kubernetes — GLM-5.1 lidera. MiMo V2.5 Pro demonstrou autonomia em deploys complexos.
+
+#### 4.4.3 IaC (Terraform, Pulumi, CloudFormation, CDK)
+
+**Keywords trigger:** terraform, pulumi, cloudformation, cdk, infrastructure as code, iac, hcl, state, module
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `mimo-v2.5-pro`
+**Fallback de budget:** `deepseek-v4-pro`
+
+**Justificativa:** Terraform/Pulumi exigem aderência a provider docs (AWS, GCP, Azure) — GLM-5.1 lidera. DeepSeek V4 Pro é forte em HCL pelo menor preço.
+
+#### 4.4.4 CI/CD (GitHub Actions, GitLab CI, scripts de deploy)
+
+**Keywords trigger:** ci, cd, github actions, gitlab ci, jenkins, circleci, pipeline, workflow, deploy script
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `minimax-m2.5`
+
+**Justificativa:** Pipelines exigem aderência a sintaxes específicas (YAML do Actions vs GitLab) — GLM-5.1 lidera. Kimi K2.6 tem boa cobertura de actions reusáveis.
+
+#### 4.4.5 Cloud-specific (AWS, GCP, Azure, Vercel, Cloudflare)
+
+**Keywords trigger:** aws, gcp, azure, vercel, cloudflare, lambda, cloud run, app service, edge function, durable object, worker
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `mimo-v2.5-pro`
+
+**Justificativa:** Cloud-specific exige knowledge cutoff recente — todos os três cobrem bem. GLM-5.1 lidera em AWS; Kimi K2.6 forte em Cloudflare Workers; MiMo V2.5 Pro forte em GCP.
+
+#### 4.4.6 Observabilidade (logs, metrics, tracing, OpenTelemetry)
+
+**Keywords trigger:** observability, observabilidade, logs, metrics, tracing, opentelemetry, otel, prometheus, grafana, datadog, sentry, jaeger
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `mimo-v2.5-pro`
+
+**Justificativa:** Observabilidade exige conhecimento de padrões OTel (semantic conventions) — GLM-5.1 lidera.
+
+### 4.5 TRANSVERSAIS — domínios que cruzam camadas
+
+#### 4.5.1 Mobile nativo (iOS Swift, Android Kotlin)
+
+**Keywords trigger:** swift, swiftui, uikit, kotlin, jetpack compose, android, ios, mobile nativo, native mobile
+
+**Principal:** `kimi-k2.6`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `qwen3.6-plus`
+
+**Justificativa:** Mobile nativo é menos representado em training data — Kimi K2.6 tem knowledge cutoff mais recente e demos documentadas. Qwen3.6 surpreende em SwiftUI/Compose pela força em UI.
+
+#### 4.5.2 Mobile cross-platform (React Native, Flutter)
+
+**Keywords trigger:** react native, expo, flutter, dart, cross-platform mobile
+
+**Principal:** `qwen3.6-plus`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `minimax-m2.5`
+
+**Justificativa:** RN e Flutter são UI-heavy — Qwen3.6 lidera por força em UI generation. Kimi K2.6 cobre RN navigation/state management bem.
+
+#### 4.5.3 Embedded / Sistemas (C, C++, Rust, Zig)
+
+**Keywords trigger:** embedded, firmware, rust, zig, c++, microcontroller, rtos, esp32, arduino, mcu, kernel
+
+**Principal:** `mimo-v2.5-pro`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `deepseek-v4-pro`
+
+**Justificativa:** MiMo V2.5 Pro tem demos reais de Rust compiler (4,3h autônomas, 233/233 testes). Kimi K2.6 demonstrou Zig inference engine 20% mais rápido que LM Studio. DeepSeek V4 Pro forte em C/C++ low-level.
+
+#### 4.5.4 Blockchain / Smart Contracts
+
+**Keywords trigger:** blockchain, smart contract, solidity, evm, ethereum, vyper, anchor, solana, rust solana, web3, defi
+
+**Principal:** `deepseek-v4-pro`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `kimi-k2.6`
+
+**Justificativa:** Smart contracts exigem precisão matemática (overflow, reentrancy, gas optimization) — DeepSeek V4 Pro lidera. GLM-5.1 cobre Solidity 0.8+ e padrões OpenZeppelin bem.
+
+**⚠️ ATENÇÃO:** smart contracts são imutáveis após deploy — sempre exigir auditoria humana adicional.
+
+#### 4.5.5 ML/AI Integration (chamadas a LLMs, embeddings, RAG, vector DBs)
+
+**Keywords trigger:** llm, openai api, anthropic api, embedding, rag, retrieval augmented, vector database, pinecone, weaviate, qdrant, chromadb, langchain, llamaindex
+
+**Principal:** `kimi-k2.6`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `mimo-v2.5-pro`
+
+**Justificativa:** Knowledge cutoff recente é crítico aqui (APIs de LLMs mudam rapidamente) — Kimi K2.6 e GLM-5.1 são os mais atualizados.
+
+#### 4.5.6 Data Engineering / ETL
+
+**Keywords trigger:** etl, elt, data pipeline, airflow, dagster, prefect, dbt, spark, snowflake, bigquery, redshift, data warehouse
+
+**Principal:** `deepseek-v4-pro`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `kimi-k2.6`
+
+**Justificativa:** Data pipelines exigem raciocínio sobre transformações em larga escala — DeepSeek V4 Pro lidera. GLM-5.1 forte em dbt e Airflow DAGs.
+
+#### 4.5.7 Compliance (LGPD, GDPR, HIPAA, PCI-DSS, SOC2)
+
+**Keywords trigger:** lgpd, gdpr, hipaa, pci-dss, pci, soc2, sox, compliance, audit log, data retention, right to be forgotten, consent
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `mimo-v2.5-pro`
+
+**Justificativa:** Compliance exige aderência a regulamentações específicas — GLM-5.1 lidera. O checklist de Evolucao.md já cobre LGPD; este modelo é o que melhor implementa.
+
+---
+
+## Parte 5 — Benchmarks especializados (referência)
+
+Quando a SPEC mencionar um domínio específico, priorize o modelo líder no benchmark correspondente.
+
+| Benchmark | Domínio | Líder open | Score |
+|---|---|---|---|
+| **SWE-Bench Pro** | Engenharia de software fim-a-fim | kimi-k2.6 | 58,6% |
+| **SWE-Bench Pro** | (empate técnico) | glm-5.1 | 58,4% |
+| **LiveCodeBench v6** | Algoritmos / competitive programming | deepseek-v4-pro | 93,5% |
+| **LiveCodeBench v6** | (segundo lugar) | kimi-k2.6 | 89,6% |
+| **Terminal-Bench 2.0** | Operações terminal multi-step | mimo-v2.5-pro | 68,4% |
+| **Terminal-Bench 2.0** | (segundo lugar) | deepseek-v4-pro | 67,9% |
+| **Codeforces** | Algoritmos competitivos | deepseek-v4-pro | 3206 Elo |
+| **CyberGym** | Segurança ofensiva/defensiva | glm-5.1 | 68,7 |
+| **MCP-Atlas** | Tool calling MCP | glm-5.1 | 71,8 |
+| **KernelBench L3** | Otimização CUDA/kernel | glm-5.1 | 3,6× speedup |
+| **Aider Polyglot** | Edição multi-linguagem | kimi-k2.6 | top open |
+| **SWE-Bench Multilingual** | Multilíngue (Python, JS, Go, Rust, etc.) | minimax-m2.5 | 51,3% (líder open na época) |
+| **WebDev Arena (Elo)** | Frontend visual | qwen3.6-plus | top open |
+| **Video-MME** | Multimodal vídeo | mimo-v2.5 | 87,7 |
+| **ClawEval** | Agentic computer use | mimo-v2.5-pro | 64% |
+
+---
+
+## Parte 6 — Matriz por linguagem / stack
+
+### TypeScript / JavaScript (Node.js)
+
+**Frameworks cobertos:** Express, NestJS, Fastify, Hono, Koa, Next.js (backend), Remix, SvelteKit
+
+**Principal:** `glm-5.1`
+**Fallback:** `kimi-k2.6`
+**Budget:** `minimax-m2.5`
+
+### Python
+
+**Frameworks cobertos:** Django, FastAPI, Flask, Litestar, Starlette, SQLAlchemy, Pydantic, Celery
+
+**Principal:** `glm-5.1`
+**Fallback:** `deepseek-v4-pro`
+**Budget:** `kimi-k2.6`
+
+**Nota:** Python é a linguagem mais bem representada em todos os training data — diferença entre modelos é menor aqui.
+
+### Java / Kotlin (JVM)
+
+**Frameworks cobertos:** Spring Boot, Spring Security, Quarkus, Micronaut, Ktor
+
+**Principal:** `kimi-k2.6`
+**Fallback:** `glm-5.1`
+**Budget:** `deepseek-v4-pro`
+
+**Nota:** Kimi K2.6 demonstrou rewrite autônomo de 13h do exchange-core (financial matching engine Java). Spring Security é covered bem por GLM-5.1.
+
+### Go
+
+**Frameworks cobertos:** stdlib net/http, Gin, Echo, Fiber, Chi, gqlgen
+
+**Principal:** `deepseek-v4-pro`
+**Fallback:** `glm-5.1`
+**Budget:** `kimi-k2.6`
+
+**Nota:** Go é forte em systems — DeepSeek V4 Pro lidera.
+
+### Rust
+
+**Frameworks cobertos:** Axum, Actix, Rocket, Tokio, Tonic (gRPC), SeaORM, sqlx
+
+**Principal:** `mimo-v2.5-pro`
+**Fallback:** `deepseek-v4-pro`
+**Budget:** `kimi-k2.6`
+
+**Nota:** MiMo V2.5 Pro tem demo documentada de Rust compiler 4,3h autônomas.
+
+### C# / .NET
+
+**Frameworks cobertos:** ASP.NET Core, EF Core, MediatR, MassTransit
+
+**Principal:** `glm-5.1`
+**Fallback:** `kimi-k2.6`
+**Budget:** `deepseek-v4-pro`
+
+### Ruby
+
+**Frameworks cobertos:** Rails, Sinatra, Hanami, Sidekiq
+
+**Principal:** `kimi-k2.6`
+**Fallback:** `glm-5.1`
+**Budget:** `minimax-m2.5`
+
+### PHP
+
+**Frameworks cobertos:** Laravel, Symfony, Slim
+
+**Principal:** `glm-5.1`
+**Fallback:** `kimi-k2.6`
+**Budget:** `minimax-m2.5`
+
+### Swift (iOS) / Kotlin (Android)
+
+Ver Parte 4.5.1 (Mobile nativo).
+
+### Dart (Flutter)
+
+Ver Parte 4.5.2 (Mobile cross-platform).
+
+---
+
+## Parte 7 — Matriz para Fixbugs (correção de bugs)
+
+Esta parte é usada apenas quando o prompt invocado for `Fixbugs.md` e o documento gerado for `IMPLEMENTATION_FIXBUG.md`.
+
+### 7.1 Bug visual / UI (componentes, layout, estilização)
+
+**Principal:** `qwen3.6-plus`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `minimax-m2.5`
+
+**Justificativa:** Bugs visuais exigem entendimento do estado renderizado vs esperado — Qwen3.6 lidera. Kimi K2.6 é multimodal nativo (interpreta prints anexados ao bug).
+
+### 7.2 Bug de comportamento de API / endpoint
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `deepseek-v4-pro`
+
+**Justificativa:** Bugs de API exigem raciocínio sobre contratos, side effects e estado — GLM-5.1 lidera SWE-Bench Pro que captura exatamente esse tipo de bug.
+
+### 7.3 Bug de regra de negócio
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `deepseek-v4-pro`
+
+**Justificativa:** Regras de negócio exigem compreensão semântica do domínio — GLM-5.1 lidera.
+
+### 7.4 Bug de query / banco de dados
+
+**Principal:** `deepseek-v4-pro`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `kimi-k2.6`
+
+**Justificativa:** Bugs de query (resultado incorreto, performance) são problema algorítmico — DeepSeek V4 Pro lidera.
+
+### 7.5 Bug de race condition / intermitente
+
+**Principal:** `kimi-k2.6`
+**Fallback técnico:** `glm-5.1`
+**Fallback de budget:** `deepseek-v4-pro`
+
+**Justificativa:** Race conditions exigem raciocínio sobre estado concorrente — Kimi K2.6 tem demos documentadas de sistemas concorrentes complexos. GLM-5.1 forte em análise estática.
+
+### 7.6 Bug de segurança (CWE)
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `mimo-v2.5-pro`
+
+**Justificativa:** GLM-5.1 lidera CyberGym (68,7) — benchmark especializado em identificação e correção de vulnerabilidades CWE.
+
+**⚠️ Nota crítica:** o protocolo de Fixbugs.md para BUG DE SEGURANÇA exige prioridade máxima — comunique ao usuário antes de prosseguir.
+
+### 7.7 Bug em produção urgente
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `deepseek-v4-pro`
+
+**Justificativa:** Bug urgente prioriza correção precisa + rápida — GLM-5.1 oferece o melhor balanço. DeepSeek V4 Pro é alternativa quando custo é fator.
+
+### 7.8 Bug não-reproduzível (diagnóstico exploratório)
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `mimo-v2.5-pro`
+
+**Justificativa:** Bugs não-reproduzíveis exigem raciocínio investigativo — GLM-5.1 lidera por execução autônoma sustentada (8h em demos). Kimi K2.6 tem Agent Swarm para explorar hipóteses em paralelo.
+
+### 7.9 Bug de design system / tokens
+
+**Principal:** `qwen3.6-plus`
+**Fallback técnico:** `kimi-k2.6`
+**Fallback de budget:** `minimax-m2.5`
+
+**Justificativa:** Bugs em design system exigem entendimento de cascading de tokens — Qwen3.6 lidera.
+
+### 7.10 Bug de infra (deploy, ambiente, config)
+
+**Principal:** `glm-5.1`
+**Fallback técnico:** `mimo-v2.5-pro`
+**Fallback de budget:** `kimi-k2.6`
+
+**Justificativa:** Bugs de infra exigem domínio de docker/k8s/cloud — GLM-5.1 lidera.
+
+---
+
+## Parte 8 — Anti-patterns (quando NÃO usar cada modelo)
+
+### glm-5.1 — evitar quando:
+- SPEC é trivial (CRUD básico) — custo é desnecessário; use `minimax-m2.5`
+- SPEC envolve UI fortemente visual / 3D / animações complexas — use `qwen3.6-plus`
+- SPEC é puramente algorítmica (competitive programming) — use `deepseek-v4-pro`
+
+### kimi-k2.6 — evitar quando:
+- Projeto exige license MIT pura — Kimi tem "Modified MIT" com restrições adicionais; prefira `glm-5.1` ou `mimo-v2.5-pro`
+- SPEC envolve dados sensíveis e vendor está em watchlist do projeto (Anthropic acusou Moonshot em fev/2026 de uso fraudulento de contas Claude para training) — use `glm-5.1`
+- Latência/custo são críticos com workloads reasoning-heavy — Kimi tem verbosidade alta (170M tokens AA Index vs mediana 47M)
+
+### deepseek-v4-pro — evitar quando:
+- SPEC envolve nuances de produto/UX/regras de negócio sutis — DeepSeek é mais algorítmico, menos contextual
+- SPEC exige aderência rigorosa a APIs/SDKs muito recentes — knowledge cutoff pode ser limitante
+- Projeto exige SLA de produção — status "Preview" do V4 Pro
+- A janela promocional já expirou (>31/05/2026) — recalcular custo-benefício
+
+### qwen3.6-plus — evitar quando:
+- Projeto exige self-host / open-weights — Qwen3.6 Plus é **closed-weights** apesar da família Qwen ser tradicionalmente open
+- SPEC é backend pesado / algorítmica — use `glm-5.1` ou `deepseek-v4-pro`
+- Velocidade é crítica — Qwen3.6 tem ~52 t/s, abaixo da mediana
+
+### minimax-m2.5 — evitar quando:
+- SPEC é complexa com longo horizonte autônomo — use `glm-5.1` ou `kimi-k2.6`
+- SPEC exige tool calling intensivo com >50 ferramentas — Terminal-Bench 2.0 baixo (42,2%)
+- ⚠️ Confirmar com usuário que está usando `minimax-m2.5` (MIT) e NÃO `minimax-m2.7` (Non-Commercial)
+
+### mimo-v2.5-pro — evitar quando:
+- SPEC envolve domínio web puro (REST APIs, CRUD frontend) — over-spec; modelo é forte em systems
+- Projeto não tem MCP / tool calling — feature distintiva (harness awareness) não agrega
+- Deploy em cloud managed (AWS Bedrock, Azure AI) — modelo não disponível nessas plataformas
+
+### mimo-v2.5 — evitar quando:
+- SPEC não envolve multimodalidade (imagens, vídeo, áudio) — modelo equivalente sem o overhead seria melhor
+
+---
+
+## Parte 9 — Regras de decisão e tie-breakers
+
+Quando múltiplas seções recomendarem modelos diferentes, aplique nesta ordem:
+
+### Tie-breaker 1 — Domínio dominante prevalece
+Se a SPEC tem 70%+ de uma camada (ex: 70%+ backend), use o ranking dessa camada. Os 30% restantes são executados sem regredir.
+
+### Tie-breaker 2 — Especificidade do benchmark
+Se um domínio funcional (Parte 4) tem benchmark dedicado (ex: CyberGym para segurança), o líder desse benchmark prevalece sobre o líder em SWE-Bench genérico.
+
+### Tie-breaker 3 — Restrições de licença
+Se o projeto exige license MIT pura (uso comercial sem ambiguidade):
+- ✅ glm-5.1, deepseek-v4-pro, minimax-m2.5, mimo-v2.5-pro, mimo-v2.5
+- ⚠️ kimi-k2.6 (Modified MIT — verificar cláusulas adicionais)
+- ❌ qwen3.6-plus (closed-weights), minimax-m2.7 (Non-Commercial)
+
+### Tie-breaker 4 — Self-host obrigatório
+Se o projeto exige deploy on-premise / air-gapped:
+- ✅ glm-5.1, mimo-v2.5-pro, kimi-k2.6, deepseek-v4-pro, minimax-m2.5
+- ❌ qwen3.6-plus (apenas via API Alibaba)
+
+### Tie-breaker 5 — Janela de contexto
+Se a SPEC envolve codebase grande (>200K tokens):
+- ✅ deepseek-v4-pro (1M), qwen3.6-plus (1M), mimo-v2.5-pro (1M), mimo-v2.5 (1M)
+- ⚠️ kimi-k2.6 (262K), glm-5.1 (200K), minimax-m2.5 (205K) — pode exigir chunking
+
+### Tie-breaker 6 — Custo crítico
+Se budget é restrição absoluta (ordem do mais barato ao mais caro por tarefa típica):
+1. minimax-m2.5 ($0,30/$1,20)
+2. qwen3.6-plus ($0,325/$1,95)
+3. mimo-v2.5 ($0,40/$2,00)
+4. deepseek-v4-pro promo ($0,435/$0,87 até 31/05/2026)
+5. kimi-k2.6 ($0,60/$2,50)
+6. glm-5.1 ($0,95/$3,15)
+7. mimo-v2.5-pro ($1,00/$3,00)
+
+### Tie-breaker 7 — Aderência a checklist de segurança do Evolucao.md
+Se a SPEC ativa qualquer item do checklist de segurança (autenticação, autorização, upload, LGPD, admin):
+- Prefira `glm-5.1` (líder CyberGym 68,7) em qualquer caso de empate.
+
+---
+
+## Parte 10 — Formato exato da saída do agente
+
+Após gerar o `IMPLEMENTATION.md` (ou `IMPLEMENTATION_FIXBUG.md`), o agente deve produzir a saída no formato abaixo, em português do Brasil:
+
+```
+Para executar [IMPLEMENTATION.md / IMPLEMENTATION_FIXBUG.md] eu sugiro os modelos a seguir que tem o melhor desempenho para essa tarefa:
+
+1. [nome-do-modelo-principal]
+   Justificativa: [1-2 linhas citando o domínio identificado na SPEC e o benchmark/feature que sustenta a recomendação. Ex: "SPEC envolve OAuth 2.1 + RBAC + RLS no Postgres — GLM-5.1 lidera CyberGym (68,7) e SWE-Bench Pro (58,4%), com aderência forte a RFCs de identidade e RLS Supabase."]
+
+2. [nome-do-modelo-fallback-técnico]
+   Justificativa: [1-2 linhas]
+
+3. [nome-do-modelo-fallback-budget]
+   Justificativa: [1-2 linhas]
+```
+
+**Regras de redação da saída:**
+- Sempre exatamente 3 modelos (não mais, não menos)
+- Sempre nessa ordem: principal → fallback técnico → fallback de budget
+- Justificativa deve citar o domínio específico identificado na SPEC, não termos genéricos
+- Justificativa deve citar pelo menos um benchmark ou feature distintiva
+- Português do Brasil, tom direto, sem floreio
+- Nunca recomende modelo que esteja em anti-pattern (Parte 8) para o caso
+
+**Exemplo real de saída:**
+
+> Para executar IMPLEMENTATION.md eu sugiro os modelos a seguir que tem o melhor desempenho para essa tarefa:
+>
+> 1. **glm-5.1**
+>    Justificativa: A SPEC envolve autenticação com senha (bcrypt), JWT com refresh rotation e RLS no Supabase. GLM-5.1 lidera CyberGym (68,7) — benchmark especializado em segurança — e SWE-Bench Pro (58,4%). Tem aderência forte a OWASP ASVS e gera policies RLS Postgres com precisão.
+>
+> 2. **kimi-k2.6**
+>    Justificativa: Empata GLM em SWE-Bench Pro (58,6%) e cobre fluxos JWT/refresh com qualidade. Boa escolha se você precisar de janela de contexto maior ou Agent Swarm para investigar bordas do fluxo.
+>
+> 3. **deepseek-v4-pro**
+>    Justificativa: Durante a promoção até 31/05/2026, entrega ~80% da capacidade dos líderes a 1/4 do custo. Implementa corretamente os algoritmos criptográficos e queries de autorização. Recomendado se budget for restrição.
+
+---
+
+## Parte 11 — Notas sobre evolução deste documento
+
+Este documento foi gerado em 18 de maio de 2026. Modelos de IA evoluem rapidamente — revise trimestralmente.
+
+**Próximos eventos esperados que devem disparar atualização:**
+- 31/05/2026 — fim da promoção DeepSeek V4 Pro (recalcular custo-benefício)
+- 14/05/2026 — deprecation GLM-5 no OpenCode
+- 05/06/2026 — descontinuação GPT-5.2
+- Lançamentos futuros: Qwen3.7, GLM-5.2, Kimi K3, DeepSeek V5
+
+**Critérios para adicionar novo modelo a este documento:**
+1. Disponibilidade pública via API ou self-host
+2. License compatível com projetos comerciais (ou flag explícito como Non-Commercial)
+3. Score em ao menos um benchmark relevante (SWE-Bench Pro, LiveCodeBench, Terminal-Bench)
+4. Validação independente em pelo menos uma fonte fora do provedor
+
+**Critérios para remover modelo:**
+1. Descontinuação anunciada pelo provedor
+2. Substituído por versão estritamente superior no mesmo preço
+3. License mudada para incompatível com uso comercial (caso minimax-m2.7)
