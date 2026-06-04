@@ -189,13 +189,24 @@ export default function Settings() {
     mutationFn: async () => {
       if (!driverSettings || !currentClient?.id) return;
       const row = driverFieldSettingsToRow(driverSettings, currentClient.id);
-      
+
       if (isDriverNew) {
-        const { error } = await supabase.from('driver_field_settings').insert(row);
+        const { error } = await supabase
+          .from('driver_field_settings')
+          .insert(row)
+          .select('id')
+          .single();
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('driver_field_settings').update(row).eq('client_id', currentClient.id);
+        const { data, error } = await supabase
+          .from('driver_field_settings')
+          .update(row)
+          .eq('client_id', currentClient.id)
+          .select('id');
         if (error) throw error;
+        if (!data || data.length !== 1) {
+          throw new Error('Nenhuma configuracao de motorista foi atualizada. Verifique permissoes do usuario.');
+        }
       }
     },
     onSuccess: () => {
@@ -203,8 +214,8 @@ export default function Settings() {
       setDriverSuccess(true);
       queryClient.invalidateQueries({ queryKey: ['driverSettings', currentClient?.id] });
     },
-    onError: () => {
-      setDriverError('Erro ao salvar configurações.');
+    onError: (mutationError: Error) => {
+      setDriverError(mutationError.message || 'Erro ao salvar configurações.');
     }
   });
 

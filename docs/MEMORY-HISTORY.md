@@ -4,6 +4,19 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 
 ## 📜 Histórico de Sessões e Mudanças
 
+### Junho 2026
+- **Configurações de Motoristas (04/06/2026)**:
+  - Corrigido bug onde Coordinator recebia HTTP 403 ao salvar campos obrigatórios do motorista.
+  - Policies `dfs_insert` e `dfs_update` recriadas para aceitar Coordinator+, espelhando a correção já aplicada em `vehicle_field_settings`.
+  - `saveDriverMutation` em `Settings.tsx` recebeu validação de linha persistida (guardrail defensivo).
+  - Criado spec E2E `settings-driver-field-persistence.spec.ts`.
+
+- **Configurações de Veículos (03/06/2026)**:
+  - Corrigido mesmo padrão de bug para `vehicle_field_settings`.
+  - Policy de escrita alinhada para Coordinator/Manager/Director/Admin Master.
+  - `saveVehicleMutation` recebeu validação de linha persistida.
+  - Criado spec E2E `settings-vehicle-field-persistence.spec.ts`.
+
 ### Maio 2026
 - **Telefone no Cadastro de Motoristas (11/05/2026)**:
   - Adicionada migration aditiva para coluna `phone` em `drivers` (`VARCHAR(20)`, nullable, `DEFAULT NULL`).
