@@ -5,6 +5,13 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 ## 📜 Histórico de Sessões e Mudanças
 
 ### Junho 2026
+- **Alçada de Aprovação (04/06/2026)**:
+  - Corrigido bug crítico: Fleet Assistant aprovação orçamentos acima de sua alçada quando itens não estavam carregados.
+  - `canApprove` passou a considerar `itemsLoading` e `hasItems` antes de liberar aprovação.
+  - `reviewMutation` revalida itens e total contra `budgetApprovalLimit` antes do UPDATE.
+  - Tooltip do botão explicita motivo do bloqueio (loading, sem itens, acima do limite).
+  - Adicionados testes unitários e spec E2E de regressão.
+
 - **Configurações de Motoristas (04/06/2026)**:
   - Corrigido bug onde Coordinator recebia HTTP 403 ao salvar campos obrigatórios do motorista.
   - Policies `dfs_insert` e `dfs_update` recriadas para aceitar Coordinator+, espelhando a correção já aplicada em `vehicle_field_settings`.

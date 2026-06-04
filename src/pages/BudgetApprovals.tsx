@@ -26,8 +26,15 @@ import type { User } from '../types';
 
 const ALWAYS_APPROVE_ROLES = ['Coordinator', 'Director', 'Admin Master'];
 
-function canApprove(user: User, budgetTotal: number): boolean {
+export function canApprove(
+  user: User,
+  budgetTotal: number,
+  opts: { itemsLoading: boolean; hasItems: boolean }
+): boolean {
   if (ALWAYS_APPROVE_ROLES.includes(user.role)) return true;
+  if (opts.itemsLoading) return false;
+  if (!opts.hasItems) return false;
+  if (budgetTotal <= 0) return false;
   return user.budgetApprovalLimit > 0 && budgetTotal <= user.budgetApprovalLimit;
 }
 
@@ -84,12 +91,21 @@ function OrderRow({ order, user, onApprove, onReject, approving }: OrderRowProps
   });
 
   const subtotal = calcBudgetSubtotal(items);
-  const withinLimit = canApprove(user, subtotal);
+  const withinLimit = canApprove(user, subtotal, {
+    itemsLoading: loadingItems,
+    hasItems: items.length > 0,
+  });
   const isAlwaysApprover = ALWAYS_APPROVE_ROLES.includes(user.role);
 
-  const limitTooltip = !isAlwaysApprover && !withinLimit
-    ? `Valor acima do seu limite de aprovação (${formatCurrency(user.budgetApprovalLimit)})`
-    : undefined;
+  const limitTooltip = isAlwaysApprover
+    ? undefined
+    : loadingItems
+      ? 'Aguardando carregamento dos itens do orçamento...'
+      : items.length === 0
+        ? 'Orçamento sem itens cadastrados — não é possível validar contra sua alçada de aprovação.'
+        : !withinLimit
+          ? `Valor acima do seu limite de aprovação (${formatCurrency(user.budgetApprovalLimit)})`
+          : undefined;
 
   return (
     <>
@@ -247,6 +263,27 @@ export default function BudgetApprovals() {
   const reviewMutation = useMutation({
     mutationFn: async ({ id, approve }: { id: string; approve: boolean }) => {
       setProcessingId(id);
+
+      if (approve && !ALWAYS_APPROVE_ROLES.includes(user!.role)) {
+        const { data: itemRows, error: itemsError } = await supabase
+          .from('maintenance_budget_items')
+          .select('quantity, value')
+          .eq('maintenance_order_id', id);
+        if (itemsError) throw itemsError;
+        if (!itemRows || itemRows.length === 0) {
+          throw new Error('Não é possível aprovar: orçamento sem itens cadastrados.');
+        }
+        const total = itemRows.reduce(
+          (sum, r) => sum + Number(r.quantity) * Number(r.value),
+          0,
+        );
+        if (total <= 0 || total > user!.budgetApprovalLimit) {
+          throw new Error(
+            `Não é possível aprovar: valor (${formatCurrency(total)}) excede sua alçada (${formatCurrency(user!.budgetApprovalLimit)}).`,
+          );
+        }
+      }
+
       const { error } = await supabase
         .from('maintenance_orders')
         .update({
@@ -261,6 +298,10 @@ export default function BudgetApprovals() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
       queryClient.invalidateQueries({ queryKey: ['maintenanceOrders'] });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Falha ao processar aprovação.';
+      window.alert(msg);
     },
     onSettled: () => setProcessingId(null),
   });
