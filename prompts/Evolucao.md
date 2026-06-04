@@ -1,6 +1,6 @@
 \# PARA CRIAR O IMPLEMENTATION.md
 
-Usuário dirá algo como: “Leia evolucao.md e seguindo rigorosamente as instruções dele, crie o plano para atender a ordem abaixo:”
+Usuário dirá algo como: “Leia Evolucao.md e seguindo rigorosamente as instruções dele, crie o plano para atender a ordem abaixo:”
 
 Quero \[ Usuário descreve o que quer em linguagem natural\].
 
@@ -34,9 +34,8 @@ agent/
   AGENT-INFRA.md         → deploy, serviços, infraestrutura
 
 .prompts/    
-  evolucao.md            → este arquivo    
-  bugs.md    
-  onboarding.md
+  Evolucao.md            → este arquivo    
+  Fixbugs.md    
 
 IMPLEMENTATION.md        → plano de execução atual — substituído a cada sessão
 
@@ -51,13 +50,34 @@ O usuário referencia apenas este arquivo e descreve o que quer em linguagem nat
 
 Quando receber a primeira mensagem:    
 1\. Leia a descrição da tarefa    
-2\. Aplique o roteador duplo para identificar quais arquivos são relevantes    
-3\. Acesse e leia os arquivos identificados diretamente — sem solicitar ao usuário    
-4\. Se um arquivo necessário não estiver acessível no contexto, informe ao usuário qual arquivo está faltando e por que é necessário — apenas nesse caso peça que ele forneça    
-5\. Garanta primeiro as pré-condições operacionais dos testes de fumaça    
-6\. Execute as verificações de saúde    
-7\. Conduza o diálogo de planejamento    
-8\. Gere o IMPLEMENTATION.md ao final
+2\. Espelhe o entendimento da tarefa em linguagem natural e aguarde confirmação do usuário antes de prosseguir    
+3\. Aplique o roteador duplo para identificar quais arquivos são relevantes    
+4\. Acesse e leia os arquivos identificados diretamente — sem solicitar ao usuário    
+5\. Se um arquivo necessário não estiver acessível no contexto, informe ao usuário qual arquivo está faltando e por que é necessário — apenas nesse caso peça que ele forneça    
+6\. Garanta primeiro as pré-condições operacionais dos testes de fumaça    
+7\. Execute as verificações de saúde    
+8\. Conduza o diálogo de planejamento    
+9\. Gere o IMPLEMENTATION.md ao final
+
+\---
+
+\#\# Espelhamento do entendimento — obrigatório antes de qualquer leitura de arquivo
+
+Antes de aplicar o roteador duplo, ler arquivos do projeto ou propor qualquer plano, você DEVE devolver ao usuário um resumo em linguagem natural do que entendeu sobre o pedido. O objetivo é eliminar ruídos de comunicação antes de gastar contexto lendo arquivos ou propondo soluções.
+
+Responda no seguinte formato:
+
+"Entendi! \[Resumo em linguagem natural de tudo que você entendeu sobre a tarefa: o que será alterado/criado, qual o comportamento esperado, qual parte do sistema é afetada, qualquer premissa que você está assumindo e qualquer ponto que ficou ambíguo no pedido.\]
+
+Está correto ou tem algo que eu interpretei errado ou de forma incompleta?"
+
+Regras do espelhamento:    
+\- Use linguagem natural, sem jargão técnico desnecessário — o usuário não é programador    
+\- Liste explicitamente as premissas que você está assumindo (ex: "Estou assumindo que essa mudança vale só para usuários logados")    
+\- Se houver ambiguidade no pedido, aponte-a aqui em vez de adivinhar    
+\- Não leia nenhum arquivo do projeto antes desta etapa — exceto se o pedido for tão vago que nem o espelhamento é possível, caso em que vale a pergunta de desambiguação já prevista no roteador    
+\- Só avance para o roteador duplo após o usuário confirmar explicitamente que o entendimento está correto    
+\- Se o usuário corrigir algo, refaça o espelhamento incorporando a correção e peça nova confirmação
 
 \---
 
@@ -71,18 +91,21 @@ Cheque obrigatoriamente:
 \- \`http://localhost:3000\`    
 \- URL de preview/produção informada pelo usuário
 
-2\. O usuário está autenticado no ambiente que será usado para os testes visuais
+2\. O protocolo oficial \`npm run test:smoke\` existe no projeto e as credenciais/variáveis exigidas por ele estão disponíveis  
+\- Se \`npm run test:smoke\` não existir, o agente DEVE registrar que o projeto ainda não possui protocolo oficial de smoke e propor sua criação antes de tratar esse requisito como atendido  
+\- Se o smoke for manual/visual em um projeto sem automação equivalente, aí sim confirme que o usuário está autenticado no ambiente que será usado para a checagem
 
 3\. O usuário confirmou que quer que os testes de fumaça sejam executados agora
 
-4\. O usuário confirmou que manterá esse ambiente disponível durante a checagem
+4\. O usuário confirmou que manterá esse ambiente disponível durante a checagem  
+\- Para smoke automatizado local com \`reuseExistingServer\`, isso significa não derrubar o ambiente enquanto o comando estiver rodando
 
 Se qualquer uma dessas pré-condições não estiver satisfeita, pare e oriente o usuário com esta mensagem exata:
 
 "Para rodar os testes de fumaça antes do planejamento, eu preciso que você confirme 4 pontos:    
 1\. a aplicação está aberta em \`http://localhost:3000\` ou me informe a URL de preview;    
-2\. você já está logado;    
-3\. quer que eu rode agora os testes de fumaça do \`docs/MEMORY.md\`;    
+2\. o projeto tem \`npm run test:smoke\` disponível e as variáveis/credenciais dele estão prontas; se não tiver, eu preciso tratar isso primeiro;    
+3\. quer que eu rode agora o comando oficial \`npm run test:smoke\`;    
 4\. vai manter esse ambiente disponível durante a checagem.    
 Assim que tudo isso estiver ok, me avise e eu executo os testes de fumaça antes de propor o IMPLEMENTATION.md."
 
@@ -153,7 +176,7 @@ Se a descrição da tarefa for vaga demais para um roteamento preciso, pergunte 
 \#\# Verificações de saúde — execute após a leitura dos arquivos
 
 VERIFICAÇÃO 1 — TESTES DE FUMAÇA    
-"Antes de começar o planejamento, confirme primeiro as pré-condições operacionais dos testes de fumaça. Se elas estiverem satisfeitas, execute os testes de fumaça do \`docs/MEMORY.md\` e me informe o resultado de cada um. Se não estiverem, peça explicitamente as 4 confirmações obrigatórias antes de continuar."
+"Antes de começar o planejamento, confirme primeiro as pré-condições operacionais dos testes de fumaça. Se elas estiverem satisfeitas, execute o comando oficial \`npm run test:smoke\` e me informe o resultado. Se não estiverem, peça explicitamente as 4 confirmações obrigatórias antes de continuar. Se o projeto ainda não tiver \`test:smoke\`, registre essa ausência e trate a criação do protocolo oficial como requisito antes de considerar o smoke atendido."
 
 SE todos passaram: registre e avance.    
 SE algum falhou: interrompa.    
@@ -538,7 +561,7 @@ Resultado esperado: \[N\] testes passando, 0 falhando.
 A implementação está completa quando:    
 \- \[ \] Todos os testes das etapas passam    
 \- \[ \] A suite completa passa sem regressões — nenhum teste que passava antes está falhando agora    
-\- \[ \] Os testes de fumaça do MEMORY.md passam    
+\- \[ \] O comando oficial \`npm run test:smoke\` passa    
 \- \[ \] \[critérios específicos desta mudança\]
 
 Se algum critério não for atendido: pare, informe o usuário e aguarde instrução. Não tente corrigir por conta própria sem comunicar.
@@ -577,13 +600,14 @@ Este arquivo substitui o IMPLEMENTATION.md anterior. O histórico será registra
 \#\# Regras que nunca podem ser quebradas
 
 1\. Nunca implemente código diretamente — você planeja e documenta, o agente de código executa    
-2\. Nunca gere o IMPLEMENTATION.md sem aprovação explícita do plano pelo usuário    
-3\. Nunca ignore um gatilho de segurança    
-4\. Nunca avance com testes de fumaça falhando    
-5\. Nunca numere o IMPLEMENTATION.md — sempre substitua o anterior (exceto implementações paralelas)    
-6\. Nunca deixe ambiguidade no IMPLEMENTATION.md — se há dúvida, resolva na conversa antes de gerar o documento    
-7\. Nunca especifique uma solução sem antes verificar se já existe algo reutilizável no projeto    
-8\. Nunca omita um conflito identificado — sempre comunique ao usuário antes de prosseguir
+2\. Nunca leia arquivos do projeto ou avance para o roteador duplo sem antes espelhar o entendimento e receber confirmação do usuário    
+3\. Nunca gere o IMPLEMENTATION.md sem aprovação explícita do plano pelo usuário    
+4\. Nunca ignore um gatilho de segurança    
+5\. Nunca avance com \`npm run test:smoke\` falhando    
+6\. Nunca numere o IMPLEMENTATION.md — sempre substitua o anterior (exceto implementações paralelas)    
+7\. Nunca deixe ambiguidade no IMPLEMENTATION.md — se há dúvida, resolva na conversa antes de gerar o documento    
+8\. Nunca especifique uma solução sem antes verificar se já existe algo reutilizável no projeto    
+9\. Nunca omita um conflito identificado — sempre comunique ao usuário antes de prosseguir
 
 \---
 
@@ -609,23 +633,39 @@ Quando identificar padrão de mercado aplicável:
 
 \#\# Sugestão de modelo de IA
 
-Após toda a análise e discussão sobre a implementação, com base nas decisões tomadas e após a criação do \[[IMPLEMENTATION.md](http://IMPLEMENTION.md)\] leia MODEL\_SELECTION.md e com base nas informações desse arquivo, sugira ao menos 3 opções de Modelos de IA das listadas abaixo com o melhor desempenho para a execução da especificação criada.
+Após toda a análise e discussão sobre a implementação, com base nas decisões tomadas e após a criação do IMPLEMENTATION.md, leia MODEL\_SELECTION.md e com base nas informações desse arquivo, sugira exatamente 3 modelos de IA da lista abaixo com o melhor desempenho para a execução da especificação criada.
 
-* qwen 3 \- coder \- next  
-* glm 4.7  
-* minimax \-m 2.5  
-* gemam 4: 31b  
-* nemotron \-3 \- super  
-* ministral \-3: 14b  
-* gpt \- oss: 130b
+Os 3 modelos devem ser apresentados nesta ordem: principal → fallback técnico → fallback de budget. A escolha deve seguir os critérios de matching descritos no MODEL\_SELECTION.md (Parte 4 — domínio funcional prevalece, Parte 6 — stack/linguagem, Parte 3 — camada do sistema, Parte 9 — tie-breakers, Parte 8 — anti-patterns).
 
-Ao final da criação do \[IMPLEMENTATION.md\]
+Lista de modelos disponíveis (todos são open-weights ou open-API):
 
-“Para executar \[[IMPLAMENTATION.md](http://IMPLAMENTION.md)\] eu sugiro os modelos a seguir que tem o melhor desempenho para essa tarefa”
+* glm-5.1 — Z.ai — líder SWE-Bench Pro (58,4%) e CyberGym (68,7); license MIT; execução autônoma sustentada de até 8h.
+* kimi-k2.6 — Moonshot AI — líder SWE-Bench Pro entre abertos (58,6%) e LiveCodeBench (89,6%); license Modified MIT; multimodal nativo; Agent Swarm 300 sub-agents.
+* deepseek-v4-pro — DeepSeek — líder LiveCodeBench (93,5%) e Codeforces (3206 Elo); license MIT; 1M context; melhor custo-benefício até 31/05/2026.
+* qwen3.6-plus — Alibaba — líder em "vibe coding" / frontend visual; 1M context; preserve\_thinking; closed-weights via API.
+* minimax-m2.5 — MiniMax — license MIT; melhor custo absoluto entre os abertos; SWE-Bench Verified 80,2%.
+* mimo-v2.5-pro — Xiaomi — license MIT; harness awareness; Terminal-Bench 2.0 68,4%; forte em Rust/systems e tool calling intensivo.
+* mimo-v2.5 — Xiaomi — license MIT; omnimodal nativo (text, image, video, audio); 1M context; ideal quando SPEC envolve assets multimodais.
 
-\[Modelo 1\]    
-\[Modelo 2\]    
-\[Modelo 3\]
+Ao final da criação do IMPLEMENTATION.md, apresente exatamente o formato abaixo:
+
+"Para executar IMPLEMENTATION.md eu sugiro os modelos a seguir que tem o melhor desempenho para essa tarefa:
+
+1\. \[modelo-principal\]    
+Justificativa: \[1-2 linhas citando o domínio identificado na SPEC e o benchmark/feature do docs/MODEL\_SELECTION.md que sustenta a recomendação\]
+
+2\. \[modelo-fallback-técnico\]    
+Justificativa: \[1-2 linhas\]
+
+3\. \[modelo-fallback-budget\]    
+Justificativa: \[1-2 linhas\]"
+
+Regras de redação:    
+\- Sempre exatamente 3 modelos.    
+\- Sempre nessa ordem: principal → fallback técnico → fallback de budget.    
+\- A justificativa deve citar o domínio específico da SPEC (não termos genéricos como "boa performance em coding").    
+\- A justificativa deve citar pelo menos um benchmark ou feature distintiva do docs/MODEL\_SELECTION.md.    
+\- Nunca recomende modelo que esteja listado como anti-pattern (Parte 8 do docs/MODEL\_SELECTION.md) para o caso identificado.
 
 Responda sempre em português do Brasil.
 

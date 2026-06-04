@@ -70,18 +70,21 @@ Cheque obrigatoriamente:
 \- \`http://localhost:3000\`  
 \- URL de preview/produção informada pelo usuário
 
-2\. O usuário está autenticado no ambiente que será usado para os testes visuais
+2\. O protocolo oficial \`npm run test:smoke\` existe no projeto e as credenciais/variáveis exigidas por ele estão disponíveis  
+\- Se \`npm run test:smoke\` não existir, o agente DEVE registrar a ausência do protocolo oficial e tratar sua criação como lacuna operacional antes de considerar o smoke atendido  
+\- Se o smoke for manual/visual em um projeto sem automação equivalente, aí sim confirme que o usuário está autenticado no ambiente que será usado para a checagem
 
 3\. O usuário confirmou que quer que os testes de fumaça sejam executados agora
 
-4\. O usuário confirmou que manterá esse ambiente disponível durante a checagem
+4\. O usuário confirmou que manterá esse ambiente disponível durante a checagem  
+\- Para smoke automatizado local com \`reuseExistingServer\`, isso significa não derrubar o ambiente enquanto o comando estiver rodando
 
 Se qualquer uma dessas pré-condições não estiver satisfeita, pare e oriente o usuário com esta mensagem exata:
 
 "Para rodar os testes de fumaça antes do diagnóstico, eu preciso que você confirme 4 pontos:  
 1\. a aplicação está aberta em \`http://localhost:3000\` ou me informe a URL de preview;  
-2\. você já está logado;  
-3\. quer que eu rode agora os testes de fumaça do \`docs/MEMORY.md\`;  
+2\. o projeto tem \`npm run test:smoke\` disponível e as variáveis/credenciais dele estão prontas; se não tiver, eu preciso tratar isso primeiro;  
+3\. quer que eu rode agora o comando oficial \`npm run test:smoke\`;  
 4\. vai manter esse ambiente disponível durante a checagem.  
 Assim que tudo isso estiver ok, me avise e eu executo os testes de fumaça antes de propor o IMPLEMENTATION\_FIXBUG.md."
 
@@ -144,7 +147,7 @@ Leia o texto completo antes de qualquer hipótese. Mensagens de erro geralmente 
 \#\# Verificações de saúde — execute após a leitura dos arquivos
 
 VERIFICAÇÃO 1 — TESTES DE FUMAÇA  
-"Antes de diagnosticar, confirme primeiro as pré-condições operacionais dos testes de fumaça. Se elas estiverem satisfeitas, execute os testes de fumaça do \`docs/MEMORY.md\` e me informe o resultado de cada um. Se não estiverem, peça explicitamente as 4 confirmações obrigatórias antes de continuar. Preciso saber o estado geral do sistema antes de tocar em qualquer coisa."
+"Antes de diagnosticar, confirme primeiro as pré-condições operacionais dos testes de fumaça. Se elas estiverem satisfeitas, execute o comando oficial \`npm run test:smoke\` e me informe o resultado. Se não estiverem, peça explicitamente as 4 confirmações obrigatórias antes de continuar. Se o projeto ainda não tiver \`test:smoke\`, registre essa ausência e trate a criação do protocolo oficial como lacuna antes de considerar o smoke atendido. Preciso saber o estado geral do sistema antes de tocar em qualquer coisa."
 
 SE testes de fumaça falhando além do bug relatado:  
 "Além do bug que você relatou, \[teste X\] também está falhando. Isso pode indicar que os problemas estão relacionados — ou que há dois bugs distintos. Quer que eu investigue os dois ou focamos apenas no bug relatado agora?"
@@ -329,7 +332,7 @@ Antes de implementar, leia:
 \[Descrição precisa: arquivo, função, linha ou lógica responsável pelo problema. Explique por que essa é a causa — não apenas o que é.\]
 
 \#\# Estado dos testes antes da correção — baseline  
-\- Testes de fumaça: \[X passando, Y falhando — liste os que falham\]  
+\- Testes de fumaça (\`npm run test:smoke\`): \[X passando, Y falhando — liste os que falham\]  
 \- Suite completa: \[X passando, Y falhando — liste os que falham\]  
 \- Testes falhando relacionados ao bug: \[lista — estes devem passar após a correção\]  
 \- Testes falhando não relacionados ao bug: \[lista — estes não são responsabilidade desta correção, mas não devem piorar\]
@@ -377,7 +380,7 @@ Resultado esperado: \[comportamento correto descrito com precisão\]
 \`\`\`  
 Resultado esperado: pelo menos \[N\] testes passando. Nenhum teste que passava antes deve estar falhando agora.
 
-3\. Execute os testes de fumaça do docs/MEMORY.md e confirme que todos passam.
+3\. Execute \`npm run test:smoke\` e confirme que todos os testes do protocolo oficial passam.
 
 Se qualquer verificação falhar: pare, informe o usuário com o resultado exato e aguarde instrução. Não tente corrigir por conta própria sem comunicar.
 
@@ -456,23 +459,40 @@ Registre, não corrija. Use sempre a frase:
 
 \#\# Sugestão de modelo de IA
 
-Após toda a análise e discussão sobre a implementação, com base nas decisões tomadas e após a criação do \[[IMPLEMENTION\_FIXBUG.md](http://IMPLEMENTION.md)\] leia MODEL\_SELECTION.md e com base nas informações desse arquivo, sugira ao menos 3 opções de Modelos de IA das listadas abaixo com o melhor desempenho para a execução da especificação criada.
+Após toda a análise e diagnóstico do bug, com base nas decisões tomadas e após a criação do IMPLEMENTATION\_FIXBUG.md, leia MODEL\_SELECTION.md e com base nas informações desse arquivo, sugira exatamente 3 modelos de IA da lista abaixo com o melhor desempenho para a execução da correção criada.
 
-* qwen 3 \- coder \- next  
-* glm 4.7  
-* minimax \-m 2.5  
-* gemma 4: 31b  
-* nemotron \-3 \- super  
-* ministral \-3: 14b  
-* gpt \- oss: 130b
+Os 3 modelos devem ser apresentados nesta ordem: principal → fallback técnico → fallback de budget. Para correção de bugs, consulte preferencialmente a Parte 7 do MODEL\_SELECTION.md (matriz por tipo de bug) e depois a Parte 4 (domínio funcional afetado). Aplique os tie-breakers da Parte 9 e descarte modelos contraindicados pela Parte 8 (anti-patterns).
 
-Ao final da criação do \[IMPLEMENTATION.md\]
+Lista de modelos disponíveis (todos são open-weights ou open-API):
 
-“Para executar \[[IMPLEMENTION\_FIXBUG](http://IMPLEMENTION.md)[.md](http://IMPLAMENTION.md)\] eu sugiro os modelos a seguir que tem o melhor desempenho para essa tarefa”
+* glm-5.1 — Z.ai — líder SWE-Bench Pro (58,4%) e CyberGym (68,7); license MIT; ideal para bugs de comportamento de API, regras de negócio, segurança e infra.
+* kimi-k2.6 — Moonshot AI — líder SWE-Bench Pro entre abertos (58,6%) e LiveCodeBench (89,6%); multimodal nativo (interpreta prints anexados ao bug); ideal para race conditions e bugs intermitentes.
+* deepseek-v4-pro — DeepSeek — líder LiveCodeBench (93,5%) e Codeforces (3206 Elo); license MIT; ideal para bugs de query SQL, performance e algorítmicos; melhor custo até 31/05/2026.
+* qwen3.6-plus — Alibaba — líder em UI/visual; ideal para bugs visuais, de layout, animação e design system; closed-weights via API.
+* minimax-m2.5 — MiniMax — license MIT; melhor custo absoluto; ideal para bugs simples e correções pontuais.
+* mimo-v2.5-pro — Xiaomi — license MIT; harness awareness; Terminal-Bench 2.0 68,4%; ideal para bugs em Rust/systems e ambientes complexos com muitas ferramentas.
+* mimo-v2.5 — Xiaomi — license MIT; omnimodal nativo; ideal quando o bug envolve interpretação de prints, vídeos ou assets multimodais.
 
-\[Modelo 1\]    
-\[Modelo 2\]    
-\[Modelo 3\]
+Ao final da criação do IMPLEMENTATION\_FIXBUG.md, apresente exatamente o formato abaixo:
+
+"Para executar IMPLEMENTATION\_FIXBUG.md eu sugiro os modelos a seguir que tem o melhor desempenho para essa tarefa:
+
+1\. \[modelo-principal\]    
+Justificativa: \[1-2 linhas citando o tipo de bug identificado e o benchmark/feature do MODEL\_SELECTION.md que sustenta a recomendação\]
+
+2\. \[modelo-fallback-técnico\]    
+Justificativa: \[1-2 linhas\]
+
+3\. \[modelo-fallback-budget\]    
+Justificativa: \[1-2 linhas\]"
+
+Regras de redação:    
+\- Sempre exatamente 3 modelos.    
+\- Sempre nessa ordem: principal → fallback técnico → fallback de budget.    
+\- A justificativa deve citar o tipo de bug específico (visual, API, regra de negócio, query, race condition, segurança, etc.) e a camada afetada (frontend, backend, database, design, infra).    
+\- A justificativa deve citar pelo menos um benchmark ou feature distintiva do MODEL\_SELECTION.md.    
+\- Para BUG DE SEGURANÇA, glm-5.1 deve sempre ser uma das três opções por liderar CyberGym (68,7).    
+\- Nunca recomende modelo que esteja listado como anti-pattern (Parte 8 do MODEL\_SELECTION.md) para o caso identificado.
 
 Responda sempre em português do Brasil.
 

@@ -12,11 +12,13 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:unit:coverage": "vitest run --coverage",
+    "test:smoke": "playwright test e2e/smoke/app-smoke.spec.ts --project=chromium",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
     "test:shippers": "playwright test e2e/shippers-operational-units.spec.ts",
-    "migrate:shippers": "node scripts/exec-migration.mjs"
+    "migrate:shippers": "node scripts/exec-migration.mjs",
+    "seed:demo:betafleet": "node scripts/seed-betafleet-demo.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",
@@ -25,8 +27,9 @@
     "@vitejs/plugin-react": "^5.0.4",
     "better-sqlite3": "^12.4.1",
     "clsx": "^2.1.1",
+    "csv-parse": "^6.2.1",
     "dexie": "^4.3.0",
-    "dotenv": "^17.2.3",
+    "dotenv": "^17.4.2",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "pdfjs-dist": "^5.5.207",

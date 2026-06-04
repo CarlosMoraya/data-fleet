@@ -48,6 +48,7 @@ Qualquer nova funcionalidade **DEVE** seguir estas fases sequenciais:
 | Comando | Descrição |
 | :--- | :--- |
 | `npm run dev` | Inicia o servidor de desenvolvimento (Vite) |
+| `npm run test:smoke` | Executa o protocolo oficial de smoke: login, rota protegida, shell autenticado e navegação crítica de Cadastros |
 | `npx playwright test` | Executa a bateria completa de testes E2E |
 | `npm run build` | Gera o bundle de produção (~8s esperado) |
 | `npx playwright show-report` | Exibe o último relatório de testes |
