@@ -150,20 +150,32 @@ export default function Settings() {
       const row = fieldSettingsToRow(settings, currentClient.id);
       
       if (isNew) {
-        const { error } = await supabase.from('vehicle_field_settings').insert(row);
+        const { error } = await supabase
+          .from('vehicle_field_settings')
+          .insert(row)
+          .select('id')
+          .single();
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('vehicle_field_settings').update(row).eq('client_id', currentClient.id);
+        const { data, error } = await supabase
+          .from('vehicle_field_settings')
+          .update(row)
+          .eq('client_id', currentClient.id)
+          .select('id');
         if (error) throw error;
+        if (!data || data.length !== 1) {
+          throw new Error('Nenhuma configuracao de veiculo foi atualizada. Verifique permissoes do usuario.');
+        }
       }
     },
     onSuccess: () => {
       setIsNew(false);
       setSuccess(true);
       queryClient.invalidateQueries({ queryKey: ['vehicleSettings', currentClient?.id] });
+      queryClient.invalidateQueries({ queryKey: ['vehicleFieldSettings', currentClient?.id] });
     },
-    onError: () => {
-      setError('Erro ao salvar configurações.');
+    onError: (mutationError) => {
+      setError(mutationError.message || 'Erro ao salvar configurações.');
     }
   });
 
