@@ -192,6 +192,20 @@ Arquivos modificados: src/pages/BudgetApprovals.tsx, src/pages/BudgetApprovals.c
 Testes adicionados: src/pages/BudgetApprovals.canApprove.test.ts; e2e/pending/budget-approval-alcada.spec.ts
 Observação aberta: defesa em profundidade no Supabase (RPC + RLS de UPDATE em maintenance_orders.budget_status) registrada como próxima evolução.
 
+## 🆕 Atualização de Sessão (04/06/2026) — Cleanup RLS Duplicadas
+- Migration criada: `supabase/migrations/20260604010000_cleanup_duplicate_rls_policies.sql`
+- Policies removidas (DROP IF EXISTS):
+  - `vehicle_field_settings`: `field_settings_select`, `field_settings_insert`, `field_settings_update`
+  - `vehicles`: `vehicles_select_admin`, `vehicles_select_tenant`
+  - `checklist_templates`: `templates_select`, `templates_insert`, `templates_update`, `templates_delete`
+- Policies preservadas: `vfs_*`, `vehicles_select`, `vehicles_select_auditor`, `vehicles_select_own_driver`, `workshop_vehicle_select`, `checklist_templates_*`, `templates_select_driver`
+- Prechecks na migration: aborta se as famílias atuais esperadas não existirem
+- Validações executadas: `npm run lint` ✅; `npm run test:unit` ✅ (140 testes); `npm run test:smoke` ✅ (6 testes); E2Es relevantes ✅ (settings-vehicle-field-persistence 2/2, driver-checklist-visibility 3/3, new-roles-audit 37/37)
+- Execução da migration no Supabase Dashboard: concluída com sucesso (Success, no rows returned)
+- Snapshot antes validado: todas as policies atuais presentes, todas as legadas presentes
+- Snapshot depois validado: 9 policies legadas removidas, nenhuma policy atual perdida
+- Validações pós-migração: `npm run lint` ✅; `npm run test:unit` ✅ (140 testes); `npm run test:smoke` ✅ (6 testes); E2Es relevantes ✅ (settings-vehicle-field-persistence 2/2, driver-checklist-visibility 3/3, new-roles-audit 37/37)
+
 ## 🆕 Atualização de Sessão (04/06/2026) — New Roles Audit E2E
 Bug corrigido: `e2e/completed/new-roles-audit.spec.ts` ainda esperava nomes antigos (`Robson`/`Pereira`) para as credenciais oficiais de Coordinator e Supervisor.
 Causa raiz: spec desatualizada frente aos usuarios oficiais atuais (`Beatriz Lima` e `Camila Torres`) e seletor de badge de role amplo demais, casando topbar e sidebar. A spec tambem esperava indevidamente que Supervisor nao pudesse criar `Fleet Analyst`, embora a regra atual permita criar roles com rank inferior.
