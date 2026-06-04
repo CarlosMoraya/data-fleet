@@ -43,6 +43,7 @@ export default function Drivers() {
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
   const canDelete = ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') || ((user?.role === 'Fleet Analyst' || user?.role === 'Supervisor') && user?.canDeleteDrivers === true);
+  const hasActiveClient = !!currentClient?.id;
 
   // Queries
   const { data: drivers = [], isLoading: loadingDrivers, isError: driversError } = useQuery({
@@ -56,7 +57,7 @@ export default function Drivers() {
       if (error) throw error;
       return (data as DriverRow[]).map(driverFromRow);
     },
-    enabled: !!user
+    enabled: !!user && hasActiveClient
   });
 
   const { data: fieldSettings } = useQuery({
@@ -87,7 +88,7 @@ export default function Drivers() {
       });
       return map;
     },
-    enabled: !!user
+    enabled: !!user && hasActiveClient
   });
 
   // Redirect Drivers and Yard Auditors
@@ -99,10 +100,14 @@ export default function Drivers() {
     driver: Partial<Driver>,
     files: DriverFiles
   ): Promise<void> => {
-    if (!currentClient?.id) return;
+    if (!currentClient?.id) {
+      throw new Error('Selecione um cliente ativo antes de salvar motoristas.');
+    }
     await saveDriver(currentClient.id, driver, files, editingDriver?.id);
-    queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] });
-    queryClient.invalidateQueries({ queryKey: ['driverVehicleMap', currentClient?.id] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['driverVehicleMap', currentClient?.id] }),
+    ]);
     setIsFormOpen(false);
     setEditingDriver(null);
     sessionStorage.removeItem('driverFormOpen');
@@ -144,7 +149,7 @@ export default function Drivers() {
           <p className="text-sm text-zinc-500 mt-1">Gerencie os motoristas da sua frota.</p>
         </div>
 
-        {canCreate && (
+        {canCreate && hasActiveClient && (
           <button
             onClick={() => {
               sessionStorage.removeItem('driverFormData');

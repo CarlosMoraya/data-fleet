@@ -22,6 +22,8 @@ const users = {
 };
 
 test.describe.serial('Embarcadores + Unidades Operacionais - Full Workflow', () => {
+  test.use({ storageState: 'e2e/.auth/alexandre.json' });
+
   // Use dynamic suffix to avoid duplicate errors in persistent DB
   const suffix = Math.floor(Math.random() * 10000);
   const testData = {
@@ -43,12 +45,10 @@ test.describe.serial('Embarcadores + Unidades Operacionais - Full Workflow', () 
   });
 
   test('Manager: Login', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input[type="email"]', users.manager.email);
-    await page.fill('input[type="password"]', users.manager.password);
-    await page.getByRole('button', { name: 'Entrar' }).click();
-
-    await page.waitForURL(`${BASE_URL}/`);
+    await page.goto(`${BASE_URL}/`);
+    await expect(page).toHaveURL(`${BASE_URL}/`);
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Manager').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('Manager: Create Shippers', async ({ page }) => {

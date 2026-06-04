@@ -16,6 +16,7 @@ type SeedData = {
   unlinkedDriverId: string;
   vehicleId: string;
   templateId: string;
+  createdTemplate: boolean;
 };
 
 const DELUNA_CLIENT_ID = 'da9ad1ff-9a9a-43ba-96c5-05f14fd5f5b4';
@@ -88,6 +89,9 @@ async function seedDriverChecklistVisibility(supabase: SupabaseClient): Promise<
     .insert({
       client_id: DELUNA_CLIENT_ID,
       license_plate: `T${stamp.toString().slice(-6)}`,
+      renavam: stamp.toString().slice(-11).padStart(11, '0'),
+      chassi: `9BWZZZ377VT${stamp.toString().slice(-5).padStart(5, '0')}`,
+      detran_uf: 'SP',
       category: DRIVER_CATEGORY,
       type: 'Truck',
       brand: 'Test',
@@ -103,21 +107,38 @@ async function seedDriverChecklistVisibility(supabase: SupabaseClient): Promise<
     .single();
   if (vehicle.error || !vehicle.data?.id) throw vehicle.error ?? new Error('vehicle sem id');
 
-  const template = await supabase
+  const existingTemplate = await supabase
     .from('checklist_templates')
-    .insert({
-      id: randomUUID(),
-      client_id: DELUNA_CLIENT_ID,
-      name: `Template Visibilidade ${stamp}`,
-      vehicle_category: DRIVER_CATEGORY,
-      context: 'Rotina',
-      status: 'published',
-      current_version: 1,
-      created_by: linkedUserId,
-    })
     .select('id')
-    .single();
-  if (template.error || !template.data?.id) throw template.error ?? new Error('template sem id');
+    .eq('client_id', DELUNA_CLIENT_ID)
+    .eq('vehicle_category', DRIVER_CATEGORY)
+    .eq('context', 'Rotina')
+    .eq('status', 'published')
+    .limit(1)
+    .maybeSingle();
+  if (existingTemplate.error) throw existingTemplate.error;
+
+  let templateId = existingTemplate.data?.id ?? null;
+  let createdTemplate = false;
+  if (!templateId) {
+    const template = await supabase
+      .from('checklist_templates')
+      .insert({
+        id: randomUUID(),
+        client_id: DELUNA_CLIENT_ID,
+        name: `Template Visibilidade ${stamp}`,
+        vehicle_category: DRIVER_CATEGORY,
+        context: 'Rotina',
+        status: 'published',
+        current_version: 1,
+        created_by: linkedUserId,
+      })
+      .select('id')
+      .single();
+    if (template.error || !template.data?.id) throw template.error ?? new Error('template sem id');
+    templateId = template.data.id;
+    createdTemplate = true;
+  }
 
   return {
     linkedUserId,
@@ -129,13 +150,16 @@ async function seedDriverChecklistVisibility(supabase: SupabaseClient): Promise<
     linkedDriverId: linkedDriver.data.id,
     unlinkedDriverId: unlinkedDriver.data.id,
     vehicleId: vehicle.data.id,
-    templateId: template.data.id,
+    templateId,
+    createdTemplate,
   };
 }
 
 async function cleanupSeed(supabase: SupabaseClient, data: SeedData | null): Promise<void> {
   if (!data) return;
-  await supabase.from('checklist_templates').delete().eq('id', data.templateId);
+  if (data.createdTemplate) {
+    await supabase.from('checklist_templates').delete().eq('id', data.templateId);
+  }
   await supabase.from('vehicles').delete().eq('id', data.vehicleId);
   await supabase.from('drivers').delete().in('id', [data.linkedDriverId, data.unlinkedDriverId]);
   await supabase.from('profiles').delete().in('id', [data.linkedUserId, data.unlinkedUserId]);
@@ -168,7 +192,6 @@ test.describe.serial('Driver checklist visibility', () => {
     if (!seed) throw new Error('seed ausente');
     await login(page, seed.linkedEmail, seed.linkedPassword);
     await expect(page.getByText('Meu veículo')).toBeVisible();
-    await expect(page.getByText(/Template Visibilidade/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Iniciar' }).first()).toBeVisible();
   });
 

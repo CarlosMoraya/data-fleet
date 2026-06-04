@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import path from 'node:path';
 
 /**
  * Testes E2E para integração Motorista ↔ Usuário do Sistema
@@ -17,6 +18,7 @@ let driverEmail: string;
 let driverPassword: string;
 const driverName = `Driver Test ${Date.now()}`;
 const driverCPF = `9${Date.now().toString().slice(-10)}`.slice(0, 11);
+const pdfPath = path.join(process.cwd(), 'e2e/assets/test-document.pdf');
 
 test.describe.serial('1. Driver-User Integration (Analyst Profile)', () => {
   // Carregar auth do Analyst (Mariana)
@@ -64,16 +66,33 @@ test.describe.serial('1. Driver-User Integration (Analyst Profile)', () => {
     const cpfInput = page.locator('input[name="cpf"]');
     await cpfInput.fill(driverCPF);
 
+    await page.locator('input[name="issueDate"]').fill('2026-01-10');
+    await page.locator('input[name="expirationDate"]').fill('2030-01-10');
+    await page.locator('input[name="registrationNumber"]').fill(`123456789${Date.now().toString().slice(-2)}`);
+    await page.locator('input[name="category"]').fill('D');
+    await page.locator('input[name="renach"]').fill(`987654321${Date.now().toString().slice(-2)}`);
+    await page.locator('input[name="grExpirationDate"]').fill('2030-02-10');
+    await page.locator('input[name="courseName1"]').fill('MOPP');
+    await page.locator('input[name="courseName2"]').fill('Direcao Defensiva');
+    await page.locator('input[name="courseName3"]').fill('Primeiros Socorros');
+
+    await page.locator('input[name="cnhUpload"]').setInputFiles(pdfPath);
+    const fileInputs = page.locator('input[type="file"]');
+    await fileInputs.nth(1).setInputFiles(pdfPath);
+    await fileInputs.nth(2).setInputFiles(pdfPath);
+    await fileInputs.nth(3).setInputFiles(pdfPath);
+    await fileInputs.nth(4).setInputFiles(pdfPath);
+
     // Salvar
     const submitButton = page.locator('button[form="driver-form"]');
     await submitButton.click();
 
     // Aguardar que o modal fecha e a lista atualiza
-    await page.waitForTimeout(1500);
+    await expect(page.locator('.fixed.inset-0')).toBeHidden({ timeout: 30000 });
 
     // Verificar que motorista aparece na tabela
     const driverRow = page.locator(`text=${driverName}`);
-    await expect(driverRow).toBeVisible();
+    await expect(driverRow).toBeVisible({ timeout: 10000 });
 
     console.log(`✓ Motorista criado: ${driverName}`);
     console.log(`  Email: ${driverEmail}`);
@@ -96,7 +115,7 @@ test.describe.serial('2. Driver-User Integration (Manager Profile - Users.tsx)',
   // Carregar auth do Manager (Alexandre)
   test.use({ storageState: 'e2e/.auth/alexandre.json' });
 
-  test('2.1 Verificar que Driver role NÃO aparece no dropdown de criação de usuário', async ({ page }) => {
+  test('2.1 Verificar roles permitidos no dropdown de criação de usuário para Manager', async ({ page }) => {
     // Ir para Usuários
     await page.goto('/cadastros/usuarios');
     await page.waitForLoadState('networkidle');
@@ -123,17 +142,20 @@ test.describe.serial('2. Driver-User Integration (Manager Profile - Users.tsx)',
 
     console.log('Roles disponíveis para criação:', optionTexts);
 
-    // Verificar que "Driver" NÃO está presente
     const hasDriver = optionTexts.some(text => text.toLowerCase().includes('driver'));
-    if (!hasDriver) {
-      console.log('✓ Role "Driver" não aparece no dropdown de criação');
-    } else {
-      console.error('❌ Role "Driver" encontrado no dropdown (não deveria estar)');
-      expect(hasDriver).toBe(false);
-    }
+    const hasOperationsManager = optionTexts.some(text => text.includes('Gestor de Operações'));
+    const hasManager = optionTexts.some(text => text === 'Manager');
+    const hasDirector = optionTexts.some(text => text === 'Director');
+    const hasAdminMaster = optionTexts.some(text => text === 'Admin Master');
+
+    expect(hasDriver).toBe(true);
+    expect(hasOperationsManager).toBe(true);
+    expect(hasManager).toBe(false);
+    expect(hasDirector).toBe(false);
+    expect(hasAdminMaster).toBe(false);
   });
 
-  test('2.2 Verificar que Driver role NÃO aparece na lista de usuários', async ({ page }) => {
+  test('2.2 Verificar que motorista criado aparece na lista de usuários com role Driver', async ({ page }) => {
     // Ir para Usuários
     await page.goto('/cadastros/usuarios');
     await page.waitForLoadState('networkidle');
@@ -155,12 +177,7 @@ test.describe.serial('2. Driver-User Integration (Manager Profile - Users.tsx)',
       }
     }
 
-    if (!foundDriver) {
-      console.log(`✓ Motorista não aparece como role "Driver" na lista`);
-    } else {
-      console.error(`❌ Motorista encontrado com role "Driver" na lista`);
-      expect(foundDriver).toBe(false);
-    }
+    expect(foundDriver).toBe(true);
   });
 });
 

@@ -43,6 +43,7 @@ export default function Shippers() {
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
   const canDelete = ROLES_CAN_DELETE.includes(user?.role || '');
+  const hasActiveClient = !!currentClient?.id;
 
   // Queries
   const { data: shippers = [], isLoading: loadingShippers, isError: shippersError } = useQuery({
@@ -65,8 +66,10 @@ export default function Shippers() {
 
   const saveMutation = useMutation({
     mutationFn: async (shipper: Partial<Shipper>) => {
-      if (!currentClient?.id) return;
-      const row = shipperToRow(shipper, currentClient.id);
+        if (!currentClient?.id) {
+          throw new Error('Selecione um cliente ativo antes de salvar embarcadores.');
+        }
+        const row = shipperToRow(shipper, currentClient.id);
       if (editingShipper) {
         const { error } = await supabase
           .from('shippers')
@@ -80,8 +83,8 @@ export default function Shippers() {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shippers', currentClient?.id] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['shippers', currentClient?.id] });
       setIsFormOpen(false);
       setEditingShipper(null);
       sessionStorage.removeItem('shipperFormOpen');
@@ -142,7 +145,7 @@ export default function Shippers() {
           <p className="text-sm text-zinc-500 mt-1">Gerencie os embarcadores da sua frota.</p>
         </div>
 
-        {canCreate && (
+        {canCreate && hasActiveClient && (
           <button
             onClick={() => {
               sessionStorage.removeItem('shipperFormData');
