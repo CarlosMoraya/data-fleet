@@ -3,7 +3,7 @@ import { Truck, Wrench, CalendarDays, FileWarning, UserX, Loader2 } from 'lucide
 import DashboardKpiCard from './DashboardKpiCard';
 import VehicleTypeBarChart from './VehicleTypeBarChart';
 import MaintenanceTypeDonutChart from './MaintenanceTypeDonutChart';
-import { countActiveInMaintenance } from '../../lib/dashboardKpi';
+import { buildActiveMaintenanceTypeData, countActiveInMaintenance } from '../../lib/dashboardKpi';
 import type { MaintenanceOrderDashboard } from '../../types/maintenance';
 
 export interface VehicleRow {
@@ -108,20 +108,12 @@ export default function OperationalPanel({
     })).filter((d) => d.value > 0);
   }, [vehicles, filteredVehicles]);
 
-  // Donut: ordens por tipo de manutenção (filtrado por vehicleType se ativo)
-  const ordersForDonut = filters.vehicleType
-    ? maintenanceOrders.filter((o) => {
-      const vIds = new Set(
-        vehicles.filter((v) => v.type === filters.vehicleType).map((v) => v.id)
-      );
-      return vIds.has(o.vehicle_id);
-    })
-    : maintenanceOrders;
-
-  const maintenanceTypeData = MAINTENANCE_TYPES.map((t) => ({
-    name: t,
-    value: ordersForDonut.filter((o) => o.type === t).length,
-  })).filter((d) => d.value > 0);
+  // Donut: ordens ativas por tipo de manutenção (filtrado por vehicleType se ativo)
+  const maintenanceTypeData = buildActiveMaintenanceTypeData(
+    activeMaintenanceOrders,
+    vehicles,
+    filters.vehicleType
+  );
 
   if (isLoading) {
     return (

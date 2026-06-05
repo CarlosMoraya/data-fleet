@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { countActiveInMaintenance } from './dashboardKpi';
+import { countActiveInMaintenance, buildActiveMaintenanceTypeData } from './dashboardKpi';
 
 describe('countActiveInMaintenance', () => {
   it('retorna 2 quando há 2 ordens ativas e nenhum filtro de tipo', () => {
@@ -49,5 +49,64 @@ describe('countActiveInMaintenance', () => {
     ];
     const vehicles = [{ id: 'v1', type: 'Truck' }];
     expect(countActiveInMaintenance(orders, vehicles, 'Truck')).toBe(1);
+  });
+});
+
+describe('buildActiveMaintenanceTypeData', () => {
+  it('retorna contagem por tipo apenas para ordens ativas', () => {
+    const orders = [
+      { vehicle_id: 'v1', status: 'Aguardando orçamento', type: 'Corretiva' as const },
+      { vehicle_id: 'v2', status: 'Orçamento aprovado', type: 'Preventiva' as const },
+    ];
+    const vehicles = [
+      { id: 'v1', type: 'Truck' },
+      { id: 'v2', type: 'Van' },
+    ];
+    const result = buildActiveMaintenanceTypeData(orders, vehicles, null);
+    expect(result).toEqual([
+      { name: 'Corretiva', value: 1 },
+      { name: 'Preventiva', value: 1 },
+    ]);
+  });
+
+  it('ignora ordens concluídas e canceladas', () => {
+    const orders = [
+      { vehicle_id: 'v1', status: 'Concluído', type: 'Corretiva' as const },
+      { vehicle_id: 'v2', status: 'Cancelado', type: 'Preventiva' as const },
+      { vehicle_id: 'v3', status: 'Aguardando orçamento', type: 'Preditiva' as const },
+    ];
+    const vehicles = [
+      { id: 'v1', type: 'Truck' },
+      { id: 'v2', type: 'Van' },
+      { id: 'v3', type: 'Truck' },
+    ];
+    const result = buildActiveMaintenanceTypeData(orders, vehicles, null);
+    expect(result).toEqual([{ name: 'Preditiva', value: 1 }]);
+  });
+
+  it('respeita filtro de tipo de veículo', () => {
+    const orders = [
+      { vehicle_id: 'v1', status: 'Aguardando orçamento', type: 'Corretiva' as const },
+      { vehicle_id: 'v2', status: 'Orçamento aprovado', type: 'Preventiva' as const },
+    ];
+    const vehicles = [
+      { id: 'v1', type: 'Truck' },
+      { id: 'v2', type: 'Van' },
+    ];
+    const result = buildActiveMaintenanceTypeData(orders, vehicles, 'Truck');
+    expect(result).toEqual([{ name: 'Corretiva', value: 1 }]);
+  });
+
+  it('retorna array vazio quando não há ordens ativas', () => {
+    const orders = [
+      { vehicle_id: 'v1', status: 'Concluído', type: 'Corretiva' as const },
+      { vehicle_id: 'v2', status: 'Cancelado', type: 'Preventiva' as const },
+    ];
+    const vehicles = [
+      { id: 'v1', type: 'Truck' },
+      { id: 'v2', type: 'Van' },
+    ];
+    const result = buildActiveMaintenanceTypeData(orders, vehicles, null);
+    expect(result).toEqual([]);
   });
 });
