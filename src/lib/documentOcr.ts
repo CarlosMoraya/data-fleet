@@ -99,20 +99,24 @@ function extractCrlvFromText(text: string): Partial<Vehicle> {
     return m ? m[1].trim() : null;
   };
 
-  // Placa
-  const plate = tryMatch(/PLACA\s*[:\-]?\s*([A-Z]{3}\d[A-Z0-9]\d{2})/);
+  // Aceita formato Mercosul (ABC1D23) E formato antigo (ABC1234)
+  const plate = tryMatch(/PLACA\s*[:\-]?\s*([A-Z]{3}(?:\d[A-Z0-9]\d{2}|\d{4}))/)
+    ?? tryMatch(/\b([A-Z]{3}(?:\d[A-Z0-9]\d{2}|\d{4}))\b/);
   if (plate) result.licensePlate = filterPlate(plate);
 
   // Renavam
-  const renavam = tryMatch(/(?:C[OÓ]D(?:IGO)?\.?\s*RENAVAM|RENAVAM)\s*[:\-]?\s*(\d{9,11})/);
+  const renavam = tryMatch(/(?:C[OÓ]D(?:IGO)?\.?\s*RENAVAM|RENAVAM)\s*[:\-]?\s*(\d{9,11})/)
+    ?? tryMatch(/\b(\d{9,11})\s+[A-Z]{3}(?:\d[A-Z0-9]\d{2}|\d{4})\b/);
   if (renavam) result.renavam = filterDigitsOnly(renavam);
 
   // Exercício CRLV
-  const exercicio = tryMatch(/EXERC[IÍ]CIO\s*[:\-]?\s*(\d{4})/);
+  const exercicio = tryMatch(/EXERC[IÍ]CIO\s*[:\-]?\s*(\d{4})/)
+    ?? (plate ? tryMatch(new RegExp(`\\b${plate}\\b\\s+(\\d{4})`)) : null);
   if (exercicio) result.crlvYear = exercicio;
 
   // Ano de fabricação
-  const ano = tryMatch(/ANO\s*(?:DE\s*)?FABRICA[CÇ][AÃ]O\s*[:\-]?\s*(\d{4})/);
+  const ano = tryMatch(/ANO\s*(?:DE\s*)?FABRICA[CÇ][AÃ]O\s*[:\-]?\s*(\d{4})/)
+    ?? (plate ? tryMatch(new RegExp(`\\b${plate}\\b\\s+\\d{4}\\s+(\\d{4})`)) : null);
   if (ano) {
     const yr = parseInt(ano, 10);
     if (!isNaN(yr)) result.year = yr;
@@ -125,38 +129,50 @@ function extractCrlvFromText(text: string): Partial<Vehicle> {
     if (parts[0]) result.brand = normalizeUpper(parts[0]);
     if (parts[1]) result.model = normalizeUpper(parts.slice(1).join(' '));
   }
+  const marcaModeloDigital = tryMatch(/\b([A-ZÀ-Ú]+\/[A-Z0-9À-Ú\s]+?)\s+(?:PASSAGEIRO|CARGA|MISTO|TRA[CÇ][AÃ]O)\b/);
+  if (marcaModeloDigital) {
+    const parts = marcaModeloDigital.split('/').map(s => s.trim()).filter(Boolean);
+    if (parts[0]) result.brand = normalizeUpper(parts[0]);
+    if (parts[1]) result.model = normalizeUpper(parts.slice(1).join(' '));
+  }
 
   // Chassi (17 chars alfanuméricos)
-  const chassi = tryMatch(/CHASSI\s*[:\-]?\s*([A-Z0-9]{17})/);
+  const chassi = tryMatch(/CHASSI\s*[:\-]?\s*([A-Z0-9]{17})/)
+    ?? tryMatch(/\b([A-HJ-NPR-Z0-9]{17})\b/);
   if (chassi) result.chassi = filterAlphanumeric(chassi, 17);
 
   // Cor predominante
-  const cor = tryMatch(/COR\s*PREDOMINANTE\s*[:\-]?\s*([A-ZÀ-Ú\s]{3,20})/);
+  const cor = tryMatch(/COR\s*PREDOMINANTE\s*[:\-]?\s*([A-ZÀ-Ú\s]{3,20})/)
+    ?? (chassi ? tryMatch(new RegExp(`\\b${chassi}\\b\\s+([A-ZÀ-Ú]{3,20})\\s+`)) : null);
   if (cor) result.color = capitalizeWords(cor.replace(/\s+/g, ' ').trim());
 
   // PBT
-  const pbt = tryMatch(/(?:PESO\s*BRUTO\s*TOTAL|PBT)\s*[:\-]?\s*([\d.,]+)/);
+  const pbt = tryMatch(/(?:PESO\s*BRUTO\s*TOTAL|PBT)\s*[:\-]?\s*([\d.,]+)/)
+    ?? tryMatch(/\b\d+\s*CV\s*\/\s*\d+\s+([\d.,]+)\s+[A-Z0-9]{10,}/);
   if (pbt) {
     const n = parseFloat(pbt.replace(',', '.'));
     if (!isNaN(n)) result.pbt = n;
   }
 
   // CMT
-  const cmt = tryMatch(/CMT\s*[:\-]?\s*([\d.,]+)/);
+  const cmt = tryMatch(/CMT\s*[:\-]?\s*([\d.,]+)/)
+    ?? tryMatch(/\b[A-Z0-9]{10,}\s+([\d.,]+)\s+\d{1,2}\s+\d{2}P\b/);
   if (cmt) {
     const n = parseFloat(cmt.replace(',', '.'));
     if (!isNaN(n)) result.cmt = n;
   }
 
   // Eixos
-  const eixos = tryMatch(/EIXOS?\s*[:\-]?\s*(\d{1,2})/);
+  const eixos = tryMatch(/EIXOS?\s*[:\-]?\s*(\d{1,2})/)
+    ?? tryMatch(/\b[A-Z0-9]{10,}\s+[\d.,]+\s+(\d{1,2})\s+\d{2}P\b/);
   if (eixos) {
     const n = parseInt(eixos, 10);
     if (!isNaN(n)) result.eixos = n;
   }
 
   // Detran UF — captura apenas a sigla de 2 letras no campo LOCAL
-  const local = tryMatch(/LOCAL\s*[:\-]?\s*(?:[A-Z\s]*?\s)?([A-Z]{2})(?:\s|$)/);
+  const local = tryMatch(/LOCAL\s*[:\-]?\s*(?:[A-Z\s]*?\s)?([A-Z]{2})(?:\s|$)/)
+    ?? tryMatch(/\b[A-ZÀ-Ú\s]+?\s+([A-Z]{2})\s+\d{2}\/\d{2}\/\d{4}\b/);
   if (local) result.detranUF = filterAlpha(local, 2);
 
   ocrDebug('CRLV regex resultado:', {
