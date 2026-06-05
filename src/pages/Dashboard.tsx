@@ -126,6 +126,39 @@ export default function Dashboard() {
       gcTime: 30 * 60 * 1000,
     });
 
+  const { data: activeMaintenanceOrders = [], isLoading: loadingActiveMaintenance } =
+    useQuery<MaintenanceOrderDashboard[]>({
+      queryKey: ['dashboard-active-maintenance', currentClient?.id],
+      queryFn: async () => {
+        let query = supabase
+          .from('maintenance_orders')
+          .select('id, vehicle_id, type, status, approved_cost, current_km, vehicles(type)')
+          .not('status', 'in', '("Concluído","Cancelado")');
+        if (currentClient?.id) {
+          query = query.eq('client_id', currentClient.id);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        return (data ?? []).map((row: Record<string, unknown>) => ({
+          id: row.id as string,
+          vehicle_id: row.vehicle_id as string,
+          type: row.type as MaintenanceOrderDashboard['type'],
+          status: row.status as string,
+          approved_cost: row.approved_cost != null ? Number(row.approved_cost) : null,
+          current_km: row.current_km != null ? Number(row.current_km) : null,
+          vehicle_type:
+            row.vehicles && typeof row.vehicles === 'object' && !Array.isArray(row.vehicles)
+              ? (row.vehicles as Record<string, unknown>).type as string | null
+              : Array.isArray(row.vehicles) && row.vehicles.length > 0
+                ? (row.vehicles[0] as Record<string, unknown>).type as string | null
+                : null,
+        }));
+      },
+      enabled: !!user,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+    });
+
   const { data: checklistRows = [], isLoading: loadingChecklists } = useQuery<
     { vehicle_id: string; context: string; completed_at: string; odometer_km: number | null }[]
   >({
@@ -256,7 +289,7 @@ export default function Dashboard() {
   // ── Loading state ─────────────────────────────────────────────────────────
 
   const isPanelLoading =
-    loadingVehicles || loadingMaintenance || loadingChecklists || loadingDrivers;
+    loadingVehicles || loadingMaintenance || loadingActiveMaintenance || loadingChecklists || loadingDrivers;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -335,6 +368,7 @@ export default function Dashboard() {
           <OperationalPanel
             vehicles={vehicles}
             maintenanceOrders={maintenanceOrders}
+            activeMaintenanceOrders={activeMaintenanceOrders}
             overdueChecklistVehicleIds={overdueChecklistVehicleIds}
             expiredCrlvCount={expiredCrlvCount}
             expiredCnhCount={expiredCnhCount}

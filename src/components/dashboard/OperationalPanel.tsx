@@ -3,6 +3,7 @@ import { Truck, Wrench, CalendarDays, FileWarning, UserX, Loader2 } from 'lucide
 import DashboardKpiCard from './DashboardKpiCard';
 import VehicleTypeBarChart from './VehicleTypeBarChart';
 import MaintenanceTypeDonutChart from './MaintenanceTypeDonutChart';
+import { countActiveInMaintenance } from '../../lib/dashboardKpi';
 import type { MaintenanceOrderDashboard } from '../../types/maintenance';
 
 export interface VehicleRow {
@@ -26,6 +27,7 @@ const MAINTENANCE_TYPES = ['Corretiva', 'Preventiva', 'Preditiva'] as const;
 interface OperationalPanelProps {
   vehicles: VehicleRow[];
   maintenanceOrders: MaintenanceOrderDashboard[];
+  activeMaintenanceOrders: MaintenanceOrderDashboard[];
   overdueChecklistVehicleIds: Set<string>;
   expiredCrlvCount: number;
   expiredCnhCount: number;
@@ -37,6 +39,7 @@ interface OperationalPanelProps {
 export default function OperationalPanel({
   vehicles,
   maintenanceOrders,
+  activeMaintenanceOrders,
   overdueChecklistVehicleIds,
   expiredCrlvCount,
   expiredCnhCount,
@@ -67,7 +70,8 @@ export default function OperationalPanel({
   }, [vehicles, maintenanceOrders, filters]);
 
   const totalVehicles = filteredVehicles.length;
-  const inMaintenance = filteredOrders.filter((o) => o.status !== 'Concluído' && o.status !== 'Cancelado').length;
+  // O KPI "Em Manutenção" reflete estado operacional atual e não é afetado pelo filtro de tipo de manutenção.
+  const inMaintenance = countActiveInMaintenance(activeMaintenanceOrders, vehicles, filters.vehicleType);
 
   const overdueChecklists = filters.vehicleType
     ? filteredVehicles.filter((v) => overdueChecklistVehicleIds.has(v.id)).length
