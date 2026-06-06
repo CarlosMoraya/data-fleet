@@ -78,8 +78,40 @@ export default function InviteWorkshopModal({ onClose }: Props) {
     },
   });
 
+  const copyTextToClipboard = async (text: string) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch {
+        // Fall through to the legacy copy path when browser permission blocks Clipboard API.
+      }
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.top = '-9999px';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+
+    let copied = false;
+    try {
+      copied = document.execCommand('copy');
+    } finally {
+      document.body.removeChild(textarea);
+    }
+
+    if (!copied) {
+      throw new Error('Não foi possível copiar o link.');
+    }
+  };
+
   const handleCopy = async (url: string, token: string) => {
-    await navigator.clipboard.writeText(url);
+    await copyTextToClipboard(url);
     setCopiedToken(token);
     setTimeout(() => setCopiedToken(null), 2000);
   };

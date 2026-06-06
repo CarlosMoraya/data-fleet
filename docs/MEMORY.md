@@ -228,3 +228,10 @@ Causa raiz: `OperationalPanel.tsx` montava o donut com `maintenanceOrders`, cole
 Correção aplicada: agregação do donut operacional passa a usar ordens ativas por tipo, com teste unitário protegendo status ativo/inativo e filtro por tipo de veículo.
 Arquivos modificados: `src/lib/dashboardKpi.ts`, `src/lib/dashboardKpi.test.ts`, `src/components/dashboard/OperationalPanel.tsx`, `docs/MEMORY.md`
 Testes adicionados: casos unitários em `src/lib/dashboardKpi.test.ts` para `buildActiveMaintenanceTypeData`.
+
+## 🆕 Atualização de Sessão (05/06/2026) — Convite de Oficinas
+Bug corrigido: botão de copiar link no modal "Convidar Oficina Parceira" não funcionava em HTTP por IP local.
+Causa raiz: `InviteWorkshopModal` dependia exclusivamente de `navigator.clipboard.writeText`, que pode ser bloqueado fora de secure context ou por permissão do navegador.
+Correção aplicada: adicionado fallback local com `textarea` temporário e `document.execCommand('copy')`, preservando o uso da Clipboard API quando disponível.
+Arquivos modificados: `src/components/InviteWorkshopModal.tsx`, `docs/MEMORY.md`
+Testes adicionados: nenhum — testes pulados por solicitação do usuário.
