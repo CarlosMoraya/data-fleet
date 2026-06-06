@@ -116,8 +116,26 @@ export default function InviteWorkshopModal({ onClose }: Props) {
     setTimeout(() => setCopiedToken(null), 2000);
   };
 
+  const isLocalInviteOrigin = (hostname: string) =>
+    hostname === 'localhost'
+    || hostname === '127.0.0.1'
+    || hostname.startsWith('192.168.')
+    || hostname.startsWith('10.')
+    || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
+
+  const getInviteBaseUrl = () => {
+    const configuredUrl = import.meta.env.VITE_FRONTEND_URL as string | undefined;
+    if (configuredUrl) return configuredUrl.replace(/\/+$/, '');
+
+    if (isLocalInviteOrigin(window.location.hostname)) {
+      return 'https://app.betafleet.com.br';
+    }
+
+    return window.location.origin;
+  };
+
   const getInviteUrl = (token: string) =>
-    `${window.location.origin}/workshop/join?token=${token}`;
+    `${getInviteBaseUrl()}/workshop/join?token=${token}`;
 
   const formatExpiry = (expiresAt: string) => {
     const d = new Date(expiresAt);

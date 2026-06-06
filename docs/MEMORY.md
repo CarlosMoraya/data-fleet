@@ -235,3 +235,10 @@ Causa raiz: `InviteWorkshopModal` dependia exclusivamente de `navigator.clipboar
 Correção aplicada: adicionado fallback local com `textarea` temporário e `document.execCommand('copy')`, preservando o uso da Clipboard API quando disponível.
 Arquivos modificados: `src/components/InviteWorkshopModal.tsx`, `docs/MEMORY.md`
 Testes adicionados: nenhum — testes pulados por solicitação do usuário.
+
+## 🆕 Atualização de Sessão (05/06/2026) — Link Público de Convite de Oficinas
+Bug corrigido: link de convite copiado em ambiente local usava `http://192.168...:3000`, e o WhatsApp não tratava esse endereço como link compartilhável/clicável.
+Causa raiz: `InviteWorkshopModal` montava o convite com `window.location.origin`, herdando a origem local/IP usada pelo operador.
+Correção aplicada: link de convite passa a usar `VITE_FRONTEND_URL` quando configurado e, em origens locais/IP privadas, cai para `https://app.betafleet.com.br`.
+Arquivos modificados: `src/components/InviteWorkshopModal.tsx`, `.env.example`, `docs/MEMORY.md`
+Testes adicionados: nenhum — validação manual pendente.
