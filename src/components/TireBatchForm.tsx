@@ -3,6 +3,7 @@ import { Loader2, X, ChevronRight, ChevronLeft, AlertTriangle, CheckCircle2 } fr
 import { cn } from '../lib/utils';
 import { TireVisualClassification, VehicleTireConfig, AxleConfigEntry } from '../types';
 import { generatePositions, generatePositionsFromConfig } from '../lib/tirePositions';
+import { safeRandomUUID } from '../lib/uuid';
 import { supabase } from '../lib/supabase';
 
 interface TireBatchFormProps {
@@ -188,7 +189,7 @@ export default function TireBatchForm({
           rows.push({
             client_id: clientId,
             vehicle_id: vehicle.id,
-            tire_code: crypto.randomUUID(),
+            tire_code: safeRandomUUID(),
             specification: template.specification.trim(),
             dot: template.dot.trim() || null,
             fire_marking: template.fireMarking.trim() || null,

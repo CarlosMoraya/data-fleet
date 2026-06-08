@@ -1,6 +1,7 @@
 import React from 'react';
 import { Loader2, X, AlertTriangle } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { safeRandomUUID } from '../lib/uuid';
 import { Tire, TireVisualClassification, VehicleTireConfig, AxleConfigEntry } from '../types';
 import { generatePositions, generatePositionsFromConfig, validatePositionAssignment } from '../lib/tirePositions';
 
@@ -141,7 +142,7 @@ export default function TireForm({
       await onSave(
         {
           ...buildSharedData(),
-          tireCode: crypto.randomUUID(),
+          tireCode: safeRandomUUID(),
           currentPosition,
           positionType: selectedPos?.type ?? 'single',
         },
@@ -153,7 +154,7 @@ export default function TireForm({
       if (freePositions.length === 0) return;
       const tiresArray: Partial<Tire>[] = freePositions.map(pos => ({
         ...buildSharedData(),
-        tireCode: crypto.randomUUID(),
+        tireCode: safeRandomUUID(),
         currentPosition: pos.code,
         positionType: pos.type,
       }));
