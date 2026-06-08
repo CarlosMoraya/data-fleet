@@ -13,6 +13,11 @@ setup('authenticate as Admin Master', async ({ page }) => {
   }
 
   await page.goto('/login');
+  // Wait for the React app to fully render the login form before interacting.
+  // Without this, a cold Vite dev server may not have compiled the JS bundle yet,
+  // causing fill/click to time out because the inputs don't exist in the DOM.
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 15000 });
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', password);
   await page.click('button[type="submit"]');
