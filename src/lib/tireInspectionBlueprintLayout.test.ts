@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { calculateBlueprintLayout } from './tireInspectionBlueprintLayout';
+import { generatePositionsFromConfig } from './tirePositions';
 import type { AxleConfigEntry } from '../types/tire';
 
 // ─── Fixtures de AxleConfig ───────────────────────────────────────────────────
@@ -184,6 +185,32 @@ describe('calculateBlueprintLayout — status', () => {
     expect(e1.status).toBe('done');
     expect(d1.status).toBe('done');
     expect(e2.status).toBe('empty');
+  });
+});
+
+// ─── Paridade total de progresso ↔ pneus desenhados ───────────────────────────
+
+describe('Paridade total de progresso ↔ pneus desenhados', () => {
+  it('número de posições geradas é igual ao número de nós desenhados (rodagem simples)', () => {
+    const positions = generatePositionsFromConfig(twoAxleSimples, 1, '');
+    const layout = calculateBlueprintLayout(twoAxleSimples, 1, '');
+    expect(layout.nodes.length).toBe(positions.length);
+  });
+
+  it('cenário do bug: 2 eixos simples + 1 estepe = 5 posições (denominador correto)', () => {
+    expect(generatePositionsFromConfig(twoAxleSimples, 1, '').length).toBe(5);
+  });
+
+  it('número de posições geradas é igual ao número de nós desenhados (rodagem dupla)', () => {
+    const positions = generatePositionsFromConfig(twoAxleDupla, 1, '');
+    const layout = calculateBlueprintLayout(twoAxleDupla, 1, '');
+    expect(layout.nodes.length).toBe(positions.length);
+  });
+
+  it('número de posições geradas é igual ao número de nós desenhados (rodagem tripla)', () => {
+    const positions = generatePositionsFromConfig(twoAxleTripla, 1, '');
+    const layout = calculateBlueprintLayout(twoAxleTripla, 1, '');
+    expect(layout.nodes.length).toBe(positions.length);
   });
 });
 

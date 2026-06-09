@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Gauge, Loader2, CheckCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { generatePositionsFromConfig } from '../lib/tirePositions';
 import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePendingTireInspectionCount } from '../hooks/usePendingTireInspectionCount';
@@ -103,6 +104,18 @@ export default function TireInspectionFill() {
   const responseByCode = useMemo(
     () => Object.fromEntries(responses.map(r => [r.positionCode, r])),
     [responses],
+  );
+
+  const totalPositions = useMemo(
+    () =>
+      inspection
+        ? generatePositionsFromConfig(
+            inspection.axleConfigSnapshot,
+            inspection.stepsCountSnapshot,
+            '',
+          ).length
+        : 0,
+    [inspection],
   );
 
   const isCompleted = inspection?.status === 'completed';
@@ -265,7 +278,7 @@ export default function TireInspectionFill() {
             </div>
 
             {/* Progress */}
-            <ProgressBar total={answeredCodes.size + (inspection.axleConfigSnapshot.length || 0)} done={answeredCodes.size} />
+            <ProgressBar total={totalPositions} done={answeredCodes.size} />
 
             {/* Finish button */}
             {!isCompleted && (
