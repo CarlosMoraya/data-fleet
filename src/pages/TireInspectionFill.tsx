@@ -19,7 +19,8 @@ import {
   completeTireInspection,
 } from '../services/tireInspectionService';
 import { supabase } from '../lib/supabase';
-import type { TireInspectionResponse } from '../types';
+import { applyOfflineKm } from '../lib/offlineCacheUpdates';
+import type { TireInspection, TireInspectionResponse } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -130,6 +131,7 @@ export default function TireInspectionFill() {
     mutationFn: async (km: number) => {
       if (!isOnline) {
         await enqueueOperation({ type: 'confirm_tire_km', odometerKm: km }, '', inspectionId!);
+        queryClient.setQueryData(['tireInspection', inspectionId], (old: TireInspection | undefined) => applyOfflineKm(old, km));
         return;
       }
       const { error } = await supabase
@@ -176,6 +178,11 @@ export default function TireInspectionFill() {
           observation: data.observation,
           respondedAt: data.respondedAt,
         }, inspectionId!);
+        queryClient.setQueryData(['tireInspectionResponses', inspectionId], (old: TireInspectionResponse[] | undefined) => {
+          const response: TireInspectionResponse = { ...data, id: `offline-${data.positionCode}`, inspectionId: inspectionId!, photoUrl: '' };
+          const base = old ?? [];
+          return [...base.filter(r => r.positionCode !== response.positionCode), response];
+        });
         return;
       }
       await saveInspectionResponse({
@@ -198,11 +205,13 @@ export default function TireInspectionFill() {
     networkMode: 'offlineFirst',
     mutationFn: async () => {
       if (!isOnline) {
+        const completedAt = new Date().toISOString();
         await enqueueOperation({
           type: 'finish_tire_inspection',
-          completedAt: new Date().toISOString(),
+          completedAt,
           vehicleId: inspection!.vehicleId,
         }, inspectionId!);
+        queryClient.setQueryData(['tireInspection', inspectionId], (old: TireInspection | undefined) => old ? { ...old, status: 'completed', completedAt } : old);
         return;
       }
       await completeTireInspection(inspectionId!, inspection!.odometerKm ?? 0);

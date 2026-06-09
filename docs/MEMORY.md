@@ -294,3 +294,11 @@ Correção aplicada: networkMode: 'offlineFirst' nas 4 mutations de ChecklistFil
 Arquivos modificados: src/pages/ChecklistFill.tsx, src/pages/TireInspectionFill.tsx
 Testes adicionados: e2e/pending/checklist-offline-fill.spec.ts
 Observação: iniciar checklist offline (local-first) continua como evolução futura.
+
+## 🆕 Atualização de Sessão (09/06/2026) — Bugfix: app não sobrevivia a recarregamento offline
+Bug corrigido: app não sobrevvia a recarregamento offline (após a foto: tela branca "Esta página não está funcionando" ou volta para "Informe o hodômetro", perdendo o checklist).
+Causa raiz: fundação offline-first incompleta — (1) sem service worker/PWA, (2) cache do React Query só em memória, (3) escritas offline (KM/respostas) só na fila Dexie, não refletidas no cache; ao recarregar, kmConfirmed voltava a false porque checklist.odometerKm seguia nulo.
+Correção aplicada: PWA com vite-plugin-pwa (navigateFallback p/ reabrir offline); persistência do cache do React Query (PersistQueryClientProvider + localStorage, filtrada às chaves de preenchimento); atualização otimista do cache nas escritas offline; limpeza do cache no logout; redução do pico de memória da câmera.
+Arquivos modificados: vite.config.ts, src/vite-env.d.ts, index.html, src/lib/react-query.ts, src/App.tsx, src/context/AuthContext.tsx, src/pages/ChecklistFill.tsx, src/pages/TireInspectionFill.tsx, src/components/CameraCapture.tsx; novos: src/lib/offlineCacheUpdates.ts, public/icons/icon-192.png, public/icons/icon-512.png
+Testes adicionados: src/lib/offlineCacheUpdates.test.ts, e2e/pending/checklist-offline-reload.spec.ts
+Observação: local-first reads / iniciar checklist offline seguem como evolução futura.

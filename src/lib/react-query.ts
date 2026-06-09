@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -9,4 +10,9 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: true, // Revalida ao voltar para a aba apenas se dados tiverem > 3 min
     },
   },
+});
+
+export const persister = createSyncStoragePersister({
+  storage: window.localStorage,
+  key: 'betafleet-rq-cache',
 });

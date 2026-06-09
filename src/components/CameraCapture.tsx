@@ -57,7 +57,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    const MAX = 1920;
+    const MAX = 1280;
     let w = video.videoWidth;
     let h = video.videoHeight;
     if (w > MAX || h > MAX) {
@@ -93,6 +93,8 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
   const confirm = () => {
     if (capturedFile) {
       onCapture(capturedFile, gps?.lat, gps?.lng);
+      setPreview(null);
+      setCapturedFile(null);
     }
   };
 

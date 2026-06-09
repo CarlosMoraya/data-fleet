@@ -5,8 +5,8 @@
 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient } from './lib/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { queryClient, persister } from './lib/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import Layout from './components/Layout';
@@ -50,7 +50,24 @@ function OfflineSyncBoot() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister,
+        maxAge: 1000 * 60 * 60 * 24,
+        buster: 'v1',
+        dehydrateOptions: {
+          shouldDehydrateQuery: (q) => {
+            const k = q.queryKey?.[0];
+            return [
+              'checklist', 'checklistItems', 'checklistResponses',
+              'vehicleInitialKm', 'lastOdometerKm', 'workshops', 'openChecklist',
+              'tireInspection', 'tireInspectionResponses', 'tireInspectionItems',
+            ].includes(k as string);
+          },
+        },
+      }}
+    >
       <OfflineSyncBoot />
       <AuthProvider>
         <Router>
@@ -89,6 +106,6 @@ export default function App() {
           </Routes>
         </Router>
       </AuthProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }

@@ -15,6 +15,7 @@ import { usePendingSyncCount } from '../hooks/usePendingSyncCount';
 import type { Checklist, ChecklistItem, ChecklistContext, ResponseStatus } from '../types';
 import { WORKSHOP_CONTEXTS } from '../types';
 import { cn } from '../lib/utils';
+import { applyOfflineKm, applyOfflineWorkshop, upsertResponse } from '../lib/offlineCacheUpdates';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface ItemState {
@@ -196,10 +197,19 @@ export default function ChecklistFill() {
     networkMode: 'offlineFirst',
     mutationFn: async ({ itemId, status, observation, photoUrl }: { itemId: string; status: ResponseStatus; observation: string; photoUrl: string }) => {
       if (!navigator.onLine) {
+        const respondedAt = new Date().toISOString();
         await enqueueOperation(
-          { type: 'save_response', itemId, status, observation, photoUrl, respondedAt: new Date().toISOString() },
+          { type: 'save_response', itemId, status, observation, photoUrl, respondedAt },
           checklistId!,
         );
+        queryClient.setQueryData(['checklistResponses', checklistId], (old: any[] | undefined) => upsertResponse(old, {
+          checklist_id: checklistId!,
+          item_id: itemId,
+          status,
+          observation,
+          photo_url: photoUrl || null,
+          responded_at: respondedAt,
+        }));
         return;
       }
       const { error } = await supabase.from('checklist_responses').upsert({
@@ -224,6 +234,7 @@ export default function ChecklistFill() {
     mutationFn: async (km: number) => {
       if (!navigator.onLine) {
         await enqueueOperation({ type: 'confirm_km', odometerKm: km }, checklistId!);
+        queryClient.setQueryData(['checklist', checklistId], (old: Checklist | undefined) => applyOfflineKm(old, km));
         return;
       }
       const { error } = await supabase
@@ -260,6 +271,7 @@ export default function ChecklistFill() {
     mutationFn: async (workshopId: string) => {
       if (!navigator.onLine) {
         await enqueueOperation({ type: 'confirm_workshop', workshopId }, checklistId!);
+        queryClient.setQueryData(['checklist', checklistId], (old: Checklist | undefined) => applyOfflineWorkshop(old, workshopId));
         return;
       }
       const { error } = await supabase
@@ -281,16 +293,19 @@ export default function ChecklistFill() {
       if (!checklist?.vehicleId) throw new Error('Este checklist não está associado a um veículo.');
 
       if (!navigator.onLine) {
+        const completedAt = new Date().toISOString();
         await enqueueOperation(
           {
             type: 'finish_checklist',
-            completedAt: new Date().toISOString(),
+            completedAt,
             templateContext: templateContext ?? null,
             workshopId: checklist.workshopId || selectedWorkshopId || undefined,
             vehicleId: checklist.vehicleId,
           },
           checklistId!,
         );
+        queryClient.setQueryData(['checklist', checklistId], (old: Checklist | undefined) => old ? { ...old, status: 'completed', completedAt } : old);
+        queryClient.setQueriesData({ queryKey: ['openChecklist'] }, null);
         return;
       }
 
@@ -360,6 +375,7 @@ export default function ChecklistFill() {
       updateItemLocal(itemId, { photoUrl: localPreviewUrl, uploading: false });
 
       const currentState = itemStates[idx];
+      const respondedAt = new Date().toISOString();
       await enqueueOperation(
         {
           type: 'save_response',
@@ -368,10 +384,18 @@ export default function ChecklistFill() {
           observation: currentState.observation,
           photoUrl: '',
           pendingPhotoKey,
-          respondedAt: new Date().toISOString(),
+          respondedAt,
         },
         checklistId!,
       );
+      queryClient.setQueryData(['checklistResponses', checklistId], (old: any[] | undefined) => upsertResponse(old, {
+        checklist_id: checklistId!,
+        item_id: itemId,
+        status: currentState.status!,
+        observation: currentState.observation,
+        photo_url: '',
+        responded_at: respondedAt,
+      }));
       return;
     }
 

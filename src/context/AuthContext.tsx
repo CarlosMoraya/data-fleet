@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from '../lib/supabase';
 import { User, Role, Client, WorkshopAccount, WorkshopPartnership } from '../types';
 import { isOperationsManager } from '../lib/rolePermissions';
+import { queryClient, persister } from '../lib/react-query';
 
 interface AuthContextType {
   user: User | null;
@@ -247,6 +248,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await supabase.auth.signOut();
+    queryClient.clear();
+    await persister.removeClient();
   };
 
   const switchClient = (clientId: string) => {
