@@ -193,6 +193,7 @@ export default function ChecklistFill() {
   // ── Mutations ────────────────────────────────────────────────────────────
 
   const saveResponseMutation = useMutation({
+    networkMode: 'offlineFirst',
     mutationFn: async ({ itemId, status, observation, photoUrl }: { itemId: string; status: ResponseStatus; observation: string; photoUrl: string }) => {
       if (!navigator.onLine) {
         await enqueueOperation(
@@ -219,6 +220,7 @@ export default function ChecklistFill() {
   });
 
   const confirmKmMutation = useMutation({
+    networkMode: 'offlineFirst',
     mutationFn: async (km: number) => {
       if (!navigator.onLine) {
         await enqueueOperation({ type: 'confirm_km', odometerKm: km }, checklistId!);
@@ -254,6 +256,7 @@ export default function ChecklistFill() {
   };
 
   const confirmWorkshopMutation = useMutation({
+    networkMode: 'offlineFirst',
     mutationFn: async (workshopId: string) => {
       if (!navigator.onLine) {
         await enqueueOperation({ type: 'confirm_workshop', workshopId }, checklistId!);
@@ -273,6 +276,7 @@ export default function ChecklistFill() {
   });
 
   const finishChecklistMutation = useMutation({
+    networkMode: 'offlineFirst',
     mutationFn: async () => {
       if (!checklist?.vehicleId) throw new Error('Este checklist não está associado a um veículo.');
 

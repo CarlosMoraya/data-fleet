@@ -126,6 +126,7 @@ export default function TireInspectionFill() {
   // ── KM confirmation ───────────────────────────────────────────────────────
 
   const confirmKmMutation = useMutation({
+    networkMode: 'offlineFirst',
     mutationFn: async (km: number) => {
       if (!isOnline) {
         await enqueueOperation({ type: 'confirm_tire_km', odometerKm: km }, '', inspectionId!);
@@ -156,6 +157,7 @@ export default function TireInspectionFill() {
   // ── Save response ─────────────────────────────────────────────────────────
 
   const saveResponseMutation = useMutation({
+    networkMode: 'offlineFirst',
     mutationFn: async ({ data, blob }: { data: Omit<TireInspectionResponse, 'id'>; blob?: Blob }) => {
       if (!isOnline && blob) {
         const photoKey = await enqueuePhoto(blob, currentClient!.id, inspectionId!, data.positionCode);
@@ -193,6 +195,7 @@ export default function TireInspectionFill() {
   // ── Complete inspection ───────────────────────────────────────────────────
 
   const completeMutation = useMutation({
+    networkMode: 'offlineFirst',
     mutationFn: async () => {
       if (!isOnline) {
         await enqueueOperation({

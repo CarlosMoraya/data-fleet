@@ -286,3 +286,11 @@ Correção aplicada (paliativa): guard offline no início — bloqueia com mensa
 Arquivos modificados: src/lib/checklistStartGuard.ts (novo), src/pages/Checklists.tsx
 Testes adicionados: src/lib/checklistStartGuard.test.ts
 Observação: criação offline real (local-first) registrada como evolução futura.
+
+## 🆕 Atualização de Sessão (09/06/2026) — Bugfix: preenchimento offline do checklist travava
+Bug corrigido: preenchimento offline do checklist (e inspeção de pneus) travava — "Confirmar hodômetro" e "Finalizar" ficavam em loop offline.
+Causa raiz: as mutations de preenchimento tinham o ramo offline (enqueueOperation) correto, mas sem networkMode; o padrão 'online' do React Query pausa a mutation offline e nunca executa a mutationFn, deixando isPending eterno e o ramo de enfileiramento inalcançável.
+Correção aplicada: networkMode: 'offlineFirst' nas 4 mutations de ChecklistFill.tsx e nas 3 de TireInspectionFill.tsx.
+Arquivos modificados: src/pages/ChecklistFill.tsx, src/pages/TireInspectionFill.tsx
+Testes adicionados: e2e/pending/checklist-offline-fill.spec.ts
+Observação: iniciar checklist offline (local-first) continua como evolução futura.
