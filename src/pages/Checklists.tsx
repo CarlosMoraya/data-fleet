@@ -16,6 +16,8 @@ import {
 } from '../services/tireInspectionService';
 import { cn } from '../lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { getChecklistStartBlockMessage, getTireInspectionStartBlockMessage } from '../lib/checklistStartGuard';
 
 const STATUS_LABEL: Record<string, string> = { in_progress: 'Em andamento', completed: 'Concluído' };
 const STATUS_COLOR: Record<string, string> = {
@@ -49,6 +51,8 @@ export default function Checklists() {
   const [confirmDelete, setConfirmDelete] = useState<Checklist | null>(null);
   const [tireInspectionError, setTireInspectionError] = useState<string | null>(null);
   const [startingTireInspection, setStartingTireInspection] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const isOnline = useOnlineStatus();
 
   // ── Queries for Driver ────────────────────────────────────────────────────
   const { data: vehicleInfo, isLoading: loadingVehicleInfo } = useQuery({
@@ -251,6 +255,11 @@ export default function Checklists() {
   });
 
   const handleStartTireInspection = (vehicleId: string) => {
+    const block = getTireInspectionStartBlockMessage(isOnline);
+    if (block) {
+      setTireInspectionError(block);
+      return;
+    }
     setTireInspectionError(null);
     setStartingTireInspection(true);
     startTireInspectionMutation.mutate(vehicleId);
@@ -288,6 +297,12 @@ export default function Checklists() {
 
   const startChecklist = (template: ChecklistTemplate, vehicleId?: string) => {
     if (!vehicleId) return;
+    const block = getChecklistStartBlockMessage(isOnline);
+    if (block) {
+      setStartError(block);
+      return;
+    }
+    setStartError(null);
     setStarting(template.id);
     startMutation.mutate({ template, vehicleId });
   };
@@ -414,6 +429,9 @@ export default function Checklists() {
                   <p className="text-xs text-zinc-400 italic">Nenhum template publicado para {vehicleInfo.category}</p>
                 )}
 
+                {startError && (
+                  <p className="text-xs text-red-600 mt-2">{startError}</p>
+                )}
                 {/* Inspeção de Pneus */}
                 {tireInspectionError && (
                   <p className="text-xs text-red-600 mt-2">{tireInspectionError}</p>
@@ -533,6 +551,9 @@ export default function Checklists() {
               </div>
             )}
 
+            {startError && (
+              <p className="text-xs text-red-600 mt-2">{startError}</p>
+            )}
             {/* Inspeção de Pneus — Auditor */}
             {selectedVehicleId && (
               <div className="pt-2 border-t border-zinc-100 space-y-1">
