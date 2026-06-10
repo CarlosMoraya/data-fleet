@@ -113,7 +113,7 @@ export default defineConfig({
         storageState: 'e2e/.auth/jorge.json',
       },
       dependencies: ['setup-jorge'],
-      testMatch: /driver-flow\.spec\.ts/,
+      testMatch: [/driver-flow\.spec\.ts/, /driver-schedules-cache\.spec\.ts/],
       testIgnore: pendingIgnore,
     },
   ],

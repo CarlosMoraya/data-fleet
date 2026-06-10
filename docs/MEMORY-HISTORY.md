@@ -64,5 +64,10 @@ Em vez de usar ORMs complexos no frontend, utilizamos funções de mapeamento pu
 
 ---
 
+### 09/06/2026 — Bugfix: agendamentos do motorista só renderizavam após recarregar a página
+- **Causa raiz:** colisão de queryKey `['driverVehicle', userId, clientId]` entre `Checklists.tsx` (retorna objeto `{id,plate,category}`) e `WorkshopSchedules.tsx` (espera string `id`). Na navegação SPA, o cache populado pelo Checklists poluía a query de Agendamentos, que enviava `[object Object]` como `vehicle_id` ao PostgREST, gerando erro 400.
+- **Correção:** renomeação da queryKey para `['driverScheduleVehicleId', userId, clientId]` e endurecimento da guarda `enabled` para `typeof driverVehicle === 'string' && driverVehicle.length > 0`.
+- **Teste de regressão:** `e2e/driver-schedules-cache.spec.ts` (navegação SPA Checklists→Agendamentos sem erro 400).
+
 > [!NOTE]
 > Este arquivo substitui o antigo `CHANGELOG.md`, focando em decisões de alto nível e marcos históricos.

@@ -183,7 +183,7 @@ function DriverView() {
   }
 
   const { data: driverVehicle, isLoading: loadingVehicle } = useQuery({
-    queryKey: ['driverVehicle', user?.id, currentClient?.id],
+    queryKey: ['driverScheduleVehicleId', user?.id, currentClient?.id],
     queryFn: async () => {
       try {
         // Resolve veículo do motorista via profile_id → driver → vehicle
@@ -245,7 +245,7 @@ function DriverView() {
       const hydratedRows = await hydrateWorkshopScheduleRows((data ?? []) as WorkshopScheduleRow[]);
       return hydratedRows.map((row) => scheduleFromRow(row));
     },
-    enabled: !!driverVehicle
+    enabled: typeof driverVehicle === 'string' && driverVehicle.length > 0
   });
 
   const isLoading = loadingVehicle || loadingSchedules;

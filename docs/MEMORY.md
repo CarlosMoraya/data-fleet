@@ -302,3 +302,11 @@ Correção aplicada: PWA com vite-plugin-pwa (navigateFallback p/ reabrir offlin
 Arquivos modificados: vite.config.ts, src/vite-env.d.ts, index.html, src/lib/react-query.ts, src/App.tsx, src/context/AuthContext.tsx, src/pages/ChecklistFill.tsx, src/pages/TireInspectionFill.tsx, src/components/CameraCapture.tsx; novos: src/lib/offlineCacheUpdates.ts, public/icons/icon-192.png, public/icons/icon-512.png
 Testes adicionados: src/lib/offlineCacheUpdates.test.ts, e2e/pending/checklist-offline-reload.spec.ts
 Observação: local-first reads / iniciar checklist offline seguem como evolução futura.
+
+## 🆕 Atualização de Sessão (09/06/2026) — Bugfix: agendamentos do motorista só renderizavam após recarregar a página
+Bug corrigido: Agendamentos do motorista só renderizavam após recarregar a página (erro 400 "invalid input syntax for type uuid: [object Object]").
+Causa raiz: colisão de queryKey ['driverVehicle', userId, clientId] entre Checklists.tsx (retorna objeto {id,plate,category}) e WorkshopSchedules.tsx (espera string id); o cache do Checklists (1ª tela do motorista) poluía a query de Agendamentos na navegação SPA.
+Correção aplicada: queryKey de WorkshopSchedules renomeada para ['driverScheduleVehicleId', ...]; guarda enabled endurecida para typeof string.
+Arquivos modificados: src/pages/WorkshopSchedules.tsx; playwright.config.ts (testMatch do project driver).
+Testes adicionados: e2e/driver-schedules-cache.spec.ts (regressão E2E navegação SPA Checklists→Agendamentos sem 400).
+Observação: duplicação de lógica "resolver veículo do motorista" entre Checklists.tsx e WorkshopSchedules.tsx registrada como evolução futura (hook único useDriverVehicle).
