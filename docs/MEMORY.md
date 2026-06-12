@@ -344,6 +344,13 @@ Validações executadas: npm run lint ✅; npm run test:unit ✅ (188 testes); n
 
 Observação preexistente (NÃO corrigida neste bugfix — registro conforme guardrail): C.2 falha por strict mode violation em `modal.getByText(/KM/i)`, que resolve 2 elementos (label "KM" e valor "65.000 km"). A correção é trocar por seletor mais preciso (ex.: `getByText(/^KM$/)`), mas isso está fora do escopo deste bugfix e deve ser tratado em sessão separada.
 
+## 🆕 Atualização de Sessão (12/06/2026) — Correção de Vulnerabilidades npm
+Bug corrigido: npm informava 5 high severity vulnerabilities ao auditar/iniciar o projeto
+Causa raiz: arvore npm prendia versoes vulneraveis de esbuild via vite@6.4.2 e tsx@4.21.0, alem de plugins Vite em ranges afetados
+Correcao aplicada: atualizacao controlada de vite, @vitejs/plugin-react, @tailwindcss/vite, tsx, vitest e @vitest/coverage-v8; lockfile regenerado; adicionado script test:audit
+Arquivos modificados: package.json, package-lock.json, docs/MEMORY.md
+Testes adicionados: script npm run test:audit
+
 ## 🆕 Atualização de Sessão (12/06/2026) — Bug RLS: Coordinator/Director não veem inspeções de pneus
 Bug corrigido: inspeção de pneus concluída não aparecia na aba "Inspeções de Pneus" para Coordinator/Director
 Causa raiz: política RLS de SELECT de tire_inspections e tire_inspection_responses omitia os cargos 'Coordinator' e 'Director', enquanto a tela (isAssistantPlus em Checklists.tsx) já liberava a aba para eles → RLS retornava 0 linhas silenciosamente
