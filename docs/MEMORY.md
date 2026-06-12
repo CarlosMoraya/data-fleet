@@ -343,3 +343,10 @@ Testes adicionados: nenhum (os C.1–C.6 corrigidos passam a ser a cobertura de 
 Validações executadas: npm run lint ✅; npm run test:unit ✅ (188 testes); npm run test:smoke ✅ (6 testes); npm run test:e2e ✅ (97 passando, 1 falha preexistente em C.2).
 
 Observação preexistente (NÃO corrigida neste bugfix — registro conforme guardrail): C.2 falha por strict mode violation em `modal.getByText(/KM/i)`, que resolve 2 elementos (label "KM" e valor "65.000 km"). A correção é trocar por seletor mais preciso (ex.: `getByText(/^KM$/)`), mas isso está fora do escopo deste bugfix e deve ser tratado em sessão separada.
+
+## 🆕 Atualização de Sessão (12/06/2026) — Bug RLS: Coordinator/Director não veem inspeções de pneus
+Bug corrigido: inspeção de pneus concluída não aparecia na aba "Inspeções de Pneus" para Coordinator/Director
+Causa raiz: política RLS de SELECT de tire_inspections e tire_inspection_responses omitia os cargos 'Coordinator' e 'Director', enquanto a tela (isAssistantPlus em Checklists.tsx) já liberava a aba para eles → RLS retornava 0 linhas silenciosamente
+Correção aplicada: nova migration aditiva recriando apenas as duas políticas de SELECT com 'Coordinator' e 'Director' acrescentados à lista de cargos de visão do tenant
+Arquivos modificados: supabase/migrations/20260612000000_fix_tire_inspections_select_coordinator_director.sql (novo)
+Testes adicionados: e2e/pending/tire-inspections-visibility-by-role.spec.ts (visibilidade por cargo; pendente de usuários de teste)
