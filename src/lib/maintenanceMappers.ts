@@ -4,6 +4,7 @@ import {
   MaintenanceOrderRow,
   MaintenanceBudgetItemRow,
 } from '../types/maintenance';
+import { normalizeBudgetSystem } from './budgetSystems';
 
 // Re-export para compatibilidade com código que importa daqui
 export type { BudgetItem, MaintenanceBudgetItemRow, MaintenanceOrderRow };
@@ -14,7 +15,7 @@ export function budgetItemFromRow(row: MaintenanceBudgetItemRow): BudgetItem {
     maintenanceOrderId: row.maintenance_order_id,
     clientId: row.client_id,
     itemName: row.item_name,
-    system: row.system || '',
+    system: normalizeBudgetSystem(row.system),
     quantity: Number(row.quantity),
     value: Number(row.value),
     sortOrder: row.sort_order,

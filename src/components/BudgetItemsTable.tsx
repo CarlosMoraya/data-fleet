@@ -2,6 +2,7 @@ import React from 'react';
 import { Trash2, Plus, Loader2 } from 'lucide-react';
 import type { BudgetItem } from '../lib/maintenanceMappers';
 import { calcBudgetSubtotal } from '../lib/maintenanceMappers';
+import { BUDGET_SYSTEM_OPTIONS } from '../lib/budgetSystems';
 
 interface BudgetItemsTableProps {
   items: BudgetItem[];
@@ -146,13 +147,16 @@ export default function BudgetItemsTable({
                 />
               </td>
               <td className="px-2 py-1.5 w-40">
-                <input
-                  type="text"
-                  value={item.system}
+                <select
+                  value={item.system || ''}
                   onChange={e => handleChange(idx, 'system', e.target.value)}
-                  placeholder="Sistema"
                   className={cellInput}
-                />
+                >
+                  <option value="">Selecione...</option>
+                  {BUDGET_SYSTEM_OPTIONS.map(sys => (
+                    <option key={sys} value={sys}>{sys}</option>
+                  ))}
+                </select>
               </td>
               <td className="px-2 py-1.5 w-16">
                 <input

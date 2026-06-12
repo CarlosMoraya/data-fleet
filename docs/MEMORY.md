@@ -310,3 +310,18 @@ Correção aplicada: queryKey de WorkshopSchedules renomeada para ['driverSchedu
 Arquivos modificados: src/pages/WorkshopSchedules.tsx; playwright.config.ts (testMatch do project driver).
 Testes adicionados: e2e/driver-schedules-cache.spec.ts (regressão E2E navegação SPA Checklists→Agendamentos sem 400).
 Observação: duplicação de lógica "resolver veículo do motorista" entre Checklists.tsx e WorkshopSchedules.tsx registrada como evolução futura (hook único useDriverVehicle).
+
+## 🆕 Atualização de Sessão (11/06/2026) — Restrição de Sistemas de Orçamento em Manutenção
+Feature implementada: campo Sistema da tabela de itens do orçamento em Manutenção deixou de aceitar texto livre e passou a usar lista suspensa oficial com 12 sistemas conhecidos + Outros.
+Causa raiz: sistemas vindos de OCR/IA ou preenchimento manual não eram normalizados, permitindo valores livres inconsistentes; dados legados com system=null ou desconhecido não eram tratados.
+Correção aplicada:
+- `src/lib/budgetSystems.ts` (novo): fonte única de sistemas oficiais, inferência por palavras-chave e normalização defensiva (isKnownBudgetSystem, normalizeBudgetSystem, inferBudgetSystem).
+- `src/lib/budgetOcr.ts`: regex KY e inferSystem removidos; importa inferBudgetSystem e normalizeBudgetSystem de budgetSystems; prompt do Gemini atualizado com lista oficial.
+- `src/lib/maintenanceMappers.ts`: budgetItemFromRow aplica normalizeBudgetSystem em row.system.
+- `src/services/maintenanceService.ts`: grava system normalizado para itens significativos.
+- `src/components/BudgetItemsTable.tsx`: campo Sistema editável trocado de <input type=text> por <select> com BUDGET_SYSTEM_OPTIONS.
+- `src/components/MaintenanceForm.tsx`: adicionada validação hasBudgetItemWithoutSystem antes do salvamento; bloqueia submit de itens com nome preenchido e sistema vazio/desconhecido.
+Arquivos modificados: src/lib/budgetSystems.ts, src/lib/budgetOcr.ts, src/lib/maintenanceMappers.ts, src/services/maintenanceService.ts, src/components/BudgetItemsTable.tsx, src/components/MaintenanceForm.tsx?
+Testes adicionados: src/lib/budgetSystems.test.ts (9), src/lib/maintenanceMappers.test.ts (5), src/components/BudgetItemsTable.test.tsx (3), src/components/MaintenanceForm.validation.test.ts (7)
+Validações executadas: npm run lint ✅; npm run test:unit ✅ (188 testes); npm run test:smoke ✅ (6 testes); npm run build ✅ (~4.5s); E2E — falha pré-existente em tire-inspection-assistant.spec.ts mantida; nenhuma nova falha introduzida em Manutenção/Orçamentos.
+Decisões: lista de sistemas é constante de frontend (sem tabela no banco); Outros cobre OCR/IA sem identificação, valores vazios e legados; IMPLEMENTATION.md é artefato transitório e não entra no commit por padrão.

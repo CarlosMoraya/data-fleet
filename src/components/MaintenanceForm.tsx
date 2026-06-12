@@ -7,6 +7,7 @@ import type { BudgetItem } from '../lib/maintenanceMappers';
 import { budgetItemFromRow, type MaintenanceBudgetItemRow } from '../lib/maintenanceMappers';
 import { validateFile } from '../lib/storageHelpers';
 import { extractBudgetData } from '../lib/budgetOcr';
+import { isKnownBudgetSystem } from '../lib/budgetSystems';
 import BudgetItemsTable from './BudgetItemsTable';
 
 const inputClass =
@@ -168,8 +169,16 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
     onClose();
   };
 
+  const hasBudgetItemWithoutSystem = (items: BudgetItem[]): boolean => {
+    return items.some(item => item.itemName.trim().length > 0 && !isKnownBudgetSystem(item.system));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (hasBudgetItemWithoutSystem(budgetItems)) {
+      setError('Selecione o sistema dos itens do orçamento ou use Outros.');
+      return;
+    }
     if (isWorkshopMode) {
       // Modo Workshop: validar apenas os 5 campos obrigatórios
       if (!formData.expectedExitDate || !formData.workshopOs || !formData.mechanicName || !formData.currentKm) {

@@ -1,6 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { BudgetItem } from './maintenanceMappers';
+import { inferBudgetSystem, normalizeBudgetSystem } from './budgetSystems';
 import { performOcr } from './ocr/ocrEngine';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -39,31 +40,7 @@ async function extractPdfText(file: File): Promise<string> {
   return fullText;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Sistemas conhecidos para classificação automática
-// ─────────────────────────────────────────────────────────────
-
-const KNOWN_SYSTEMS: [RegExp, string][] = [
-  [/freio|pastilha|disco|lonas?|tambor|abs/i, 'Sistema de Freio'],
-  [/motor|cabeçote|virabrequim|biela|pistão|válvula|filtro de óleo/i, 'Motor'],
-  [/suspensão|amortecedor|mola|pivô|bandeja|barra estabilizadora/i, 'Suspensão'],
-  [/câmbio|embreagem|transmissão|caixa de câmbio/i, 'Transmissão'],
-  [/elétric|alternador|bateria|motor de partida|fusível|relé/i, 'Sistema Elétrico'],
-  [/arrefecimento|radiador|termostato|bomba d[ae] água|ventoinha/i, 'Arrefecimento'],
-  [/direção|caixa de direção|bomba hidráulica|terminal|bieleta/i, 'Direção'],
-  [/ar.condicionado|compressor|evaporador|condensador|gás/i, 'Ar Condicionado'],
-  [/pneu|rodas?|aro|alinhamento|balanceamento/i, 'Pneus e Rodas'],
-  [/combustível|injetor|bico|bomba de combustível|filtro de combustível/i, 'Sistema de Combustível'],
-  [/carroceria|lataria|funilaria|pintura|para.choque|espelho/i, 'Carroceria'],
-  [/mão.de.obra|revisão|inspeção|troca de óleo|lubrificação/i, 'Mão de Obra'],
-];
-
-function inferSystem(itemName: string): string {
-  for (const [pattern, system] of KNOWN_SYSTEMS) {
-    if (pattern.test(itemName)) return system;
-  }
-  return '';
-}
+// System inference moved to src/lib/budgetSystems.ts (single source of truth)
 
 // ─────────────────────────────────────────────────────────────
 // Extração por regex
@@ -157,7 +134,7 @@ function extractBudgetFromText(text: string): {
       if (itemName && itemName.length >= 4 && value > 0) {
         items.push({
           itemName,
-          system: inferSystem(itemName),
+          system: inferBudgetSystem(itemName),
           quantity: quantity || 1,
           value,
           sortOrder: sortOrder++,
@@ -175,6 +152,22 @@ function extractBudgetFromText(text: string): {
 // Gemini fallback
 // ─────────────────────────────────────────────────────────────
 
+const BUDGET_SYSTEM_LIST = [
+  'Sistema de Freio',
+  'Motor',
+  'Suspensão',
+  'Transmissão',
+  'Sistema Elétrico',
+  'Arrefecimento',
+  'Direção',
+  'Ar Condicionado',
+  'Pneus e Rodas',
+  'Sistema de Combustível',
+  'Carroceria',
+  'Mão de Obra',
+  'Outros',
+].join(', ');
+
 const BUDGET_PROMPT = `Você está analisando um orçamento/ordem de serviço de oficina automotiva.
 Extraia as informações abaixo. Retorne SOMENTE JSON válido:
 {
@@ -183,7 +176,7 @@ Extraia as informações abaixo. Retorne SOMENTE JSON válido:
   "current_km": 12345
 }
 Regras:
-- items.system = sistema do veículo (ex: Sistema de Freio, Motor, Suspensão...); null se não identificar.
+- items.system = UM DOS seguintes valores: ${BUDGET_SYSTEM_LIST}. Se não identificar, use "Outros".
 - items.value = valor unitário do item em reais (número); 0 se não informado.
 - workshop_os = número/código da ordem de serviço da oficina (campo OS, O.S., Ordem de Serviço); null se não encontrar.
 - current_km = leitura do hodômetro/quilometragem atual do veículo (número inteiro); null se não constar.
@@ -195,7 +188,7 @@ async function extractBudgetViaIA(file: File): Promise<BudgetExtractionResult> {
 
   const items: BudgetItem[] = (json.items ?? []).map((it: any, idx: number) => ({
     itemName: String(it.item_name || ''),
-    system: String(it.system || ''),
+    system: normalizeBudgetSystem(String(it.system || '')),
     quantity: Number(it.quantity) || 1,
     value: Number(it.value) || 0,
     sortOrder: idx,

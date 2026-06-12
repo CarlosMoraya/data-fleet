@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { MaintenanceOrder, BudgetItem, BudgetStatus } from '../types/maintenance';
 import { uploadMaintenanceBudget } from '../lib/storageHelpers';
+import { normalizeBudgetSystem } from '../lib/budgetSystems';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ export async function saveMaintenanceOrder(
         maintenance_order_id: orderId,
         client_id: effectiveClientId,
         item_name: item.itemName,
-        system: item.system || null,
+        system: item.itemName.trim().length > 0 ? normalizeBudgetSystem(item.system) : null,
         quantity: item.quantity,
         value: item.value,
         sort_order: idx,
