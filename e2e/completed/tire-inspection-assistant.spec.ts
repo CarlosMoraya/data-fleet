@@ -106,7 +106,7 @@ test.describe.serial('Inspeção de Pneus — Fleet Assistant (Pedro)', () => {
       return;
     }
 
-    await tireRows.first().click();
+    await tireRows.first().locator('button[title="Visualizar"]').click();
 
     // Modal deve abrir
     const modal = page.locator('.fixed.inset-0').last();
@@ -128,7 +128,7 @@ test.describe.serial('Inspeção de Pneus — Fleet Assistant (Pedro)', () => {
       return;
     }
 
-    await tireRows.first().click();
+    await tireRows.first().locator('button[title="Visualizar"]').click();
 
     const modal = page.locator('.fixed.inset-0').last();
     await expect(modal).toBeVisible({ timeout: 10000 });
@@ -151,7 +151,7 @@ test.describe.serial('Inspeção de Pneus — Fleet Assistant (Pedro)', () => {
       return;
     }
 
-    await tireRows.first().click();
+    await tireRows.first().locator('button[title="Visualizar"]').click();
 
     const modal = page.locator('.fixed.inset-0').last();
     await expect(modal).toBeVisible({ timeout: 10000 });
@@ -179,7 +179,7 @@ test.describe.serial('Inspeção de Pneus — Fleet Assistant (Pedro)', () => {
     const completedRows = page.locator('table tbody tr', {
       hasText: /Inspeção de Pneus/i,
     });
-    await completedRows.first().click();
+    await completedRows.first().locator('button[title="Visualizar"]').click();
 
     const modal = page.locator('.fixed.inset-0').last();
     await expect(modal).toBeVisible({ timeout: 10000 });
@@ -217,7 +217,7 @@ test.describe.serial('Inspeção de Pneus — Fleet Assistant (Pedro)', () => {
       return;
     }
 
-    await tireRows.first().click();
+    await tireRows.first().locator('button[title="Visualizar"]').click();
 
     const modal = page.locator('.fixed.inset-0').last();
     await expect(modal).toBeVisible({ timeout: 10000 });
@@ -253,7 +253,7 @@ test.describe.serial('Inspeção de Pneus — Fleet Assistant (Pedro)', () => {
       return;
     }
 
-    await tireRows.first().click();
+    await tireRows.first().locator('button[title="Visualizar"]').click();
 
     const modal = page.locator('.fixed.inset-0').last();
     await expect(modal).toBeVisible({ timeout: 10000 });

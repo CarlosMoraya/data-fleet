@@ -78,3 +78,10 @@ Em vez de usar ORMs complexos no frontend, utilizamos funções de mapeamento pu
 
 > [!NOTE]
 > Este arquivo substitui o antigo `CHANGELOG.md`, focando em decisões de alto nível e marcos históricos.
+
+### 12/06/2026 — Bugfix E2E: inspeção de pneus não abria modal no teste
+- **Contexto:** `tire-inspection-assistant.spec.ts` (bloco C) falhava com timeout aguardando `.fixed.inset-0` ficar visível.
+- **Causa raiz:** teste clicava no centro da `<tr>` (sem `onClick`); o modal só abre pelo botão "Visualizar". Não era regressão — a interação nunca existiu; falhou quando dados reais de inspeção destravaram a guarda `test.skip`.
+- **Correção:** nos 6 pontos do bloco C, trocar `tireRows.first().click()` / `completedRows.first().click()` por `.locator('button[title="Visualizar"]').click()`. Nenhuma mudança em produção.
+- **Arquivo modificado:** `e2e/completed/tire-inspection-assistant.spec.ts`.
+- **Testes:** C.1–C.6 corrigidos passam a ser cobertura de regressão real; nenhum teste novo necessário.

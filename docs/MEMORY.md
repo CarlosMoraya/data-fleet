@@ -325,3 +325,13 @@ Arquivos modificados: src/lib/budgetSystems.ts, src/lib/budgetOcr.ts, src/lib/ma
 Testes adicionados: src/lib/budgetSystems.test.ts (9), src/lib/maintenanceMappers.test.ts (5), src/components/BudgetItemsTable.test.tsx (3), src/components/MaintenanceForm.validation.test.ts (7)
 Validações executadas: npm run lint ✅; npm run test:unit ✅ (188 testes); npm run test:smoke ✅ (6 testes); npm run build ✅ (~4.5s); E2E — falha pré-existente em tire-inspection-assistant.spec.ts mantida; nenhuma nova falha introduzida em Manutenção/Orçamentos.
 Decisões: lista de sistemas é constante de frontend (sem tabela no banco); Outros cobre OCR/IA sem identificação, valores vazios e legados; IMPLEMENTATION.md é artefato transitório e não entra no commit por padrão.
+
+## 🆕 Atualização de Sessão (12/06/2026) — Bugfix E2E: inspeção de pneus não abria modal no teste
+Bug corrigido: E2E tire-inspection-assistant.spec.ts (bloco C) falhava ao abrir o TireInspectionDetailModal.
+Causa raiz: o teste clicava no centro da linha (<tr> sem onClick); no app o modal só abre pelo botão "Visualizar". Não era regressão — a interação de clique-na-linha nunca existiu; a falha só apareceu quando dados reais de inspeção destravaram a guarda test.skip.
+Correção aplicada: nos 6 pontos do bloco C, trocar o clique na linha por clique em button[title="Visualizar"] dentro da linha. Nenhuma mudança em produção.
+Arquivos modificados: e2e/completed/tire-inspection-assistant.spec.ts
+Testes adicionados: nenhum (os C.1–C.6 corrigidos passam a ser a cobertura de regressão real).
+Validações executadas: npm run lint ✅; npm run test:unit ✅ (188 testes); npm run test:smoke ✅ (6 testes); npm run test:e2e ✅ (97 passando, 1 falha preexistente em C.2).
+
+Observação preexistente (NÃO corrigida neste bugfix — registro conforme guardrail): C.2 falha por strict mode violation em `modal.getByText(/KM/i)`, que resolve 2 elementos (label "KM" e valor "65.000 km"). A correção é trocar por seletor mais preciso (ex.: `getByText(/^KM$/)`), mas isso está fora do escopo deste bugfix e deve ser tratado em sessão separada.
