@@ -8,7 +8,7 @@ import {
   type TireInspectionRow,
   type TireInspectionResponseRow,
 } from '../lib/tireInspectionMappers';
-import type { TireInspection, TireInspectionResponse } from '../types';
+import type { TireInspection, TireInspectionResponse, TireInspectionResponseStatus } from '../types';
 import type { AxleConfigEntry } from '../types/tire';
 
 const PHOTO_BUCKET = 'checklist-photos';
@@ -44,6 +44,76 @@ export async function fetchTireInspectionResponses(inspectionId: string): Promis
     .order('responded_at', { ascending: true });
   if (error) throw error;
   return (data as TireInspectionResponseRow[]).map(tireInspectionResponseFromRow);
+}
+
+export interface PositionComparison {
+  positionCode: string;
+  positionLabel: string;
+  photos: Array<{
+    inspectionId: string;
+    inspectionDate: string;
+    photoUrl: string;
+    photoTimestamp: string;
+    status: TireInspectionResponseStatus;
+    isCurrent: boolean;
+  }>;
+}
+
+export async function fetchTireInspectionComparison(
+  vehicleId: string,
+  currentInspection: TireInspection,
+): Promise<PositionComparison[]> {
+  const { data: inspections, error: inspectionsError } = await supabase
+    .from('tire_inspections')
+    .select('id, started_at, completed_at')
+    .eq('vehicle_id', vehicleId)
+    .lte('started_at', currentInspection.startedAt)
+    .order('started_at', { ascending: false })
+    .limit(3);
+  if (inspectionsError) throw inspectionsError;
+
+  const inspectionIds = (inspections ?? []).map((inspection: { id: string }) => inspection.id);
+  if (inspectionIds.length === 0) return [];
+
+  const inspectionDates = new Map(
+    (inspections ?? []).map((inspection: { id: string; started_at: string }) => [inspection.id, inspection.started_at]),
+  );
+
+  const { data: responses, error: responsesError } = await supabase
+    .from('tire_inspection_responses')
+    .select('*')
+    .in('inspection_id', inspectionIds);
+  if (responsesError) throw responsesError;
+
+  const mappedResponses = (responses as TireInspectionResponseRow[]).map(tireInspectionResponseFromRow);
+  const positions = generatePositionsFromConfig(
+    currentInspection.axleConfigSnapshot,
+    currentInspection.stepsCountSnapshot,
+    '',
+  );
+
+  return positions
+    .map((position) => ({
+      positionCode: position.code,
+      positionLabel: position.label,
+      photos: mappedResponses
+        .filter((response) => response.positionCode === position.code)
+        .sort((a, b) => {
+          const dateA = inspectionDates.get(a.inspectionId) ?? '';
+          const dateB = inspectionDates.get(b.inspectionId) ?? '';
+          return dateB.localeCompare(dateA);
+        })
+        .slice(0, 3)
+        .map((response) => ({
+          inspectionId: response.inspectionId,
+          inspectionDate: inspectionDates.get(response.inspectionId) ?? '',
+          photoUrl: response.photoUrl,
+          photoTimestamp: response.photoTimestamp,
+          status: response.status,
+          isCurrent: response.inspectionId === currentInspection.id,
+        })),
+    }))
+    .filter((comparison) => comparison.photos.length > 0);
 }
 
 // ─── Distinct manufacturers / brands ─────────────────────────────────────────

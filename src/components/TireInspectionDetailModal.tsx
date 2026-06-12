@@ -1,8 +1,12 @@
 import React from 'react';
 import { X, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchTireInspectionResponses } from '../services/tireInspectionService';
-import type { TireInspection, TireInspectionResponse } from '../types';
+import {
+  fetchTireInspectionComparison,
+  fetchTireInspectionResponses,
+  type PositionComparison,
+} from '../services/tireInspectionService';
+import type { TireInspection } from '../types';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -17,6 +21,15 @@ export default function TireInspectionDetailModal({ inspection, onClose }: Props
   const { data: responses = [], isLoading } = useQuery({
     queryKey: ['tireInspectionResponses', inspection.id],
     queryFn: () => fetchTireInspectionResponses(inspection.id),
+  });
+
+  const {
+    data: comparison = [],
+    isLoading: loadingComparison,
+    isError: comparisonError,
+  } = useQuery({
+    queryKey: ['tireInspectionComparison', inspection.id],
+    queryFn: () => fetchTireInspectionComparison(inspection.vehicleId, inspection),
   });
 
   const total = responses.length;
@@ -59,21 +72,24 @@ export default function TireInspectionDetailModal({ inspection, onClose }: Props
           <SummaryBadge label="Conformidade" value={`${conformRate}%`} color="blue" />
         </div>
 
-        {/* Photo gallery */}
+        {/* Comparison */}
         <div className="p-6">
-          {isLoading ? (
+          <h3 className="text-sm font-semibold text-zinc-800 mb-3">Comparação (3 últimas inspeções)</h3>
+          {loadingComparison || isLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="animate-spin text-zinc-400" size={28} />
             </div>
+          ) : comparisonError ? (
+            <p className="text-sm text-red-600 py-8 text-center">Não foi possível carregar a comparação.</p>
+          ) : comparison.length === 0 ? (
+            <p className="text-sm text-zinc-400 py-8 text-center">Nenhuma foto registrada para esta inspeção.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <div className="flex gap-3 pb-2" style={{ minWidth: 'max-content' }}>
-                {responses.map(r => (
-                  <div key={r.id}>
-                    <TireResponseCard response={r} />
-                  </div>
-                ))}
-              </div>
+            <div className="space-y-3">
+              {comparison.map(item => (
+                <div key={item.positionCode}>
+                  <PositionComparisonRow comparison={item} />
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -108,37 +124,65 @@ function SummaryBadge({ label, value, color }: { label: string; value: string | 
   );
 }
 
-function TireResponseCard({ response }: { response: TireInspectionResponse }) {
-  const isConform = response.status === 'conforme';
+function PositionComparisonRow({ comparison }: { comparison: PositionComparison }) {
+  return (
+    <div className="rounded-xl border border-zinc-100 bg-zinc-50/50 p-3 sm:flex sm:gap-4">
+      <div className="mb-3 sm:mb-0 sm:w-32 sm:flex-shrink-0">
+        <p className="text-sm font-semibold text-zinc-900">{comparison.positionCode}</p>
+        <p className="text-xs text-zinc-500">{comparison.positionLabel}</p>
+      </div>
+      <div className="min-w-0 flex-1 overflow-x-auto">
+        <div className="flex gap-3 pb-1" style={{ minWidth: 'max-content' }}>
+          {comparison.photos.map(photo => (
+            <div key={photo.inspectionId}>
+              <ComparisonPhotoCard
+                photo={photo}
+                positionCode={comparison.positionCode}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ComparisonPhotoCard({
+  photo,
+  positionCode,
+}: {
+  photo: PositionComparison['photos'][number];
+  positionCode: string;
+}) {
+  const isConform = photo.status === 'conforme';
+  const formatDate = (iso?: string) =>
+    iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
   return (
-    <div className="flex-shrink-0 w-40 rounded-xl border overflow-hidden bg-white shadow-sm">
-      {/* Photo */}
+    <div className="flex-shrink-0 w-40 rounded-xl border border-zinc-200 overflow-hidden bg-white shadow-sm">
       <div className="relative w-full h-32 bg-zinc-100">
-        {response.photoUrl ? (
-          <img src={response.photoUrl} alt={response.positionCode} className="w-full h-full object-cover" />
+        {photo.photoUrl ? (
+          <img src={photo.photoUrl} alt={positionCode} className="w-full h-full object-cover" />
         ) : (
           <div className="flex items-center justify-center h-full text-zinc-300 text-xs">Sem foto</div>
         )}
-        {/* Status badge */}
         <div className={`absolute top-1 right-1 rounded-full p-0.5 ${isConform ? 'bg-green-500' : 'bg-red-500'}`}>
           {isConform
             ? <CheckCircle size={14} className="text-white" />
             : <XCircle size={14} className="text-white" />
           }
         </div>
-      </div>
-
-      {/* Info */}
-      <div className="p-2 space-y-1 text-xs">
-        <p className="font-semibold text-zinc-800">{response.positionCode}</p>
-        {response.dot && <p className="text-zinc-500">DOT: {response.dot}</p>}
-        {response.fireMarking && <p className="text-zinc-500">MF: {response.fireMarking}</p>}
-        <p className="text-zinc-600 truncate" title={response.manufacturer}>{response.manufacturer}</p>
-        <p className="text-zinc-600 truncate" title={response.brand}>{response.brand}</p>
-        {response.observation && (
-          <p className="text-zinc-400 italic truncate" title={response.observation}>{response.observation}</p>
+        {photo.isCurrent && (
+          <span className="absolute left-1 top-1 rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+            Atual
+          </span>
         )}
+      </div>
+      <div className="p-2 space-y-1 text-xs">
+        <p className="font-medium text-zinc-800">{formatDate(photo.inspectionDate)}</p>
+        <p className={isConform ? 'text-green-700' : 'text-red-700'}>
+          {isConform ? 'Conforme' : 'Não conforme'}
+        </p>
       </div>
     </div>
   );

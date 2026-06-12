@@ -41,6 +41,7 @@ export default function Checklists() {
   const [historySearch, setHistorySearch] = useState('');
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'in_progress' | 'completed'>('all');
   const [onlyWithIssues, setOnlyWithIssues] = useState(false);
+  const [activeTab, setActiveTab] = useState<'checklists' | 'tireInspections'>('checklists');
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
 
   // Local UI state
@@ -587,125 +588,181 @@ export default function Checklists() {
       {/* ── Fleet Assistant+ view ─────────────────────────────── */}
       {isAssistantPlus && (
         <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden flex-1 min-h-0 flex flex-col">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-100">
-            <button
-              onClick={() => setOnlyWithIssues(false)}
-              className={cn(
-                'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-                !onlyWithIssues ? 'bg-zinc-700 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
-              )}
-            >
-              Todos
-            </button>
-            <button
-              onClick={() => setOnlyWithIssues(true)}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-                onlyWithIssues ? 'bg-red-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
-              )}
-            >
-              <AlertCircle className="h-3 w-3" />
-              Com inconformidades
-              {issueChecklistIds.size > 0 && (
-                <span className="opacity-70">({issueChecklistIds.size})</span>
-              )}
-            </button>
+          <div className="border-b border-zinc-200 px-4">
+            <nav className="-mb-px flex gap-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab('checklists')}
+                className={cn(
+                  activeTab === 'checklists'
+                    ? 'border-orange-500 text-orange-600 font-medium'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300',
+                  'flex items-center whitespace-nowrap border-b-2 px-4 py-3 text-sm transition-colors',
+                )}
+              >
+                Checklists
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('tireInspections')}
+                className={cn(
+                  activeTab === 'tireInspections'
+                    ? 'border-orange-500 text-orange-600 font-medium'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300',
+                  'flex items-center whitespace-nowrap border-b-2 px-4 py-3 text-sm transition-colors',
+                )}
+              >
+                Inspeções de Pneus
+              </button>
+            </nav>
           </div>
 
-          {checklists.length === 0 ? (
-            <div className="text-center py-16 text-zinc-400">
-              <ClipboardCheck className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">Nenhum checklist realizado neste tenant.</p>
-            </div>
-          ) : (
-            <div className="flex-1 overflow-auto">
-              <table className="min-w-full divide-y divide-zinc-100">
-                <thead className="sticky top-0 z-10">
-                  <tr className="bg-zinc-50">
-                    {['Template', 'Contexto', 'Veículo', 'Preenchido por', 'Data', 'Status', 'Ações'].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-50">
-                  {checklists
-                    .filter(c => !onlyWithIssues || issueChecklistIds.has(c.id))
-                    .map(c => (
-                    <tr key={c.id} className="hover:bg-zinc-50">
-                      <td className="px-4 py-3 text-sm text-zinc-900">
-                        <div className="flex items-center gap-1.5">
-                          {issueChecklistIds.has(c.id) && (
-                            <AlertCircle className="h-3.5 w-3.5 text-red-400 flex-shrink-0" title="Contém inconformidades" />
-                          )}
-                          {c.templateName ?? '—'}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-zinc-500">{c.templateContext ?? '—'}</td>
-                      <td className="px-4 py-3 text-sm text-zinc-600">{c.vehicleLicensePlate ?? '—'}</td>
-                      <td className="px-4 py-3 text-sm text-zinc-600">{c.filledByName ?? '—'}</td>
-                      <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(c.startedAt)}</td>
-                      <td className="px-4 py-3">
-                        <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', STATUS_COLOR[c.status])}>
-                          {STATUS_LABEL[c.status]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => setViewChecklist(c)} className="p-1.5 rounded hover:bg-zinc-100" title="Visualizar">
+          {activeTab === 'checklists' && (
+            <>
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-100">
+                <button
+                  onClick={() => setOnlyWithIssues(false)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    !onlyWithIssues ? 'bg-zinc-700 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
+                  )}
+                >
+                  Todos
+                </button>
+                <button
+                  onClick={() => setOnlyWithIssues(true)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    onlyWithIssues ? 'bg-red-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
+                  )}
+                >
+                  <AlertCircle className="h-3 w-3" />
+                  Com inconformidades
+                  {issueChecklistIds.size > 0 && (
+                    <span className="opacity-70">({issueChecklistIds.size})</span>
+                  )}
+                </button>
+              </div>
+
+              {checklists.length === 0 ? (
+                <div className="text-center py-16 text-zinc-400">
+                  <ClipboardCheck className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">Nenhum checklist realizado neste tenant.</p>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-auto">
+                  <table className="min-w-full divide-y divide-zinc-100">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="bg-zinc-50">
+                        {['Template', 'Contexto', 'Veículo', 'Preenchido por', 'Data', 'Status', 'Ações'].map(h => (
+                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-50">
+                      {checklists
+                        .filter(c => !onlyWithIssues || issueChecklistIds.has(c.id))
+                        .map(c => (
+                        <tr key={c.id} className="hover:bg-zinc-50">
+                          <td className="px-4 py-3 text-sm text-zinc-900">
+                            <div className="flex items-center gap-1.5">
+                              {issueChecklistIds.has(c.id) && (
+                                <AlertCircle className="h-3.5 w-3.5 text-red-400 flex-shrink-0" title="Contém inconformidades" />
+                              )}
+                              {c.templateName ?? '—'}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-zinc-500">{c.templateContext ?? '—'}</td>
+                          <td className="px-4 py-3 text-sm text-zinc-600">{c.vehicleLicensePlate ?? '—'}</td>
+                          <td className="px-4 py-3 text-sm text-zinc-600">{c.filledByName ?? '—'}</td>
+                          <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(c.startedAt)}</td>
+                          <td className="px-4 py-3">
+                            <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', STATUS_COLOR[c.status])}>
+                              {STATUS_LABEL[c.status]}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => setViewChecklist(c)} className="p-1.5 rounded hover:bg-zinc-100" title="Visualizar">
+                                <Eye className="h-4 w-4 text-zinc-400" />
+                              </button>
+                              {isAnalystPlus && c.status === 'completed' && issueChecklistIds.has(c.id) && (
+                                <button
+                                  onClick={() => setCreatePlanChecklist(c)}
+                                  className="p-1.5 rounded hover:bg-orange-50 text-orange-400"
+                                  title="Criar Plano de Ação"
+                                >
+                                  <ClipboardList className="h-4 w-4" />
+                                </button>
+                              )}
+                              {isAdminMaster && (
+                                <button
+                                  onClick={() => setConfirmDelete(c)}
+                                  className="p-1.5 rounded hover:bg-red-50 text-red-400"
+                                  title="Excluir (Admin Master)"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === 'tireInspections' && (
+            tireInspections.length === 0 ? (
+              <div className="text-center py-16 text-zinc-400">
+                <Disc className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Nenhuma inspeção de pneus registrada neste tenant.</p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-auto">
+                <table className="min-w-full divide-y divide-zinc-100">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-zinc-50">
+                      {['Veículo', 'Inspetor', 'Início', 'Conclusão', 'Status', 'Ações'].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-50">
+                    {tireInspections.map(ti => (
+                      <tr key={ti.id} className="hover:bg-zinc-50">
+                        <td className="px-4 py-3 text-sm text-zinc-900">
+                          <div className="flex items-center gap-1.5">
+                            <Disc className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
+                            {ti.vehicleLicensePlate ?? '—'}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-zinc-600">{ti.filledByName ?? '—'}</td>
+                        <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(ti.startedAt)}</td>
+                        <td className="px-4 py-3 text-xs text-zinc-500">{ti.completedAt ? formatDate(ti.completedAt) : '—'}</td>
+                        <td className="px-4 py-3">
+                          <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', STATUS_COLOR[ti.status])}>
+                            {STATUS_LABEL[ti.status]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button onClick={() => setViewTireInspection(ti)} className="p-1.5 rounded hover:bg-zinc-100" title="Visualizar">
                             <Eye className="h-4 w-4 text-zinc-400" />
                           </button>
-                          {isAnalystPlus && c.status === 'completed' && issueChecklistIds.has(c.id) && (
-                            <button
-                              onClick={() => setCreatePlanChecklist(c)}
-                              className="p-1.5 rounded hover:bg-orange-50 text-orange-400"
-                              title="Criar Plano de Ação"
-                            >
-                              <ClipboardList className="h-4 w-4" />
-                            </button>
-                          )}
-                          {isAdminMaster && (
-                            <button
-                              onClick={() => setConfirmDelete(c)}
-                              className="p-1.5 rounded hover:bg-red-50 text-red-400"
-                              title="Excluir (Admin Master)"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {/* Inspeções de pneus */}
-                  {!onlyWithIssues && tireInspections.map(ti => (
-                    <tr key={`ti-${ti.id}`} className="hover:bg-blue-50/30">
-                      <td className="px-4 py-3 text-sm text-zinc-900">
-                        <div className="flex items-center gap-1.5">
-                          <Disc className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
-                          Inspeção de Pneus
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-blue-500 font-medium">Inspeção de Pneus</td>
-                      <td className="px-4 py-3 text-sm text-zinc-600">{ti.vehicleLicensePlate ?? '—'}</td>
-                      <td className="px-4 py-3 text-sm text-zinc-600">{ti.filledByName ?? '—'}</td>
-                      <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(ti.startedAt)}</td>
-                      <td className="px-4 py-3">
-                        <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', STATUS_COLOR[ti.status])}>
-                          {STATUS_LABEL[ti.status]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => setViewTireInspection(ti)} className="p-1.5 rounded hover:bg-zinc-100" title="Visualizar">
-                          <Eye className="h-4 w-4 text-zinc-400" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
           )}
         </div>
       )}

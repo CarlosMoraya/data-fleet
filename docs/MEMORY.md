@@ -26,7 +26,8 @@ Este arquivo registra o progresso atual, pendências e a visão de curto prazo p
 ## 🟡 Tarefas em Andamento
 
 1.  **Estabilização de Testes E2E (Inspeção de Pneus)**:
-    - Ajustar falhas de timing nos testes de movimentação de pneus.
+    - Fluxo Assistant+ de listagem/viewer validado em 12/06/2026 com a nova aba "Inspeções de Pneus" e comparação visual das 3 últimas inspeções por posição.
+    - Ajustar falhas remanescentes de timing nos testes de movimentação de pneus.
     - Corrigir o seeding de dados para o motorista (Jorge) e Auditor (Carlos).
 2.  **Migração para React Query**:
     - Finalizar a substituição de estados locais por queries em páginas menores (ex: Shippers).
@@ -218,6 +219,13 @@ Bug corrigido: KPI "Em Manutenção" do Dashboard exibia 0 quando OS ativas esta
 Causa raiz: query `dashboard-maintenance` filtrava ordens por `entry_date` dentro do range do filtro de período, e o mesmo array alimentava o KPI de estado atual
 Correção aplicada: nova query `dashboard-active-maintenance` (sem filtro de período, filtra apenas por status != Concluído/Cancelado) alimentando exclusivamente o KPI "Em Manutenção"
 Arquivos modificados: src/pages/Dashboard.tsx, src/components/dashboard/OperationalPanel.tsx
+
+## 🆕 Atualização de Sessão (12/06/2026) — Aba Inspeções de Pneus em Checklists
+- Implementada a aba interna "Inspeções de Pneus" na visão Assistant+ de `/checklists`, mantendo "Checklists" separada e sem linhas de inspeção de pneus misturadas.
+- `TireInspectionDetailModal` agora exibe comparação por posição de pneu com até 3 fotos (inspeção atual + 2 anteriores), data/status e badge "Atual".
+- Service layer recebeu `fetchTireInspectionComparison`, usando RLS existente e ordenação por `started_at` sem nova migration.
+- Teste E2E `tire-inspection-assistant.spec.ts` atualizado para abrir a aba dedicada e validar o viewer comparativo.
+- Validações executadas: `npm run lint` ✅; `npm run test:unit` ✅ (`191` testes); `npx playwright test e2e/completed/tire-inspection-assistant.spec.ts --project=chromium` ✅ (`14` testes); `npm run test:smoke` ✅ (`6` testes).
 Arquivos criados: src/lib/dashboardKpi.ts (função pura countActiveInMaintenance), src/lib/dashboardKpi.test.ts (5 cenários)
 Testes adicionados: src/lib/dashboardKpi.test.ts
 Validações executadas: `npm run lint` ✅; `npm run test:unit` ✅ (145 testes passando); `npm run test:smoke` ✅ (6 testes passando)
