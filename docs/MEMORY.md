@@ -357,3 +357,15 @@ Causa raiz: política RLS de SELECT de tire_inspections e tire_inspection_respon
 Correção aplicada: nova migration aditiva recriando apenas as duas políticas de SELECT com 'Coordinator' e 'Director' acrescentados à lista de cargos de visão do tenant
 Arquivos modificados: supabase/migrations/20260612000000_fix_tire_inspections_select_coordinator_director.sql (novo)
 Testes adicionados: e2e/pending/tire-inspections-visibility-by-role.spec.ts (visibilidade por cargo; pendente de usuários de teste)
+
+## 🆕 Atualização de Sessão (12/06/2026) — Remoção do piso de 7 dias em inspeções de pneus
+Feature implementada: campo "Pneus (Inspeção)" na tela de Configurações passa a aceitar qualquer valor inteiro a partir de 0 dias (antes: mínimo de 7). O valor padrão de exibição permanece 7 para tenants que nunca configuraram.
+Motivação: permitir inspeções consecutivas do mesmo veículo/motorista sem bloqueio de intervalo — essencial para testes.
+Correção aplicada:
+- `src/components/ChecklistDayIntervalSettings.tsx`: clamp de persistência `Math.max(7, ...)` → `Math.max(0, ...)`; `min="7"` → `min="0"`; handler de digitação `>= 1` → `>= 0`; texto auxiliar e title atualizados.
+- `src/services/tireInspectionService.test.ts`: adicionado teste "não bloqueia quando intervalo configurado é 0, mesmo com inspeção concluída hoje".
+- `e2e/pending/tire-inspection-settings.spec.ts`: seletores `min="7"` → `min="0"`; teste C.1 reescrito para validar que 0 é permitido e persiste; asserções B.2 atualizadas para `>= 0`.
+Função `validateInspectionInterval` NÃO foi alterada — já funciona corretamente para intervalo 0.
+Arquivos modificados: src/components/ChecklistDayIntervalSettings.tsx, src/services/tireInspectionService.test.ts, e2e/pending/tire-inspection-settings.spec.ts
+Testes adicionados: 1 teste unitário (intervalo 0 não bloqueia)
+Validações executadas: `npm run lint` ✅; `npm run test:unit` ✅ (195 testes); `npm run test:smoke` ✅ (6 testes)

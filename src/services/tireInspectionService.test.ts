@@ -23,6 +23,7 @@ vi.mock('../lib/supabase', () => ({
 import {
   fetchDistinctManufacturers,
   fetchDistinctBrands,
+  findOpenTireInspection,
   validateTireInspectionEligibility,
   createTireInspection,
   saveInspectionResponse,
@@ -71,6 +72,55 @@ function makeSelectChain(returnValue: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+// ─── findOpenTireInspection ─────────────────────────────────────────────────
+
+describe('findOpenTireInspection', () => {
+  it('retorna o id quando existe inspeção em andamento para o veículo', async () => {
+    const chain = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'insp-1' }, error: null }),
+    };
+    mockFrom.mockReturnValue(chain);
+
+    const result = await findOpenTireInspection('veh-1');
+
+    expect(result).toBe('insp-1');
+    expect(chain.eq).toHaveBeenNthCalledWith(1, 'vehicle_id', 'veh-1');
+    expect(chain.eq).toHaveBeenNthCalledWith(2, 'status', 'in_progress');
+  });
+
+  it('retorna null quando não há inspeção aberta', async () => {
+    const chain = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
+    mockFrom.mockReturnValue(chain);
+
+    const result = await findOpenTireInspection('veh-1');
+
+    expect(result).toBeNull();
+  });
+
+  it('lança erro quando Supabase retorna error', async () => {
+    const chain = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: new Error('lookup failed') }),
+    };
+    mockFrom.mockReturnValue(chain);
+
+    await expect(findOpenTireInspection('veh-1')).rejects.toThrow('lookup failed');
+  });
 });
 
 // ─── fetchDistinctManufacturers ───────────────────────────────────────────────
@@ -209,6 +259,38 @@ describe('validateTireInspectionEligibility', () => {
     await expect(
       validateTireInspectionEligibility('veh-1', simpleAxleConfig, 1, 'Truck', 7),
     ).rejects.toThrow('Próxima inspeção disponível a partir de');
+  });
+
+  it('não bloqueia quando intervalo configurado é 0, mesmo com inspeção concluída hoje', async () => {
+    let callCount = 0;
+    mockFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          then: (resolve: (v: unknown) => void) => resolve({
+            data: [
+              { current_position: 'E1' }, { current_position: 'D1' },
+              { current_position: 'E2' }, { current_position: 'D2' },
+              { current_position: 'Step 1' },
+            ],
+            error: null,
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: { completed_at: new Date().toISOString() }, error: null }),
+      };
+    });
+
+    await expect(
+      validateTireInspectionEligibility('veh-1', simpleAxleConfig, 1, 'Truck', 0),
+    ).resolves.toBeUndefined();
   });
 });
 

@@ -5,6 +5,15 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 ## 📜 Histórico de Sessões e Mudanças
 
 ### Junho 2026
+- **Remoção do piso de 7 dias em inspeções de pneus (12/06/2026)**:
+  - Motivação: permitir inspeções consecutivas do mesmo veículo/motorista sem bloqueio de intervalo — essencial para testes operacionais.
+  - Mudança: campo "Pneus (Inspeção)" em Configurações passa a aceitar qualquer inteiro a partir de 0 dias; padrão de exibição mantido em 7.
+  - Frontend: `ChecklistDayIntervalSettings.tsx` — clamp `Math.max(7,...)` → `Math.max(0,...)`; `min="7"` → `min="0"`; handler `>= 1` → `>= 0`; texto e title atualizados.
+  - Teste unitário: adicionado caso "intervalo 0 não bloqueia" em `tireInspectionService.test.ts` (195 testes total).
+  - E2E: `tire-inspection-settings.spec.ts` atualizado para novo piso 0, teste C.1 reescrito como "salvar 0 persiste".
+  - Função `validateInspectionInterval` inalterada; sem migration; sem novo arquivo.
+  - Validações: `npm run lint` ✅, `npm run test:unit` ✅ (195), `npm run test:smoke` ✅ (6).
+
 - **Correção de Vulnerabilidades npm (12/06/2026)**:
   - Causa raiz: árvore npm prendia versões vulneráveis de esbuild via vite@6.4.2 e tsx@4.21.0, além de plugins Vite em ranges afetados. O npm audit apontava 5 high severity vulnerabilities.
   - Correção: atualização controlada para vite@8.0.16, @vitejs/plugin-react@6.0.2, @tailwindcss/vite@4.3.1, tsx@4.22.4, vitest@4.1.8, @vitest/coverage-v8@4.1.8; lockfile regenerado; adicionado script `npm run test:audit` como gate de regressão.
