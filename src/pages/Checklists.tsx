@@ -13,6 +13,7 @@ import CreateActionPlanModal from '../components/CreateActionPlanModal';
 import {
   validateTireInspectionEligibility,
   createTireInspection,
+  findOpenTireInspection,
 } from '../services/tireInspectionService';
 import { cn } from '../lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -222,6 +223,9 @@ export default function Checklists() {
 
   const startTireInspectionMutation = useMutation({
     mutationFn: async (vehicleId: string) => {
+      const openId = await findOpenTireInspection(vehicleId);
+      if (openId) return openId;
+
       const { data: veh, error: vehErr } = await supabase
         .from('vehicles')
         .select('axle_config, steps_count, type')

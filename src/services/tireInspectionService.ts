@@ -46,6 +46,26 @@ export async function fetchTireInspectionResponses(inspectionId: string): Promis
   return (data as TireInspectionResponseRow[]).map(tireInspectionResponseFromRow);
 }
 
+// ─── Open inspection lookup ─────────────────────────────────────────────────
+
+/**
+ * Returns the id of an existing in-progress tire inspection for the given
+ * vehicle within the current tenant (RLS-scoped), or null if none exists.
+ * Used to resume an open inspection instead of creating a duplicate.
+ */
+export async function findOpenTireInspection(vehicleId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('tire_inspections')
+    .select('id')
+    .eq('vehicle_id', vehicleId)
+    .eq('status', 'in_progress')
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.id ?? null;
+}
+
 export interface PositionComparison {
   positionCode: string;
   positionLabel: string;

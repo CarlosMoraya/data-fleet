@@ -58,7 +58,7 @@ export default function TireInspectionFill() {
   const { data: responses = [] } = useQuery({
     queryKey: ['tireInspectionResponses', inspectionId],
     queryFn: () => fetchTireInspectionResponses(inspectionId!),
-    enabled: !!inspectionId && kmConfirmed,
+    enabled: !!inspectionId && (kmConfirmed || !!inspection?.odometerKm),
     gcTime: Infinity,
     networkMode: 'offlineFirst',
   });
