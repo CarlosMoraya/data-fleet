@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Gauge, Loader2, CheckCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -121,22 +121,29 @@ export default function TireInspectionFill() {
 
   const isCompleted = inspection?.status === 'completed';
 
-  // KM: já confirmado se odometer_km está preenchido
-  const odometerAlreadySet = !!inspection?.odometerKm;
+  useEffect(() => {
+    if (inspection?.odometerKm && kmInput === '') {
+      setKmInput(String(inspection.odometerKm));
+    }
+  }, [inspection?.odometerKm]);
 
   // ── KM confirmation ───────────────────────────────────────────────────────
 
   const confirmKmMutation = useMutation({
     networkMode: 'offlineFirst',
     mutationFn: async (km: number) => {
+      const startedAt = new Date().toISOString();
       if (!isOnline) {
-        await enqueueOperation({ type: 'confirm_tire_km', odometerKm: km }, '', inspectionId!);
-        queryClient.setQueryData(['tireInspection', inspectionId], (old: TireInspection | undefined) => applyOfflineKm(old, km));
+        await enqueueOperation({ type: 'confirm_tire_km', odometerKm: km, startedAt }, '', inspectionId!);
+        queryClient.setQueryData(
+          ['tireInspection', inspectionId],
+          (old: TireInspection | undefined) => (old ? { ...applyOfflineKm(old, km), startedAt } : old),
+        );
         return;
       }
       const { error } = await supabase
         .from('tire_inspections')
-        .update({ odometer_km: km })
+        .update({ odometer_km: km, started_at: startedAt })
         .eq('id', inspectionId);
       if (error) throw error;
     },
@@ -235,7 +242,7 @@ export default function TireInspectionFill() {
 
   if (!inspection) return null;
 
-  const showKmStep = !odometerAlreadySet && !kmConfirmed;
+  const showKmStep = !isCompleted && !kmConfirmed;
 
   const selectedTire = selectedPosition ? tireMap[selectedPosition] : undefined;
   const existingResponse = selectedPosition ? responseByCode[selectedPosition] : undefined;
@@ -275,7 +282,7 @@ export default function TireInspectionFill() {
         )}
 
         {/* Step 2: Blueprint */}
-        {(kmConfirmed || odometerAlreadySet) && (
+        {(kmConfirmed || isCompleted) && (
           <>
             <div className="bg-white rounded-xl border p-4">
               <p className="text-sm text-gray-500 mb-3">

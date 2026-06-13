@@ -23,6 +23,39 @@ Este arquivo registra o progresso atual, pendências e a visão de curto prazo p
 
 ---
 
+## 🆕 Atualização de Sessão (12/06/2026) — Bugfix Inspeção de Pneus: comparação e câmera
+Bug corrigido: Inspeção de Pneus — comparação em ordem errada + câmera no celular (rodada 2)
+Causa raiz:
+- Comparação ranqueava por started_at; inspeção retomada (concluída depois) ficava "antiga" e mostrava só 1 foto
+- Câmera ao vivo (getUserMedia) exige contexto seguro; celular via http://IP não tem → fallback acionado com UX confusa
+Correção aplicada:
+- fetchTireInspectionComparison passa a ranquear/ordenar por completed_at ?? started_at (âncora na aberta)
+- CameraCapture: detecta contexto inseguro proativamente + texto/rótulo claros ("Tirar foto" via câmera nativa)
+Arquivos modificados:
+- src/services/tireInspectionService.ts
+- src/components/CameraCapture.tsx
+- src/services/tireInspectionService.comparison.test.ts (caso de regressão)
+Notas: câmera ao vivo no celular requer HTTPS (Vercel/túnel) — não é defeito de código.
+
+---
+
+## 🆕 Atualização de Sessão (12/06/2026) — Bugfix Inspeção de Pneus: datas reais
+Bug corrigido: Inspeção de Pneus — datas exibidas não refletiam o dia real (rodada 3)
+Causa raiz:
+- Cards mostravam started_at em vez do photoTimestamp da foto
+- started_at ficava na data de criação do rascunho (retomado por findOpenTireInspection), não no dia do preenchimento
+Correção aplicada:
+- Card passa a exibir photo.photoTimestamp
+- confirmKmMutation grava started_at = momento da confirmação do KM (online + offline via SyncOperation)
+Arquivos modificados:
+- src/components/TireInspectionDetailModal.tsx
+- src/pages/TireInspectionFill.tsx
+- src/lib/offline/offlineDb.ts
+- src/lib/offline/syncService.ts
+Notas: registros já concluídos mantêm o started_at antigo (sem correção retroativa).
+
+---
+
 ## 🟡 Tarefas em Andamento
 
 1.  **Estabilização de Testes E2E (Inspeção de Pneus)**:

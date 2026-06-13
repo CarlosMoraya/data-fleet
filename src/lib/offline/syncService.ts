@@ -84,6 +84,7 @@ export async function flushQueue(): Promise<void> {
   }
 }
 
+
 // ─── Process a single entry ───────────────────────────────────────────────────
 
 async function processEntry(entry: SyncQueueEntry): Promise<void> {
@@ -207,7 +208,7 @@ async function processEntry(entry: SyncQueueEntry): Promise<void> {
       if (!inspectionId) throw new Error('inspectionId missing for confirm_tire_km');
       const { error: kmErr } = await supabase
         .from('tire_inspections')
-        .update({ odometer_km: op.odometerKm })
+        .update({ odometer_km: op.odometerKm, started_at: op.startedAt })
         .eq('id', inspectionId);
       if (kmErr) throw kmErr;
       break;
@@ -224,4 +225,3 @@ async function processEntry(entry: SyncQueueEntry): Promise<void> {
     }
   }
 }
-

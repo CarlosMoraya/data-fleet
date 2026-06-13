@@ -37,17 +37,27 @@ const currentInspection: TireInspection = {
 function makeInspectionsChain(returnValue: unknown) {
   return {
     select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    lte: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue(returnValue),
+    eq: vi.fn().mockResolvedValue(returnValue),
   };
 }
 
 function makeResponsesChain(returnValue: unknown) {
   return {
     select: vi.fn().mockReturnThis(),
-    in: vi.fn().mockResolvedValue(returnValue),
+    in: vi.fn((_column: string, values: string[]) => {
+      if (
+        returnValue
+        && typeof returnValue === 'object'
+        && 'data' in returnValue
+        && Array.isArray((returnValue as { data: unknown }).data)
+      ) {
+        return Promise.resolve({
+          ...(returnValue as { data: Array<{ inspection_id: string }> }),
+          data: (returnValue as { data: Array<{ inspection_id: string }> }).data.filter(row => values.includes(row.inspection_id)),
+        });
+      }
+      return Promise.resolve(returnValue);
+    }),
   };
 }
 
@@ -156,5 +166,49 @@ describe('fetchTireInspectionComparison', () => {
     expect(result[0].positionCode).toBe('E1');
     expect(result[0].photos).toHaveLength(1);
     expect(result[0].photos[0].isCurrent).toBe(true);
+  });
+
+  it('ranqueia inspeções retomadas pela data efetiva de conclusão', async () => {
+    const resumedInspection: TireInspection = {
+      ...currentInspection,
+      id: 'A',
+      startedAt: '2026-06-08T22:41:00Z',
+    };
+    const laterStartedInspection: TireInspection = {
+      ...currentInspection,
+      id: 'C',
+      startedAt: '2026-06-08T23:05:00Z',
+    };
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'tire_inspections') {
+        return makeInspectionsChain({
+          data: [
+            { id: 'A', started_at: '2026-06-08T22:41:00Z', completed_at: '2026-06-12T22:10:00Z' },
+            { id: 'C', started_at: '2026-06-08T23:05:00Z', completed_at: '2026-06-08T23:07:00Z' },
+          ],
+          error: null,
+        });
+      }
+      return makeResponsesChain({
+        data: [
+          makeResponseRow('A', 'E1'),
+          makeResponseRow('C', 'E1'),
+        ],
+        error: null,
+      });
+    });
+
+    const resultA = await fetchTireInspectionComparison('veh-1', resumedInspection);
+
+    expect(resultA).toHaveLength(1);
+    expect(resultA[0].photos.map(photo => photo.inspectionId)).toEqual(['A', 'C']);
+    expect(resultA[0].photos.map(photo => photo.isCurrent)).toEqual([true, false]);
+
+    const resultC = await fetchTireInspectionComparison('veh-1', laterStartedInspection);
+
+    expect(resultC).toHaveLength(1);
+    expect(resultC[0].photos.map(photo => photo.inspectionId)).toEqual(['C']);
+    expect(resultC[0].photos.map(photo => photo.isCurrent)).toEqual([true]);
   });
 });

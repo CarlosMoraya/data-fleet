@@ -27,6 +27,11 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
   }, []);
 
   const startCamera = useCallback(async () => {
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      setUseFileInput(true);
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
@@ -128,10 +133,12 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
             ) : (
               <>
                 <Camera className="h-16 w-16 mx-auto text-zinc-400" />
-                <p className="text-zinc-300 text-sm">Câmera indisponível neste dispositivo.</p>
+                <p className="text-zinc-300 text-sm">
+                  Câmera ao vivo indisponível neste endereço (requer HTTPS). Use o botão abaixo para fotografar com a câmera do dispositivo.
+                </p>
                 <label className="block cursor-pointer">
                   <span className="px-6 py-3 bg-orange-500 text-white rounded-xl font-medium text-sm">
-                    Selecionar foto
+                    Tirar foto
                   </span>
                   <input
                     type="file"

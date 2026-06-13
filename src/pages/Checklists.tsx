@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle, Disc } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -26,6 +26,12 @@ const STATUS_COLOR: Record<string, string> = {
   completed: 'bg-green-100 text-green-800',
 };
 
+const TAB_STORAGE_KEY = 'checklists:activeTab';
+
+export function getStoredChecklistTab(raw: string | null): 'checklists' | 'tireInspections' {
+  return raw === 'tireInspections' || raw === 'checklists' ? raw : 'checklists';
+}
+
 export default function Checklists() {
   const { user, currentClient } = useAuth();
   const navigate = useNavigate();
@@ -42,7 +48,9 @@ export default function Checklists() {
   const [historySearch, setHistorySearch] = useState('');
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'in_progress' | 'completed'>('all');
   const [onlyWithIssues, setOnlyWithIssues] = useState(false);
-  const [activeTab, setActiveTab] = useState<'checklists' | 'tireInspections'>('checklists');
+  const [activeTab, setActiveTab] = useState<'checklists' | 'tireInspections'>(
+    () => getStoredChecklistTab(sessionStorage.getItem(TAB_STORAGE_KEY)),
+  );
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
 
   // Local UI state
@@ -55,6 +63,10 @@ export default function Checklists() {
   const [startingTireInspection, setStartingTireInspection] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const isOnline = useOnlineStatus();
+
+  useEffect(() => {
+    sessionStorage.setItem(TAB_STORAGE_KEY, activeTab);
+  }, [activeTab]);
 
   // ── Queries for Driver ────────────────────────────────────────────────────
   const { data: vehicleInfo, isLoading: loadingVehicleInfo } = useQuery({

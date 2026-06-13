@@ -83,20 +83,28 @@ export async function fetchTireInspectionComparison(
   vehicleId: string,
   currentInspection: TireInspection,
 ): Promise<PositionComparison[]> {
+  const effectiveDate = (inspection: { started_at: string; completed_at: string | null }) =>
+    inspection.completed_at ?? inspection.started_at;
+
   const { data: inspections, error: inspectionsError } = await supabase
     .from('tire_inspections')
     .select('id, started_at, completed_at')
-    .eq('vehicle_id', vehicleId)
-    .lte('started_at', currentInspection.startedAt)
-    .order('started_at', { ascending: false })
-    .limit(3);
+    .eq('vehicle_id', vehicleId);
   if (inspectionsError) throw inspectionsError;
 
-  const inspectionIds = (inspections ?? []).map((inspection: { id: string }) => inspection.id);
+  const sorted = (inspections ?? [])
+    .slice()
+    .sort((a, b) => effectiveDate(b).localeCompare(effectiveDate(a)));
+  const idx = sorted.findIndex((inspection) => inspection.id === currentInspection.id);
+  const windowInspections = idx >= 0 ? sorted.slice(idx, idx + 3) : sorted.slice(0, 3);
+  const inspectionIds = windowInspections.map((inspection) => inspection.id);
   if (inspectionIds.length === 0) return [];
 
   const inspectionDates = new Map(
-    (inspections ?? []).map((inspection: { id: string; started_at: string }) => [inspection.id, inspection.started_at]),
+    windowInspections.map((inspection) => [inspection.id, inspection.started_at]),
+  );
+  const effectiveDates = new Map(
+    windowInspections.map((inspection) => [inspection.id, effectiveDate(inspection)]),
   );
 
   const { data: responses, error: responsesError } = await supabase
@@ -119,9 +127,9 @@ export async function fetchTireInspectionComparison(
       photos: mappedResponses
         .filter((response) => response.positionCode === position.code)
         .sort((a, b) => {
-          const dateA = inspectionDates.get(a.inspectionId) ?? '';
-          const dateB = inspectionDates.get(b.inspectionId) ?? '';
-          return dateB.localeCompare(dateA);
+          const da = effectiveDates.get(a.inspectionId) ?? '';
+          const db = effectiveDates.get(b.inspectionId) ?? '';
+          return db.localeCompare(da);
         })
         .slice(0, 3)
         .map((response) => ({

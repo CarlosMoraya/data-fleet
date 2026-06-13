@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -6,7 +6,7 @@ import {
   fetchTireInspectionResponses,
   type PositionComparison,
 } from '../services/tireInspectionService';
-import type { TireInspection } from '../types';
+import type { TireInspection, TireInspectionResponse } from '../types';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -18,6 +18,8 @@ interface Props {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function TireInspectionDetailModal({ inspection, onClose }: Props) {
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
   const { data: responses = [], isLoading } = useQuery({
     queryKey: ['tireInspectionResponses', inspection.id],
     queryFn: () => fetchTireInspectionResponses(inspection.id),
@@ -36,6 +38,10 @@ export default function TireInspectionDetailModal({ inspection, onClose }: Props
   const conformes = responses.filter(r => r.status === 'conforme').length;
   const naoConformes = total - conformes;
   const conformRate = total > 0 ? Math.round((conformes / total) * 100) : 0;
+  const responseByPosition = React.useMemo(
+    () => Object.fromEntries(responses.map(r => [r.positionCode, r])),
+    [responses],
+  );
 
   const formatDate = (iso?: string) =>
     iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
@@ -87,13 +93,33 @@ export default function TireInspectionDetailModal({ inspection, onClose }: Props
             <div className="space-y-3">
               {comparison.map(item => (
                 <div key={item.positionCode}>
-                  <PositionComparisonRow comparison={item} />
+                  <PositionComparisonRow
+                    comparison={item}
+                    response={responseByPosition[item.positionCode]}
+                    onOpenPhoto={setLightboxUrl}
+                  />
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <img src={lightboxUrl} alt="Foto da inspeção" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" />
+          <button
+            type="button"
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 text-white/80 hover:text-white"
+            aria-label="Fechar"
+          >
+            <X size={28} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -124,25 +150,56 @@ function SummaryBadge({ label, value, color }: { label: string; value: string | 
   );
 }
 
-function PositionComparisonRow({ comparison }: { comparison: PositionComparison }) {
+function PositionComparisonRow({
+  comparison,
+  response,
+  onOpenPhoto,
+}: {
+  comparison: PositionComparison;
+  response?: TireInspectionResponse;
+  onOpenPhoto: (url: string) => void;
+}) {
   return (
     <div className="rounded-xl border border-zinc-100 bg-zinc-50/50 p-3 sm:flex sm:gap-4">
       <div className="mb-3 sm:mb-0 sm:w-32 sm:flex-shrink-0">
         <p className="text-sm font-semibold text-zinc-900">{comparison.positionCode}</p>
         <p className="text-xs text-zinc-500">{comparison.positionLabel}</p>
       </div>
-      <div className="min-w-0 flex-1 overflow-x-auto">
-        <div className="flex gap-3 pb-1" style={{ minWidth: 'max-content' }}>
-          {comparison.photos.map(photo => (
-            <div key={photo.inspectionId}>
-              <ComparisonPhotoCard
-                photo={photo}
-                positionCode={comparison.positionCode}
-              />
+      <div className="min-w-0 flex-1 space-y-3">
+        <div className="grid grid-cols-2 gap-2 rounded-lg border border-zinc-100 bg-white/70 p-3 text-xs sm:grid-cols-4">
+          <DetailField label="DOT" value={response?.dot || '—'} />
+          <DetailField label="Marcação de fogo" value={response?.fireMarking || '—'} />
+          <DetailField label="Fabricante" value={response?.manufacturer || '—'} />
+          <DetailField label="Marca" value={response?.brand || '—'} />
+          {response?.observation && (
+            <div className="col-span-2 sm:col-span-4">
+              <DetailField label="Observação" value={response.observation} />
             </div>
-          ))}
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          <div className="flex gap-3 pb-1" style={{ minWidth: 'max-content' }}>
+            {comparison.photos.map(photo => (
+              <div key={photo.inspectionId}>
+                <ComparisonPhotoCard
+                  photo={photo}
+                  positionCode={comparison.positionCode}
+                  onOpenPhoto={onOpenPhoto}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs text-zinc-400">{label}</p>
+      <p className="font-medium text-zinc-800">{value}</p>
     </div>
   );
 }
@@ -150,9 +207,11 @@ function PositionComparisonRow({ comparison }: { comparison: PositionComparison 
 function ComparisonPhotoCard({
   photo,
   positionCode,
+  onOpenPhoto,
 }: {
   photo: PositionComparison['photos'][number];
   positionCode: string;
+  onOpenPhoto: (url: string) => void;
 }) {
   const isConform = photo.status === 'conforme';
   const formatDate = (iso?: string) =>
@@ -162,7 +221,13 @@ function ComparisonPhotoCard({
     <div className="flex-shrink-0 w-40 rounded-xl border border-zinc-200 overflow-hidden bg-white shadow-sm">
       <div className="relative w-full h-32 bg-zinc-100">
         {photo.photoUrl ? (
-          <img src={photo.photoUrl} alt={positionCode} className="w-full h-full object-cover" />
+          <button
+            type="button"
+            onClick={() => onOpenPhoto(photo.photoUrl)}
+            className="h-full w-full cursor-zoom-in transition-transform hover:scale-[1.02] active:scale-[0.99]"
+          >
+            <img src={photo.photoUrl} alt={positionCode} className="w-full h-full object-cover" />
+          </button>
         ) : (
           <div className="flex items-center justify-center h-full text-zinc-300 text-xs">Sem foto</div>
         )}
@@ -179,7 +244,7 @@ function ComparisonPhotoCard({
         )}
       </div>
       <div className="p-2 space-y-1 text-xs">
-        <p className="font-medium text-zinc-800">{formatDate(photo.inspectionDate)}</p>
+        <p className="font-medium text-zinc-800">{formatDate(photo.photoTimestamp)}</p>
         <p className={isConform ? 'text-green-700' : 'text-red-700'}>
           {isConform ? 'Conforme' : 'Não conforme'}
         </p>

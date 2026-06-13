@@ -47,6 +47,7 @@ export type SyncOperation =
   | {
       type: 'confirm_tire_km';
       odometerKm: number;
+      startedAt: string;
     }
   | {
       type: 'finish_tire_inspection';
