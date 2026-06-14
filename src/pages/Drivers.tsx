@@ -11,6 +11,8 @@ import { driverFieldSettingsFromRow, defaultDriverFieldSettings, DriverFieldSett
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { saveDriver, deleteDriver } from '../services/driverService';
 import type { DriverFiles } from '../services/driverService';
+import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
+import SelectClientNotice from '../components/SelectClientNotice';
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -24,8 +26,9 @@ function formatCPF(cpf: string): string {
 }
 
 export default function Drivers() {
-  const { currentClient, user } = useAuth();
+  const { currentClient, user, clients } = useAuth();
   const queryClient = useQueryClient();
+  const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(() => {
     return sessionStorage.getItem('driverFormOpen') === 'true';
@@ -40,14 +43,13 @@ export default function Drivers() {
   });
   const [viewingDriver, setViewingDriver] = useState<Driver | null>(null);
 
-  const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
-  const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
-  const canDelete = ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') || ((user?.role === 'Fleet Analyst' || user?.role === 'Supervisor') && user?.canDeleteDrivers === true);
-  const hasActiveClient = !!currentClient?.id;
+  const canCreate = ROLES_CAN_CREATE.includes(user?.role || '') && !blockWrite;
+  const canEdit = ROLES_CAN_EDIT.includes(user?.role || '') && !blockWrite;
+  const canDelete = (ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') || ((user?.role === 'Fleet Analyst' || user?.role === 'Supervisor') && user?.canDeleteDrivers === true)) && !blockWrite;
 
   // Queries
   const { data: drivers = [], isLoading: loadingDrivers, isError: driversError } = useQuery({
-    queryKey: ['drivers', currentClient?.id],
+    queryKey: ['drivers', currentClient?.id ?? 'all-clients'],
     queryFn: async () => {
       let query = supabase.from('drivers').select('*');
       if (currentClient?.id) {
@@ -57,7 +59,7 @@ export default function Drivers() {
       if (error) throw error;
       return (data as DriverRow[]).map(driverFromRow);
     },
-    enabled: !!user && hasActiveClient
+    enabled: !!user && showsAggregatedData(user?.role, currentClient?.id)
   });
 
   const { data: fieldSettings } = useQuery({
@@ -75,7 +77,7 @@ export default function Drivers() {
   });
 
   const { data: driverVehicleMap = {} } = useQuery({
-    queryKey: ['driverVehicleMap', currentClient?.id],
+    queryKey: ['driverVehicleMap', currentClient?.id ?? 'all-clients'],
     queryFn: async () => {
       let query = supabase.from('vehicles').select('driver_id, license_plate').not('driver_id', 'is', null);
       if (currentClient?.id) {
@@ -88,7 +90,7 @@ export default function Drivers() {
       });
       return map;
     },
-    enabled: !!user && hasActiveClient
+    enabled: !!user && showsAggregatedData(user?.role, currentClient?.id)
   });
 
   // Redirect Drivers and Yard Auditors
@@ -141,15 +143,22 @@ export default function Drivers() {
     });
   }, [drivers, search]);
 
+  const clientNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    clients.forEach(c => map.set(c.id, c.name));
+    return map;
+  }, [clients]);
+
   return (
     <div className="flex flex-col gap-6 h-full">
+      {blockWrite && <SelectClientNotice />}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Motoristas</h1>
           <p className="text-sm text-zinc-500 mt-1">Gerencie os motoristas da sua frota.</p>
         </div>
 
-        {canCreate && hasActiveClient && (
+        {canCreate && (
           <button
             onClick={() => {
               sessionStorage.removeItem('driverFormData');
@@ -195,6 +204,9 @@ export default function Drivers() {
             <table className="min-w-full divide-y divide-zinc-200">
               <thead className="bg-zinc-50 sticky top-0 z-10">
                 <tr>
+                  {blockWrite && (
+                    <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Cliente</th>
+                  )}
                   <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider sm:pl-6">Motorista</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">CPF</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Categoria CNH</th>
@@ -208,6 +220,13 @@ export default function Drivers() {
               <tbody className="divide-y divide-zinc-200 bg-white">
                 {filteredDrivers.map((driver) => (
                   <tr key={driver.id} className="hover:bg-zinc-50 transition-colors">
+                    {blockWrite && (
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-600">
+                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                          {driver.clientId ? (clientNameMap.get(driver.clientId) ?? '—') : '—'}
+                        </span>
+                      </td>
+                    )}
                     <td className="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
                       <div className="flex items-center">
                         <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-zinc-100 flex items-center justify-center border border-zinc-200">
@@ -280,8 +299,8 @@ export default function Drivers() {
                 ))}
                 {filteredDrivers.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-sm text-zinc-500">
-                      {search ? 'Nenhum motorista encontrado para esta busca.' : 'Nenhum motorista cadastrado para este cliente.'}
+                    <td colSpan={blockWrite ? 7 : 6} className="py-10 text-center text-sm text-zinc-500">
+                      {search ? 'Nenhum motorista encontrado para esta busca.' : blockWrite ? 'Nenhum motorista cadastrado em nenhum cliente.' : 'Nenhum motorista cadastrado para este cliente.'}
                     </td>
                   </tr>
                 )}

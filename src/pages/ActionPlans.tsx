@@ -7,6 +7,8 @@ import type { ActionPlan, ActionPlanStatus } from '../types';
 import ActionPlanModal from '../components/ActionPlanModal';
 import { cn } from '../lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
+import SelectClientNotice from '../components/SelectClientNotice';
 
 const ALL_STATUSES: (ActionPlanStatus | 'all')[] = ['all', 'pending', 'in_progress', 'awaiting_conclusion', 'completed', 'cancelled'];
 const STATUS_TAB_LABEL: Record<string, string> = {
@@ -19,17 +21,18 @@ const STATUS_TAB_LABEL: Record<string, string> = {
 };
 
 export default function ActionPlans() {
-  const { currentClient } = useAuth();
+  const { currentClient, user, clients } = useAuth();
   const queryClient = useQueryClient();
+  const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
 
   const [activeTab, setActiveTab] = useState<ActionPlanStatus | 'all'>('pending');
   const [search, setSearch] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<ActionPlan | null>(null);
 
   const { data: plans = [], isLoading } = useQuery({
-    queryKey: ['actionPlans', currentClient?.id],
+    queryKey: ['actionPlans', currentClient?.id ?? 'all-clients'],
     queryFn: async () => {
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from('action_plans')
         .select(`
           *,
@@ -42,8 +45,13 @@ export default function ActionPlans() {
           checklist_responses!checklist_response_id(checklist_items(title)),
           checklists!checklist_id(checklist_templates(name))
         `)
-        .eq('client_id', currentClient!.id)
         .order('created_at', { ascending: false });
+
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+
+      const { data, error: fetchError } = await query;
 
       if (fetchError) throw fetchError;
 
@@ -74,7 +82,7 @@ export default function ActionPlans() {
         return actionPlanFromRow(row as ActionPlanRow);
       });
     },
-    enabled: !!currentClient?.id
+    enabled: showsAggregatedData(user?.role, currentClient?.id)
   });
 
   const counts = useMemo(() => {
@@ -105,8 +113,16 @@ export default function ActionPlans() {
   const formatDueDate = (date?: string) =>
     date ? new Date(date).toLocaleDateString('pt-BR') : '—';
 
+  const clientNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    clients.forEach(c => map.set(c.id, c.name));
+    return map;
+  }, [clients]);
+
   return (
     <div className="flex flex-col gap-6 h-full">
+      {blockWrite && <SelectClientNotice />}
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
@@ -177,14 +193,17 @@ export default function ActionPlans() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-zinc-400">
             <ClipboardList className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">Nenhuma ação encontrada.</p>
+            <p className="text-sm">{blockWrite ? 'Nenhuma ação encontrada em nenhum cliente.' : 'Nenhuma ação encontrada.'}</p>
           </div>
         ) : (
           <div className="flex-1 overflow-auto">
             <table className="min-w-full divide-y divide-zinc-100">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-zinc-50">
-                  {['Nome / Ação', 'Veículo', 'Status', 'Responsável', 'Prazo', 'Criado em', ''].map(h => (
+                  {[
+                    ...(blockWrite ? ['Cliente'] : []),
+                    'Nome / Ação', 'Veículo', 'Status', 'Responsável', 'Prazo', 'Criado em', '',
+                  ].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                       {h}
                     </th>
@@ -195,9 +214,16 @@ export default function ActionPlans() {
                 {filtered.map(p => (
                   <tr
                     key={p.id}
-                    onClick={() => setSelectedPlan(p)}
-                    className="hover:bg-zinc-50 cursor-pointer transition-colors"
+                    onClick={() => !blockWrite && setSelectedPlan(p)}
+                    className={cn('hover:bg-zinc-50 transition-colors', !blockWrite && 'cursor-pointer')}
                   >
+                    {blockWrite && (
+                      <td className="px-4 py-3 text-sm text-zinc-600">
+                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                          {p.clientId ? (clientNameMap.get(p.clientId) ?? '—') : '—'}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-4 py-3 max-w-[220px]">
                       {p.name && <p className="text-sm font-medium text-zinc-900 truncate">{p.name}</p>}
                       <p className="text-xs text-zinc-500 truncate">{p.suggestedAction}</p>
@@ -221,7 +247,9 @@ export default function ActionPlans() {
                     </td>
                     <td className="px-4 py-3 text-xs text-zinc-400">{formatDate(p.createdAt)}</td>
                     <td className="px-4 py-3">
-                      <span className="text-xs text-orange-500 hover:underline">Gerenciar</span>
+                      <span className={cn('text-xs text-orange-500 hover:underline', blockWrite && 'opacity-40 pointer-events-none')}>
+                        Gerenciar
+                      </span>
                     </td>
                   </tr>
                 ))}

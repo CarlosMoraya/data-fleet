@@ -2,6 +2,17 @@
 
 Este arquivo registra o progresso atual, pendências e a visão de curto prazo para o desenvolvimento.
 
+## 🆕 Atualização de Sessão (14/06/2026) — Bugfix: modo "Todos os Clientes" do Admin Master inconsistente
+
+Bug corrigido: modo "Todos os Clientes" do Admin Master inconsistente — telas de Checklists, Plano de Ação, Templates, Motoristas, Pneus e Agendamentos ficavam vazias/bloqueadas, e não havia impedimento para criar/configurar sem cliente.
+Causa raiz: ausência de regra consistente para currentClient = null (Admin Master) — leitura cross-tenant não habilitada e escrita não bloqueada por página.
+Correção aplicada: regra central em src/lib/clientScope.ts (requiresClientSelection / showsAggregatedData) + componente SelectClientNotice; aplicados em 8 páginas → leitura agrega todos os clientes com coluna "Cliente"; criação/edição bloqueadas em "Todos os Clientes" com aviso. Sem migration (RLS já permite Admin Master ler cross-tenant). Workshop fora de escopo.
+Arquivos modificados: src/lib/clientScope.ts (novo), src/lib/clientScope.test.ts (novo), src/components/SelectClientNotice.tsx (novo), src/pages/ActionPlans.tsx, src/pages/Checklists.tsx, src/pages/ChecklistTemplates.tsx, src/pages/Drivers.tsx, src/pages/Tires.tsx, src/pages/Vehicles.tsx, src/pages/Maintenance.tsx, src/pages/WorkshopSchedules.tsx
+Testes adicionados: clientScope.test.ts (regras requiresClientSelection / showsAggregatedData).
+Validações executadas: npm run lint ✅; npm run test:unit ✅ (286 testes, +8 novos).
+
+---
+
 ## 🟢 Estado Atual (Checklist de Progresso)
 
 - [x] **Núcleo de Cadastros**: Veículos, Motoristas, Embarcadores e Unidades Operacionais estabilizados.

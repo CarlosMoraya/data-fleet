@@ -7,6 +7,8 @@ import type { ChecklistTemplate, TemplateCategory, TemplateStatus, ChecklistCont
 import ChecklistTemplateForm from '../components/ChecklistTemplateForm';
 import { cn } from '../lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
+import SelectClientNotice from '../components/SelectClientNotice';
 
 const STATUS_LABEL: Record<TemplateStatus, string> = {
   draft: 'Rascunho',
@@ -28,8 +30,9 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 export default function ChecklistTemplates() {
-  const { user, currentClient } = useAuth();
+  const { user, currentClient, clients } = useAuth();
   const queryClient = useQueryClient();
+  const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
   const [filterCategory, setFilterCategory] = useState<TemplateCategory | 'Todos'>('Todos');
   const [filterContext, setFilterContext] = useState<ChecklistContext | 'Todos'>('Todos');
 
@@ -55,21 +58,24 @@ export default function ChecklistTemplates() {
 
   const isManager = ['Manager', 'Coordinator', 'Director', 'Admin Master'].includes(user?.role ?? '');
   const isAdminMaster = user?.role === 'Admin Master';
-  const canCreate = isManager;
+  const canCreate = isManager && !blockWrite;
 
   const { data: templates = [], isLoading: loadingTemplates, isError: templatesError } = useQuery({
-    queryKey: ['checklistTemplates', currentClient?.id],
+    queryKey: ['checklistTemplates', currentClient?.id ?? 'all-clients'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('checklist_templates')
         .select('*')
-        .eq('client_id', currentClient.id)
         .order('created_at', { ascending: false });
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
       
+      const { data, error } = await query;
       if (error) throw error;
       return (data ?? []).map(r => templateFromRow(r as ChecklistTemplateRow));
     },
-    enabled: !!currentClient?.id
+    enabled: showsAggregatedData(user?.role, currentClient?.id)
   });
 
   const filtered = useMemo(() => {
@@ -176,8 +182,16 @@ export default function ChecklistTemplates() {
     },
   };
 
+  const clientNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    clients.forEach(c => map.set(c.id, c.name));
+    return map;
+  }, [clients]);
+
   return (
     <div className="flex flex-col gap-6 h-full">
+      {blockWrite && <SelectClientNotice />}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -258,7 +272,7 @@ export default function ChecklistTemplates() {
             <table className="min-w-full divide-y divide-zinc-100">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-zinc-50">
-                  {['Nome', 'Contexto', 'Categoria', 'Status', 'Versão', 'Ações'].map(h => (
+                  {[...(blockWrite ? ['Cliente'] : []), 'Nome', 'Contexto', 'Categoria', 'Status', 'Versão', 'Ações'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                       {h}
                     </th>
@@ -268,6 +282,13 @@ export default function ChecklistTemplates() {
               <tbody className="divide-y divide-zinc-50">
                 {filtered.map(t => (
                   <tr key={t.id} className="hover:bg-zinc-50 transition-colors">
+                    {blockWrite && (
+                      <td className="px-4 py-3 text-sm text-zinc-600">
+                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                          {t.clientId ? (clientNameMap.get(t.clientId) ?? '—') : '—'}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <div>
                         <p className="text-sm font-medium text-zinc-900">{t.name}</p>
@@ -289,7 +310,7 @@ export default function ChecklistTemplates() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
                         {/* Edit (only draft) */}
-                        {t.status === 'draft' && isManager && (
+                        {t.status === 'draft' && isManager && !blockWrite && (
                           <button
                             title="Editar"
                             onClick={() => { setEditingTemplate(t); setShowForm(true); }}
@@ -300,7 +321,7 @@ export default function ChecklistTemplates() {
                         )}
 
                         {/* Publish (draft → published) */}
-                        {t.status === 'draft' && isManager && (
+                        {t.status === 'draft' && isManager && !blockWrite && (
                           <button
                             title="Publicar"
                             onClick={() => setConfirmAction({ type: 'publish', template: t })}
@@ -311,7 +332,7 @@ export default function ChecklistTemplates() {
                         )}
 
                         {/* New version (published → draft with v+1) */}
-                        {t.status === 'published' && isManager && (
+                        {t.status === 'published' && isManager && !blockWrite && (
                           <button
                             title="Nova versão"
                             onClick={() => setConfirmAction({ type: 'new-version', template: t })}
@@ -322,7 +343,7 @@ export default function ChecklistTemplates() {
                         )}
 
                         {/* Deprecate (published → deprecated) */}
-                        {t.status === 'published' && isManager && (
+                        {t.status === 'published' && isManager && !blockWrite && (
                           <button
                             title="Descontinuar"
                             onClick={() => setConfirmAction({ type: 'deprecate', template: t })}
@@ -333,7 +354,7 @@ export default function ChecklistTemplates() {
                         )}
 
                         {/* Delete */}
-                        {((t.status === 'draft' && isManager) || isAdminMaster) && (
+                        {((t.status === 'draft' && isManager && !blockWrite) || (isAdminMaster && !blockWrite)) && (
                           <button
                             title="Excluir"
                             onClick={() => setConfirmAction({ type: 'delete', template: t })}

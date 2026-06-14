@@ -11,6 +11,8 @@ import { vehicleFromRow, VehicleRow } from '../lib/vehicleMappers';
 import { fieldSettingsFromRow, defaultFieldSettings, VehicleFieldSettingsRow } from '../lib/fieldSettingsMappers';
 import { saveVehicle, deleteVehicle } from '../services/vehicleService';
 import type { VehicleFiles } from '../services/vehicleService';
+import { requiresClientSelection } from '../lib/clientScope';
+import SelectClientNotice from '../components/SelectClientNotice';
 
 interface AvailableDriver {
   id: string;
@@ -35,8 +37,9 @@ const ROLES_CAN_EDIT = ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator',
 const ROLES_CAN_ALWAYS_DELETE = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 
 export default function Vehicles() {
-  const { currentClient, user } = useAuth();
+  const { currentClient, user, clients } = useAuth();
   const queryClient = useQueryClient();
+  const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(() => {
     return sessionStorage.getItem('vehicleFormOpen') === 'true';
@@ -52,9 +55,9 @@ export default function Vehicles() {
 
   const [viewingVehicle, setViewingVehicle] = useState<Vehicle | null>(null);
 
-  const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
-  const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
-  const canDelete = ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') || (user?.canDeleteVehicles === true);
+  const canCreate = ROLES_CAN_CREATE.includes(user?.role || '') && !blockWrite;
+  const canEdit = ROLES_CAN_EDIT.includes(user?.role || '') && !blockWrite;
+  const canDelete = (ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') || (user?.canDeleteVehicles === true)) && !blockWrite;
 
   // Redirect Drivers and Yard Auditors
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
@@ -206,8 +209,15 @@ export default function Vehicles() {
     });
   }, [vehicles, search]);
 
+  const clientNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    clients.forEach(c => map.set(c.id, c.name));
+    return map;
+  }, [clients]);
+
   return (
     <div className="flex flex-col gap-6 h-full">
+      {blockWrite && <SelectClientNotice />}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Veículos</h1>
@@ -262,6 +272,9 @@ export default function Vehicles() {
             <table className="min-w-full divide-y divide-zinc-200">
               <thead className="bg-zinc-50 sticky top-0 z-10">
                 <tr>
+                  {blockWrite && (
+                    <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Cliente</th>
+                  )}
                   <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider sm:pl-6">Veículo</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Tipo / Energia</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Proprietário</th>
@@ -276,6 +289,13 @@ export default function Vehicles() {
               <tbody className="divide-y divide-zinc-200 bg-white">
                 {filteredVehicles.map((vehicle) => (
                   <tr key={vehicle.id} className="hover:bg-zinc-50 transition-colors">
+                    {blockWrite && (
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-600">
+                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                          {vehicle.clientId ? (clientNameMap.get(vehicle.clientId) ?? '—') : '—'}
+                        </span>
+                      </td>
+                    )}
                     <td className="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
                       <div className="flex items-center">
                         <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-zinc-100 flex items-center justify-center border border-zinc-200">
@@ -370,8 +390,8 @@ export default function Vehicles() {
                 ))}
                 {filteredVehicles.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-10 text-center text-sm text-zinc-500">
-                      {search ? 'Nenhum veículo encontrado para esta busca.' : 'Nenhum veículo cadastrado para este cliente.'}
+                    <td colSpan={blockWrite ? 8 : 7} className="py-10 text-center text-sm text-zinc-500">
+                      {search ? 'Nenhum veículo encontrado para esta busca.' : blockWrite ? 'Nenhum veículo cadastrado em nenhum cliente.' : 'Nenhum veículo cadastrado para este cliente.'}
                     </td>
                   </tr>
                 )}

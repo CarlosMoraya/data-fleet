@@ -16,6 +16,8 @@ import {
   cancelMaintenanceOrder,
 } from '../services/maintenanceService';
 import { isOperationsManager } from '../lib/rolePermissions';
+import { requiresClientSelection } from '../lib/clientScope';
+import SelectClientNotice from '../components/SelectClientNotice';
 
 // Re-export para compatibilidade com componentes que importam daqui
 export type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus };
@@ -108,11 +110,12 @@ export function shouldEnableMaintenanceOrdersQuery(params: {
 }
 
 export default function Maintenance() {
-  const { currentClient, user: profile } = useAuth();
+  const { currentClient, user: profile, clients } = useAuth();
   const isWorkshopUser = profile?.role === 'Workshop';
   const isAdminMaster = profile?.role === 'Admin Master';
+  const blockWrite = requiresClientSelection(profile?.role, currentClient?.id);
   const operationsManager = isOperationsManager(profile?.role);
-  const canWriteMaintenance = !operationsManager && !isWorkshopUser;
+  const canWriteMaintenance = !operationsManager && !isWorkshopUser && !blockWrite;
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = React.useState<StatusFilter>('all');
   const [search, setSearch] = React.useState('');
@@ -282,6 +285,12 @@ export default function Maintenance() {
     });
   }, [orders, activeTab, search]);
 
+  const clientNameMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    clients.forEach(c => map.set(c.id, c.name));
+    return map;
+  }, [clients]);
+
   const handleComplete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     updateStatusMutation.mutate({ id, status: 'Concluído' });
@@ -289,6 +298,7 @@ export default function Maintenance() {
 
   return (
     <div className="flex flex-col gap-6 h-full">
+      {blockWrite && <SelectClientNotice />}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -425,6 +435,7 @@ export default function Maintenance() {
               <thead className="sticky top-0 z-10">
                 <tr className="bg-zinc-50">
                   {[
+                    ...(blockWrite ? ['Cliente'] : []),
                     isWorkshopUser ? 'OS da Oficina' : 'OS',
                     'Placa',
                     isWorkshopUser ? 'Cliente' : 'Oficina',
@@ -446,6 +457,13 @@ export default function Maintenance() {
                   const days = daysInWorkshop(o.entryDate);
                   return (
                     <tr key={o.id} className="hover:bg-zinc-50 transition-colors">
+                      {blockWrite && (
+                        <td className="px-4 py-3 text-sm text-zinc-600 whitespace-nowrap">
+                          <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                            {o.clientId ? (clientNameMap.get(o.clientId) ?? o.clientName ?? '—') : (o.clientName ?? '—')}
+                          </span>
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-sm font-mono font-medium text-zinc-900 whitespace-nowrap">
                         {isWorkshopUser ? (o.workshopOs || o.os) : o.os}
                       </td>

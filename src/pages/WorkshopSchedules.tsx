@@ -27,6 +27,8 @@ import {
   formatWorkshopAddress,
 } from '../lib/workshopScheduleMappers';
 import ScheduleForm from '../components/ScheduleForm';
+import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
+import SelectClientNotice from '../components/SelectClientNotice';
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
 
@@ -371,11 +373,11 @@ const DriverScheduleCard: React.FC<{ schedule: WorkshopSchedule; dimmed?: boolea
 // ─── View Fleet Assistant+ ────────────────────────────────────────────────────
 
 function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isAssistantPlus: boolean }) {
-  const { user, currentClient } = useAuth();
+  const { user, currentClient, clients } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const operationsManager = isOperationsManager(user?.role);
-  const canWriteSchedules = !operationsManager && isAssistantPlus;
+  const canWriteSchedules = !operationsManager && isAssistantPlus && !requiresClientSelection(user?.role, currentClient?.id);
 
   const handleGenerateMaintenance = (schedule: WorkshopSchedule) => {
     if (!canWriteSchedules) return;
@@ -405,19 +407,24 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
   });
 
   const { data: schedules = [], isLoading, error } = useQuery({
-    queryKey: ['workshopSchedules', currentClient?.id],
+    queryKey: ['workshopSchedules', currentClient?.id ?? 'all-clients'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('workshop_schedules')
         .select('*')
-        .eq('client_id', currentClient!.id)
         .order('scheduled_date', { ascending: false });
+
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       const hydratedRows = await hydrateWorkshopScheduleRows((data ?? []) as WorkshopScheduleRow[]);
       return hydratedRows.map((row) => scheduleFromRow(row));
     },
-    enabled: !!currentClient?.id
+    enabled: showsAggregatedData(user?.role, currentClient?.id)
   });
 
   const saveMutation = useMutation({
@@ -494,8 +501,17 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
     { key: 'cancelled', label: 'Cancelados' },
   ];
 
+  const clientNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    clients.forEach(c => map.set(c.id, c.name));
+    return map;
+  }, [clients]);
+
+  const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
+
   return (
     <div className="space-y-6">
+      {blockWrite && <SelectClientNotice />}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Agendamentos</h1>
         <p className="text-sm text-zinc-500 mt-1">
@@ -580,6 +596,9 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50">
+                {blockWrite && (
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Cliente</th>
+                )}
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Veículo</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Oficina</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 hidden sm:table-cell">Data</th>
@@ -595,6 +614,8 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
                   schedule={s}
                   canDelete={canDelete}
                   canWriteSchedules={canWriteSchedules}
+                  blockWrite={blockWrite}
+                  clientName={s.clientId ? (clientNameMap.get(s.clientId) ?? undefined) : undefined}
                   onEdit={canWriteSchedules ? () => {
                     sessionStorage.setItem('scheduleFormEditing', JSON.stringify(s));
                     sessionStorage.setItem('scheduleFormOpen', 'true');
@@ -637,12 +658,14 @@ const ScheduleRow: React.FC<{
   schedule: WorkshopSchedule;
   canDelete: boolean;
   canWriteSchedules: boolean;
+  blockWrite?: boolean;
+  clientName?: string;
   onEdit?: () => void;
   onComplete?: () => void;
   onCancel?: () => void;
   onDelete?: () => void;
   onGenerateMaintenance?: () => void;
-}> = ({ schedule, canDelete, canWriteSchedules, onEdit, onComplete, onCancel, onDelete, onGenerateMaintenance }) => {
+}> = ({ schedule, canDelete, canWriteSchedules, blockWrite, clientName, onEdit, onComplete, onCancel, onDelete, onGenerateMaintenance }) => {
   const isScheduled = schedule.status === 'scheduled';
   const address = formatWorkshopAddress(schedule);
   const mapsUrl = buildGoogleMapsUrl(schedule);
@@ -650,6 +673,13 @@ const ScheduleRow: React.FC<{
 
   return (
     <tr className="hover:bg-zinc-50 transition-colors">
+      {blockWrite && (
+        <td className="px-4 py-3 text-sm text-zinc-600">
+          <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+            {clientName ?? '—'}
+          </span>
+        </td>
+      )}
       <td className="px-4 py-3 font-mono text-xs font-medium text-zinc-700">
         {schedule.vehicleLicensePlate ?? '-'}
       </td>

@@ -19,6 +19,8 @@ import { cn } from '../lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { getChecklistStartBlockMessage, getTireInspectionStartBlockMessage } from '../lib/checklistStartGuard';
+import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
+import SelectClientNotice from '../components/SelectClientNotice';
 
 const STATUS_LABEL: Record<string, string> = { in_progress: 'Em andamento', completed: 'Concluído' };
 const STATUS_COLOR: Record<string, string> = {
@@ -33,9 +35,10 @@ export function getStoredChecklistTab(raw: string | null): 'checklists' | 'tireI
 }
 
 export default function Checklists() {
-  const { user, currentClient } = useAuth();
+  const { user, currentClient, clients } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
 
   const isDriver = user?.role === 'Driver';
   const isAuditor = user?.role === 'Yard Auditor';
@@ -168,13 +171,16 @@ export default function Checklists() {
   });
 
   const { data: checklists = [], isLoading: loadingChecklists } = useQuery({
-    queryKey: ['checklists', currentClient?.id, isDriverOrAuditor ? user?.id : 'all'],
+    queryKey: ['checklists', currentClient?.id ?? 'all-clients', isDriverOrAuditor ? user?.id : 'all'],
     queryFn: async () => {
       let query = supabase
         .from('checklists')
         .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context)')
-        .eq('client_id', currentClient!.id)
         .order('started_at', { ascending: false });
+
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
 
       if (isDriverOrAuditor) {
         query = query.eq('filled_by', user!.id).limit(50);
@@ -184,7 +190,7 @@ export default function Checklists() {
       if (error) throw error;
       return (data ?? []).map(r => checklistFromRow(r as ChecklistRow));
     },
-    enabled: !!currentClient?.id
+    enabled: showsAggregatedData(user?.role, currentClient?.id)
   });
 
   // Query for issues (inconformidades) - mainly for Assistant+
@@ -207,17 +213,20 @@ export default function Checklists() {
 
   // ── Tire inspection queries ───────────────────────────────────────────────
   const { data: tireInspections = [] } = useQuery({
-    queryKey: ['tireInspections', currentClient?.id],
+    queryKey: ['tireInspections', currentClient?.id ?? 'all-clients'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('tire_inspections')
         .select('*, vehicles(license_plate), profiles(name)')
-        .eq('client_id', currentClient!.id)
         .order('started_at', { ascending: false });
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return (data ?? []).map(r => tireInspectionFromRow(r as TireInspectionRow));
     },
-    enabled: !!currentClient?.id,
+    enabled: showsAggregatedData(user?.role, currentClient?.id),
   });
 
   const { data: pneusDayInterval = 7 } = useQuery({
@@ -356,6 +365,12 @@ export default function Checklists() {
   }, [checklists, historyStatusFilter, historySearch]);
 
   const isLoading = loadingVehicleInfo || loadingChecklists;
+
+  const clientNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    clients.forEach(c => map.set(c.id, c.name));
+    return map;
+  }, [clients]);
 
   if (isLoading) {
     return (
@@ -603,7 +618,9 @@ export default function Checklists() {
 
       {/* ── Fleet Assistant+ view ─────────────────────────────── */}
       {isAssistantPlus && (
-        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="flex flex-col gap-4">
+          {blockWrite && <SelectClientNotice />}
+          <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="border-b border-zinc-200 px-4">
             <nav className="-mb-px flex gap-1">
               <button
@@ -663,14 +680,14 @@ export default function Checklists() {
               {checklists.length === 0 ? (
                 <div className="text-center py-16 text-zinc-400">
                   <ClipboardCheck className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">Nenhum checklist realizado neste tenant.</p>
+                  <p className="text-sm">{blockWrite ? 'Nenhum checklist realizado em nenhum cliente.' : 'Nenhum checklist realizado neste tenant.'}</p>
                 </div>
               ) : (
                 <div className="flex-1 overflow-auto">
                   <table className="min-w-full divide-y divide-zinc-100">
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-zinc-50">
-                        {['Template', 'Contexto', 'Veículo', 'Preenchido por', 'Data', 'Status', 'Ações'].map(h => (
+                        {[...(blockWrite ? ['Cliente'] : []), 'Template', 'Contexto', 'Veículo', 'Preenchido por', 'Data', 'Status', 'Ações'].map(h => (
                           <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                             {h}
                           </th>
@@ -682,6 +699,13 @@ export default function Checklists() {
                         .filter(c => !onlyWithIssues || issueChecklistIds.has(c.id))
                         .map(c => (
                         <tr key={c.id} className="hover:bg-zinc-50">
+                          {blockWrite && (
+                            <td className="px-4 py-3 text-sm text-zinc-600">
+                              <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                                {c.clientId ? (clientNameMap.get(c.clientId) ?? '—') : '—'}
+                              </span>
+                            </td>
+                          )}
                           <td className="px-4 py-3 text-sm text-zinc-900">
                             <div className="flex items-center gap-1.5">
                               {issueChecklistIds.has(c.id) && (
@@ -704,7 +728,7 @@ export default function Checklists() {
                               <button onClick={() => setViewChecklist(c)} className="p-1.5 rounded hover:bg-zinc-100" title="Visualizar">
                                 <Eye className="h-4 w-4 text-zinc-400" />
                               </button>
-                              {isAnalystPlus && c.status === 'completed' && issueChecklistIds.has(c.id) && (
+                              {isAnalystPlus && c.status === 'completed' && issueChecklistIds.has(c.id) && !blockWrite && (
                                 <button
                                   onClick={() => setCreatePlanChecklist(c)}
                                   className="p-1.5 rounded hover:bg-orange-50 text-orange-400"
@@ -737,14 +761,14 @@ export default function Checklists() {
             tireInspections.length === 0 ? (
               <div className="text-center py-16 text-zinc-400">
                 <Disc className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">Nenhuma inspeção de pneus registrada neste tenant.</p>
+                <p className="text-sm">{blockWrite ? 'Nenhuma inspeção de pneus registrada em nenhum cliente.' : 'Nenhuma inspeção de pneus registrada neste tenant.'}</p>
               </div>
             ) : (
               <div className="flex-1 overflow-auto">
                 <table className="min-w-full divide-y divide-zinc-100">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-zinc-50">
-                      {['Veículo', 'Inspetor', 'Início', 'Conclusão', 'Status', 'Ações'].map(h => (
+                      {[...(blockWrite ? ['Cliente'] : []), 'Veículo', 'Inspetor', 'Início', 'Conclusão', 'Status', 'Ações'].map(h => (
                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                           {h}
                         </th>
@@ -754,6 +778,13 @@ export default function Checklists() {
                   <tbody className="divide-y divide-zinc-50">
                     {tireInspections.map(ti => (
                       <tr key={ti.id} className="hover:bg-zinc-50">
+                        {blockWrite && (
+                          <td className="px-4 py-3 text-sm text-zinc-600">
+                            <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                              {ti.clientId ? (clientNameMap.get(ti.clientId) ?? '—') : '—'}
+                            </span>
+                          </td>
+                        )}
                         <td className="px-4 py-3 text-sm text-zinc-900">
                           <div className="flex items-center gap-1.5">
                             <Disc className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
@@ -779,7 +810,8 @@ export default function Checklists() {
                 </table>
               </div>
             )
-          )}
+            )}
+          </div>
         </div>
       )}
 

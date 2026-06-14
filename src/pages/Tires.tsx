@@ -11,6 +11,8 @@ import TireForm from '../components/TireForm';
 import TireBatchForm from '../components/TireBatchForm';
 import TireHistoryModal from '../components/TireHistoryModal';
 import { saveTire, toggleTireActive, deleteTire } from '../services/tireService';
+import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
+import SelectClientNotice from '../components/SelectClientNotice';
 
 const ROLES_CAN_VIEW_TIRES = [
   'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager',
@@ -297,12 +299,13 @@ function VehiclePickerModal({
 // ─── Página Principal ─────────────────────────────────────────────────────────
 
 export default function Tires() {
-  const { currentClient, user: profile } = useAuth();
+  const { currentClient, user: profile, clients } = useAuth();
   const queryClient = useQueryClient();
+  const blockWrite = requiresClientSelection(profile?.role, currentClient?.id);
 
-  const canRegister = ROLES_CAN_REGISTER_TIRES.includes(profile?.role ?? '');
+  const canRegister = ROLES_CAN_REGISTER_TIRES.includes(profile?.role ?? '') && !blockWrite;
   const canView = ROLES_CAN_VIEW_TIRES.includes(profile?.role ?? '');
-  const canDelete = ROLES_CAN_DELETE_TIRES.includes(profile?.role ?? '');
+  const canDelete = ROLES_CAN_DELETE_TIRES.includes(profile?.role ?? '') && !blockWrite;
 
   const [search, setSearch] = React.useState('');
 
@@ -350,7 +353,7 @@ export default function Tires() {
       if (error) throw error;
       return (data as TireRow[]).map(tireFromRow);
     },
-    enabled: canView && !!currentClient?.id,
+    enabled: canView && showsAggregatedData(profile?.role, currentClient?.id),
   });
 
   const { data: tireConfigs = [] } = useQuery({
@@ -454,6 +457,12 @@ export default function Tires() {
     return full;
   }, [vehiclesList, tires, tireConfigs]);
 
+  const clientNameMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    clients.forEach(c => map.set(c.id, c.name));
+    return map;
+  }, [clients]);
+
   // ── Filtros ───────────────────────────────────────────────────────────────
   const filtered = React.useMemo(() => {
     return tires.filter(t => {
@@ -529,6 +538,7 @@ export default function Tires() {
 
   return (
     <div className="flex flex-col h-full gap-4 p-4 md:p-6 overflow-hidden">
+      {blockWrite && <SelectClientNotice />}
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
@@ -568,13 +578,16 @@ export default function Tires() {
             <div className="flex flex-col items-center justify-center h-40 text-zinc-400">
               <Circle className="h-8 w-8 mb-2 opacity-30" />
               <p className="text-sm">
-                {tires.length === 0 ? 'Nenhum pneu cadastrado.' : 'Nenhum pneu encontrado com os filtros aplicados.'}
+                {tires.length === 0 ? (blockWrite ? 'Nenhum pneu cadastrado em nenhum cliente.' : 'Nenhum pneu cadastrado.') : 'Nenhum pneu encontrado com os filtros aplicados.'}
               </p>
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead className="border-b border-zinc-100 sticky top-0 bg-zinc-50">
                 <tr>
+                  {blockWrite && (
+                    <th className="px-4 py-3 text-left font-medium text-zinc-500 uppercase tracking-wide text-xs">Cliente</th>
+                  )}
                   <th className="px-4 py-3 text-left font-medium text-zinc-500 uppercase tracking-wide text-xs">Especificação</th>
                   <th className="px-4 py-3 text-left font-medium text-zinc-500 uppercase tracking-wide text-xs">Veículo</th>
                   <th className="px-4 py-3 text-left font-medium text-zinc-500 uppercase tracking-wide text-xs">Posição</th>
@@ -586,6 +599,13 @@ export default function Tires() {
               <tbody className="divide-y divide-zinc-50">
                 {filtered.map(tire => (
                   <tr key={tire.id} className={cn('hover:bg-zinc-50/50', !tire.active && 'opacity-50')}>
+                    {blockWrite && (
+                      <td className="px-4 py-3 text-sm text-zinc-600">
+                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                          {tire.clientId ? (clientNameMap.get(tire.clientId) ?? '—') : '—'}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-zinc-600">
                       <div>{tire.specification}</div>
                       {tire.dot && (
