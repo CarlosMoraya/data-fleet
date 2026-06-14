@@ -24,6 +24,7 @@ import {
   getTrailingMonthKeys,
   sumApprovedCostByMonthKeys,
   calculateMovingAverageProjection,
+  computeOverdueChecklistVehicleIds,
 } from './dashboardKpi';
 
 describe('countActiveInMaintenance', () => {
@@ -674,5 +675,86 @@ describe('calculateMovingAverageProjection', () => {
 
   it('arredonda para cima quando a média tem 0.5', () => {
     expect(calculateMovingAverageProjection([10000, 10001])).toBe(10001);
+  });
+});
+
+describe('computeOverdueChecklistVehicleIds', () => {
+  it('paridade single-tenant: veículos vencidos conforme intervalos do cliente', () => {
+    const clientId = 'client-a';
+    const vehicles = [
+      { id: 'v1', client_id: clientId },
+      { id: 'v2', client_id: clientId },
+      { id: 'v3', client_id: clientId },
+    ];
+    const checklistRows = [
+      { vehicle_id: 'v1', context: 'Rotina', completed_at: '2026-06-01T10:00:00Z' },
+      { vehicle_id: 'v2', context: 'Rotina', completed_at: '2026-05-01T10:00:00Z' },
+    ];
+    const intervalsByClient = new Map([
+      [clientId, { rotina_day_interval: 30, seguranca_day_interval: null }],
+    ]);
+    const today = new Date('2026-06-14T12:00:00Z');
+    const result = computeOverdueChecklistVehicleIds({ vehicles, checklistRows, intervalsByClient, today });
+    expect(result.has('v1')).toBe(false);
+    expect(result.has('v2')).toBe(true);
+    expect(result.has('v3')).toBe(true);
+  });
+
+  it('cross-tenant com intervalos distintos: cada veículo usa intervalo do seu cliente', () => {
+    const clientA = 'client-a';
+    const clientB = 'client-b';
+    const vehicles = [
+      { id: 'v1', client_id: clientA },
+      { id: 'v2', client_id: clientB },
+    ];
+    const checklistRows = [
+      { vehicle_id: 'v1', context: 'Rotina', completed_at: '2026-06-01T10:00:00Z' },
+      { vehicle_id: 'v2', context: 'Rotina', completed_at: '2026-06-01T10:00:00Z' },
+    ];
+    const intervalsByClient = new Map([
+      [clientA, { rotina_day_interval: 10, seguranca_day_interval: null }],
+      [clientB, { rotina_day_interval: 90, seguranca_day_interval: null }],
+    ]);
+    const today = new Date('2026-06-14T12:00:00Z');
+    const result = computeOverdueChecklistVehicleIds({ vehicles, checklistRows, intervalsByClient, today });
+    expect(result.has('v1')).toBe(true);
+    expect(result.has('v2')).toBe(false);
+  });
+
+  it('veículo sem checklist registrado conta como vencido quando há intervalo definido', () => {
+    const clientId = 'client-a';
+    const vehicles = [
+      { id: 'v1', client_id: clientId },
+    ];
+    const checklistRows: { vehicle_id: string; context: string; completed_at: string }[] = [];
+    const intervalsByClient = new Map([
+      [clientId, { rotina_day_interval: 30, seguranca_day_interval: null }],
+    ]);
+    const today = new Date('2026-06-14T12:00:00Z');
+    const result = computeOverdueChecklistVehicleIds({ vehicles, checklistRows, intervalsByClient, today });
+    expect(result.has('v1')).toBe(true);
+  });
+
+  it('veículo cujo cliente não tem intervalos não conta como vencido', () => {
+    const clientA = 'client-a';
+    const vehicles = [
+      { id: 'v1', client_id: clientA },
+    ];
+    const checklistRows: { vehicle_id: string; context: string; completed_at: string }[] = [];
+    const intervalsByClient = new Map<string, { rotina_day_interval: number | null; seguranca_day_interval: number | null }>();
+    const today = new Date('2026-06-14T12:00:00Z');
+    const result = computeOverdueChecklistVehicleIds({ vehicles, checklistRows, intervalsByClient, today });
+    expect(result.has('v1')).toBe(false);
+  });
+
+  it('veículo sem client_id não conta como vencido', () => {
+    const vehicles = [
+      { id: 'v1', client_id: null },
+    ];
+    const checklistRows: { vehicle_id: string; context: string; completed_at: string }[] = [];
+    const intervalsByClient = new Map<string, { rotina_day_interval: number | null; seguranca_day_interval: number | null }>();
+    const today = new Date('2026-06-14T12:00:00Z');
+    const result = computeOverdueChecklistVehicleIds({ vehicles, checklistRows, intervalsByClient, today });
+    expect(result.has('v1')).toBe(false);
   });
 });

@@ -93,6 +93,57 @@ export function calculateChecklistComplianceRate(totalVehicles: number, overdueV
   return Math.max(0, Math.min(100, result));
 }
 
+function daysBetween(a: Date, b: Date) {
+  return Math.floor((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+export function computeOverdueChecklistVehicleIds(params: {
+  vehicles: { id: string; client_id?: string | null }[];
+  checklistRows: { vehicle_id: string; context: string; completed_at: string }[];
+  intervalsByClient: Map<string, { rotina_day_interval: number | null; seguranca_day_interval: number | null }>;
+  today: Date;
+}): Set<string> {
+  const { vehicles, checklistRows, intervalsByClient, today } = params;
+  const overdue = new Set<string>();
+
+  const lastByVehicle = new Map<string, { rotina?: string; seguranca?: string }>();
+  for (const c of checklistRows) {
+    if (!c.vehicle_id || !c.completed_at) continue;
+    const entry = lastByVehicle.get(c.vehicle_id) ?? {};
+    if (c.context === 'Rotina' && (!entry.rotina || c.completed_at > entry.rotina)) {
+      entry.rotina = c.completed_at;
+    }
+    if (c.context === 'Segurança' && (!entry.seguranca || c.completed_at > entry.seguranca)) {
+      entry.seguranca = c.completed_at;
+    }
+    lastByVehicle.set(c.vehicle_id, entry);
+  }
+
+  for (const v of vehicles) {
+    const clientId = v.client_id ?? null;
+    const intervals = clientId != null ? intervalsByClient.get(clientId) : undefined;
+    if (!intervals) continue;
+    if (intervals.rotina_day_interval == null && intervals.seguranca_day_interval == null) continue;
+
+    const last = lastByVehicle.get(v.id);
+    if (intervals.rotina_day_interval != null) {
+      const lastDate = last?.rotina ? new Date(last.rotina) : null;
+      if (!lastDate || daysBetween(lastDate, today) > intervals.rotina_day_interval) {
+        overdue.add(v.id);
+        continue;
+      }
+    }
+    if (intervals.seguranca_day_interval != null) {
+      const lastDate = last?.seguranca ? new Date(last.seguranca) : null;
+      if (!lastDate || daysBetween(lastDate, today) > intervals.seguranca_day_interval) {
+        overdue.add(v.id);
+      }
+    }
+  }
+
+  return overdue;
+}
+
 export function countOverdueMaintenanceOrders(
   orders: Pick<MaintenanceOrderDashboard, 'status' | 'expected_exit_date'>[],
   todayIso: string

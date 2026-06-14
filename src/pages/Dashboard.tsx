@@ -27,6 +27,7 @@ import {
   getTrailingMonthKeys,
   sumApprovedCostByMonthKeys,
   calculateMovingAverageProjection,
+  computeOverdueChecklistVehicleIds,
   type ActionItem,
 } from '../lib/dashboardKpi';
 
@@ -39,10 +40,6 @@ const tabs: { id: TabType; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'operacional', label: 'Operação', icon: Activity },
   { id: 'custos', label: 'Custos', icon: DollarSign },
 ];
-
-function daysBetween(a: Date, b: Date) {
-  return Math.floor((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
-}
 
 function getDefaultDateRange() {
   const now = new Date();
@@ -90,7 +87,7 @@ export default function Dashboard() {
     queryFn: async () => {
       let query = supabase
         .from('vehicles')
-        .select('id, type, crlv_year, crlv_expiration_date, driver_id, license_plate, gr_expiration_date, shippers(name), operational_units(name)');
+        .select('id, type, crlv_year, crlv_expiration_date, driver_id, license_plate, gr_expiration_date, client_id, shippers(name), operational_units(name)');
       if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
       }
@@ -102,6 +99,7 @@ export default function Dashboard() {
         crlv_year: row.crlv_year as string | null,
         crlv_expiration_date: row.crlv_expiration_date != null ? (row.crlv_expiration_date as string) : null,
         driver_id: row.driver_id as string | null,
+        client_id: row.client_id as string | null,
         license_plate: row.license_plate != null ? (row.license_plate as string) : null,
         gr_expiration_date: row.gr_expiration_date != null ? (row.gr_expiration_date as string) : null,
         shipper_name:
@@ -254,110 +252,93 @@ export default function Dashboard() {
   >({
     queryKey: ['dashboard-checklists', currentClient?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('checklists')
-        .select('vehicle_id, context, completed_at, odometer_km')
-        .eq('client_id', currentClient!.id)
+        .select('vehicle_id, completed_at, odometer_km, checklist_templates(context)')
         .eq('status', 'completed')
         .not('vehicle_id', 'is', null);
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as { vehicle_id: string; context: string; completed_at: string; odometer_km: number | null }[];
+      return (data ?? []).map((row: Record<string, unknown>) => ({
+        vehicle_id: row.vehicle_id as string,
+        context:
+          row.checklist_templates && typeof row.checklist_templates === 'object' && !Array.isArray(row.checklist_templates)
+            ? ((row.checklist_templates as Record<string, unknown>).context as string)
+            : Array.isArray(row.checklist_templates) && row.checklist_templates.length > 0
+              ? ((row.checklist_templates[0] as Record<string, unknown>).context as string)
+              : '',
+        completed_at: row.completed_at as string,
+        odometer_km: row.odometer_km != null ? Number(row.odometer_km) : null,
+      }));
     },
-    enabled: !!currentClient?.id,
+    enabled: !!user,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
 
-  const { data: intervals } = useQuery<{
-    rotina_day_interval: number | null;
-    seguranca_day_interval: number | null;
-  } | null>({
+  const { data: intervalRows = [], isLoading: loadingIntervals } = useQuery<
+    { client_id: string; rotina_day_interval: number | null; seguranca_day_interval: number | null }[]
+  >({
     queryKey: ['dashboard-intervals', currentClient?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('checklist_day_intervals')
-        .select('rotina_day_interval, seguranca_day_interval')
-        .eq('client_id', currentClient!.id)
-        .maybeSingle();
+        .select('client_id, rotina_day_interval, seguranca_day_interval');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
       if (error) throw error;
-      return data;
+      return (data ?? []) as { client_id: string; rotina_day_interval: number | null; seguranca_day_interval: number | null }[];
     },
-    enabled: !!currentClient?.id,
+    enabled: !!user,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
+
+  const intervalsByClient = useMemo(() => {
+    const map = new Map<string, { rotina_day_interval: number | null; seguranca_day_interval: number | null }>();
+    for (const row of intervalRows) {
+      map.set(row.client_id, { rotina_day_interval: row.rotina_day_interval, seguranca_day_interval: row.seguranca_day_interval });
+    }
+    return map;
+  }, [intervalRows]);
 
   const { data: drivers = [], isLoading: loadingDrivers } = useQuery<
     { id: string; name: string | null; expiration_date: string | null; gr_expiration_date: string | null }[]
   >({
     queryKey: ['dashboard-drivers', currentClient?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('drivers')
-        .select('id, name, expiration_date, gr_expiration_date')
-        .eq('client_id', currentClient!.id);
+        .select('id, name, expiration_date, gr_expiration_date');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return (data ?? []) as { id: string; name: string | null; expiration_date: string | null; gr_expiration_date: string | null }[];
     },
-    enabled: !!currentClient?.id,
+    enabled: !!user,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
 
   // ── Computed values ───────────────────────────────────────────────────────
 
-  const overdueChecklistVehicleIds = useMemo(() => {
-    const overdue = new Set<string>();
-    if (!intervals) return overdue;
-    if (!intervals.rotina_day_interval && !intervals.seguranca_day_interval)
-      return overdue;
-
-    // Build map: vehicle_id → { lastRotina, lastSeguranca }
-    const lastByVehicle = new Map<
-      string,
-      { rotina?: string; seguranca?: string }
-    >();
-    for (const c of checklistRows) {
-      if (!c.vehicle_id || !c.completed_at) continue;
-      const entry = lastByVehicle.get(c.vehicle_id) ?? {};
-      if (
-        c.context === 'Rotina' &&
-        (!entry.rotina || c.completed_at > entry.rotina)
-      ) {
-        entry.rotina = c.completed_at;
-      }
-      if (
-        c.context === 'Segurança' &&
-        (!entry.seguranca || c.completed_at > entry.seguranca)
-      ) {
-        entry.seguranca = c.completed_at;
-      }
-      lastByVehicle.set(c.vehicle_id, entry);
-    }
-
-    const today = new Date();
-    for (const v of vehicles) {
-      const last = lastByVehicle.get(v.id);
-      if (intervals.rotina_day_interval != null) {
-        const lastDate = last?.rotina ? new Date(last.rotina) : null;
-        if (!lastDate || daysBetween(lastDate, today) > intervals.rotina_day_interval) {
-          overdue.add(v.id);
-          continue;
-        }
-      }
-      if (intervals.seguranca_day_interval != null) {
-        const lastDate = last?.seguranca ? new Date(last.seguranca) : null;
-        if (
-          !lastDate ||
-          daysBetween(lastDate, today) > intervals.seguranca_day_interval
-        ) {
-          overdue.add(v.id);
-        }
-      }
-    }
-
-    return overdue;
-  }, [vehicles, checklistRows, intervals]);
+  const overdueChecklistVehicleIds = useMemo(
+    () =>
+      computeOverdueChecklistVehicleIds({
+        vehicles,
+        checklistRows,
+        intervalsByClient,
+        today: new Date(),
+      }),
+    [vehicles, checklistRows, intervalsByClient]
+  );
 
   const currentYear = new Date().getFullYear().toString();
   const today = new Date().toISOString().split('T')[0];
@@ -492,6 +473,7 @@ export default function Dashboard() {
     loadingPreviousMaintenance ||
     loadingCostProjection ||
     loadingChecklists ||
+    loadingIntervals ||
     loadingDrivers;
 
   // ── Render ────────────────────────────────────────────────────────────────

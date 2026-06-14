@@ -24,6 +24,15 @@ Este arquivo registra o progresso atual, pendências e a visão de curto prazo p
 
 ---
 
+## 🆕 Atualização de Sessão (14/06/2026) — Bugfix Dashboard do Admin Master em "Todos os Clientes"
+Bug corrigido: Dashboard do Admin Master mostrava métricas incorretas (conformidade 100%, documentos vencidos sem CNH, sem checklist vencido) e erro 400 em /checklists ao selecionar "Todos os Clientes".
+Causa raiz: queries de checklists, drivers e checklist_day_intervals em Dashboard.tsx ficavam desabilitadas e filtravam por client_id undefined quando currentClient era null (modo global do Admin Master); o cálculo de checklist vencido usava um único intervalo para todos os clientes.
+Correção aplicada: queries passam a habilitar por !!user e filtrar por client_id apenas quando há cliente selecionado; intervalos passam a ser buscados por cliente e o vencimento de checklist é calculado por cliente (computeOverdueChecklistVehicleIds). Sem migration — RLS já permite Admin Master ler cross-tenant.
+Arquivos modificados: src/pages/Dashboard.tsx, src/components/dashboard/OperationalPanel.tsx, src/lib/dashboardKpi.ts, src/lib/dashboardKpi.test.ts
+Testes adicionados: dashboardKpi.test.ts — computeOverdueChecklistVehicleIds (paridade single-tenant + cross-tenant com intervalos distintos).
+
+---
+
 ## 🆕 Atualização de Sessão (14/06/2026) — CRLV a vencer: campo + alerta preventivo no Dashboard
 Feature implementada: campo `crlv_expiration_date` (data real de vencimento do CRLV) no cadastro de veículos, com alerta preventivo "CRLV a vencer (30d)" no Dashboard.
 Mudanças aplicadas:
