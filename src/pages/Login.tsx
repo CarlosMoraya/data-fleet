@@ -70,7 +70,7 @@ export default function Login() {
             <span className="text-white">etaFleet</span>
           </span>
           <span className="text-[11px] font-medium text-white/50 uppercase tracking-[0.25em] mt-1 ml-5">
-            Evolution always
+            GESTÃO DE FROTAS
           </span>
         </div>
 
