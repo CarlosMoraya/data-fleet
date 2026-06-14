@@ -16,6 +16,7 @@ export interface VehicleRow {
   id: string;
   type: string;
   crlv_year: string | null;
+  crlv_expiration_date: string | null;
   driver_id: string | null;
   license_plate?: string | null;
   gr_expiration_date?: string | null;

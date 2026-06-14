@@ -5,6 +5,14 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 ## 📜 Histórico de Sessões e Mudanças
 
 ### Junho 2026
+- **CRLV a vencer: campo + alerta preventivo no Dashboard (14/06/2026)**:
+  - Motivação: eliminar a contradição em que um CRLV podia ser "vencido pelo ano" e "a vencer pela data" ao mesmo tempo; habilitar alerta preventivo "CRLV a vencer (30d)" no Dashboard.
+  - Mudança: coluna `crlv_expiration_date DATE NULL` adicionada à tabela `vehicles` (migration aditiva, sem backfill); campo de data no formulário de veículo; predicado puro `isCrlvExpired` com precedência data→ano; `getExpiringSoonCrlvPlates` para a Fila de Ação; `buildActionQueue` estendida com categoria `crlv_expiring` (severity medium).
+  - Decisões: campo opcional fixo (não entra em `vehicle_field_settings`); `crlv_year` permanece como fallback; sem backfill; `schema.sql` não é tocado (migrations são fonte de verdade); OCR da data fora do escopo (evolução futura).
+  - Segurança: coluna herda RLS existente de `vehicles`; nenhuma policy nova; exibição na Fila de Ação segue o RISCO ACEITO de 13/06/2026.
+  - Rollback: `ALTER TABLE vehicles DROP COLUMN IF EXISTS crlv_expiration_date;` (restaura 100% do comportamento anterior).
+  - Testes: +15 unitários (273 total). Validações: `npm run lint` ✅, `npm run test:unit` ✅ (273), `npm run test:smoke` ✅ (6). Validação manual guiada ✅.
+
 - **Dashboard Executivo — Fase 3: tendência histórica de custo + projeção financeira (13/06/2026)**:
   - Motivação: acrescentar ao painel de Custos capacidades analíticas de série temporal e projeção orçamentária, usando dados já existentes sem alterar banco/RLS.
   - Mudança: gráfico "Evolução do Custo de Manutenção" (Recharts LineChart) com granularidade automática dia/mês baseada no span do filtro de período; KPI "Projeção Próximo Mês" calculado por média móvel simples dos 3 meses fechados anteriores.

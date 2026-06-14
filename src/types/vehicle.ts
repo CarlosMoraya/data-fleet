@@ -35,6 +35,7 @@ export interface Vehicle {
   acquisitionDate?: string;
   crlvUpload?: string;
   crlvYear?: string;
+  crlvExpirationDate?: string;
   status?: 'Available' | 'In Use' | 'Maintenance';
 
   // New fields

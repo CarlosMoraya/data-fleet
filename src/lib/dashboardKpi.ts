@@ -54,7 +54,7 @@ export function buildActiveMaintenanceTypeData(
 export type ActionSeverity = 'high' | 'medium';
 
 export interface ActionItem {
-  category: 'checklist' | 'crlv' | 'cnh' | 'os_overdue' | 'os_pending_approval';
+  category: 'checklist' | 'crlv' | 'crlv_expiring' | 'cnh' | 'os_overdue' | 'os_pending_approval';
   label: string;
   count: number;
   severity: ActionSeverity;
@@ -115,6 +115,7 @@ export function countPendingApprovalOrders(
 export function buildActionQueue(input: {
   checklist: string[];
   crlv: string[];
+  crlvExpiring: string[];
   cnh: string[];
   osOverdue: string[];
   osPendingApproval: string[];
@@ -122,6 +123,7 @@ export function buildActionQueue(input: {
   const items: ActionItem[] = [
     { category: 'checklist', label: 'Veículos com checklist vencido', count: input.checklist.length, severity: 'high', details: input.checklist },
     { category: 'crlv', label: 'Veículos com CRLV vencido', count: input.crlv.length, severity: 'high', details: input.crlv },
+    { category: 'crlv_expiring', label: 'Veículos com CRLV a vencer (30d)', count: input.crlvExpiring.length, severity: 'medium', details: input.crlvExpiring },
     { category: 'cnh', label: 'Motoristas com CNH vencida', count: input.cnh.length, severity: 'high', details: input.cnh },
     { category: 'os_overdue', label: 'OS com prazo de saída vencido', count: input.osOverdue.length, severity: 'high', details: input.osOverdue },
     { category: 'os_pending_approval', label: 'OS aguardando aprovação', count: input.osPendingApproval.length, severity: 'medium', details: input.osPendingApproval },
@@ -217,13 +219,34 @@ export function mapVehicleIdsToPlates(ids: string[], plateByVehicleId: Map<strin
     .filter((plate): plate is string => Boolean(plate));
 }
 
+export function isCrlvExpired(vehicle: Pick<VehicleRow, 'crlv_year' | 'crlv_expiration_date'>, currentYear: string, todayIso: string): boolean {
+  if (vehicle.crlv_expiration_date != null) {
+    return vehicle.crlv_expiration_date < todayIso;
+  }
+  return vehicle.crlv_year != null && vehicle.crlv_year < currentYear;
+}
+
 export function getExpiredCrlvPlates(
-  vehicles: Pick<VehicleRow, 'license_plate' | 'crlv_year'>[],
-  currentYear: string
+  vehicles: Pick<VehicleRow, 'license_plate' | 'crlv_year' | 'crlv_expiration_date'>[],
+  currentYear: string,
+  todayIso: string
 ): string[] {
   return vehicles
-    .filter((vehicle) => vehicle.crlv_year != null && vehicle.crlv_year < currentYear && vehicle.license_plate)
+    .filter((vehicle) => isCrlvExpired(vehicle, currentYear, todayIso) && vehicle.license_plate)
     .map((vehicle) => vehicle.license_plate as string);
+}
+
+export function getExpiringSoonCrlvPlates(
+  vehicles: Pick<VehicleRow, 'license_plate' | 'crlv_expiration_date'>[],
+  todayIso: string,
+  windowDays: number
+): string[] {
+  return vehicles
+    .filter((v) => {
+      const date = v.crlv_expiration_date;
+      return date != null && date >= todayIso && Math.floor((new Date(date).getTime() - new Date(todayIso).getTime()) / 86400000) <= windowDays && v.license_plate;
+    })
+    .map((v) => v.license_plate as string);
 }
 
 export function getExpiredCnhNames(

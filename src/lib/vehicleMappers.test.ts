@@ -124,3 +124,33 @@ describe('vehicleFromRow', () => {
     expect(vehicle.axleConfig).toBeUndefined();
   });
 });
+
+describe('round-trip de crlv_expiration_date', () => {
+  it('vehicleFromRow lê crlv_expiration_date e vehicleToRow grava crlv_expiration_date', () => {
+    const row = {
+      id: 'v1',
+      license_plate: 'ABC1D23',
+      crlv_expiration_date: '2027-02-15',
+    } as unknown as VehicleRow;
+
+    const vehicle = vehicleFromRow(row);
+    expect(vehicle.crlvExpirationDate).toBe('2027-02-15');
+
+    const backToRow = vehicleToRow({ crlvExpirationDate: '2027-02-15' } as Partial<Vehicle>, 'c1');
+    expect(backToRow.crlv_expiration_date).toBe('2027-02-15');
+  });
+
+  it('null no row vira undefined no Vehicle, e ausência no Vehicle vira null no row', () => {
+    const row = {
+      id: 'v1',
+      license_plate: 'ABC1D23',
+      crlv_expiration_date: null,
+    } as unknown as VehicleRow;
+
+    const vehicle = vehicleFromRow(row);
+    expect(vehicle.crlvExpirationDate).toBeUndefined();
+
+    const backToRow = vehicleToRow({}, 'c1');
+    expect(backToRow.crlv_expiration_date).toBeNull();
+  });
+});

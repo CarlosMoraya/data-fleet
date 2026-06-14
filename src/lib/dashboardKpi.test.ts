@@ -15,7 +15,9 @@ import {
   calculateCostVariation,
   countExpiringSoon,
   mapVehicleIdsToPlates,
+  isCrlvExpired,
   getExpiredCrlvPlates,
+  getExpiringSoonCrlvPlates,
   getExpiredCnhNames,
   chooseTrendGranularity,
   buildCostTrendSeries,
@@ -236,6 +238,7 @@ describe('buildActionQueue', () => {
     const result = buildActionQueue({
       checklist: ['ABC1D23', 'DEF4G56'],
       crlv: ['GHI7J89'],
+      crlvExpiring: [],
       cnh: ['Maria Souza'],
       osOverdue: ['JKL0M12', 'NOP3Q45', 'RST6U78'],
       osPendingApproval: ['VWX9Y01', 'ZAB2C34'],
@@ -256,6 +259,7 @@ describe('buildActionQueue', () => {
     const result = buildActionQueue({
       checklist: [],
       crlv: [],
+      crlvExpiring: [],
       cnh: [],
       osOverdue: [],
       osPendingApproval: [],
@@ -267,6 +271,7 @@ describe('buildActionQueue', () => {
     const result = buildActionQueue({
       checklist: [],
       crlv: [],
+      crlvExpiring: [],
       cnh: [],
       osOverdue: [],
       osPendingApproval: ['ABC1D23', 'DEF4G56', 'GHI7J89'],
@@ -275,6 +280,23 @@ describe('buildActionQueue', () => {
     expect(result[0].category).toBe('os_pending_approval');
     expect(result[0].severity).toBe('medium');
     expect(result[0].details).toEqual(['ABC1D23', 'DEF4G56', 'GHI7J89']);
+  });
+
+  it('retorna item crlv_expiring com severity medium e ordenado após itens high', () => {
+    const result = buildActionQueue({
+      checklist: [],
+      crlv: ['ABC1D23'],
+      crlvExpiring: ['XYZ9A87'],
+      cnh: [],
+      osOverdue: [],
+      osPendingApproval: [],
+    });
+    expect(result).toHaveLength(2);
+    expect(result[0].category).toBe('crlv');
+    expect(result[0].severity).toBe('high');
+    expect(result[1].category).toBe('crlv_expiring');
+    expect(result[1].severity).toBe('medium');
+    expect(result[1].details).toEqual(['XYZ9A87']);
   });
 });
 
@@ -414,21 +436,94 @@ describe('mapVehicleIdsToPlates', () => {
   });
 });
 
+describe('isCrlvExpired', () => {
+  it('data futura próxima: não vencido', () => {
+    expect(isCrlvExpired({ crlv_year: '2025', crlv_expiration_date: '2027-01-15' }, '2026', '2026-06-13')).toBe(false);
+  });
+
+  it('data passada: vencido por data, mesmo com crlv_year atual', () => {
+    expect(isCrlvExpired({ crlv_year: '2026', crlv_expiration_date: '2026-06-10' }, '2026', '2026-06-13')).toBe(true);
+  });
+
+  it('sem data + ano antigo: vencido por fallback', () => {
+    expect(isCrlvExpired({ crlv_year: '2025', crlv_expiration_date: null }, '2026', '2026-06-13')).toBe(true);
+  });
+
+  it('sem data + ano atual: não vencido', () => {
+    expect(isCrlvExpired({ crlv_year: '2026', crlv_expiration_date: null }, '2026', '2026-06-13')).toBe(false);
+  });
+
+  it('sem data + ano nulo: não vencido', () => {
+    expect(isCrlvExpired({ crlv_year: null, crlv_expiration_date: null }, '2026', '2026-06-13')).toBe(false);
+  });
+});
+
 describe('getExpiredCrlvPlates', () => {
-  it('retorna placas de CRLV vencido', () => {
+  it('retorna placas de CRLV vencido por data', () => {
     const result = getExpiredCrlvPlates([
-      { license_plate: 'ABC1D23', crlv_year: '2025' },
-      { license_plate: 'DEF4G56', crlv_year: '2026' },
-    ], '2026');
+      { license_plate: 'ABC1D23', crlv_year: '2026', crlv_expiration_date: '2026-06-10' },
+      { license_plate: 'DEF4G56', crlv_year: '2026', crlv_expiration_date: '2026-07-01' },
+    ], '2026', '2026-06-13');
     expect(result).toEqual(['ABC1D23']);
   });
 
-  it('ignora ano atual/futuro e placa nula', () => {
+  it('ignora ano atual/futuro e placa nula (fallback por ano)', () => {
     const result = getExpiredCrlvPlates([
-      { license_plate: null, crlv_year: '2025' },
-      { license_plate: 'DEF4G56', crlv_year: '2026' },
-      { license_plate: 'GHI7J89', crlv_year: '2027' },
-    ], '2026');
+      { license_plate: null, crlv_year: '2025', crlv_expiration_date: null },
+      { license_plate: 'DEF4G56', crlv_year: '2026', crlv_expiration_date: null },
+      { license_plate: 'GHI7J89', crlv_year: '2027', crlv_expiration_date: null },
+    ], '2026', '2026-06-13');
+    expect(result).toEqual([]);
+  });
+
+  it('fallback por ano quando sem data', () => {
+    const result = getExpiredCrlvPlates([
+      { license_plate: 'ABC1D23', crlv_year: '2025', crlv_expiration_date: null },
+    ], '2026', '2026-06-13');
+    expect(result).toEqual(['ABC1D23']);
+  });
+});
+
+describe('getExpiringSoonCrlvPlates', () => {
+  it('inclui placa com data dentro da janela', () => {
+    const result = getExpiringSoonCrlvPlates([
+      { license_plate: 'ABC1D23', crlv_expiration_date: '2026-07-10' },
+    ], '2026-06-13', 30);
+    expect(result).toEqual(['ABC1D23']);
+  });
+
+  it('inclui placa com data exatamente no limite da janela', () => {
+    const result = getExpiringSoonCrlvPlates([
+      { license_plate: 'ABC1D23', crlv_expiration_date: '2026-07-13' },
+    ], '2026-06-13', 30);
+    expect(result).toEqual(['ABC1D23']);
+  });
+
+  it('não inclui placa com data já passada (vencido)', () => {
+    const result = getExpiringSoonCrlvPlates([
+      { license_plate: 'ABC1D23', crlv_expiration_date: '2026-06-12' },
+    ], '2026-06-13', 30);
+    expect(result).toEqual([]);
+  });
+
+  it('não inclui placa com data nula', () => {
+    const result = getExpiringSoonCrlvPlates([
+      { license_plate: 'ABC1D23', crlv_expiration_date: null },
+    ], '2026-06-13', 30);
+    expect(result).toEqual([]);
+  });
+
+  it('não inclui placa sem license_plate', () => {
+    const result = getExpiringSoonCrlvPlates([
+      { license_plate: null, crlv_expiration_date: '2026-07-10' },
+    ], '2026-06-13', 30);
+    expect(result).toEqual([]);
+  });
+
+  it('não inclui placa com data além da janela', () => {
+    const result = getExpiringSoonCrlvPlates([
+      { license_plate: 'ABC1D23', crlv_expiration_date: '2026-08-01' },
+    ], '2026-06-13', 30);
     expect(result).toEqual([]);
   });
 });

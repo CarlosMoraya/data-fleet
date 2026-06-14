@@ -24,6 +24,23 @@ Este arquivo registra o progresso atual, pendências e a visão de curto prazo p
 
 ---
 
+## 🆕 Atualização de Sessão (14/06/2026) — CRLV a vencer: campo + alerta preventivo no Dashboard
+Feature implementada: campo `crlv_expiration_date` (data real de vencimento do CRLV) no cadastro de veículos, com alerta preventivo "CRLV a vencer (30d)" no Dashboard.
+Mudanças aplicadas:
+- Migration aditiva: `supabase/migrations/20260614000000_add_crlv_expiration_date_to_vehicles.sql` (nullable, sem backfill).
+- Tipo `Vehicle`: adicionado `crlvExpirationDate?: string`.
+- Mapper `vehicleMappers.ts`: adicionado `crlv_expiration_date` em `VehicleRow`, `vehicleFromRow` e `vehicleToRow`.
+- Formulário `VehicleForm.tsx`: input `type="date"` para "Vencimento do CRLV" após "Exercício CRLV" (opcional fixo, sem `req()`).
+- Funções puras em `dashboardKpi.ts`: `isCrlvExpired` (precedência data→ano), `getExpiringSoonCrlvPlates`; `getExpiredCrlvPlates` alterada para usar o predicado; `buildActionQueue` estendida com categoria `crlv_expiring` (severity `medium`).
+- Dashboard.tsx: query inclui `crlv_expiration_date`; `expiredCrlvCount` usa `isCrlvExpired`; `expiringSoonDocsCount` soma CRLV; `actionItems` inclui `crlvExpiring`; rota `crlv_expiring` → `/cadastros/veiculos`.
+- OperationalPanel.tsx: `VehicleRow` recebeu `crlv_expiration_date`.
+Arquivos modificados: `supabase/migrations/20260614000000_add_crlv_expiration_date_to_vehicles.sql`, `src/types/vehicle.ts`, `src/lib/vehicleMappers.ts`, `src/lib/vehicleMappers.test.ts`, `src/components/VehicleForm.tsx`, `src/lib/dashboardKpi.ts`, `src/lib/dashboardKpi.test.ts`, `src/pages/Dashboard.tsx`, `src/components/dashboard/OperationalPanel.tsx`
+Testes: `npm run lint` ✅; `npm run test:unit` ✅ (273 testes, +15 novos); `npm run test:smoke` ✅ (6 testes).
+Decisões: campo opcional fixo (não entra em `vehicle_field_settings`); sem backfill (veículos existentes ficam NULL); precedência data→ano (quando a data existe, ela é a única fonte do status CRLV); nova categoria `crlv_expiring` na Fila de Ação com severity medium.
+Rollback: `ALTER TABLE vehicles DROP COLUMN IF EXISTS crlv_expiration_date;`
+
+---
+
 ## 🆕 Atualização de Sessão (13/06/2026) — Dashboard Executivo Fase 2
 Feature implementada: evolução do Dashboard — Fase 2 (tendência operacional, comparativo de custos e refinamento da Fila de Ação).
 Mudanças aplicadas:
@@ -111,9 +128,13 @@ Notas: registros já concluídos mantêm o started_at antigo (sem correção ret
 ## 🔴 Próximos Passos Definidos
 
 1.  **Dashboard Executivo**:
-    - Criar visão consolidada para o `Admin Master` com métricas cross-tenant.
+    - Criar visão consolidada para o `Admin Master` com métricas cross-tenant (item A — sessão separada).
 2.  **Integração de Notificações**:
     - Sistema de alertas para vencimento de CRLV e CNH via Edge Functions (Cron).
+3.  **OCR da data do CRLV**:
+    - `documentOcr.ts` já extrai o ano; extrair também a data de vencimento é evolução natural (registrado como evolução futura).
+4.  **Backfill futuro**:
+    - Importar datas reais de CRLV (planilha) para veículos legados, se o usuário desejar.
 
 ---
 

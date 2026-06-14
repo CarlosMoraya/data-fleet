@@ -20,7 +20,9 @@ import {
   calculatePreviousPeriodRange,
   countExpiringSoon,
   mapVehicleIdsToPlates,
+  isCrlvExpired,
   getExpiredCrlvPlates,
+  getExpiringSoonCrlvPlates,
   getExpiredCnhNames,
   getTrailingMonthKeys,
   sumApprovedCostByMonthKeys,
@@ -88,7 +90,7 @@ export default function Dashboard() {
     queryFn: async () => {
       let query = supabase
         .from('vehicles')
-        .select('id, type, crlv_year, driver_id, license_plate, gr_expiration_date, shippers(name), operational_units(name)');
+        .select('id, type, crlv_year, crlv_expiration_date, driver_id, license_plate, gr_expiration_date, shippers(name), operational_units(name)');
       if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
       }
@@ -98,6 +100,7 @@ export default function Dashboard() {
         id: row.id as string,
         type: row.type as string,
         crlv_year: row.crlv_year as string | null,
+        crlv_expiration_date: row.crlv_expiration_date != null ? (row.crlv_expiration_date as string) : null,
         driver_id: row.driver_id as string | null,
         license_plate: row.license_plate != null ? (row.license_plate as string) : null,
         gr_expiration_date: row.gr_expiration_date != null ? (row.gr_expiration_date as string) : null,
@@ -357,14 +360,13 @@ export default function Dashboard() {
   }, [vehicles, checklistRows, intervals]);
 
   const currentYear = new Date().getFullYear().toString();
+  const today = new Date().toISOString().split('T')[0];
   const expiredCrlvCount = useMemo(
     () =>
-      vehicles.filter((v) => v.crlv_year !== null && v.crlv_year < currentYear)
-        .length,
-    [vehicles, currentYear]
+      vehicles.filter((v) => isCrlvExpired(v, currentYear, today)).length,
+    [vehicles, currentYear, today]
   );
 
-  const today = new Date().toISOString().split('T')[0];
   const expiredCnhCount = useMemo(
     () =>
       drivers.filter(
@@ -435,7 +437,8 @@ export default function Dashboard() {
     () =>
       countExpiringSoon(drivers.map((driver) => driver.expiration_date), today, EXPIRING_SOON_WINDOW_DAYS) +
       countExpiringSoon(drivers.map((driver) => driver.gr_expiration_date), today, EXPIRING_SOON_WINDOW_DAYS) +
-      countExpiringSoon(vehicles.map((vehicle) => vehicle.gr_expiration_date ?? null), today, EXPIRING_SOON_WINDOW_DAYS),
+      countExpiringSoon(vehicles.map((vehicle) => vehicle.gr_expiration_date ?? null), today, EXPIRING_SOON_WINDOW_DAYS) +
+      countExpiringSoon(vehicles.map((vehicle) => vehicle.crlv_expiration_date ?? null), today, EXPIRING_SOON_WINDOW_DAYS),
     [drivers, today, vehicles]
   );
 
@@ -443,7 +446,8 @@ export default function Dashboard() {
     () =>
       buildActionQueue({
         checklist: mapVehicleIdsToPlates([...overdueChecklistVehicleIds], plateByVehicleId),
-        crlv: getExpiredCrlvPlates(vehicles, currentYear),
+        crlv: getExpiredCrlvPlates(vehicles, currentYear, today),
+        crlvExpiring: getExpiringSoonCrlvPlates(vehicles, today, EXPIRING_SOON_WINDOW_DAYS),
         cnh: getExpiredCnhNames(drivers, today),
         osOverdue: mapVehicleIdsToPlates(
           activeMaintenanceOrders
@@ -471,6 +475,7 @@ export default function Dashboard() {
     const routes: Record<ActionItem['category'], string> = {
       checklist: '/checklists',
       crlv: '/cadastros/veiculos',
+      crlv_expiring: '/cadastros/veiculos',
       cnh: '/cadastros/motoristas',
       os_overdue: '/manutencao',
       os_pending_approval: '/manutencao',

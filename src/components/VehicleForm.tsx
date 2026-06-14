@@ -485,6 +485,11 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                   <input type="text" name="crlvYear" required={req('crlvYear')} inputMode="numeric" maxLength={4} placeholder="Ex: 2025" value={formData.crlvYear || ''} onChange={handleChange} className={inputClass} />
                 </div>
 
+                <div>
+                  <Label name="crlvExpirationDate">Vencimento do CRLV</Label>
+                  <input type="date" name="crlvExpirationDate" value={formData.crlvExpirationDate || ''} onChange={handleChange} className={inputClass} />
+                </div>
+
                 {/* CRLV Upload */}
                 <div className="sm:col-span-2">
                   <Label name="crlvUpload">CRLV — Documento do Veículo</Label>
