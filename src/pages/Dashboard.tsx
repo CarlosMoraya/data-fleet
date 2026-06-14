@@ -1,19 +1,31 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, DollarSign, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, DollarSign, CalendarDays, Activity } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import OperationalPanel from '../components/dashboard/OperationalPanel';
 import CostPanel from '../components/dashboard/CostPanel';
+import OverviewPanel from '../components/dashboard/OverviewPanel';
 import type { VehicleRow, DashboardFilters } from '../components/dashboard/OperationalPanel';
 import type { MaintenanceOrderDashboard } from '../types/maintenance';
+import {
+  calculateFleetAvailability,
+  countVehiclesInMaintenance,
+  calculateChecklistComplianceRate,
+  countOverdueMaintenanceOrders,
+  countPendingApprovalOrders,
+  buildActionQueue,
+  type ActionItem,
+} from '../lib/dashboardKpi';
 
-type TabType = 'operacional' | 'custos';
+type TabType = 'geral' | 'operacional' | 'custos';
 
 const tabs: { id: TabType; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: 'operacional', label: 'Painel Operacional', icon: LayoutDashboard },
-  { id: 'custos', label: 'Painel de Custos de Manutenção', icon: DollarSign },
+  { id: 'geral', label: 'Visão Geral', icon: LayoutDashboard },
+  { id: 'operacional', label: 'Operação', icon: Activity },
+  { id: 'custos', label: 'Custos', icon: DollarSign },
 ];
 
 function daysBetween(a: Date, b: Date) {
@@ -31,7 +43,8 @@ function getDefaultDateRange() {
 
 export default function Dashboard() {
   const { currentClient, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>('operacional');
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<TabType>('geral');
   const [filters, setFilters] = useState<DashboardFilters>({
     vehicleType: null,
     maintenanceType: null,
@@ -119,6 +132,7 @@ export default function Dashboard() {
               : Array.isArray(row.vehicles) && row.vehicles.length > 0
                 ? (row.vehicles[0] as Record<string, unknown>).type as string | null
                 : null,
+          expected_exit_date: row.expected_exit_date != null ? (row.expected_exit_date as string) : null,
         }));
       },
       enabled: !!user,
@@ -132,7 +146,7 @@ export default function Dashboard() {
       queryFn: async () => {
         let query = supabase
           .from('maintenance_orders')
-          .select('id, vehicle_id, type, status, approved_cost, current_km, vehicles(type)')
+          .select('id, vehicle_id, type, status, approved_cost, current_km, expected_exit_date, vehicles(type)')
           .not('status', 'in', '("Concluído","Cancelado")');
         if (currentClient?.id) {
           query = query.eq('client_id', currentClient.id);
@@ -152,6 +166,7 @@ export default function Dashboard() {
               : Array.isArray(row.vehicles) && row.vehicles.length > 0
                 ? (row.vehicles[0] as Record<string, unknown>).type as string | null
                 : null,
+          expected_exit_date: row.expected_exit_date != null ? (row.expected_exit_date as string) : null,
         }));
       },
       enabled: !!user,
@@ -286,6 +301,68 @@ export default function Dashboard() {
     [drivers, today]
   );
 
+  // ── Executive KPIs (Visão Geral) ─────────────────────────────────────────
+
+  const vehiclesInMaintenance = useMemo(
+    () => countVehiclesInMaintenance(activeMaintenanceOrders, null, vehicles),
+    [activeMaintenanceOrders, vehicles]
+  );
+
+  const availabilityRate = useMemo(
+    () => calculateFleetAvailability(vehicles.length, vehiclesInMaintenance),
+    [vehicles.length, vehiclesInMaintenance]
+  );
+
+  const openOrdersCount = activeMaintenanceOrders.length;
+
+  const overdueOrdersCount = useMemo(
+    () => countOverdueMaintenanceOrders(activeMaintenanceOrders, today),
+    [activeMaintenanceOrders, today]
+  );
+
+  const pendingApprovalCount = useMemo(
+    () => countPendingApprovalOrders(activeMaintenanceOrders),
+    [activeMaintenanceOrders]
+  );
+
+  const totalApprovedCost = useMemo(
+    () =>
+      maintenanceOrders
+        .filter((o) => o.approved_cost !== null && o.approved_cost > 0)
+        .reduce((sum, o) => sum + (o.approved_cost ?? 0), 0),
+    [maintenanceOrders]
+  );
+
+  const complianceRate = useMemo(
+    () => calculateChecklistComplianceRate(vehicles.length, overdueChecklistVehicleIds.size),
+    [vehicles.length, overdueChecklistVehicleIds.size]
+  );
+
+  const expiredDocsCount = expiredCrlvCount + expiredCnhCount;
+
+  const actionItems = useMemo(
+    () =>
+      buildActionQueue({
+        overdueChecklistCount: overdueChecklistVehicleIds.size,
+        expiredCrlvCount,
+        expiredCnhCount,
+        overdueOsCount: overdueOrdersCount,
+        pendingApprovalCount,
+      }),
+    [overdueChecklistVehicleIds.size, expiredCrlvCount, expiredCnhCount, overdueOrdersCount, pendingApprovalCount]
+  );
+
+  const handleActionClick = (category: ActionItem['category']) => {
+    const routes: Record<ActionItem['category'], string> = {
+      checklist: '/checklists',
+      crlv: '/cadastros/veiculos',
+      cnh: '/cadastros/motoristas',
+      os_overdue: '/manutencao',
+      os_pending_approval: '/manutencao',
+    };
+    navigate(routes[category]);
+  };
+
   // ── Loading state ─────────────────────────────────────────────────────────
 
   const isPanelLoading =
@@ -364,6 +441,22 @@ export default function Dashboard() {
 
       {/* Panels */}
       <div className="flex-1 min-h-0 overflow-y-auto">
+        {activeTab === 'geral' && (
+          <OverviewPanel
+            totalVehicles={vehicles.length}
+            vehiclesInMaintenance={vehiclesInMaintenance}
+            availabilityRate={availabilityRate}
+            openOrdersCount={openOrdersCount}
+            overdueOrdersCount={overdueOrdersCount}
+            pendingApprovalCount={pendingApprovalCount}
+            totalApprovedCost={totalApprovedCost}
+            complianceRate={complianceRate}
+            expiredDocsCount={expiredDocsCount}
+            actionItems={actionItems}
+            onActionClick={handleActionClick}
+            isLoading={isPanelLoading}
+          />
+        )}
         {activeTab === 'operacional' && (
           <OperationalPanel
             vehicles={vehicles}

@@ -105,4 +105,5 @@ export interface MaintenanceOrderDashboard {
   approved_cost: number | null;
   current_km: number | null;
   vehicle_type: string | null;
+  expected_exit_date: string | null;
 }
