@@ -1,9 +1,15 @@
 import React, { useMemo } from 'react';
-import { Truck, Wrench, CalendarDays, FileWarning, UserX, Loader2 } from 'lucide-react';
+import { Truck, Wrench, CalendarDays, FileWarning, UserX, Loader2, Clock, Hourglass } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
 import VehicleTypeBarChart from './VehicleTypeBarChart';
 import MaintenanceTypeDonutChart from './MaintenanceTypeDonutChart';
-import { buildActiveMaintenanceTypeData, countActiveInMaintenance } from '../../lib/dashboardKpi';
+import {
+  buildActiveMaintenanceTypeData,
+  countActiveInMaintenance,
+  calculateAverageMaintenanceDays,
+  calculateAverageOpenOrderAgeDays,
+  buildMaintenanceStatusData,
+} from '../../lib/dashboardKpi';
 import type { MaintenanceOrderDashboard } from '../../types/maintenance';
 
 export interface VehicleRow {
@@ -11,6 +17,8 @@ export interface VehicleRow {
   type: string;
   crlv_year: string | null;
   driver_id: string | null;
+  license_plate?: string | null;
+  gr_expiration_date?: string | null;
   initial_km?: number | null;
   shipper_name?: string | null;
   operational_unit_name?: string | null;
@@ -84,6 +92,11 @@ export default function OperationalPanel({
     ).length
     : expiredCrlvCount;
 
+  const avgMaintenanceDays = calculateAverageMaintenanceDays(maintenanceOrders);
+  const today = new Date().toISOString().split('T')[0];
+  const avgOpenOrderAgeDays = calculateAverageOpenOrderAgeDays(activeMaintenanceOrders, today);
+  const maintenanceStatusData = buildMaintenanceStatusData(activeMaintenanceOrders);
+
   // Bar chart: vehicles por tipo
   const vehicleTypeData = VEHICLE_TYPES.map((t) => ({
     name: t,
@@ -126,7 +139,7 @@ export default function OperationalPanel({
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         <DashboardKpiCard
           icon={Truck}
           iconBgClass="bg-blue-50"
@@ -165,6 +178,22 @@ export default function OperationalPanel({
           value={expiredCnhCount}
           isAlert
         />
+        <DashboardKpiCard
+          icon={Clock}
+          iconBgClass="bg-sky-50"
+          iconColorClass="text-sky-600"
+          label="Tempo Médio em Manutenção"
+          value={avgMaintenanceDays != null ? `${avgMaintenanceDays} dias` : '—'}
+          subtitle="OS concluídas no período"
+        />
+        <DashboardKpiCard
+          icon={Hourglass}
+          iconBgClass="bg-violet-50"
+          iconColorClass="text-violet-600"
+          label="Permanência Média de OS Abertas"
+          value={avgOpenOrderAgeDays != null ? `${avgOpenOrderAgeDays} dias` : '—'}
+          subtitle="OS ainda abertas"
+        />
       </div>
 
       {/* Charts */}
@@ -183,6 +212,14 @@ export default function OperationalPanel({
           }
           title="Manutenções por Tipo"
         />
+        {maintenanceStatusData.length > 0 && (
+          <VehicleTypeBarChart
+            data={maintenanceStatusData}
+            activeFilter={null}
+            onFilterChange={() => { }}
+            title="Fila de Manutenção por Status"
+          />
+        )}
         {vehicleByShipperData.length > 0 && (
           <VehicleTypeBarChart
             data={vehicleByShipperData}

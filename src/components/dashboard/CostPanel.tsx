@@ -1,10 +1,11 @@
 import React, { useMemo } from 'react';
-import { DollarSign, Truck, Gauge, Loader2 } from 'lucide-react';
+import { DollarSign, Truck, Gauge, Loader2, History } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
 import VehicleTypeBarChart from './VehicleTypeBarChart';
 import MaintenanceTypeDonutChart from './MaintenanceTypeDonutChart';
 import type { VehicleRow, DashboardFilters } from './OperationalPanel';
 import type { MaintenanceOrderDashboard } from '../../types/maintenance';
+import { calculateCostVariation } from '../../lib/dashboardKpi';
 
 const VEHICLE_TYPES = ['Passeio', 'Utilitário', 'Van', 'Moto', 'Vuc', 'Toco', 'Truck', 'Cavalo'];
 const MAINTENANCE_TYPES = ['Corretiva', 'Preventiva', 'Preditiva'] as const;
@@ -21,6 +22,7 @@ interface ChecklistRow {
 interface CostPanelProps {
   vehicles: VehicleRow[];
   maintenanceOrders: MaintenanceOrderDashboard[];
+  previousPeriodCost: number;
   checklistRows: ChecklistRow[];
   dateRange: { from: string; to: string };
   filters: DashboardFilters;
@@ -31,6 +33,7 @@ interface CostPanelProps {
 export default function CostPanel({
   vehicles,
   maintenanceOrders,
+  previousPeriodCost,
   checklistRows,
   dateRange,
   filters,
@@ -70,6 +73,10 @@ export default function CostPanel({
     (sum, o) => sum + (o.approved_cost ?? 0),
     0
   );
+  const variation = calculateCostVariation(totalCost, previousPeriodCost);
+  const variationSubtitle = variation.percent != null
+    ? `${variation.percent > 0 ? '+' : ''}${variation.percent}% vs período anterior`
+    : 'sem base no período anterior';
 
   const costPerVehicle =
     filteredVehicles.length > 0 ? totalCost / filteredVehicles.length : 0;
@@ -186,13 +193,21 @@ export default function CostPanel({
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <DashboardKpiCard
           icon={DollarSign}
           iconBgClass="bg-green-50"
           iconColorClass="text-green-600"
           label="Custo Total"
           value={formatCurrency(totalCost)}
+          subtitle={variationSubtitle}
+        />
+        <DashboardKpiCard
+          icon={History}
+          iconBgClass="bg-zinc-100"
+          iconColorClass="text-zinc-600"
+          label="Custo Período Anterior"
+          value={formatCurrency(previousPeriodCost)}
           subtitle="orçamentos aprovados"
         />
         <DashboardKpiCard

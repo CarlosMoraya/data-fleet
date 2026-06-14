@@ -8,6 +8,15 @@ import {
   countOverdueMaintenanceOrders,
   countPendingApprovalOrders,
   buildActionQueue,
+  calculateAverageMaintenanceDays,
+  calculateAverageOpenOrderAgeDays,
+  buildMaintenanceStatusData,
+  calculatePreviousPeriodRange,
+  calculateCostVariation,
+  countExpiringSoon,
+  mapVehicleIdsToPlates,
+  getExpiredCrlvPlates,
+  getExpiredCnhNames,
 } from './dashboardKpi';
 
 describe('countActiveInMaintenance', () => {
@@ -218,13 +227,13 @@ describe('countPendingApprovalOrders', () => {
 });
 
 describe('buildActionQueue', () => {
-  it('retorna 5 itens com high antes de medium quando todas as contagens > 0', () => {
+  it('retorna 5 itens com high antes de medium, contagens e detalhes preservados', () => {
     const result = buildActionQueue({
-      overdueChecklistCount: 2,
-      expiredCrlvCount: 1,
-      expiredCnhCount: 1,
-      overdueOsCount: 3,
-      pendingApprovalCount: 2,
+      checklist: ['ABC1D23', 'DEF4G56'],
+      crlv: ['GHI7J89'],
+      cnh: ['Maria Souza'],
+      osOverdue: ['JKL0M12', 'NOP3Q45', 'RST6U78'],
+      osPendingApproval: ['VWX9Y01', 'ZAB2C34'],
     });
     expect(result).toHaveLength(5);
     expect(result[0].severity).toBe('high');
@@ -232,29 +241,207 @@ describe('buildActionQueue', () => {
     expect(result[2].severity).toBe('high');
     expect(result[3].severity).toBe('high');
     expect(result[4].severity).toBe('medium');
+    expect(result[0].count).toBe(result[0].details.length);
+    expect(result[0].details).toEqual(['ABC1D23', 'DEF4G56']);
+    expect(result[4].count).toBe(result[4].details.length);
+    expect(result[4].details).toEqual(['VWX9Y01', 'ZAB2C34']);
   });
 
-  it('retorna array vazio quando todas as contagens = 0', () => {
+  it('retorna array vazio quando todas as listas estão vazias', () => {
     const result = buildActionQueue({
-      overdueChecklistCount: 0,
-      expiredCrlvCount: 0,
-      expiredCnhCount: 0,
-      overdueOsCount: 0,
-      pendingApprovalCount: 0,
+      checklist: [],
+      crlv: [],
+      cnh: [],
+      osOverdue: [],
+      osPendingApproval: [],
     });
     expect(result).toEqual([]);
   });
 
-  it('retorna 1 item medium quando apenas pendingApprovalCount > 0', () => {
+  it('retorna 1 item medium quando apenas osPendingApproval tem itens', () => {
     const result = buildActionQueue({
-      overdueChecklistCount: 0,
-      expiredCrlvCount: 0,
-      expiredCnhCount: 0,
-      overdueOsCount: 0,
-      pendingApprovalCount: 3,
+      checklist: [],
+      crlv: [],
+      cnh: [],
+      osOverdue: [],
+      osPendingApproval: ['ABC1D23', 'DEF4G56', 'GHI7J89'],
     });
     expect(result).toHaveLength(1);
     expect(result[0].category).toBe('os_pending_approval');
     expect(result[0].severity).toBe('medium');
+    expect(result[0].details).toEqual(['ABC1D23', 'DEF4G56', 'GHI7J89']);
+  });
+});
+
+describe('calculateAverageMaintenanceDays', () => {
+  it('retorna média arredondada para OS concluídas com entrada e saída', () => {
+    const result = calculateAverageMaintenanceDays([
+      { status: 'Concluído', entry_date: '2026-06-01', actual_exit_date: '2026-06-05' },
+      { status: 'Concluído', entry_date: '2026-06-10', actual_exit_date: '2026-06-16' },
+    ]);
+    expect(result).toBe(5);
+  });
+
+  it('retorna null quando não há OS concluídas elegíveis', () => {
+    const result = calculateAverageMaintenanceDays([
+      { status: 'Aguardando orçamento', entry_date: '2026-06-01', actual_exit_date: '2026-06-05' },
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it('ignora OS sem actual_exit_date', () => {
+    const result = calculateAverageMaintenanceDays([
+      { status: 'Concluído', entry_date: '2026-06-01', actual_exit_date: null },
+      { status: 'Concluído', entry_date: '2026-06-10', actual_exit_date: '2026-06-14' },
+    ]);
+    expect(result).toBe(4);
+  });
+});
+
+describe('calculateAverageOpenOrderAgeDays', () => {
+  it('retorna média de permanência para OS aberta', () => {
+    const result = calculateAverageOpenOrderAgeDays([
+      { status: 'Serviço em execução', entry_date: '2026-06-03' },
+    ], '2026-06-13');
+    expect(result).toBe(10);
+  });
+
+  it('ignora OS concluídas e canceladas', () => {
+    const result = calculateAverageOpenOrderAgeDays([
+      { status: 'Concluído', entry_date: '2026-06-01' },
+      { status: 'Cancelado', entry_date: '2026-06-01' },
+      { status: 'Aguardando aprovação', entry_date: '2026-06-10' },
+    ], '2026-06-13');
+    expect(result).toBe(3);
+  });
+
+  it('retorna null quando não há OS elegíveis', () => {
+    const result = calculateAverageOpenOrderAgeDays([
+      { status: 'Concluído', entry_date: '2026-06-01' },
+      { status: 'Cancelado', entry_date: null },
+    ], '2026-06-13');
+    expect(result).toBeNull();
+  });
+});
+
+describe('buildMaintenanceStatusData', () => {
+  it('retorna contagens na ordem fixa apenas com value > 0', () => {
+    const result = buildMaintenanceStatusData([
+      { status: 'Serviço em execução' },
+      { status: 'Aguardando aprovação' },
+      { status: 'Aguardando aprovação' },
+      { status: 'Concluído' },
+    ]);
+    expect(result).toEqual([
+      { name: 'Aguardando aprovação', value: 2 },
+      { name: 'Serviço em execução', value: 1 },
+    ]);
+  });
+
+  it('retorna lista vazia quando não há status ativos do workflow', () => {
+    expect(buildMaintenanceStatusData([])).toEqual([]);
+  });
+});
+
+describe('calculatePreviousPeriodRange', () => {
+  it('retorna o período anterior com a mesma duração', () => {
+    expect(calculatePreviousPeriodRange('2026-06-01', '2026-06-30')).toEqual({
+      from: '2026-05-02',
+      to: '2026-05-31',
+    });
+  });
+
+  it('retorna o dia anterior quando from e to são iguais', () => {
+    expect(calculatePreviousPeriodRange('2026-06-13', '2026-06-13')).toEqual({
+      from: '2026-06-12',
+      to: '2026-06-12',
+    });
+  });
+});
+
+describe('calculateCostVariation', () => {
+  it('retorna variação positiva', () => {
+    expect(calculateCostVariation(110, 100)).toEqual({ percent: 10, direction: 'up' });
+  });
+
+  it('retorna percent null e direção up quando anterior é zero e atual maior que zero', () => {
+    expect(calculateCostVariation(100, 0)).toEqual({ percent: null, direction: 'up' });
+  });
+
+  it('retorna variação negativa', () => {
+    expect(calculateCostVariation(80, 100)).toEqual({ percent: -20, direction: 'down' });
+  });
+});
+
+describe('countExpiringSoon', () => {
+  it('conta data dentro da janela de 30 dias', () => {
+    expect(countExpiringSoon(['2026-06-20'], '2026-06-13', 30)).toBe(1);
+  });
+
+  it('não conta data já vencida', () => {
+    expect(countExpiringSoon(['2026-06-12'], '2026-06-13', 30)).toBe(0);
+  });
+
+  it('não conta null', () => {
+    expect(countExpiringSoon([null], '2026-06-13', 30)).toBe(0);
+  });
+
+  it('não conta data além da janela', () => {
+    expect(countExpiringSoon(['2026-07-20'], '2026-06-13', 30)).toBe(0);
+  });
+});
+
+describe('mapVehicleIdsToPlates', () => {
+  it('mapeia ids para placas', () => {
+    const plateByVehicleId = new Map([
+      ['v1', 'ABC1D23'],
+      ['v2', 'DEF4G56'],
+    ]);
+    expect(mapVehicleIdsToPlates(['v1', 'v2'], plateByVehicleId)).toEqual(['ABC1D23', 'DEF4G56']);
+  });
+
+  it('descarta id sem placa no mapa', () => {
+    const plateByVehicleId = new Map([
+      ['v1', 'ABC1D23'],
+      ['v2', null],
+    ]);
+    expect(mapVehicleIdsToPlates(['v1', 'v2', 'v3'], plateByVehicleId)).toEqual(['ABC1D23']);
+  });
+});
+
+describe('getExpiredCrlvPlates', () => {
+  it('retorna placas de CRLV vencido', () => {
+    const result = getExpiredCrlvPlates([
+      { license_plate: 'ABC1D23', crlv_year: '2025' },
+      { license_plate: 'DEF4G56', crlv_year: '2026' },
+    ], '2026');
+    expect(result).toEqual(['ABC1D23']);
+  });
+
+  it('ignora ano atual/futuro e placa nula', () => {
+    const result = getExpiredCrlvPlates([
+      { license_plate: null, crlv_year: '2025' },
+      { license_plate: 'DEF4G56', crlv_year: '2026' },
+      { license_plate: 'GHI7J89', crlv_year: '2027' },
+    ], '2026');
+    expect(result).toEqual([]);
+  });
+});
+
+describe('getExpiredCnhNames', () => {
+  it('retorna nomes com CNH vencida', () => {
+    const result = getExpiredCnhNames([
+      { name: 'Maria Souza', expiration_date: '2026-06-12' },
+      { name: 'João Silva', expiration_date: '2026-06-13' },
+    ], '2026-06-13');
+    expect(result).toEqual(['Maria Souza']);
+  });
+
+  it('ignora data nula e nome nulo', () => {
+    const result = getExpiredCnhNames([
+      { name: 'Maria Souza', expiration_date: null },
+      { name: null, expiration_date: '2026-06-12' },
+    ], '2026-06-13');
+    expect(result).toEqual([]);
   });
 });

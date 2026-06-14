@@ -5,6 +5,26 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 ## 📜 Histórico de Sessões e Mudanças
 
 ### Junho 2026
+- **Dashboard Executivo — Fase 2: tendência, comparativos e refinamento (13/06/2026)**:
+  - Motivação: evoluir a Fase 1 do Dashboard com indicadores acionáveis de tendência operacional, comparativo financeiro e detalhamento item a item da Fila de Ação.
+  - Mudança: aba "Operação" recebeu tempo médio em manutenção, permanência média de OS abertas e gráfico "Fila de Manutenção por Status"; aba "Custos" recebeu custo do período anterior e variação percentual; aba "Visão Geral" recebeu KPI "Documentos a Vencer (30d)".
+  - Fila de Ação: contrato de `buildActionQueue` evoluído de contagens para listas de detalhes (`details`), exibindo placas para veículos/OS e nomes para CNH, com renderização compacta e "+N mais" acima de 5 itens.
+  - Dados: queries existentes estendidas com `license_plate`, `gr_expiration_date`, `entry_date` e `actual_exit_date`; nova query `dashboard-maintenance-previous` para período anterior. Sem migration. Sem dependência nova.
+  - Decisões: "Documentos a Vencer (30d)" cobre somente CNH e GR; CRLV permanece apenas como vencido porque o banco possui `crlv_year`, não data de vencimento. Janela fixa de 30 dias nesta fase.
+  - Segurança/LGPD: RISCO ACEITO — exibição de placa/nome na Fila de Ação aprovada pelo usuário em 13/06/2026, restrita ao tenant via RLS e aos perfis que já acessam o Dashboard.
+  - Testes: funções puras novas adicionadas a `dashboardKpi.ts`; testes unitários de médias, status, período anterior, variação, documentos a vencer, mapeamento de placas e detalhes da Fila de Ação. Validações: `npm run lint` ✅, `npm run test:unit` ✅ (241), `npm run test:smoke` ✅ (6), checagem DOM autenticada das abas Visão Geral, Operação e Custos ✅.
+
+- **Dashboard Executivo — Fase 1: aba Visão Geral + Fila de Ação (13/06/2026)**:
+  - Motivação: evoluir o Dashboard de um painel de contagens para um painel executivo e operacional de decisão (visibilidade executiva e alertas de ação como prioridade #1).
+  - Planejamento: gerado via protocolo `prompts/Evolucao.md` (IMPLEMENTATION.md, Tipo 3 — alteração de funcionalidade existente).
+  - Mudança: nova aba "Visão Geral" (aba padrão) com 9 KPIs executivos + Fila de Ação priorizada; abas existentes renomeadas para "Operação" e "Custos".
+  - Decisões de arquitetura: 3 abas (Fila de Ação embutida na Visão Geral, não aba separada); sem aba de Pneus (evita duplicar módulo existente); KPI "Em Manutenção" (conta ordens) preservado e coexistindo com Disponibilidade (conta veículos distintos via `countVehiclesInMaintenance`); Fila de Ação agrupada por contagem na Fase 1.
+  - Dados: único ajuste foi adicionar `expected_exit_date` ao `select` de `dashboard-active-maintenance` e ao tipo `MaintenanceOrderDashboard`. Sem migration. Sem dependência nova.
+  - Lógica: 6 funções puras novas em `dashboardKpi.ts` (`calculateFleetAvailability`, `countVehiclesInMaintenance`, `calculateChecklistComplianceRate`, `countOverdueMaintenanceOrders`, `countPendingApprovalOrders`, `buildActionQueue`) + tipo `ActionItem`. Componentes novos: `OverviewPanel.tsx`, `ActionQueue.tsx`.
+  - Padrões aplicados: Pure functions + Presentational Components, Progressive Disclosure (UX), derived state via `useMemo`.
+  - Testes: +15 unitários (218 total). Validações: `npm run lint` ✅, `npm run test:unit` ✅ (218), `npm run test:smoke` ✅ (6). Commit `e015a31`.
+  - Próximas fases documentadas no IMPLEMENTATION.md: Fase 2 (tempos médios, comparativo período anterior, documentos a vencer, fila por status, detalhamento item a item) e Fase 3 (tendência/sparklines, projeções, alertas cross-tenant Admin Master).
+
 - **Remoção do piso de 7 dias em inspeções de pneus (12/06/2026)**:
   - Motivação: permitir inspeções consecutivas do mesmo veículo/motorista sem bloqueio de intervalo — essencial para testes operacionais.
   - Mudança: campo "Pneus (Inspeção)" em Configurações passa a aceitar qualquer inteiro a partir de 0 dias; padrão de exibição mantido em 7.

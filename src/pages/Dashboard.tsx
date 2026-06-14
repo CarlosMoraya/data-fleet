@@ -17,10 +17,16 @@ import {
   countOverdueMaintenanceOrders,
   countPendingApprovalOrders,
   buildActionQueue,
+  calculatePreviousPeriodRange,
+  countExpiringSoon,
+  mapVehicleIdsToPlates,
+  getExpiredCrlvPlates,
+  getExpiredCnhNames,
   type ActionItem,
 } from '../lib/dashboardKpi';
 
 type TabType = 'geral' | 'operacional' | 'custos';
+const EXPIRING_SOON_WINDOW_DAYS = 30;
 
 const tabs: { id: TabType; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'geral', label: 'Visão Geral', icon: LayoutDashboard },
@@ -78,7 +84,7 @@ export default function Dashboard() {
     queryFn: async () => {
       let query = supabase
         .from('vehicles')
-        .select('id, type, crlv_year, driver_id, shippers(name), operational_units(name)');
+        .select('id, type, crlv_year, driver_id, license_plate, gr_expiration_date, shippers(name), operational_units(name)');
       if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
       }
@@ -89,6 +95,8 @@ export default function Dashboard() {
         type: row.type as string,
         crlv_year: row.crlv_year as string | null,
         driver_id: row.driver_id as string | null,
+        license_plate: row.license_plate != null ? (row.license_plate as string) : null,
+        gr_expiration_date: row.gr_expiration_date != null ? (row.gr_expiration_date as string) : null,
         shipper_name:
           row.shippers && typeof row.shippers === 'object' && !Array.isArray(row.shippers)
             ? (row.shippers as Record<string, unknown>).name as string | null
@@ -110,7 +118,7 @@ export default function Dashboard() {
       queryFn: async () => {
         let query = supabase
           .from('maintenance_orders')
-          .select('id, vehicle_id, type, status, approved_cost, current_km, vehicles(type)')
+          .select('id, vehicle_id, type, status, approved_cost, current_km, expected_exit_date, entry_date, actual_exit_date, vehicles(type)')
           .gte('entry_date', dateRange.from)
           .lte('entry_date', dateRange.to)
           .neq('status', 'Cancelado');
@@ -133,6 +141,8 @@ export default function Dashboard() {
                 ? (row.vehicles[0] as Record<string, unknown>).type as string | null
                 : null,
           expected_exit_date: row.expected_exit_date != null ? (row.expected_exit_date as string) : null,
+          entry_date: row.entry_date != null ? (row.entry_date as string) : null,
+          actual_exit_date: row.actual_exit_date != null ? (row.actual_exit_date as string) : null,
         }));
       },
       enabled: !!user,
@@ -140,13 +150,39 @@ export default function Dashboard() {
       gcTime: 30 * 60 * 1000,
     });
 
+  const { data: previousMaintenanceOrders = [], isLoading: loadingPreviousMaintenance } = useQuery<
+    { approved_cost: number | null }[]
+  >({
+    queryKey: ['dashboard-maintenance-previous', currentClient?.id, dateRange.from, dateRange.to],
+    queryFn: async () => {
+      const previous = calculatePreviousPeriodRange(dateRange.from, dateRange.to);
+      let query = supabase
+        .from('maintenance_orders')
+        .select('id, approved_cost')
+        .gte('entry_date', previous.from)
+        .lte('entry_date', previous.to)
+        .neq('status', 'Cancelado');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []).map((row: Record<string, unknown>) => ({
+        approved_cost: row.approved_cost != null ? Number(row.approved_cost) : null,
+      }));
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
   const { data: activeMaintenanceOrders = [], isLoading: loadingActiveMaintenance } =
     useQuery<MaintenanceOrderDashboard[]>({
       queryKey: ['dashboard-active-maintenance', currentClient?.id],
       queryFn: async () => {
         let query = supabase
           .from('maintenance_orders')
-          .select('id, vehicle_id, type, status, approved_cost, current_km, expected_exit_date, vehicles(type)')
+          .select('id, vehicle_id, type, status, approved_cost, current_km, expected_exit_date, entry_date, vehicles(type)')
           .not('status', 'in', '("Concluído","Cancelado")');
         if (currentClient?.id) {
           query = query.eq('client_id', currentClient.id);
@@ -167,6 +203,8 @@ export default function Dashboard() {
                 ? (row.vehicles[0] as Record<string, unknown>).type as string | null
                 : null,
           expected_exit_date: row.expected_exit_date != null ? (row.expected_exit_date as string) : null,
+          entry_date: row.entry_date != null ? (row.entry_date as string) : null,
+          actual_exit_date: row.actual_exit_date != null ? (row.actual_exit_date as string) : null,
         }));
       },
       enabled: !!user,
@@ -213,16 +251,16 @@ export default function Dashboard() {
   });
 
   const { data: drivers = [], isLoading: loadingDrivers } = useQuery<
-    { id: string; expiration_date: string | null }[]
+    { id: string; name: string | null; expiration_date: string | null; gr_expiration_date: string | null }[]
   >({
     queryKey: ['dashboard-drivers', currentClient?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, expiration_date')
+        .select('id, name, expiration_date, gr_expiration_date')
         .eq('client_id', currentClient!.id);
       if (error) throw error;
-      return (data ?? []) as { id: string; expiration_date: string | null }[];
+      return (data ?? []) as { id: string; name: string | null; expiration_date: string | null; gr_expiration_date: string | null }[];
     },
     enabled: !!currentClient?.id,
     staleTime: 5 * 60 * 1000,
@@ -333,6 +371,14 @@ export default function Dashboard() {
     [maintenanceOrders]
   );
 
+  const previousPeriodCost = useMemo(
+    () =>
+      previousMaintenanceOrders
+        .filter((o) => o.approved_cost !== null && o.approved_cost > 0)
+        .reduce((sum, o) => sum + (o.approved_cost ?? 0), 0),
+    [previousMaintenanceOrders]
+  );
+
   const complianceRate = useMemo(
     () => calculateChecklistComplianceRate(vehicles.length, overdueChecklistVehicleIds.size),
     [vehicles.length, overdueChecklistVehicleIds.size]
@@ -340,16 +386,45 @@ export default function Dashboard() {
 
   const expiredDocsCount = expiredCrlvCount + expiredCnhCount;
 
+  const plateByVehicleId = useMemo(
+    () => new Map(vehicles.map((vehicle) => [vehicle.id, vehicle.license_plate ?? null])),
+    [vehicles]
+  );
+
+  const expiringSoonDocsCount = useMemo(
+    () =>
+      countExpiringSoon(drivers.map((driver) => driver.expiration_date), today, EXPIRING_SOON_WINDOW_DAYS) +
+      countExpiringSoon(drivers.map((driver) => driver.gr_expiration_date), today, EXPIRING_SOON_WINDOW_DAYS) +
+      countExpiringSoon(vehicles.map((vehicle) => vehicle.gr_expiration_date ?? null), today, EXPIRING_SOON_WINDOW_DAYS),
+    [drivers, today, vehicles]
+  );
+
   const actionItems = useMemo(
     () =>
       buildActionQueue({
-        overdueChecklistCount: overdueChecklistVehicleIds.size,
-        expiredCrlvCount,
-        expiredCnhCount,
-        overdueOsCount: overdueOrdersCount,
-        pendingApprovalCount,
+        checklist: mapVehicleIdsToPlates([...overdueChecklistVehicleIds], plateByVehicleId),
+        crlv: getExpiredCrlvPlates(vehicles, currentYear),
+        cnh: getExpiredCnhNames(drivers, today),
+        osOverdue: mapVehicleIdsToPlates(
+          activeMaintenanceOrders
+            .filter(
+              (order) =>
+                order.status !== 'Concluído' &&
+                order.status !== 'Cancelado' &&
+                order.expected_exit_date != null &&
+                order.expected_exit_date < today
+            )
+            .map((order) => order.vehicle_id),
+          plateByVehicleId
+        ),
+        osPendingApproval: mapVehicleIdsToPlates(
+          activeMaintenanceOrders
+            .filter((order) => order.status === 'Aguardando aprovação')
+            .map((order) => order.vehicle_id),
+          plateByVehicleId
+        ),
       }),
-    [overdueChecklistVehicleIds.size, expiredCrlvCount, expiredCnhCount, overdueOrdersCount, pendingApprovalCount]
+    [activeMaintenanceOrders, currentYear, drivers, overdueChecklistVehicleIds, plateByVehicleId, today, vehicles]
   );
 
   const handleActionClick = (category: ActionItem['category']) => {
@@ -366,7 +441,12 @@ export default function Dashboard() {
   // ── Loading state ─────────────────────────────────────────────────────────
 
   const isPanelLoading =
-    loadingVehicles || loadingMaintenance || loadingActiveMaintenance || loadingChecklists || loadingDrivers;
+    loadingVehicles ||
+    loadingMaintenance ||
+    loadingActiveMaintenance ||
+    loadingPreviousMaintenance ||
+    loadingChecklists ||
+    loadingDrivers;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -452,6 +532,7 @@ export default function Dashboard() {
             totalApprovedCost={totalApprovedCost}
             complianceRate={complianceRate}
             expiredDocsCount={expiredDocsCount}
+            expiringSoonDocsCount={expiringSoonDocsCount}
             actionItems={actionItems}
             onActionClick={handleActionClick}
             isLoading={isPanelLoading}
@@ -474,6 +555,7 @@ export default function Dashboard() {
           <CostPanel
             vehicles={vehicles}
             maintenanceOrders={maintenanceOrders}
+            previousPeriodCost={previousPeriodCost}
             checklistRows={checklistRows}
             dateRange={dateRange}
             filters={filters}

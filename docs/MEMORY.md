@@ -10,6 +10,7 @@ Este arquivo registra o progresso atual, pendências e a visão de curto prazo p
 - [x] **Pneus**: Módulo completo com configuração de eixos e histórico de movimentação.
 - [x] **Oficinas**: Novo modelo de parcerias multi-tenant e gestão de convites ativa.
 - [x] **Performance**: Build otimizado (~8s) e cache de queries (React Query) configurado.
+- [x] **Dashboard Executivo**: Fase 2 concluída com tempos médios, fila por status, comparativo de período, documentos a vencer em 30 dias e Fila de Ação detalhada.
 
 ## ✅ Protocolo Oficial de Smoke
 
@@ -20,6 +21,28 @@ Este arquivo registra o progresso atual, pendências e a visão de curto prazo p
 - Fora do escopo: CRUD completo, specs `e2e/pending/**`, importacoes, OCR, fluxos destrutivos e regressao E2E completa.
 - Conduta em falha: parar, registrar o teste falho com a evidencia e corrigir o problema antes de continuar.
 - Observacao: `npm run test:e2e` continua sendo a regressao completa. Ele nao substitui o smoke oficial.
+
+---
+
+## 🆕 Atualização de Sessão (13/06/2026) — Dashboard Executivo Fase 2
+Feature implementada: evolução do Dashboard — Fase 2 (tendência operacional, comparativo de custos e refinamento da Fila de Ação).
+Mudanças aplicadas:
+- Aba "Operação": adicionados KPIs de tempo médio em manutenção, permanência média de OS abertas e gráfico "Fila de Manutenção por Status".
+- Aba "Custos": adicionados custo do período anterior e variação percentual no KPI "Custo Total".
+- Aba "Visão Geral": adicionado KPI "Documentos a Vencer (30d)" cobrindo CNH e GR, sem CRLV por ausência de data de vencimento no banco.
+- Fila de Ação: passou a listar placas de veículos e nomes de motoristas por categoria, com limite visual de 5 detalhes e indicador "+N mais".
+Arquivos modificados:
+- src/pages/Dashboard.tsx
+- src/types/maintenance.ts
+- src/lib/dashboardKpi.ts
+- src/lib/dashboardKpi.test.ts
+- src/components/dashboard/OperationalPanel.tsx
+- src/components/dashboard/CostPanel.tsx
+- src/components/dashboard/OverviewPanel.tsx
+- src/components/dashboard/ActionQueue.tsx
+Testes: `npm run lint` ✅; `npm run test:unit` ✅ (241 testes); `npm run test:smoke` ✅ (6 testes); checagem DOM autenticada das abas Visão Geral, Operação e Custos ✅.
+Segurança/LGPD: RISCO ACEITO — exibição de placa/nome na Fila de Ação aprovada pelo usuário em 13/06/2026, restrita ao tenant via RLS.
+Sem migration e sem dependência nova.
 
 ---
 
@@ -402,3 +425,17 @@ Função `validateInspectionInterval` NÃO foi alterada — já funciona correta
 Arquivos modificados: src/components/ChecklistDayIntervalSettings.tsx, src/services/tireInspectionService.test.ts, e2e/pending/tire-inspection-settings.spec.ts
 Testes adicionados: 1 teste unitário (intervalo 0 não bloqueia)
 Validações executadas: `npm run lint` ✅; `npm run test:unit` ✅ (195 testes); `npm run test:smoke` ✅ (6 testes)
+
+## 🆕 Atualização de Sessão (13/06/2026) — Dashboard Executivo Fase 1 (aba Visão Geral + Fila de Ação)
+Feature implementada: evolução do Dashboard de painel de contagens para painel de decisão. Nova aba **"Visão Geral"** (agora a aba padrão), ao lado de "Operação" (antiga "Painel Operacional") e "Custos" (antiga "Painel de Custos de Manutenção").
+Conteúdo da Visão Geral: 9 KPIs executivos (Total de Veículos, Veículos em Manutenção, Disponibilidade da Frota %, OS Abertas, OS em Atraso, OS Aguardando Aprovação, Custo Total do Período, Conformidade de Checklist %, Documentos Vencidos = CRLV+CNH) + **Fila de Ação** priorizada (itens críticos agrupados por categoria, ordenados por severidade high→medium, clicáveis com navegação por `useNavigate`).
+Escopo: Fase 1 apenas (planejado em IMPLEMENTATION.md). Sem alteração de banco; sem dependência nova.
+Decisões: (1) 3 abas, com Fila de Ação embutida na Visão Geral em vez de aba "Ativos Críticos" separada; (2) sem aba de Pneus para não duplicar o módulo existente; (3) KPI "Em Manutenção" do painel Operação preservado (conta ORDENS ativas), enquanto a Disponibilidade usa VEÍCULOS distintos via nova função `countVehiclesInMaintenance` — as duas métricas coexistem intencionalmente; (4) Fila de Ação agrupada por contagem (não item a item) — detalhamento com placas/nomes fica para Fase 2.
+Único ajuste de dados: campo `expected_exit_date` adicionado ao `select` da query `dashboard-active-maintenance` e ao tipo `MaintenanceOrderDashboard` (habilita "OS em Atraso").
+Funções puras novas em `src/lib/dashboardKpi.ts`: `calculateFleetAvailability`, `countVehiclesInMaintenance`, `calculateChecklistComplianceRate`, `countOverdueMaintenanceOrders`, `countPendingApprovalOrders`, `buildActionQueue` (+ tipo `ActionItem`).
+Arquivos criados: src/components/dashboard/OverviewPanel.tsx, src/components/dashboard/ActionQueue.tsx
+Arquivos modificados: src/pages/Dashboard.tsx, src/types/maintenance.ts, src/lib/dashboardKpi.ts, src/lib/dashboardKpi.test.ts
+Testes adicionados: 15 casos unitários para as 6 funções novas (cenário feliz, divisão por zero, clamp, listas vazias, ordenação por severidade).
+Commit: e015a31
+Validações executadas: `npm run lint` ✅; `npm run test:unit` ✅ (218 testes, era 203); `npm run test:smoke` ✅ (6 testes).
+Pendente (próximas fases): Fase 2 — tempos médios em manutenção/permanência, comparativo período atual×anterior, "documentos a vencer em breve" (incl. GR), fila por status como gráfico, detalhamento item a item da Fila de Ação. Fase 3 — tendência/sparklines, projeções, alertas cross-tenant Admin Master.

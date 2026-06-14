@@ -58,6 +58,7 @@ export interface ActionItem {
   label: string;
   count: number;
   severity: ActionSeverity;
+  details: string[];
 }
 
 export function calculateFleetAvailability(totalVehicles: number, vehiclesInMaintenance: number): number {
@@ -112,18 +113,18 @@ export function countPendingApprovalOrders(
 }
 
 export function buildActionQueue(input: {
-  overdueChecklistCount: number;
-  expiredCrlvCount: number;
-  expiredCnhCount: number;
-  overdueOsCount: number;
-  pendingApprovalCount: number;
+  checklist: string[];
+  crlv: string[];
+  cnh: string[];
+  osOverdue: string[];
+  osPendingApproval: string[];
 }): ActionItem[] {
   const items: ActionItem[] = [
-    { category: 'checklist', label: 'Veículos com checklist vencido', count: input.overdueChecklistCount, severity: 'high' },
-    { category: 'crlv', label: 'Veículos com CRLV vencido', count: input.expiredCrlvCount, severity: 'high' },
-    { category: 'cnh', label: 'Motoristas com CNH vencida', count: input.expiredCnhCount, severity: 'high' },
-    { category: 'os_overdue', label: 'OS com prazo de saída vencido', count: input.overdueOsCount, severity: 'high' },
-    { category: 'os_pending_approval', label: 'OS aguardando aprovação', count: input.pendingApprovalCount, severity: 'medium' },
+    { category: 'checklist', label: 'Veículos com checklist vencido', count: input.checklist.length, severity: 'high', details: input.checklist },
+    { category: 'crlv', label: 'Veículos com CRLV vencido', count: input.crlv.length, severity: 'high', details: input.crlv },
+    { category: 'cnh', label: 'Motoristas com CNH vencida', count: input.cnh.length, severity: 'high', details: input.cnh },
+    { category: 'os_overdue', label: 'OS com prazo de saída vencido', count: input.osOverdue.length, severity: 'high', details: input.osOverdue },
+    { category: 'os_pending_approval', label: 'OS aguardando aprovação', count: input.osPendingApproval.length, severity: 'medium', details: input.osPendingApproval },
   ];
 
   return items
@@ -132,4 +133,104 @@ export function buildActionQueue(input: {
       const order = { high: 0, medium: 1 };
       return order[a.severity] - order[b.severity];
     });
+}
+
+export function calculateAverageMaintenanceDays(
+  orders: Pick<MaintenanceOrderDashboard, 'status' | 'entry_date' | 'actual_exit_date'>[]
+): number | null {
+  const days = orders
+    .filter((o) => o.status === 'Concluído' && o.entry_date != null && o.actual_exit_date != null)
+    .map((o) => Math.floor((new Date(o.actual_exit_date as string).getTime() - new Date(o.entry_date as string).getTime()) / 86400000))
+    .filter((value) => value >= 0);
+
+  if (days.length === 0) return null;
+  return Math.round(days.reduce((sum, value) => sum + value, 0) / days.length);
+}
+
+export function calculateAverageOpenOrderAgeDays(
+  orders: Pick<MaintenanceOrderDashboard, 'status' | 'entry_date'>[],
+  todayIso: string
+): number | null {
+  const today = new Date(todayIso).getTime();
+  const days = orders
+    .filter((o) => o.status !== 'Concluído' && o.status !== 'Cancelado' && o.entry_date != null)
+    .map((o) => Math.floor((today - new Date(o.entry_date as string).getTime()) / 86400000))
+    .filter((value) => value >= 0);
+
+  if (days.length === 0) return null;
+  return Math.round(days.reduce((sum, value) => sum + value, 0) / days.length);
+}
+
+export function buildMaintenanceStatusData(
+  orders: Pick<MaintenanceOrderDashboard, 'status'>[]
+): { name: string; value: number }[] {
+  const statuses = ['Aguardando orçamento', 'Aguardando aprovação', 'Orçamento aprovado', 'Serviço em execução'];
+  return statuses
+    .map((status) => ({
+      name: status,
+      value: orders.filter((o) => o.status === status).length,
+    }))
+    .filter((item) => item.value > 0);
+}
+
+export function calculatePreviousPeriodRange(from: string, to: string): { from: string; to: string } {
+  const parseIsoDate = (value: string) => {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day));
+  };
+  const formatIsoDate = (value: Date) => value.toISOString().split('T')[0];
+
+  const fromDate = parseIsoDate(from);
+  const toDate = parseIsoDate(to);
+  const durationDays = Math.floor((toDate.getTime() - fromDate.getTime()) / 86400000);
+  const prevTo = new Date(fromDate);
+  prevTo.setUTCDate(prevTo.getUTCDate() - 1);
+  const prevFrom = new Date(prevTo);
+  prevFrom.setUTCDate(prevFrom.getUTCDate() - durationDays);
+
+  return { from: formatIsoDate(prevFrom), to: formatIsoDate(prevTo) };
+}
+
+export function calculateCostVariation(
+  current: number,
+  previous: number
+): { percent: number | null; direction: 'up' | 'down' | 'flat' } {
+  if (previous === 0) {
+    return { percent: null, direction: current > 0 ? 'up' : 'flat' };
+  }
+
+  const percent = Math.round(((current - previous) / previous) * 100);
+  return { percent, direction: percent > 0 ? 'up' : percent < 0 ? 'down' : 'flat' };
+}
+
+export function countExpiringSoon(dates: (string | null)[], todayIso: string, windowDays: number): number {
+  const today = new Date(todayIso).getTime();
+  return dates.filter((date) => {
+    if (date == null || date < todayIso) return false;
+    return Math.floor((new Date(date).getTime() - today) / 86400000) <= windowDays;
+  }).length;
+}
+
+export function mapVehicleIdsToPlates(ids: string[], plateByVehicleId: Map<string, string | null>): string[] {
+  return ids
+    .map((id) => plateByVehicleId.get(id))
+    .filter((plate): plate is string => Boolean(plate));
+}
+
+export function getExpiredCrlvPlates(
+  vehicles: Pick<VehicleRow, 'license_plate' | 'crlv_year'>[],
+  currentYear: string
+): string[] {
+  return vehicles
+    .filter((vehicle) => vehicle.crlv_year != null && vehicle.crlv_year < currentYear && vehicle.license_plate)
+    .map((vehicle) => vehicle.license_plate as string);
+}
+
+export function getExpiredCnhNames(
+  drivers: { name: string | null; expiration_date: string | null }[],
+  todayIso: string
+): string[] {
+  return drivers
+    .filter((driver) => driver.expiration_date != null && driver.expiration_date < todayIso && driver.name)
+    .map((driver) => driver.name as string);
 }

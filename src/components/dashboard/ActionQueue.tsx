@@ -29,16 +29,30 @@ export default function ActionQueue({ items, onItemClick }: ActionQueueProps) {
           const textClass = isHigh ? 'text-red-700' : 'text-amber-700';
           const badgeBg = isHigh ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700';
           const interactive = onItemClick !== undefined;
+          const visibleDetails = item.details.slice(0, 5);
+          const hiddenDetailsCount = item.details.length - visibleDetails.length;
 
           const content = (
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-3">
-                <Icon className={`h-5 w-5 shrink-0 ${textClass}`} />
-                <span className={`text-sm font-medium ${textClass}`}>{item.label}</span>
+            <div className="w-full">
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-3">
+                  <Icon className={`h-5 w-5 shrink-0 ${textClass}`} />
+                  <span className={`text-sm font-medium ${textClass}`}>{item.label}</span>
+                </div>
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${badgeBg}`}>
+                  {item.count}
+                </span>
               </div>
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${badgeBg}`}>
-                {item.count}
-              </span>
+              {item.details.length > 0 && (
+                <div className="ml-8 mt-2 flex flex-wrap gap-1.5 text-xs text-zinc-500">
+                  {visibleDetails.map((detail) => (
+                    <span key={detail} className="rounded-full bg-zinc-100 px-2 py-0.5">
+                      {detail}
+                    </span>
+                  ))}
+                  {hiddenDetailsCount > 0 && <span className="px-1 py-0.5">+{hiddenDetailsCount} mais</span>}
+                </div>
+              )}
             </div>
           );
 

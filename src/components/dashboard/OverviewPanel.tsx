@@ -10,6 +10,7 @@ import {
   ListChecks,
   FileWarning,
   Loader2,
+  CalendarClock,
 } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
 import ActionQueue from './ActionQueue';
@@ -27,6 +28,7 @@ interface OverviewPanelProps {
   totalApprovedCost: number;
   complianceRate: number;
   expiredDocsCount: number;
+  expiringSoonDocsCount: number;
   actionItems: ActionItem[];
   onActionClick?: (category: ActionItem['category']) => void;
   isLoading?: boolean;
@@ -42,6 +44,7 @@ export default function OverviewPanel({
   totalApprovedCost,
   complianceRate,
   expiredDocsCount,
+  expiringSoonDocsCount,
   actionItems,
   onActionClick,
   isLoading = false,
@@ -122,6 +125,15 @@ export default function OverviewPanel({
           label="Documentos Vencidos"
           value={expiredDocsCount}
           subtitle="CRLV + CNH"
+          isAlert
+        />
+        <DashboardKpiCard
+          icon={CalendarClock}
+          iconBgClass="bg-orange-50"
+          iconColorClass="text-orange-600"
+          label="Documentos a Vencer (30d)"
+          value={expiringSoonDocsCount}
+          subtitle="CNH + GR nos próximos 30 dias"
           isAlert
         />
       </div>
