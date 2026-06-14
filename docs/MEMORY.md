@@ -2,6 +2,17 @@
 
 Este arquivo registra o progresso atual, pendências e a visão de curto prazo para o desenvolvimento.
 
+## 🆕 Atualização de Sessão (14/06/2026) — Bugfix: card "CRLVs Vencidos" divergia sob filtro de tipo
+
+Bug corrigido: card "CRLVs Vencidos" da aba Operação divergia da Visão Geral sob filtro por tipo de veículo
+Causa raiz: OperationalPanel.tsx recalculava o ramo filtrado com regra só-ano (crlv_year < currentYear), ignorando crlv_expiration_date, em vez de usar o helper isCrlvExpired (fonte de verdade já usada pela Visão Geral)
+Correção aplicada: ramo filtrado passou a usar isCrlvExpired(v, currentYear, today); today declarado antes do uso; import de isCrlvExpired adicionado
+Arquivos modificados: src/components/dashboard/OperationalPanel.tsx
+Testes adicionados: src/components/dashboard/OperationalPanel.test.tsx (regra CRLV vencido sob filtro de tipo)
+Validações executadas: npm run lint ✅; npm run test:unit ✅ (290 testes, +4 novos).
+
+---
+
 ## 🆕 Atualização de Sessão (14/06/2026) — Bugfix: modo "Todos os Clientes" do Admin Master inconsistente
 
 Bug corrigido: modo "Todos os Clientes" do Admin Master inconsistente — telas de Checklists, Plano de Ação, Templates, Motoristas, Pneus e Agendamentos ficavam vazias/bloqueadas, e não havia impedimento para criar/configurar sem cliente.

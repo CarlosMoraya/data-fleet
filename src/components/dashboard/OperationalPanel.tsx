@@ -9,6 +9,7 @@ import {
   calculateAverageMaintenanceDays,
   calculateAverageOpenOrderAgeDays,
   buildMaintenanceStatusData,
+  isCrlvExpired,
 } from '../../lib/dashboardKpi';
 import type { MaintenanceOrderDashboard } from '../../types/maintenance';
 
@@ -88,14 +89,12 @@ export default function OperationalPanel({
     : overdueChecklistVehicleIds.size;
 
   const currentYear = new Date().getFullYear().toString();
+  const today = new Date().toISOString().split('T')[0];
   const expiredCrlv = filters.vehicleType
-    ? filteredVehicles.filter(
-      (v) => v.crlv_year !== null && v.crlv_year < currentYear
-    ).length
+    ? filteredVehicles.filter((v) => isCrlvExpired(v, currentYear, today)).length
     : expiredCrlvCount;
 
   const avgMaintenanceDays = calculateAverageMaintenanceDays(maintenanceOrders);
-  const today = new Date().toISOString().split('T')[0];
   const avgOpenOrderAgeDays = calculateAverageOpenOrderAgeDays(activeMaintenanceOrders, today);
   const maintenanceStatusData = buildMaintenanceStatusData(activeMaintenanceOrders);
 
