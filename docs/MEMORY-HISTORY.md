@@ -5,6 +5,16 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 ## 📜 Histórico de Sessões e Mudanças
 
 ### Junho 2026
+- **Dashboard Executivo — Fase 3: tendência histórica de custo + projeção financeira (13/06/2026)**:
+  - Motivação: acrescentar ao painel de Custos capacidades analíticas de série temporal e projeção orçamentária, usando dados já existentes sem alterar banco/RLS.
+  - Mudança: gráfico "Evolução do Custo de Manutenção" (Recharts LineChart) com granularidade automática dia/mês baseada no span do filtro de período; KPI "Projeção Próximo Mês" calculado por média móvel simples dos 3 meses fechados anteriores.
+  - Funções puras: `chooseTrendGranularity` (span ≤62 → dia, >62 → mês), `buildCostTrendSeries` (buckets cronológicos com soma por chave, helper interno `enumerateBucketKeys`), `getTrailingMonthKeys` (meses fechados anteriores), `sumApprovedCostByMonthKeys` (totais por chave de mês), `calculateMovingAverageProjection` (média arredondada).
+  - Dados: query `dashboard-cost-projection` busca custo aprovado dos 3 meses anteriores ao mês corrente, sem filtro de período; série de tendência reutiliza `maintenanceOrders` da query existente, aplicando `filteredOrders` (respeita filtros de tipo).
+  - Decisões: granularidade determinística (limiar 62 dias); série casada com filtro de período; projeção por média móvel de 3 meses (explicável, robusta a outliers com pouco histórico); série usa `filteredOrders`, projeção usa query própria.
+  - Escopo reduzido: itens cross-tenant Admin Master e campo `crlv_expiration_date` adiados para planos próprios (Tipo 4, com migration/RLS dedicados).
+  - Componente novo: `CostTrendChart.tsx` (presentational, LineChart, empty state "Sem dados de custo no período.").
+  - Testes: +17 unitários (258 total). Validações: `npm run lint` ✅, `npm run test:unit` ✅ (258), `npm run test:smoke` ✅ (6).
+
 - **Dashboard Executivo — Fase 2: tendência, comparativos e refinamento (13/06/2026)**:
   - Motivação: evoluir a Fase 1 do Dashboard com indicadores acionáveis de tendência operacional, comparativo financeiro e detalhamento item a item da Fila de Ação.
   - Mudança: aba "Operação" recebeu tempo médio em manutenção, permanência média de OS abertas e gráfico "Fila de Manutenção por Status"; aba "Custos" recebeu custo do período anterior e variação percentual; aba "Visão Geral" recebeu KPI "Documentos a Vencer (30d)".

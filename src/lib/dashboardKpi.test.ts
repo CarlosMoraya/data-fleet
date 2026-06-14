@@ -17,6 +17,11 @@ import {
   mapVehicleIdsToPlates,
   getExpiredCrlvPlates,
   getExpiredCnhNames,
+  chooseTrendGranularity,
+  buildCostTrendSeries,
+  getTrailingMonthKeys,
+  sumApprovedCostByMonthKeys,
+  calculateMovingAverageProjection,
 } from './dashboardKpi';
 
 describe('countActiveInMaintenance', () => {
@@ -443,5 +448,136 @@ describe('getExpiredCnhNames', () => {
       { name: null, expiration_date: '2026-06-12' },
     ], '2026-06-13');
     expect(result).toEqual([]);
+  });
+});
+
+// ─── Dashboard Fase 3 — Tendência histórica e projeção ────────────────────────
+
+describe('chooseTrendGranularity', () => {
+  it('retorna "day" para intervalo de 30 dias', () => {
+    expect(chooseTrendGranularity('2026-06-01', '2026-07-01')).toBe('day');
+  });
+
+  it('retorna "month" para intervalo de 90 dias', () => {
+    expect(chooseTrendGranularity('2026-06-01', '2026-08-30')).toBe('month');
+  });
+
+  it('retorna "day" na borda de 62 dias', () => {
+    expect(chooseTrendGranularity('2026-06-01', '2026-08-02')).toBe('day');
+  });
+
+  it('retorna "month" para 63 dias', () => {
+    expect(chooseTrendGranularity('2026-06-01', '2026-08-03')).toBe('month');
+  });
+});
+
+describe('buildCostTrendSeries', () => {
+  it('granularidade "day": soma ordens no dia correto, dia sem ordens com value 0', () => {
+    const orders = [
+      { entry_date: '2026-06-01', approved_cost: 100 },
+      { entry_date: '2026-06-01', approved_cost: 200 },
+      { entry_date: '2026-06-03', approved_cost: 50 },
+    ];
+    const result = buildCostTrendSeries(orders, '2026-06-01', '2026-06-03', 'day');
+    expect(result).toEqual([
+      { name: '01/06', value: 300 },
+      { name: '02/06', value: 0 },
+      { name: '03/06', value: 50 },
+    ]);
+  });
+
+  it('granularidade "day": ignora ordem fora do intervalo', () => {
+    const orders = [
+      { entry_date: '2026-06-01', approved_cost: 100 },
+      { entry_date: '2026-05-31', approved_cost: 200 },
+      { entry_date: '2026-06-04', approved_cost: 50 },
+    ];
+    const result = buildCostTrendSeries(orders, '2026-06-01', '2026-06-03', 'day');
+    expect(result).toEqual([
+      { name: '01/06', value: 100 },
+      { name: '02/06', value: 0 },
+      { name: '03/06', value: 0 },
+    ]);
+  });
+
+  it('granularidade "day": ignora approved_cost nulo ou <= 0', () => {
+    const orders = [
+      { entry_date: '2026-06-01', approved_cost: null },
+      { entry_date: '2026-06-01', approved_cost: 0 },
+      { entry_date: '2026-06-01', approved_cost: -10 },
+      { entry_date: '2026-06-01', approved_cost: 150 },
+    ];
+    const result = buildCostTrendSeries(orders, '2026-06-01', '2026-06-01', 'day');
+    expect(result).toEqual([{ name: '01/06', value: 150 }]);
+  });
+
+  it('granularidade "month": soma por mês em ordem cronológica, mês sem ordens com value 0', () => {
+    const orders = [
+      { entry_date: '2026-06-15', approved_cost: 100 },
+      { entry_date: '2026-07-10', approved_cost: 200 },
+      { entry_date: '2026-07-20', approved_cost: 50 },
+    ];
+    const result = buildCostTrendSeries(orders, '2026-06-01', '2026-08-31', 'month');
+    expect(result).toEqual([
+      { name: '06/2026', value: 100 },
+      { name: '07/2026', value: 250 },
+      { name: '08/2026', value: 0 },
+    ]);
+  });
+});
+
+describe('getTrailingMonthKeys', () => {
+  it('retorna 3 meses fechados anteriores ao mês corrente', () => {
+    expect(getTrailingMonthKeys('2026-06-13', 3)).toEqual([
+      '2026-03', '2026-04', '2026-05',
+    ]);
+  });
+
+  it('virada de ano: retorna meses do ano anterior', () => {
+    expect(getTrailingMonthKeys('2026-01-15', 3)).toEqual([
+      '2025-10', '2025-11', '2025-12',
+    ]);
+  });
+
+  it('retorna array vazio quando count é 0', () => {
+    expect(getTrailingMonthKeys('2026-06-13', 0)).toEqual([]);
+  });
+});
+
+describe('sumApprovedCostByMonthKeys', () => {
+  it('retorna totais corretos por mês, preservando ordem de monthKeys', () => {
+    const orders = [
+      { entry_date: '2026-03-10', approved_cost: 100 },
+      { entry_date: '2026-04-05', approved_cost: 200 },
+      { entry_date: '2026-04-20', approved_cost: 50 },
+    ];
+    const result = sumApprovedCostByMonthKeys(orders, ['2026-03', '2026-04', '2026-05']);
+    expect(result).toEqual([100, 250, 0]);
+  });
+
+  it('retorna 0 para mês sem ordens', () => {
+    const orders = [
+      { entry_date: '2026-03-01', approved_cost: 500 },
+    ];
+    const result = sumApprovedCostByMonthKeys(orders, ['2026-02', '2026-03', '2026-04']);
+    expect(result).toEqual([0, 500, 0]);
+  });
+
+  it('retorna array do mesmo tamanho de monthKeys com todos 0 quando orders vazio', () => {
+    expect(sumApprovedCostByMonthKeys([], ['2026-03', '2026-04'])).toEqual([0, 0]);
+  });
+});
+
+describe('calculateMovingAverageProjection', () => {
+  it('retorna média arredondada', () => {
+    expect(calculateMovingAverageProjection([40000, 50000, 60000])).toBe(50000);
+  });
+
+  it('retorna null para array vazio', () => {
+    expect(calculateMovingAverageProjection([])).toBeNull();
+  });
+
+  it('arredonda para cima quando a média tem 0.5', () => {
+    expect(calculateMovingAverageProjection([10000, 10001])).toBe(10001);
   });
 });

@@ -10,7 +10,7 @@ Este arquivo registra o progresso atual, pendências e a visão de curto prazo p
 - [x] **Pneus**: Módulo completo com configuração de eixos e histórico de movimentação.
 - [x] **Oficinas**: Novo modelo de parcerias multi-tenant e gestão de convites ativa.
 - [x] **Performance**: Build otimizado (~8s) e cache de queries (React Query) configurado.
-- [x] **Dashboard Executivo**: Fase 2 concluída com tempos médios, fila por status, comparativo de período, documentos a vencer em 30 dias e Fila de Ação detalhada.
+- [x] **Dashboard Executivo**: Fase 3 concluída com tendência histórica de custo (gráfico de linha) e projeção do próximo mês por média móvel de 3 meses.
 
 ## ✅ Protocolo Oficial de Smoke
 
@@ -43,6 +43,22 @@ Arquivos modificados:
 Testes: `npm run lint` ✅; `npm run test:unit` ✅ (241 testes); `npm run test:smoke` ✅ (6 testes); checagem DOM autenticada das abas Visão Geral, Operação e Custos ✅.
 Segurança/LGPD: RISCO ACEITO — exibição de placa/nome na Fila de Ação aprovada pelo usuário em 13/06/2026, restrita ao tenant via RLS.
 Sem migration e sem dependência nova.
+
+---
+
+## 🆕 Atualização de Sessão (13/06/2026) — Dashboard Executivo Fase 3
+Feature implementada: evolução do Dashboard — Fase 3 (tendência histórica de custo + projeção financeira por média móvel).
+Mudanças aplicadas:
+- Aba "Custos": adicionado gráfico "Evolução do Custo de Manutenção" (LineChart Recharts) com granularidade automática (dia ≤ 62 dias de span; mês acima), reagindo ao filtro de período e ao filtro de tipo de veículo/manutenção.
+- Aba "Custos": adicionado KPI "Projeção Próximo Mês" com valor calculado por média móvel dos 3 meses fechados anteriores (`calculateMovingAverageProjection`).
+- Nova query `dashboard-cost-projection` buscando custo aprovado dos 3 meses anteriores ao mês corrente, sem filtro de período.
+- Funções puras novas em `src/lib/dashboardKpi.ts`: `chooseTrendGranularity`, `buildCostTrendSeries` (+ helper `enumerateBucketKeys`), `getTrailingMonthKeys`, `sumApprovedCostByMonthKeys`, `calculateMovingAverageProjection`.
+Arquivos criados: src/components/dashboard/CostTrendChart.tsx (presentational component, Recharts LineChart, empty state).
+Arquivos modificados: src/pages/Dashboard.tsx, src/components/dashboard/CostPanel.tsx, src/lib/dashboardKpi.ts, src/lib/dashboardKpi.test.ts.
+Testes: `npm run lint` ✅; `npm run test:unit` ✅ (258 testes, +17 da Fase 3); `npm run test:smoke` ✅ (6 testes).
+Sem migration, sem alteração de RLS, sem dependência nova. Escopo reduzido conforme decisão de 13/06/2026 (itens cross-tenant e `crlv_expiration_date` ficam para planos próprios).
+Decisões de design: granularidade determinística ≤62 dias → dia, >62 → mês; série de tendência usa `filteredOrders` (respeita filtros do painel); projeção usa query própria sem filtro de período; média móvel simples de 3 meses (explicável a gestores).
+Observação: projeção sem histórico exibe "—"; buckets sem custo aparecem zerados (linha contínua).
 
 ---
 
@@ -94,11 +110,9 @@ Notas: registros já concluídos mantêm o started_at antigo (sem correção ret
 
 ## 🔴 Próximos Passos Definidos
 
-1.  **Módulo de Custos Avançado**:
-    - Implementar projeções financeiras baseadas no histórico de manutenção.
-2.  **Dashboard Executivo**:
+1.  **Dashboard Executivo**:
     - Criar visão consolidada para o `Admin Master` com métricas cross-tenant.
-3.  **Integração de Notificações**:
+2.  **Integração de Notificações**:
     - Sistema de alertas para vencimento de CRLV e CNH via Edge Functions (Cron).
 
 ---

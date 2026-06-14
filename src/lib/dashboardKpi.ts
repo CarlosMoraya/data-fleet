@@ -234,3 +234,106 @@ export function getExpiredCnhNames(
     .filter((driver) => driver.expiration_date != null && driver.expiration_date < todayIso && driver.name)
     .map((driver) => driver.name as string);
 }
+
+// ─── Dashboard Fase 3 — Tendência histórica e projeção ────────────────────
+
+function enumerateBucketKeys(from: string, to: string, granularity: 'day' | 'month'): { key: string; name: string }[] {
+  const [fy, fm, fd] = from.split('-').map(Number);
+  const [ty, tm, td] = to.split('-').map(Number);
+  const result: { key: string; name: string }[] = [];
+
+  if (granularity === 'day') {
+    const current = new Date(Date.UTC(fy, fm - 1, fd));
+    const end = new Date(Date.UTC(ty, tm - 1, td));
+    while (current <= end) {
+      const y = current.getUTCFullYear();
+      const m = String(current.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(current.getUTCDate()).padStart(2, '0');
+      result.push({ key: `${y}-${m}-${d}`, name: `${d}/${m}` });
+      current.setUTCDate(current.getUTCDate() + 1);
+    }
+  } else {
+    const current = new Date(Date.UTC(fy, fm - 1, 1));
+    const end = new Date(Date.UTC(ty, tm - 1, 1));
+    while (current <= end) {
+      const y = current.getUTCFullYear();
+      const m = String(current.getUTCMonth() + 1).padStart(2, '0');
+      result.push({ key: `${y}-${m}`, name: `${m}/${y}` });
+      current.setUTCMonth(current.getUTCMonth() + 1);
+    }
+  }
+
+  return result;
+}
+
+export function chooseTrendGranularity(from: string, to: string): 'day' | 'month' {
+  const [fy, fm, fd] = from.split('-').map(Number);
+  const [ty, tm, td] = to.split('-').map(Number);
+  const fromMs = Date.UTC(fy, fm - 1, fd);
+  const toMs = Date.UTC(ty, tm - 1, td);
+  const spanDays = Math.floor((toMs - fromMs) / 86400000);
+  return spanDays <= 62 ? 'day' : 'month';
+}
+
+export function buildCostTrendSeries(
+  orders: Pick<MaintenanceOrderDashboard, 'entry_date' | 'approved_cost'>[],
+  from: string,
+  to: string,
+  granularity: 'day' | 'month'
+): { name: string; value: number }[] {
+  const buckets = enumerateBucketKeys(from, to, granularity);
+  const sums = new Map<string, number>();
+
+  for (const order of orders) {
+    if (order.entry_date == null || order.approved_cost == null || order.approved_cost <= 0) continue;
+    const key = granularity === 'day'
+      ? order.entry_date.substring(0, 10)
+      : order.entry_date.substring(0, 7);
+    sums.set(key, (sums.get(key) ?? 0) + order.approved_cost);
+  }
+
+  return buckets.map((bucket) => ({
+    name: bucket.name,
+    value: sums.get(bucket.key) ?? 0,
+  }));
+}
+
+export function getTrailingMonthKeys(todayIso: string, count: number): string[] {
+  const [y, m] = todayIso.substring(0, 7).split('-').map(Number);
+  const result: string[] = [];
+  const firstDayOfCurrentMonth = new Date(Date.UTC(y, m - 1, 1));
+
+  for (let i = count; i >= 1; i--) {
+    const d = new Date(firstDayOfCurrentMonth);
+    d.setUTCMonth(d.getUTCMonth() - i);
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    result.push(`${year}-${month}`);
+  }
+
+  return result;
+}
+
+export function sumApprovedCostByMonthKeys(
+  orders: Pick<MaintenanceOrderDashboard, 'entry_date' | 'approved_cost'>[],
+  monthKeys: string[]
+): number[] {
+  const totals = new Array(monthKeys.length).fill(0);
+  const indexByKey = new Map(monthKeys.map((key, i) => [key, i]));
+
+  for (const order of orders) {
+    if (order.entry_date == null || order.approved_cost == null || order.approved_cost <= 0) continue;
+    const key = order.entry_date.substring(0, 7);
+    const idx = indexByKey.get(key);
+    if (idx !== undefined) {
+      totals[idx] += order.approved_cost;
+    }
+  }
+
+  return totals;
+}
+
+export function calculateMovingAverageProjection(monthlyTotals: number[]): number | null {
+  if (monthlyTotals.length === 0) return null;
+  return Math.round(monthlyTotals.reduce((sum, v) => sum + v, 0) / monthlyTotals.length);
+}

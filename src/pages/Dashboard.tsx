@@ -22,11 +22,15 @@ import {
   mapVehicleIdsToPlates,
   getExpiredCrlvPlates,
   getExpiredCnhNames,
+  getTrailingMonthKeys,
+  sumApprovedCostByMonthKeys,
+  calculateMovingAverageProjection,
   type ActionItem,
 } from '../lib/dashboardKpi';
 
 type TabType = 'geral' | 'operacional' | 'custos';
 const EXPIRING_SOON_WINDOW_DAYS = 30;
+const PROJECTION_TRAILING_MONTHS = 3;
 
 const tabs: { id: TabType; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'geral', label: 'Visão Geral', icon: LayoutDashboard },
@@ -168,6 +172,36 @@ export default function Dashboard() {
       const { data, error } = await query;
       if (error) throw error;
       return (data ?? []).map((row: Record<string, unknown>) => ({
+        approved_cost: row.approved_cost != null ? Number(row.approved_cost) : null,
+      }));
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  const { data: costProjectionRows = [], isLoading: loadingCostProjection } = useQuery<
+    { entry_date: string | null; approved_cost: number | null }[]
+  >({
+    queryKey: ['dashboard-cost-projection', currentClient?.id],
+    queryFn: async () => {
+      const keys = getTrailingMonthKeys(today, PROJECTION_TRAILING_MONTHS);
+      const inicio = `${keys[0]}-01`;
+      const [y, m] = today.substring(0, 7).split('-').map(Number);
+      const inicioMesCorrente = `${y}-${String(m).padStart(2, '0')}-01`;
+      let query = supabase
+        .from('maintenance_orders')
+        .select('entry_date, approved_cost')
+        .gte('entry_date', inicio)
+        .lt('entry_date', inicioMesCorrente)
+        .neq('status', 'Cancelado');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []).map((row: Record<string, unknown>) => ({
+        entry_date: row.entry_date != null ? (row.entry_date as string) : null,
         approved_cost: row.approved_cost != null ? Number(row.approved_cost) : null,
       }));
     },
@@ -379,6 +413,12 @@ export default function Dashboard() {
     [previousMaintenanceOrders]
   );
 
+  const projectedNextMonthCost = useMemo(() => {
+    const monthKeys = getTrailingMonthKeys(today, PROJECTION_TRAILING_MONTHS);
+    const monthlyTotals = sumApprovedCostByMonthKeys(costProjectionRows, monthKeys);
+    return calculateMovingAverageProjection(monthlyTotals);
+  }, [today, costProjectionRows]);
+
   const complianceRate = useMemo(
     () => calculateChecklistComplianceRate(vehicles.length, overdueChecklistVehicleIds.size),
     [vehicles.length, overdueChecklistVehicleIds.size]
@@ -445,6 +485,7 @@ export default function Dashboard() {
     loadingMaintenance ||
     loadingActiveMaintenance ||
     loadingPreviousMaintenance ||
+    loadingCostProjection ||
     loadingChecklists ||
     loadingDrivers;
 
@@ -556,6 +597,7 @@ export default function Dashboard() {
             vehicles={vehicles}
             maintenanceOrders={maintenanceOrders}
             previousPeriodCost={previousPeriodCost}
+            projectedNextMonthCost={projectedNextMonthCost}
             checklistRows={checklistRows}
             dateRange={dateRange}
             filters={filters}

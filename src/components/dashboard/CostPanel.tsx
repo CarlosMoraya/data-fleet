@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
-import { DollarSign, Truck, Gauge, Loader2, History } from 'lucide-react';
+import { DollarSign, Truck, Gauge, Loader2, History, TrendingUp } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
 import VehicleTypeBarChart from './VehicleTypeBarChart';
 import MaintenanceTypeDonutChart from './MaintenanceTypeDonutChart';
+import CostTrendChart from './CostTrendChart';
 import type { VehicleRow, DashboardFilters } from './OperationalPanel';
 import type { MaintenanceOrderDashboard } from '../../types/maintenance';
-import { calculateCostVariation } from '../../lib/dashboardKpi';
+import { calculateCostVariation, chooseTrendGranularity, buildCostTrendSeries } from '../../lib/dashboardKpi';
 
 const VEHICLE_TYPES = ['Passeio', 'Utilitário', 'Van', 'Moto', 'Vuc', 'Toco', 'Truck', 'Cavalo'];
 const MAINTENANCE_TYPES = ['Corretiva', 'Preventiva', 'Preditiva'] as const;
@@ -23,6 +24,7 @@ interface CostPanelProps {
   vehicles: VehicleRow[];
   maintenanceOrders: MaintenanceOrderDashboard[];
   previousPeriodCost: number;
+  projectedNextMonthCost: number | null;
   checklistRows: ChecklistRow[];
   dateRange: { from: string; to: string };
   filters: DashboardFilters;
@@ -34,6 +36,7 @@ export default function CostPanel({
   vehicles,
   maintenanceOrders,
   previousPeriodCost,
+  projectedNextMonthCost,
   checklistRows,
   dateRange,
   filters,
@@ -105,6 +108,13 @@ export default function CostPanel({
 
     return totalKm > 0 ? totalCost / totalKm : 0;
   }, [checklistRows, dateRange, filteredVehicles, totalCost]);
+
+  const granularity = chooseTrendGranularity(dateRange.from, dateRange.to);
+
+  const costTrendData = useMemo(
+    () => buildCostTrendSeries(filteredOrders, dateRange.from, dateRange.to, granularity),
+    [filteredOrders, dateRange.from, dateRange.to, granularity]
+  );
 
   // Bar chart: custo por tipo de veículo
   const costByTypeData = useMemo(() => {
@@ -230,7 +240,21 @@ export default function CostPanel({
           value={costPerKm > 0 ? formatCurrency(costPerKm) : '—'}
           subtitle="por KM rodado"
         />
+        <DashboardKpiCard
+          icon={TrendingUp}
+          iconBgClass="bg-orange-50"
+          iconColorClass="text-orange-500"
+          label="Projeção Próximo Mês"
+          value={projectedNextMonthCost != null ? formatCurrency(projectedNextMonthCost) : '—'}
+          subtitle="média móvel 3 meses"
+        />
       </div>
+
+      <CostTrendChart
+        data={costTrendData}
+        title="Evolução do Custo de Manutenção"
+        valueFormatter={formatCurrency}
+      />
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
