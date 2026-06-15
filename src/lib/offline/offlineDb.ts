@@ -79,11 +79,18 @@ export interface PhotoBlobEntry {
   capturedAt: number;
 }
 
+export interface VehicleDraftFileEntry {
+  key: string;
+  file: File;
+  savedAt: number;
+}
+
 // ─── Dexie database ───────────────────────────────────────────────────────────
 
 class OfflineDb extends Dexie {
   syncQueue!: Table<SyncQueueEntry, number>;
   photoBlobs!: Table<PhotoBlobEntry, string>;
+  vehicleDraftFiles!: Table<VehicleDraftFileEntry, string>;
 
   constructor() {
     super('betafleet-offline-v1');
@@ -95,6 +102,11 @@ class OfflineDb extends Dexie {
     this.version(2).stores({
       syncQueue: '++id, checklistId, inspectionId, status, createdAt',
       photoBlobs: 'key, checklistId',
+    });
+    this.version(3).stores({
+      syncQueue: '++id, checklistId, inspectionId, status, createdAt',
+      photoBlobs: 'key, checklistId',
+      vehicleDraftFiles: 'key',
     });
   }
 }

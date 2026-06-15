@@ -13,6 +13,7 @@ import { saveVehicle, deleteVehicle } from '../services/vehicleService';
 import type { VehicleFiles } from '../services/vehicleService';
 import { requiresClientSelection } from '../lib/clientScope';
 import SelectClientNotice from '../components/SelectClientNotice';
+import { clearVehicleDraftFiles } from '../lib/offline/vehicleDraftFiles';
 
 interface AvailableDriver {
   id: string;
@@ -52,6 +53,7 @@ export default function Vehicles() {
       return null;
     }
   });
+  const [restoredAfterReload] = useState(() => sessionStorage.getItem('vehicleFormOpen') === 'true');
 
   const [viewingVehicle, setViewingVehicle] = useState<Vehicle | null>(null);
 
@@ -168,6 +170,7 @@ export default function Vehicles() {
       sessionStorage.removeItem('vehicleFormOpen');
       sessionStorage.removeItem('vehicleFormEditing');
       sessionStorage.removeItem('vehicleFormData');
+      void clearVehicleDraftFiles();
     },
   });
 
@@ -228,6 +231,7 @@ export default function Vehicles() {
           <button
             onClick={() => {
               sessionStorage.removeItem('vehicleFormData');
+              void clearVehicleDraftFiles();
               sessionStorage.setItem('vehicleFormOpen', 'true');
               sessionStorage.removeItem('vehicleFormEditing');
               setEditingVehicle(null);
@@ -364,6 +368,7 @@ export default function Vehicles() {
                           <button
                             onClick={() => {
                               sessionStorage.removeItem('vehicleFormData'); // draft
+                              void clearVehicleDraftFiles();
                               sessionStorage.setItem('vehicleFormOpen', 'true');
                               sessionStorage.setItem('vehicleFormEditing', JSON.stringify(vehicle));
                               setEditingVehicle(vehicle);
@@ -415,6 +420,7 @@ export default function Vehicles() {
           availableDrivers={availableDrivers}
           availableShippers={availableShippers}
           availableOperationalUnits={availableOperationalUnits}
+          restoreFiles={restoredAfterReload}
           onClose={() => {
             setIsFormOpen(false);
             setEditingVehicle(null);

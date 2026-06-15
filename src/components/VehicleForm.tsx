@@ -14,6 +14,13 @@ import {
   filterAlphanumeric,
 } from '../lib/inputHelpers';
 import { extractCrlvData, ExtractionStatus, ExtractionResult } from '../lib/documentOcr';
+import {
+  saveVehicleDraftFile,
+  removeVehicleDraftFile,
+  loadVehicleDraftFiles,
+  clearVehicleDraftFiles,
+  type VehicleDraftFileKey,
+} from '../lib/offline/vehicleDraftFiles';
 
 interface VehicleFormFiles {
   crlv: File | null;
@@ -46,6 +53,7 @@ interface VehicleFormProps {
   availableDrivers: AvailableDriver[];
   availableShippers: AvailableShipper[];
   availableOperationalUnits: AvailableOperationalUnit[];
+  restoreFiles: boolean;
   onClose: () => void;
   onSave: (vehicle: Partial<Vehicle>, files: VehicleFormFiles) => Promise<void>;
 }
@@ -82,7 +90,7 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
   initialKm: filterDigitsOnly,
 };
 
-export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, availableShippers, availableOperationalUnits, onClose, onSave }: VehicleFormProps) {
+export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, availableShippers, availableOperationalUnits, restoreFiles, onClose, onSave }: VehicleFormProps) {
   const [formData, setFormData] = useState<Partial<Vehicle>>(() => {
     try {
       const savedData = sessionStorage.getItem('vehicleFormData');
@@ -132,6 +140,20 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
   useEffect(() => {
     sessionStorage.setItem('vehicleFormData', JSON.stringify(formData));
   }, [formData]);
+
+  useEffect(() => {
+    if (!restoreFiles) return;
+    let cancelled = false;
+    loadVehicleDraftFiles().then(files => {
+      if (cancelled) return;
+      if (files.crlv) setSelectedCrlvFile(files.crlv);
+      if (files.sanitaryInspection) setSelectedSanitaryFile(files.sanitaryInspection);
+      if (files.gr) setSelectedGRFile(files.gr);
+      if (files.insurancePolicy) setSelectedInsurancePolicyFile(files.insurancePolicy);
+      if (files.maintenanceContract) setSelectedMaintenanceContractFile(files.maintenanceContract);
+    });
+    return () => { cancelled = true; };
+  }, [restoreFiles]);
 
   // Auto-initialize first axle (always direcional) when eixos is set and no config yet
   useEffect(() => {
@@ -205,19 +227,22 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     }
   };
 
-  const makeFileHandler = (setter: React.Dispatch<React.SetStateAction<File | null>>) =>
+  const makeFileHandler = (setter: React.Dispatch<React.SetStateAction<File | null>>, key: VehicleDraftFileKey) =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0] ?? null;
       if (!file) {
         setter(null);
+        void removeVehicleDraftFile(key);
         return;
       }
       try {
         validateFile(file);
         setter(file);
         setError(null);
+        void saveVehicleDraftFile(key, file);
       } catch (err: unknown) {
         setter(null);
+        void removeVehicleDraftFile(key);
         setError((err as Error).message);
         e.target.value = '';
       }
@@ -227,12 +252,14 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     const file = e.target.files?.[0] ?? null;
     if (!file) {
       setSelectedCrlvFile(null);
+      void removeVehicleDraftFile('crlv');
       return;
     }
     try {
       validateFile(file);
       setSelectedCrlvFile(file);
       setError(null);
+      void saveVehicleDraftFile('crlv', file);
       setCrlvExtractionStatus('extracting');
       setCrlvExtractionResult(null);
       const result = await extractCrlvData(file);
@@ -260,14 +287,15 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
       }
     } catch (err: unknown) {
       setSelectedCrlvFile(null);
+      void removeVehicleDraftFile('crlv');
       setError((err as Error).message);
       e.target.value = '';
     }
   };
-  const handleSanitaryFileChange = makeFileHandler(setSelectedSanitaryFile);
-  const handleGRFileChange = makeFileHandler(setSelectedGRFile);
-  const handleInsurancePolicyFileChange = makeFileHandler(setSelectedInsurancePolicyFile);
-  const handleMaintenanceContractFileChange = makeFileHandler(setSelectedMaintenanceContractFile);
+  const handleSanitaryFileChange = makeFileHandler(setSelectedSanitaryFile, 'sanitaryInspection');
+  const handleGRFileChange = makeFileHandler(setSelectedGRFile, 'gr');
+  const handleInsurancePolicyFileChange = makeFileHandler(setSelectedInsurancePolicyFile, 'insurancePolicy');
+  const handleMaintenanceContractFileChange = makeFileHandler(setSelectedMaintenanceContractFile, 'maintenanceContract');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -333,6 +361,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     sessionStorage.removeItem('vehicleFormOpen');
     sessionStorage.removeItem('vehicleFormEditing');
     sessionStorage.removeItem('vehicleFormData');
+    void clearVehicleDraftFiles();
     onClose();
   };
 
