@@ -2,6 +2,17 @@
 
 Este arquivo registra o progresso atual, pendências e a visão de curto prazo para o desenvolvimento.
 
+## 🆕 Atualização de Sessão (14/06/2026) — Bugfix: subtítulo do card "Documentos a Vencer (30d)" não mencionava CRLV
+
+Bug corrigido: subtítulo do card "Documentos a Vencer (30d)" (Dashboard › Visão Geral) não mencionava CRLV, embora o cálculo o inclua.
+Causa raiz: prop subtitle hardcoded em OverviewPanel.tsx defasada em relação ao cálculo de expiringSoonDocsCount (Dashboard.tsx), que soma CNH + GR + CRLV.
+Correção aplicada: subtítulo alterado para "CRLV + CNH + GR nos próximos 30 dias".
+Arquivos modificados: src/components/dashboard/OverviewPanel.tsx
+Testes adicionados: src/components/dashboard/OverviewPanel.test.tsx
+Validações executadas: npm run lint ✅; npm run test:unit ✅ (291 testes, +1 novo).
+
+---
+
 ## 🆕 Atualização de Sessão (14/06/2026) — Bugfix: card "CRLVs Vencidos" divergia sob filtro de tipo
 
 Bug corrigido: card "CRLVs Vencidos" da aba Operação divergia da Visão Geral sob filtro por tipo de veículo

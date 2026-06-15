@@ -133,7 +133,7 @@ export default function OverviewPanel({
           iconColorClass="text-orange-600"
           label="Documentos a Vencer (30d)"
           value={expiringSoonDocsCount}
-          subtitle="CNH + GR nos próximos 30 dias"
+          subtitle="CRLV + CNH + GR nos próximos 30 dias"
           isAlert
         />
       </div>
