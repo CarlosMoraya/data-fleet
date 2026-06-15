@@ -19,6 +19,9 @@ import {
   getExpiredCrlvPlates,
   getExpiringSoonCrlvPlates,
   getExpiredCnhNames,
+  getExpiringSoonCnhNames,
+  getExpiringSoonGrPlates,
+  getExpiringSoonGrDriverNames,
   chooseTrendGranularity,
   buildCostTrendSeries,
   getTrailingMonthKeys,
@@ -298,6 +301,139 @@ describe('buildActionQueue', () => {
     expect(result[1].category).toBe('crlv_expiring');
     expect(result[1].severity).toBe('medium');
     expect(result[1].details).toEqual(['XYZ9A87']);
+  });
+
+  it('inclui os novos itens medium após os medium pré-existentes e preserva a ordem relativa', () => {
+    const result = buildActionQueue({
+      checklist: ['AAA1A11'],
+      crlv: [],
+      crlvExpiring: ['BBB2B22'],
+      cnh: [],
+      osOverdue: [],
+      osPendingApproval: ['CCC3C33'],
+      cnhExpiring: ['Maria Souza'],
+      grVehicleExpiring: ['DDD4D44'],
+      grDriverExpiring: ['João Lima'],
+    });
+
+    expect(result.map((item) => item.category)).toEqual([
+      'checklist',
+      'crlv_expiring',
+      'os_pending_approval',
+      'cnh_expiring',
+      'gr_vehicle_expiring',
+      'gr_driver_expiring',
+    ]);
+    expect(result.slice(1).every((item) => item.severity === 'medium')).toBe(true);
+    expect(result[3].count).toBe(result[3].details.length);
+    expect(result[4].count).toBe(result[4].details.length);
+    expect(result[5].count).toBe(result[5].details.length);
+  });
+
+  it('mantém comportamento neutro quando os novos campos são omitidos', () => {
+    const result = buildActionQueue({
+      checklist: [],
+      crlv: ['ABC1D23'],
+      crlvExpiring: ['XYZ9A87'],
+      cnh: [],
+      osOverdue: [],
+      osPendingApproval: [],
+    });
+
+    expect(result).toEqual([
+      {
+        category: 'crlv',
+        label: 'Veículos com CRLV vencido',
+        count: 1,
+        severity: 'high',
+        details: ['ABC1D23'],
+      },
+      {
+        category: 'crlv_expiring',
+        label: 'Veículos com CRLV a vencer (30d)',
+        count: 1,
+        severity: 'medium',
+        details: ['XYZ9A87'],
+      },
+    ]);
+  });
+
+  it('não inclui novos itens quando as listas opcionais estão vazias', () => {
+    const result = buildActionQueue({
+      checklist: [],
+      crlv: [],
+      crlvExpiring: [],
+      cnh: [],
+      osOverdue: [],
+      osPendingApproval: [],
+      cnhExpiring: [],
+      grVehicleExpiring: [],
+      grDriverExpiring: [],
+    });
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe('expiring soon extractors', () => {
+  it('getExpiringSoonCnhNames includes names within the window and on the exact limit', () => {
+    const result = getExpiringSoonCnhNames([
+      { name: 'Maria Souza', expiration_date: '2026-07-15' },
+      { name: 'João Lima', expiration_date: '2026-06-20' },
+    ], '2026-06-15', 30);
+
+    expect(result).toEqual(['Maria Souza', 'João Lima']);
+  });
+
+  it('getExpiringSoonCnhNames excludes expired, null, unnamed and beyond-window entries', () => {
+    const result = getExpiringSoonCnhNames([
+      { name: 'Expirada', expiration_date: '2026-06-14' },
+      { name: 'Fora da janela', expiration_date: '2026-07-16' },
+      { name: null, expiration_date: '2026-06-20' },
+      { name: 'Sem data', expiration_date: null },
+    ], '2026-06-15', 30);
+
+    expect(result).toEqual([]);
+  });
+
+  it('getExpiringSoonGrPlates includes plates within the window and on the exact limit', () => {
+    const result = getExpiringSoonGrPlates([
+      { license_plate: 'ABC1D23', gr_expiration_date: '2026-06-20' },
+      { license_plate: 'XYZ9A87', gr_expiration_date: '2026-07-15' },
+    ], '2026-06-15', 30);
+
+    expect(result).toEqual(['ABC1D23', 'XYZ9A87']);
+  });
+
+  it('getExpiringSoonGrPlates excludes expired, null, plate-less and beyond-window entries', () => {
+    const result = getExpiringSoonGrPlates([
+      { license_plate: 'OLD1A11', gr_expiration_date: '2026-06-14' },
+      { license_plate: 'FAR2B22', gr_expiration_date: '2026-07-16' },
+      { license_plate: null, gr_expiration_date: '2026-06-20' },
+      { license_plate: 'NON3C33', gr_expiration_date: null },
+    ], '2026-06-15', 30);
+
+    expect(result).toEqual([]);
+  });
+
+  it('getExpiringSoonGrDriverNames includes names within the window and on the exact limit', () => {
+    const result = getExpiringSoonGrDriverNames([
+      { name: 'Carlos Dias', gr_expiration_date: '2026-06-25' },
+      { name: 'Ana Lima', gr_expiration_date: '2026-07-15' },
+    ], '2026-06-15', 30);
+
+    expect(result).toEqual(['Carlos Dias', 'Ana Lima']);
+  });
+
+  it('getExpiringSoonGrDriverNames excludes expired, null, unnamed and beyond-window entries', () => {
+    const result = getExpiringSoonGrDriverNames([
+      { name: 'Expirado', gr_expiration_date: '2026-06-14' },
+      { name: 'Fora da janela', gr_expiration_date: '2026-07-16' },
+      { name: null, gr_expiration_date: '2026-06-20' },
+      { name: 'Sem data', gr_expiration_date: null },
+    ], '2026-06-15', 30);
+
+    expect(result).toEqual([]);
   });
 });
 

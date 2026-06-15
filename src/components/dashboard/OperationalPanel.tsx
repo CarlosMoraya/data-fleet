@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Truck, Wrench, CalendarDays, FileWarning, UserX, Loader2, Clock, Hourglass, CalendarClock } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
+import ActionQueue from './ActionQueue';
 import VehicleTypeBarChart from './VehicleTypeBarChart';
 import MaintenanceTypeDonutChart from './MaintenanceTypeDonutChart';
 import {
@@ -45,6 +46,7 @@ interface OperationalPanelProps {
   expiredCnhCount: number;
   overdueOrdersCount: number;
   expiringSoonDocsCount: number;
+  actionItems: ActionItem[];
   filters: DashboardFilters;
   onFiltersChange: (f: DashboardFilters) => void;
   onActionClick?: (category: ActionItem['category']) => void;
@@ -60,6 +62,7 @@ export default function OperationalPanel({
   expiredCnhCount,
   overdueOrdersCount,
   expiringSoonDocsCount,
+  actionItems,
   filters,
   onFiltersChange,
   onActionClick,
@@ -199,6 +202,8 @@ export default function OperationalPanel({
           />
         </div>
       </div>
+
+      <ActionQueue items={actionItems} onItemClick={onActionClick} />
 
       <div className="space-y-4">
         <div>

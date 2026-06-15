@@ -54,7 +54,7 @@ export function buildActiveMaintenanceTypeData(
 export type ActionSeverity = 'high' | 'medium';
 
 export interface ActionItem {
-  category: 'checklist' | 'crlv' | 'crlv_expiring' | 'cnh' | 'os_overdue' | 'os_pending_approval';
+  category: 'checklist' | 'crlv' | 'crlv_expiring' | 'cnh' | 'cnh_expiring' | 'os_overdue' | 'os_pending_approval' | 'gr_vehicle_expiring' | 'gr_driver_expiring';
   label: string;
   count: number;
   severity: ActionSeverity;
@@ -163,6 +163,11 @@ export function countPendingApprovalOrders(
   return orders.filter((o) => o.status === 'Aguardando aprovação').length;
 }
 
+export function isWithinExpiryWindow(date: string | null, todayIso: string, windowDays: number): boolean {
+  if (date == null || date < todayIso) return false;
+  return Math.floor((new Date(date).getTime() - new Date(todayIso).getTime()) / 86400000) <= windowDays;
+}
+
 export function buildActionQueue(input: {
   checklist: string[];
   crlv: string[];
@@ -170,7 +175,13 @@ export function buildActionQueue(input: {
   cnh: string[];
   osOverdue: string[];
   osPendingApproval: string[];
+  cnhExpiring?: string[];
+  grVehicleExpiring?: string[];
+  grDriverExpiring?: string[];
 }): ActionItem[] {
+  const cnhExpiring = input.cnhExpiring ?? [];
+  const grVehicleExpiring = input.grVehicleExpiring ?? [];
+  const grDriverExpiring = input.grDriverExpiring ?? [];
   const items: ActionItem[] = [
     { category: 'checklist', label: 'Veículos com checklist vencido', count: input.checklist.length, severity: 'high', details: input.checklist },
     { category: 'crlv', label: 'Veículos com CRLV vencido', count: input.crlv.length, severity: 'high', details: input.crlv },
@@ -178,6 +189,9 @@ export function buildActionQueue(input: {
     { category: 'cnh', label: 'Motoristas com CNH vencida', count: input.cnh.length, severity: 'high', details: input.cnh },
     { category: 'os_overdue', label: 'OS com prazo de saída vencido', count: input.osOverdue.length, severity: 'high', details: input.osOverdue },
     { category: 'os_pending_approval', label: 'OS aguardando aprovação', count: input.osPendingApproval.length, severity: 'medium', details: input.osPendingApproval },
+    { category: 'cnh_expiring', label: 'Motoristas com CNH a vencer (30d)', count: cnhExpiring.length, severity: 'medium', details: cnhExpiring },
+    { category: 'gr_vehicle_expiring', label: 'Veículos com GR a vencer (30d)', count: grVehicleExpiring.length, severity: 'medium', details: grVehicleExpiring },
+    { category: 'gr_driver_expiring', label: 'Motoristas com GR a vencer (30d)', count: grDriverExpiring.length, severity: 'medium', details: grDriverExpiring },
   ];
 
   return items
@@ -306,6 +320,36 @@ export function getExpiredCnhNames(
 ): string[] {
   return drivers
     .filter((driver) => driver.expiration_date != null && driver.expiration_date < todayIso && driver.name)
+    .map((driver) => driver.name as string);
+}
+
+export function getExpiringSoonCnhNames(
+  drivers: { name: string | null; expiration_date: string | null }[],
+  todayIso: string,
+  windowDays: number
+): string[] {
+  return drivers
+    .filter((driver) => isWithinExpiryWindow(driver.expiration_date, todayIso, windowDays) && driver.name)
+    .map((driver) => driver.name as string);
+}
+
+export function getExpiringSoonGrPlates(
+  vehicles: Pick<VehicleRow, 'license_plate' | 'gr_expiration_date'>[],
+  todayIso: string,
+  windowDays: number
+): string[] {
+  return vehicles
+    .filter((vehicle) => isWithinExpiryWindow(vehicle.gr_expiration_date ?? null, todayIso, windowDays) && vehicle.license_plate)
+    .map((vehicle) => vehicle.license_plate as string);
+}
+
+export function getExpiringSoonGrDriverNames(
+  drivers: { name: string | null; gr_expiration_date: string | null }[],
+  todayIso: string,
+  windowDays: number
+): string[] {
+  return drivers
+    .filter((driver) => isWithinExpiryWindow(driver.gr_expiration_date, todayIso, windowDays) && driver.name)
     .map((driver) => driver.name as string);
 }
 

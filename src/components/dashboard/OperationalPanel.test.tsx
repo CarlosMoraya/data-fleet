@@ -62,6 +62,7 @@ const baseProps = {
   expiredCnhCount: 0,
   overdueOrdersCount: 0,
   expiringSoonDocsCount: 0,
+  actionItems: [],
   onFiltersChange: (_f: DashboardFilters) => {},
 };
 
@@ -361,5 +362,78 @@ describe('OperationalPanel — ordem de prioridade dos gráficos', () => {
       'Frota por Tipo de Veículo',
       'Manutenções por Tipo',
     ]);
+  });
+});
+
+describe('OperationalPanel — fila operacional', () => {
+  it('renders action queue item labels when actionItems are provided', () => {
+    renderWithAct(
+      <OperationalPanel
+        {...baseProps}
+        vehicles={[]}
+        filters={{ vehicleType: null, maintenanceType: null }}
+        expiredCrlvCount={0}
+        actionItems={[
+          {
+            category: 'gr_vehicle_expiring',
+            label: 'Veículos com GR a vencer (30d)',
+            count: 1,
+            severity: 'medium',
+            details: ['ABC1D23'],
+          },
+        ]}
+      />
+    );
+
+    expect(container.textContent).toContain('Veículos com GR a vencer (30d)');
+  });
+
+  it('clicking an action queue item calls onActionClick with its category', () => {
+    const onActionClick = vi.fn();
+
+    renderWithAct(
+      <OperationalPanel
+        {...baseProps}
+        vehicles={[]}
+        filters={{ vehicleType: null, maintenanceType: null }}
+        expiredCrlvCount={0}
+        onActionClick={onActionClick}
+        actionItems={[
+          {
+            category: 'gr_vehicle_expiring',
+            label: 'Veículos com GR a vencer (30d)',
+            count: 1,
+            severity: 'medium',
+            details: ['ABC1D23'],
+          },
+        ]}
+      />
+    );
+
+    const button = Array.from(container.querySelectorAll('button')).find(
+      (node) => node.textContent?.includes('Veículos com GR a vencer (30d)')
+    );
+
+    expect(button).toBeTruthy();
+
+    act(() => {
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onActionClick).toHaveBeenCalledWith('gr_vehicle_expiring');
+  });
+
+  it('renders the empty action queue state when actionItems is empty', () => {
+    renderWithAct(
+      <OperationalPanel
+        {...baseProps}
+        vehicles={[]}
+        filters={{ vehicleType: null, maintenanceType: null }}
+        expiredCrlvCount={0}
+        actionItems={[]}
+      />
+    );
+
+    expect(container.textContent).toContain('Nenhuma ação crítica pendente. Frota em dia.');
   });
 });

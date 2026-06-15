@@ -4,6 +4,18 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 
 ## Arquivamento — 2026-06-14
 
+## 🆕 Atualização de Sessão (15/06/2026) — Fila operacional acionável na aba Operação
+
+Feature implementada: a aba "Operação" do Dashboard passou a exibir uma Fila de Ação acionável, reaproveitando `ActionQueue` e `buildActionQueue`, com novos itens de CNH/GR a vencer e navegação própria para aprovação de orçamentos.
+Mudanças aplicadas:
+- `src/lib/dashboardKpi.ts`: `ActionItem.category` ampliado com `cnh_expiring`, `gr_vehicle_expiring` e `gr_driver_expiring`; adicionados `isWithinExpiryWindow`, `getExpiringSoonCnhNames`, `getExpiringSoonGrPlates` e `getExpiringSoonGrDriverNames`; `buildActionQueue` estendido com parâmetros opcionais e três novos itens `medium`, preservando o comportamento da Visão Geral quando omitidos.
+- `src/lib/dashboardKpi.test.ts`: adicionados testes dos novos extratores, do comportamento neutro de `buildActionQueue` e da ordem relativa dos novos itens `medium`.
+- `src/lib/operationalActionRoutes.ts` e `src/lib/operationalActionRoutes.test.ts`: criado mapa exaustivo categoria → rota para a fila operacional, com `os_pending_approval` direcionando para `/aprovacao-orcamentos`.
+- `src/components/dashboard/OperationalPanel.tsx`: aba Operação passou a receber `actionItems` e renderizar `ActionQueue` abaixo de "Resolver agora" e acima de "Panorama operacional", sem alterar cards, filtros ou gráficos.
+- `src/components/dashboard/OperationalPanel.test.tsx`: adicionados testes cobrindo render da fila, clique em item da fila e estado vazio, mantendo os testes existentes do painel.
+- `src/pages/Dashboard.tsx`: criada a memo `operationalActionItems` com CNH/GR a vencer; adicionada navegação da fila operacional baseada em `OPERATIONAL_ACTION_ROUTES`; a Visão Geral foi mantida intacta, incluindo `os_pending_approval` → `/manutencao`.
+Validações executadas: `npm run lint` ✅; `npm run test:unit` ✅ (`314` testes passando); `npm run test:smoke` ✅ (`6` testes passando).
+
 ## 🆕 Atualização de Sessão (15/06/2026) — Reordenação dos gráficos da aba Operação por prioridade operacional
 
 Feature implementada: gráficos da aba "Operação" do Dashboard foram reordenados para priorizar leitura de gargalo operacional na primeira dobra.

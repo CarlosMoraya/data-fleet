@@ -24,12 +24,16 @@ import {
   getExpiredCrlvPlates,
   getExpiringSoonCrlvPlates,
   getExpiredCnhNames,
+  getExpiringSoonCnhNames,
+  getExpiringSoonGrPlates,
+  getExpiringSoonGrDriverNames,
   getTrailingMonthKeys,
   sumApprovedCostByMonthKeys,
   calculateMovingAverageProjection,
   computeOverdueChecklistVehicleIds,
   type ActionItem,
 } from '../lib/dashboardKpi';
+import { OPERATIONAL_ACTION_ROUTES } from '../lib/operationalActionRoutes';
 
 type TabType = 'geral' | 'operacional' | 'custos';
 const EXPIRING_SOON_WINDOW_DAYS = 30;
@@ -423,6 +427,34 @@ export default function Dashboard() {
     [drivers, today, vehicles]
   );
 
+  const overdueOrderPlates = useMemo(
+    () =>
+      mapVehicleIdsToPlates(
+        activeMaintenanceOrders
+          .filter(
+            (order) =>
+              order.status !== 'Concluído' &&
+              order.status !== 'Cancelado' &&
+              order.expected_exit_date != null &&
+              order.expected_exit_date < today
+          )
+          .map((order) => order.vehicle_id),
+        plateByVehicleId
+      ),
+    [activeMaintenanceOrders, plateByVehicleId, today]
+  );
+
+  const pendingApprovalPlates = useMemo(
+    () =>
+      mapVehicleIdsToPlates(
+        activeMaintenanceOrders
+          .filter((order) => order.status === 'Aguardando aprovação')
+          .map((order) => order.vehicle_id),
+        plateByVehicleId
+      ),
+    [activeMaintenanceOrders, plateByVehicleId]
+  );
+
   const actionItems = useMemo(
     () =>
       buildActionQueue({
@@ -430,26 +462,26 @@ export default function Dashboard() {
         crlv: getExpiredCrlvPlates(vehicles, currentYear, today),
         crlvExpiring: getExpiringSoonCrlvPlates(vehicles, today, EXPIRING_SOON_WINDOW_DAYS),
         cnh: getExpiredCnhNames(drivers, today),
-        osOverdue: mapVehicleIdsToPlates(
-          activeMaintenanceOrders
-            .filter(
-              (order) =>
-                order.status !== 'Concluído' &&
-                order.status !== 'Cancelado' &&
-                order.expected_exit_date != null &&
-                order.expected_exit_date < today
-            )
-            .map((order) => order.vehicle_id),
-          plateByVehicleId
-        ),
-        osPendingApproval: mapVehicleIdsToPlates(
-          activeMaintenanceOrders
-            .filter((order) => order.status === 'Aguardando aprovação')
-            .map((order) => order.vehicle_id),
-          plateByVehicleId
-        ),
+        osOverdue: overdueOrderPlates,
+        osPendingApproval: pendingApprovalPlates,
       }),
-    [activeMaintenanceOrders, currentYear, drivers, overdueChecklistVehicleIds, plateByVehicleId, today, vehicles]
+    [currentYear, drivers, overdueChecklistVehicleIds, overdueOrderPlates, pendingApprovalPlates, plateByVehicleId, today, vehicles]
+  );
+
+  const operationalActionItems = useMemo(
+    () =>
+      buildActionQueue({
+        checklist: mapVehicleIdsToPlates([...overdueChecklistVehicleIds], plateByVehicleId),
+        crlv: getExpiredCrlvPlates(vehicles, currentYear, today),
+        crlvExpiring: getExpiringSoonCrlvPlates(vehicles, today, EXPIRING_SOON_WINDOW_DAYS),
+        cnh: getExpiredCnhNames(drivers, today),
+        osOverdue: overdueOrderPlates,
+        osPendingApproval: pendingApprovalPlates,
+        cnhExpiring: getExpiringSoonCnhNames(drivers, today, EXPIRING_SOON_WINDOW_DAYS),
+        grVehicleExpiring: getExpiringSoonGrPlates(vehicles, today, EXPIRING_SOON_WINDOW_DAYS),
+        grDriverExpiring: getExpiringSoonGrDriverNames(drivers, today, EXPIRING_SOON_WINDOW_DAYS),
+      }),
+    [currentYear, drivers, overdueChecklistVehicleIds, overdueOrderPlates, pendingApprovalPlates, plateByVehicleId, today, vehicles]
   );
 
   const handleActionClick = (category: ActionItem['category']) => {
@@ -458,10 +490,17 @@ export default function Dashboard() {
       crlv: '/cadastros/veiculos',
       crlv_expiring: '/cadastros/veiculos',
       cnh: '/cadastros/motoristas',
+      cnh_expiring: '/cadastros/motoristas',
       os_overdue: '/manutencao',
       os_pending_approval: '/manutencao',
+      gr_vehicle_expiring: '/cadastros/veiculos',
+      gr_driver_expiring: '/cadastros/motoristas',
     };
     navigate(routes[category]);
+  };
+
+  const handleOperationalActionClick = (category: ActionItem['category']) => {
+    navigate(OPERATIONAL_ACTION_ROUTES[category]);
   };
 
   // ── Loading state ─────────────────────────────────────────────────────────
@@ -576,9 +615,10 @@ export default function Dashboard() {
             expiredCnhCount={expiredCnhCount}
             overdueOrdersCount={overdueOrdersCount}
             expiringSoonDocsCount={expiringSoonDocsCount}
+            actionItems={operationalActionItems}
             filters={filters}
             onFiltersChange={setFilters}
-            onActionClick={handleActionClick}
+            onActionClick={handleOperationalActionClick}
             isLoading={isPanelLoading}
           />
         )}
