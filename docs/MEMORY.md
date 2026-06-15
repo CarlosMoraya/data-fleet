@@ -9,25 +9,22 @@ Este arquivo registra apenas o estado vigente, as frentes ativas e os próximos 
 - **Checklists**: infraestrutura offline-first ativa, com templates versionados e smoke oficial definido.
 - **Pneus**: módulo funcional com inspeções, configuração de eixos e histórico.
 - **Oficinas**: modelo de parceria multi-tenant ativo.
-- **Dashboard Executivo**: 3 abas em produção (`Visão Geral`, `Operação`, `Custos`), com tendência histórica de custo, projeção financeira e métricas documentais incluindo CRLV.
+- **Dashboard Executivo**: 3 abas em produção (`Visão Geral`, `Operação`, `Custos`), com tendência histórica de custo, projeção financeira, métricas documentais incluindo CRLV e cards de KPI com título em até 2 linhas; na aba Operação, os cards usam os textos "Tempo médio de OS" e "Idade média de OS abertas".
 
 ## Tarefas em Andamento
 
-1. **Dashboard — aba Operação**:
-   - Evolução em curso para painel de exceções operacionais ("Resolver agora" + "Panorama operacional"), conforme `IMPLEMENTATION.md` de 2026-06-14.
-2. **Estabilização E2E de Inspeção de Pneus**:
+1. **Estabilização E2E de Inspeção de Pneus**:
    - Persistem ajustes de timing e seed em fluxos de movimentação e perfis de teste.
-3. **Migração incremental para React Query**:
+2. **Migração incremental para React Query**:
    - Restam páginas menores ainda usando estado local.
-4. **Acessibilidade**:
+3. **Acessibilidade**:
    - Revisão pendente de `aria-labels` em modais e tabelas.
 
 ## Próximos Passos
 
-1. Concluir a evolução da aba **Operação** e validar com `npm run lint` + `npm run test:unit`.
-2. Retomar os E2Es pendentes de inspeção de pneus após estabilização de seed/timing.
-3. Avaliar notificações de vencimento (CRLV/CNH) via Edge Functions.
-4. Considerar backfill futuro de `crlv_expiration_date` para veículos legados, se houver demanda.
+1. Retomar os E2Es pendentes de inspeção de pneus após estabilização de seed/timing.
+2. Avaliar notificações de vencimento (CRLV/CNH) via Edge Functions.
+3. Considerar backfill futuro de `crlv_expiration_date` para veículos legados, se houver demanda.
 
 ## Decisões Vigentes
 

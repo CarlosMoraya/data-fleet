@@ -259,3 +259,50 @@ describe('OperationalPanel — CRLVs Vencidos under vehicle type filter', () => 
     expect(label?.parentElement?.parentElement?.tagName).not.toBe('BUTTON');
   });
 });
+
+describe('OperationalPanel — legibilidade dos títulos de KPI', () => {
+  it('renders the shortened title "Tempo médio de OS"', () => {
+    renderWithAct(
+      <OperationalPanel
+        {...baseProps}
+        vehicles={[]}
+        filters={{ vehicleType: null, maintenanceType: null }}
+        expiredCrlvCount={0}
+      />
+    );
+
+    expect(findCardValueByLabel('Tempo médio de OS')).toBe('—');
+  });
+
+  it('renders the shortened title "Idade média de OS abertas"', () => {
+    renderWithAct(
+      <OperationalPanel
+        {...baseProps}
+        vehicles={[]}
+        filters={{ vehicleType: null, maintenanceType: null }}
+        expiredCrlvCount={0}
+      />
+    );
+
+    expect(findCardValueByLabel('Idade média de OS abertas')).toBe('—');
+  });
+
+  it('applies line-clamp-2 to KPI labels instead of truncate', () => {
+    renderWithAct(
+      <OperationalPanel
+        {...baseProps}
+        vehicles={[]}
+        filters={{ vehicleType: null, maintenanceType: null }}
+        expiredCrlvCount={0}
+      />
+    );
+
+    const label = Array.from(container.querySelectorAll('p')).find(
+      (node) => node.textContent === 'Tempo médio de OS'
+    );
+
+    expect(label).toBeTruthy();
+    expect(label?.classList.contains('line-clamp-2')).toBe(true);
+    expect(label?.classList.contains('truncate')).toBe(false);
+  });
+});

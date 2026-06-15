@@ -53,7 +53,7 @@ export default function DashboardKpiCard({
         />
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-medium text-zinc-500 truncate">{label}</p>
+        <p className="text-sm font-medium text-zinc-500 line-clamp-2">{label}</p>
         <p
           className={cn(
             isMuted ? 'text-xl font-semibold' : 'text-2xl font-semibold',

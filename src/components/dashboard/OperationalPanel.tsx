@@ -226,7 +226,7 @@ export default function OperationalPanel({
             icon={Clock}
             iconBgClass="bg-sky-50"
             iconColorClass="text-sky-600"
-            label="Tempo Médio em Manutenção"
+            label="Tempo médio de OS"
             value={avgMaintenanceDays != null ? `${avgMaintenanceDays} dias` : '—'}
             subtitle="OS concluídas no período"
             variant="muted"
@@ -235,7 +235,7 @@ export default function OperationalPanel({
             icon={Hourglass}
             iconBgClass="bg-violet-50"
             iconColorClass="text-violet-600"
-            label="Permanência Média de OS Abertas"
+            label="Idade média de OS abertas"
             value={avgOpenOrderAgeDays != null ? `${avgOpenOrderAgeDays} dias` : '—'}
             subtitle="OS ainda abertas"
             variant="muted"

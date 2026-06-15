@@ -4,6 +4,15 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 
 ## Arquivamento — 2026-06-14
 
+## 🆕 Atualização de Sessão (14/06/2026) — Legibilidade dos cards de KPI do Dashboard
+
+Feature implementada: títulos dos cards de KPI passam a renderizar em até 2 linhas no componente compartilhado, com ajuste de microcopy em dois cards da aba Operação.
+Mudanças aplicadas:
+- `src/components/dashboard/DashboardKpiCard.tsx`: `label` alterado de `truncate` para `line-clamp-2`; `subtitle` mantido com `truncate`.
+- `src/components/dashboard/OperationalPanel.tsx`: textos ajustados para `Tempo médio de OS` e `Idade média de OS abertas`.
+- `src/components/dashboard/OperationalPanel.test.tsx`: adicionados 3 testes cobrindo os novos títulos e um guardião da classe `line-clamp-2`.
+Validações executadas: `npm run lint` ✅; `npm run test:unit` ✅ (299 testes, +3 novos); `npm run test:smoke` ✅ (6 testes).
+
 # MEMORY - Estado Atual do Projeto
 
 Este arquivo registra o progresso atual, pendências e a visão de curto prazo para o desenvolvimento.
