@@ -574,8 +574,11 @@ export default function Dashboard() {
             overdueChecklistVehicleIds={overdueChecklistVehicleIds}
             expiredCrlvCount={expiredCrlvCount}
             expiredCnhCount={expiredCnhCount}
+            overdueOrdersCount={overdueOrdersCount}
+            expiringSoonDocsCount={expiringSoonDocsCount}
             filters={filters}
             onFiltersChange={setFilters}
+            onActionClick={handleActionClick}
             isLoading={isPanelLoading}
           />
         )}

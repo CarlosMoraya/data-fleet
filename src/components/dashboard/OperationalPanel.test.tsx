@@ -39,9 +39,13 @@ function renderWithAct(ui: React.ReactElement) {
 const noOrders: MaintenanceOrderDashboard[] = [];
 
 function findCrlvCardValue(): string | null {
+  return findCardValueByLabel('CRLVs Vencidos');
+}
+
+function findCardValueByLabel(label: string): string | null {
   const allP = container.querySelectorAll('p');
   for (const p of allP) {
-    if (p.textContent === 'CRLVs Vencidos') {
+    if (p.textContent === label) {
       const valueEl = p.nextElementSibling;
       return valueEl?.textContent ?? null;
     }
@@ -54,6 +58,8 @@ const baseProps = {
   activeMaintenanceOrders: noOrders,
   overdueChecklistVehicleIds: new Set<string>(),
   expiredCnhCount: 0,
+  overdueOrdersCount: 0,
+  expiringSoonDocsCount: 0,
   onFiltersChange: (_f: DashboardFilters) => {},
 };
 
@@ -156,5 +162,100 @@ describe('OperationalPanel — CRLVs Vencidos under vehicle type filter', () => 
     );
 
     expect(findCrlvCardValue()).toBe('3');
+  });
+
+  it('renders OS em Atraso value from overdueOrdersCount prop', () => {
+    renderWithAct(
+      <OperationalPanel
+        {...baseProps}
+        vehicles={[]}
+        filters={{ vehicleType: null, maintenanceType: null }}
+        expiredCrlvCount={0}
+        overdueOrdersCount={4}
+      />
+    );
+
+    expect(findCardValueByLabel('OS em Atraso')).toBe('4');
+  });
+
+  it('renders Documentos a Vencer value from expiringSoonDocsCount prop', () => {
+    renderWithAct(
+      <OperationalPanel
+        {...baseProps}
+        vehicles={[]}
+        filters={{ vehicleType: null, maintenanceType: null }}
+        expiredCrlvCount={0}
+        expiringSoonDocsCount={7}
+      />
+    );
+
+    expect(findCardValueByLabel('Documentos a Vencer (30d)')).toBe('7');
+  });
+
+  it('exception cards render before neutral cards', () => {
+    renderWithAct(
+      <OperationalPanel
+        vehicles={[]}
+        filters={{ vehicleType: null, maintenanceType: null }}
+        expiredCrlvCount={0}
+        {...baseProps}
+      />
+    );
+
+    const labels = Array.from(container.querySelectorAll('p'))
+      .map((node) => node.textContent)
+      .filter((text): text is string => text != null);
+
+    expect(labels.indexOf('OS em Atraso')).toBeGreaterThanOrEqual(0);
+    expect(labels.indexOf('Total de Veículos')).toBeGreaterThanOrEqual(0);
+    expect(labels.indexOf('OS em Atraso')).toBeLessThan(labels.indexOf('Total de Veículos'));
+  });
+
+  it('clicking an exception card calls onActionClick with its category', () => {
+    const onActionClick = vi.fn();
+
+    renderWithAct(
+      <OperationalPanel
+        {...baseProps}
+        vehicles={[]}
+        filters={{ vehicleType: null, maintenanceType: null }}
+        expiredCrlvCount={0}
+        onActionClick={onActionClick}
+      />
+    );
+
+    const label = Array.from(container.querySelectorAll('p')).find(
+      (node) => node.textContent === 'OS em Atraso'
+    );
+
+    expect(label).toBeTruthy();
+
+    const button = label?.closest('button');
+    expect(button).toBeTruthy();
+
+    act(() => {
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onActionClick).toHaveBeenCalledWith('os_overdue');
+  });
+
+  it('when onActionClick is omitted, exception card does not render as button', () => {
+    renderWithAct(
+      <OperationalPanel
+        vehicles={[]}
+        filters={{ vehicleType: null, maintenanceType: null }}
+        expiredCrlvCount={0}
+        {...baseProps}
+      />
+    );
+
+    const label = Array.from(container.querySelectorAll('p')).find(
+      (node) => node.textContent === 'OS em Atraso'
+    );
+
+    expect(label).toBeTruthy();
+    expect(label?.closest('button')).toBeNull();
+    expect(label?.parentElement?.parentElement?.tagName).not.toBe('BUTTON');
   });
 });

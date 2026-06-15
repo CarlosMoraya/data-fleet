@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Truck, Wrench, CalendarDays, FileWarning, UserX, Loader2, Clock, Hourglass } from 'lucide-react';
+import { Truck, Wrench, CalendarDays, FileWarning, UserX, Loader2, Clock, Hourglass, CalendarClock } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
 import VehicleTypeBarChart from './VehicleTypeBarChart';
 import MaintenanceTypeDonutChart from './MaintenanceTypeDonutChart';
@@ -11,6 +11,7 @@ import {
   buildMaintenanceStatusData,
   isCrlvExpired,
 } from '../../lib/dashboardKpi';
+import type { ActionItem } from '../../lib/dashboardKpi';
 import type { MaintenanceOrderDashboard } from '../../types/maintenance';
 
 export interface VehicleRow {
@@ -42,8 +43,11 @@ interface OperationalPanelProps {
   overdueChecklistVehicleIds: Set<string>;
   expiredCrlvCount: number;
   expiredCnhCount: number;
+  overdueOrdersCount: number;
+  expiringSoonDocsCount: number;
   filters: DashboardFilters;
   onFiltersChange: (f: DashboardFilters) => void;
+  onActionClick?: (category: ActionItem['category']) => void;
   isLoading?: boolean;
 }
 
@@ -54,8 +58,11 @@ export default function OperationalPanel({
   overdueChecklistVehicleIds,
   expiredCrlvCount,
   expiredCnhCount,
+  overdueOrdersCount,
+  expiringSoonDocsCount,
   filters,
   onFiltersChange,
+  onActionClick,
   isLoading = false,
 }: OperationalPanelProps) {
   // Apply filters client-side
@@ -139,62 +146,101 @@ export default function OperationalPanel({
 
   return (
     <div className="space-y-6">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        <DashboardKpiCard
-          icon={Truck}
-          iconBgClass="bg-blue-50"
-          iconColorClass="text-blue-600"
-          label="Total de Veículos"
-          value={totalVehicles}
-        />
-        <DashboardKpiCard
-          icon={Wrench}
-          iconBgClass="bg-amber-50"
-          iconColorClass="text-amber-600"
-          label="Em Manutenção"
-          value={inMaintenance}
-        />
-        <DashboardKpiCard
-          icon={CalendarDays}
-          iconBgClass="bg-orange-50"
-          iconColorClass="text-orange-600"
-          label="Checklists Vencidos"
-          value={overdueChecklists}
-          isAlert
-        />
-        <DashboardKpiCard
-          icon={FileWarning}
-          iconBgClass="bg-yellow-50"
-          iconColorClass="text-yellow-600"
-          label="CRLVs Vencidos"
-          value={expiredCrlv}
-          isAlert
-        />
-        <DashboardKpiCard
-          icon={UserX}
-          iconBgClass="bg-red-50"
-          iconColorClass="text-red-600"
-          label="CNHs Vencidas"
-          value={expiredCnhCount}
-          isAlert
-        />
-        <DashboardKpiCard
-          icon={Clock}
-          iconBgClass="bg-sky-50"
-          iconColorClass="text-sky-600"
-          label="Tempo Médio em Manutenção"
-          value={avgMaintenanceDays != null ? `${avgMaintenanceDays} dias` : '—'}
-          subtitle="OS concluídas no período"
-        />
-        <DashboardKpiCard
-          icon={Hourglass}
-          iconBgClass="bg-violet-50"
-          iconColorClass="text-violet-600"
-          label="Permanência Média de OS Abertas"
-          value={avgOpenOrderAgeDays != null ? `${avgOpenOrderAgeDays} dias` : '—'}
-          subtitle="OS ainda abertas"
-        />
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-base font-semibold text-zinc-900">Resolver agora</h3>
+          <p className="text-sm text-zinc-500">O que impede a frota de rodar hoje</p>
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <DashboardKpiCard
+            icon={Clock}
+            iconBgClass="bg-sky-50"
+            iconColorClass="text-sky-600"
+            label="OS em Atraso"
+            value={overdueOrdersCount}
+            isAlert
+            onClick={onActionClick ? () => onActionClick('os_overdue') : undefined}
+          />
+          <DashboardKpiCard
+            icon={CalendarDays}
+            iconBgClass="bg-orange-50"
+            iconColorClass="text-orange-600"
+            label="Checklists Vencidos"
+            value={overdueChecklists}
+            isAlert
+            onClick={onActionClick ? () => onActionClick('checklist') : undefined}
+          />
+          <DashboardKpiCard
+            icon={FileWarning}
+            iconBgClass="bg-yellow-50"
+            iconColorClass="text-yellow-600"
+            label="CRLVs Vencidos"
+            value={expiredCrlv}
+            isAlert
+            onClick={onActionClick ? () => onActionClick('crlv') : undefined}
+          />
+          <DashboardKpiCard
+            icon={UserX}
+            iconBgClass="bg-red-50"
+            iconColorClass="text-red-600"
+            label="CNHs Vencidas"
+            value={expiredCnhCount}
+            isAlert
+            onClick={onActionClick ? () => onActionClick('cnh') : undefined}
+          />
+          <DashboardKpiCard
+            icon={CalendarClock}
+            iconBgClass="bg-amber-50"
+            iconColorClass="text-amber-600"
+            label="Documentos a Vencer (30d)"
+            value={expiringSoonDocsCount}
+            isAlert
+            onClick={onActionClick ? () => onActionClick('crlv_expiring') : undefined}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-base font-semibold text-zinc-900">Panorama operacional</h3>
+          <p className="text-sm text-zinc-500">Indicadores de contexto da frota</p>
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <DashboardKpiCard
+            icon={Truck}
+            iconBgClass="bg-blue-50"
+            iconColorClass="text-blue-600"
+            label="Total de Veículos"
+            value={totalVehicles}
+            variant="muted"
+          />
+          <DashboardKpiCard
+            icon={Wrench}
+            iconBgClass="bg-amber-50"
+            iconColorClass="text-amber-600"
+            label="Em Manutenção"
+            value={inMaintenance}
+            variant="muted"
+          />
+          <DashboardKpiCard
+            icon={Clock}
+            iconBgClass="bg-sky-50"
+            iconColorClass="text-sky-600"
+            label="Tempo Médio em Manutenção"
+            value={avgMaintenanceDays != null ? `${avgMaintenanceDays} dias` : '—'}
+            subtitle="OS concluídas no período"
+            variant="muted"
+          />
+          <DashboardKpiCard
+            icon={Hourglass}
+            iconBgClass="bg-violet-50"
+            iconColorClass="text-violet-600"
+            label="Permanência Média de OS Abertas"
+            value={avgOpenOrderAgeDays != null ? `${avgOpenOrderAgeDays} dias` : '—'}
+            subtitle="OS ainda abertas"
+            variant="muted"
+          />
+        </div>
       </div>
 
       {/* Charts */}
