@@ -7,11 +7,13 @@ import type { VehicleRow, DashboardFilters } from './OperationalPanel';
 import type { MaintenanceOrderDashboard } from '../../types/maintenance';
 
 vi.mock('./VehicleTypeBarChart', () => ({
-  default: () => React.createElement('div', { 'data-testid': 'vehicle-type-chart' }),
+  default: ({ title }: { title?: string }) =>
+    React.createElement('div', { 'data-testid': 'vehicle-type-chart', 'data-title': title }),
 }));
 
 vi.mock('./MaintenanceTypeDonutChart', () => ({
-  default: () => React.createElement('div', { 'data-testid': 'maintenance-type-chart' }),
+  default: ({ title }: { title?: string }) =>
+    React.createElement('div', { 'data-testid': 'maintenance-type-chart', 'data-title': title }),
 }));
 
 let container: HTMLDivElement;
@@ -304,5 +306,60 @@ describe('OperationalPanel — legibilidade dos títulos de KPI', () => {
     expect(label).toBeTruthy();
     expect(label?.classList.contains('line-clamp-2')).toBe(true);
     expect(label?.classList.contains('truncate')).toBe(false);
+  });
+});
+
+describe('OperationalPanel — ordem de prioridade dos gráficos', () => {
+  it('renders charts in operational priority order', () => {
+    const vehicles: VehicleRow[] = [
+      {
+        id: 'v1',
+        type: 'Truck',
+        crlv_year: '2026',
+        crlv_expiration_date: null,
+        driver_id: null,
+        shipper_name: 'Embarcador A',
+        operational_unit_name: 'Unidade 1',
+      },
+    ];
+
+    const activeMaintenanceOrders: MaintenanceOrderDashboard[] = [
+      {
+        id: 'mo-1',
+        vehicle_id: 'v1',
+        type: 'Corretiva',
+        status: 'Aguardando aprovação',
+        approved_cost: null,
+        current_km: null,
+        vehicle_type: 'Truck',
+        expected_exit_date: null,
+        entry_date: '2026-06-10',
+        actual_exit_date: null,
+      },
+    ];
+
+    renderWithAct(
+      <OperationalPanel
+        {...baseProps}
+        vehicles={vehicles}
+        maintenanceOrders={activeMaintenanceOrders}
+        activeMaintenanceOrders={activeMaintenanceOrders}
+        filters={{ vehicleType: null, maintenanceType: null }}
+        expiredCrlvCount={0}
+      />
+    );
+
+    const chartNodes = Array.from(
+      container.querySelectorAll('[data-testid="vehicle-type-chart"], [data-testid="maintenance-type-chart"]')
+    );
+    const titles = chartNodes.map((n) => n.getAttribute('data-title'));
+
+    expect(titles).toEqual([
+      'Fila de Manutenção por Status',
+      'Frota por Unidade Operacional',
+      'Frota por Embarcador',
+      'Frota por Tipo de Veículo',
+      'Manutenções por Tipo',
+    ]);
   });
 });

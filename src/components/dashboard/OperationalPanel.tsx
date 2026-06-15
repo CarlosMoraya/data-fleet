@@ -245,6 +245,30 @@ export default function OperationalPanel({
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {maintenanceStatusData.length > 0 && (
+          <VehicleTypeBarChart
+            data={maintenanceStatusData}
+            activeFilter={null}
+            onFilterChange={() => { }}
+            title="Fila de Manutenção por Status"
+          />
+        )}
+        {vehicleByOpUnitData.length > 0 && (
+          <VehicleTypeBarChart
+            data={vehicleByOpUnitData}
+            activeFilter={null}
+            onFilterChange={() => { }}
+            title="Frota por Unidade Operacional"
+          />
+        )}
+        {vehicleByShipperData.length > 0 && (
+          <VehicleTypeBarChart
+            data={vehicleByShipperData}
+            activeFilter={null}
+            onFilterChange={() => { }}
+            title="Frota por Embarcador"
+          />
+        )}
         <VehicleTypeBarChart
           data={vehicleTypeData}
           activeFilter={filters.vehicleType}
@@ -259,30 +283,6 @@ export default function OperationalPanel({
           }
           title="Manutenções por Tipo"
         />
-        {maintenanceStatusData.length > 0 && (
-          <VehicleTypeBarChart
-            data={maintenanceStatusData}
-            activeFilter={null}
-            onFilterChange={() => { }}
-            title="Fila de Manutenção por Status"
-          />
-        )}
-        {vehicleByShipperData.length > 0 && (
-          <VehicleTypeBarChart
-            data={vehicleByShipperData}
-            activeFilter={null}
-            onFilterChange={() => { }}
-            title="Frota por Embarcador"
-          />
-        )}
-        {vehicleByOpUnitData.length > 0 && (
-          <VehicleTypeBarChart
-            data={vehicleByOpUnitData}
-            activeFilter={null}
-            onFilterChange={() => { }}
-            title="Frota por Unidade Operacional"
-          />
-        )}
       </div>
     </div>
   );

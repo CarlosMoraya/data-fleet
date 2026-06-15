@@ -4,6 +4,14 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 
 ## Arquivamento — 2026-06-14
 
+## 🆕 Atualização de Sessão (15/06/2026) — Reordenação dos gráficos da aba Operação por prioridade operacional
+
+Feature implementada: gráficos da aba "Operação" do Dashboard foram reordenados para priorizar leitura de gargalo operacional na primeira dobra.
+Mudanças aplicadas:
+- `src/components/dashboard/OperationalPanel.tsx`: ordem da grade de gráficos alterada para `Fila de Manutenção por Status` → `Frota por Unidade Operacional` → `Frota por Embarcador` → `Frota por Tipo de Veículo` → `Manutenções por Tipo`, sem alterar cálculos, props, filtros ou condições.
+- `src/components/dashboard/OperationalPanel.test.tsx`: mocks dos gráficos enriquecidos com `data-title` e adicionado teste de regressão validando a ordem no DOM.
+Validações executadas: `npm run lint` ✅; `npx vitest run src/components/dashboard/OperationalPanel.test.tsx` ✅; `npm run test:smoke` ✅.
+
 ## 🆕 Atualização de Sessão (14/06/2026) — Legibilidade dos cards de KPI do Dashboard
 
 Feature implementada: títulos dos cards de KPI passam a renderizar em até 2 linhas no componente compartilhado, com ajuste de microcopy em dois cards da aba Operação.
