@@ -1,10 +1,7 @@
-import * as pdfjsLib from 'pdfjs-dist';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { BudgetItem } from './maintenanceMappers';
 import { inferBudgetSystem, normalizeBudgetSystem } from './budgetSystems';
 import { performOcr } from './ocr/ocrEngine';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+import { loadPdfjs } from './ocr/pdfLoader';
 
 const DEBUG = import.meta.env.VITE_DEBUG_OCR === '1';
 const debug = (...args: unknown[]) => {
@@ -24,6 +21,7 @@ export interface BudgetExtractionResult {
 // ─────────────────────────────────────────────────────────────
 
 async function extractPdfText(file: File): Promise<string> {
+  const pdfjsLib = await loadPdfjs();
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   const pages: string[] = [];

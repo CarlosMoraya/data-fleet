@@ -1,7 +1,6 @@
-import * as pdfjsLib from 'pdfjs-dist';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { Vehicle, Driver } from '../types';
 import { performOcr } from './ocr/ocrEngine';
+import { loadPdfjs } from './ocr/pdfLoader';
 import {
   filterDigitsOnly,
   filterPlate,
@@ -12,9 +11,6 @@ import {
   normalizeUpper,
   capitalizeWords,
 } from './inputHelpers';
-
-// Usa o worker local (bundlado pelo Vite) para evitar dependência de CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 // ─────────────────────────────────────────────────────────────
 // Debug logging — ative com VITE_DEBUG_OCR=1 no .env
@@ -43,6 +39,7 @@ export interface ExtractionResult<T> {
 // ─────────────────────────────────────────────────────────────
 
 async function extractPdfText(file: File): Promise<string> {
+  const pdfjsLib = await loadPdfjs();
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   const pages: string[] = [];

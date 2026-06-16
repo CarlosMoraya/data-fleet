@@ -1,12 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, lazy, Suspense } from 'react';
 import { DollarSign, Truck, Gauge, Loader2, History, TrendingUp } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
-import VehicleTypeBarChart from './VehicleTypeBarChart';
-import MaintenanceTypeDonutChart from './MaintenanceTypeDonutChart';
-import CostTrendChart from './CostTrendChart';
+import RouteFallback from '../RouteFallback';
 import type { VehicleRow, DashboardFilters } from './OperationalPanel';
 import type { MaintenanceOrderDashboard } from '../../types/maintenance';
 import { calculateCostVariation, chooseTrendGranularity, buildCostTrendSeries } from '../../lib/dashboardKpi';
+
+const VehicleTypeBarChart = lazy(() => import('./VehicleTypeBarChart'));
+const MaintenanceTypeDonutChart = lazy(() => import('./MaintenanceTypeDonutChart'));
+const CostTrendChart = lazy(() => import('./CostTrendChart'));
 
 const VEHICLE_TYPES = ['Passeio', 'Utilitário', 'Van', 'Moto', 'Vuc', 'Toco', 'Truck', 'Cavalo'];
 const MAINTENANCE_TYPES = ['Corretiva', 'Preventiva', 'Preditiva'] as const;
@@ -250,52 +252,54 @@ export default function CostPanel({
         />
       </div>
 
-      <CostTrendChart
-        data={costTrendData}
-        title="Evolução do Custo de Manutenção"
-        valueFormatter={formatCurrency}
-      />
+      <Suspense fallback={<RouteFallback />}>
+        <CostTrendChart
+          data={costTrendData}
+          title="Evolução do Custo de Manutenção"
+          valueFormatter={formatCurrency}
+        />
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <VehicleTypeBarChart
-          data={costByTypeData}
-          activeFilter={filters.vehicleType}
-          onFilterChange={(t) => onFiltersChange({ ...filters, vehicleType: t })}
-          title="Custo por Tipo de Veículo"
-          valueFormatter={formatCurrency}
-          yAxisLabel="R$"
-        />
-        <MaintenanceTypeDonutChart
-          data={costByMaintenanceTypeData}
-          activeFilter={filters.maintenanceType}
-          onFilterChange={(t) =>
-            onFiltersChange({ ...filters, maintenanceType: t })
-          }
-          title="Custo por Tipo de Manutenção"
-          valueFormatter={formatCurrency}
-        />
-        {costByShipperData.length > 0 && (
+        {/* Charts */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <VehicleTypeBarChart
-            data={costByShipperData}
-            activeFilter={null}
-            onFilterChange={() => { }}
-            title="Custo por Embarcador"
+            data={costByTypeData}
+            activeFilter={filters.vehicleType}
+            onFilterChange={(t) => onFiltersChange({ ...filters, vehicleType: t })}
+            title="Custo por Tipo de Veículo"
             valueFormatter={formatCurrency}
             yAxisLabel="R$"
           />
-        )}
-        {costByOpUnitData.length > 0 && (
-          <VehicleTypeBarChart
-            data={costByOpUnitData}
-            activeFilter={null}
-            onFilterChange={() => { }}
-            title="Custo por Unidade Operacional"
+          <MaintenanceTypeDonutChart
+            data={costByMaintenanceTypeData}
+            activeFilter={filters.maintenanceType}
+            onFilterChange={(t) =>
+              onFiltersChange({ ...filters, maintenanceType: t })
+            }
+            title="Custo por Tipo de Manutenção"
             valueFormatter={formatCurrency}
-            yAxisLabel="R$"
           />
-        )}
-      </div>
+          {costByShipperData.length > 0 && (
+            <VehicleTypeBarChart
+              data={costByShipperData}
+              activeFilter={null}
+              onFilterChange={() => { }}
+              title="Custo por Embarcador"
+              valueFormatter={formatCurrency}
+              yAxisLabel="R$"
+            />
+          )}
+          {costByOpUnitData.length > 0 && (
+            <VehicleTypeBarChart
+              data={costByOpUnitData}
+              activeFilter={null}
+              onFilterChange={() => { }}
+              title="Custo por Unidade Operacional"
+              valueFormatter={formatCurrency}
+              yAxisLabel="R$"
+            />
+          )}
+        </div>
+      </Suspense>
     </div>
   );
 }

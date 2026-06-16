@@ -38,6 +38,10 @@ function renderWithAct(ui: React.ReactElement) {
   return root;
 }
 
+async function flushLazy() {
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+}
+
 const noOrders: MaintenanceOrderDashboard[] = [];
 
 function findCrlvCardValue(): string | null {
@@ -311,7 +315,7 @@ describe('OperationalPanel — legibilidade dos títulos de KPI', () => {
 });
 
 describe('OperationalPanel — ordem de prioridade dos gráficos', () => {
-  it('renders charts in operational priority order', () => {
+  it('renders charts in operational priority order', async () => {
     const vehicles: VehicleRow[] = [
       {
         id: 'v1',
@@ -349,6 +353,8 @@ describe('OperationalPanel — ordem de prioridade dos gráficos', () => {
         expiredCrlvCount={0}
       />
     );
+
+    await flushLazy();
 
     const chartNodes = Array.from(
       container.querySelectorAll('[data-testid="vehicle-type-chart"], [data-testid="maintenance-type-chart"]')

@@ -4,6 +4,44 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 
 ## Arquivamento — 2026-06-16
 
+### Lazy loading de pdfjs-dist e gráficos do Dashboard
+
+Implementado carregamento sob demanda de `pdfjs-dist` nos fluxos de OCR e dos gráficos do Dashboard que dependem de `recharts`.
+
+**Arquivos criados:**
+- `src/lib/ocr/pdfLoader.ts`: loader único com `import()` dinâmico, memoization da Promise e configuração única de `GlobalWorkerOptions.workerSrc`.
+- `src/lib/ocr/pdfLoader.test.ts`: cobertura unitária da memoization do loader.
+
+**Arquivos modificados:**
+- `src/lib/documentOcr.ts`: OCR de CRLV/CNH passou a obter `pdfjs-dist` via `loadPdfjs()` dentro de `extractPdfText`, sem alterar regex, prompts, fallback ou assinaturas exportadas.
+- `src/lib/budgetOcr.ts`: OCR de orçamento passou a obter `pdfjs-dist` via `loadPdfjs()` dentro de `extractPdfText`, sem alterar parse, prompt, fallback ou assinatura exportada.
+- `src/components/dashboard/OperationalPanel.tsx`: gráficos carregados com `React.lazy` e grid envolvido por um único `Suspense` com `RouteFallback`.
+- `src/components/dashboard/CostPanel.tsx`: `CostTrendChart` e grid de gráficos carregados com `React.lazy` dentro de um único `Suspense` com `RouteFallback`.
+- `src/components/dashboard/OperationalPanel.test.tsx`: teste de ordem dos gráficos ajustado para aguardar resolução assíncrona do lazy load.
+- `docs/reports/perf/perf-baseline.json`: baseline atualizado após aceite explícito do resultado medido.
+- `docs/reports/perf/perf-latest.md`, `docs/reports/perf/perf-latest.json` e `docs/reports/perf/history/perf-2026-06-16-2026.md`: relatório e histórico da medição pós-lazy loading.
+
+**Decisões:**
+- `performOcr` permanece importado estaticamente; o peso removido do caminho inicial é o `pdfjs-dist`.
+- Os arquivos internos de gráfico permanecem inalterados e continuam importando `recharts`; o lazy loading foi aplicado no nível dos painéis.
+- Sem `manualChunks` nesta sessão.
+- Gate de performance aceito explicitamente mesmo com regressões em `route.manutencao.requestCount` (`5 -> 6`) e `returnBehavior.returnEntryMs` (`156 ms -> 211 ms`), porque o objetivo principal era deslocar `pdfjs-dist` e `recharts` para chunks sob demanda.
+
+**Métricas antes/depois desta fase:**
+- Dashboard: `421,6 KB raw / 118,8 KB gzip` -> `35,9 KB raw / 9,0 KB gzip`.
+- `pdfjs-dist`: removido dos imports estáticos de OCR e separado em chunk `pdf-*.js` de `399,7 KB raw / 118,5 KB gzip`.
+- `recharts`: removido do chunk principal do Dashboard e separado em chunks de gráficos (`VehicleTypeBarChart`, `MaintenanceTypeDonutChart`, `CostTrendChart`, `CategoricalChart`).
+- Total JS gzip: `911,3 KB` -> `920,0 KB` (+0,9%).
+- Entrada Dashboard: `1424 ms` -> `859 ms`.
+- Requests Dashboard: `8` -> `0`.
+- Maior chunk permanece `pdf.worker.min-*.mjs` com `1210,0 KB raw / 358,7 KB gzip`.
+
+**Validações:** `npm run test:smoke` pré-implementação ✅ (6 testes); `npx vitest run src/lib/ocr/pdfLoader.test.ts` ✅; `npx vitest run src/components/dashboard/OperationalPanel.test.tsx` ✅ (16 testes); `npm run lint` ✅; `npm run test:unit` ✅ (333 testes); `npm run test:smoke` pós-implementação ✅ (6 testes); `npm run build` ✅; `npm run perf -- --update-baseline` ✅. Validação manual aprovada pelo usuário em 16/06/2026; checklist detalhado com PDFs/imagens reais e DevTools Network não foi executado pelo agente nesta sessão.
+
+**Próxima fase sugerida:** avaliar `manualChunks`, cache/preload do `pdf.worker`, error boundary para falha de chunk de gráfico e teste de render para `CostPanel`.
+
+---
+
 ### Code splitting por rota com React.lazy/Suspense
 
 Implementado code splitting por rota no roteador central para eliminar o bundle monolítico inicial de páginas.

@@ -1,9 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, lazy, Suspense } from 'react';
 import { Truck, Wrench, CalendarDays, FileWarning, UserX, Loader2, Clock, Hourglass, CalendarClock } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
 import ActionQueue from './ActionQueue';
-import VehicleTypeBarChart from './VehicleTypeBarChart';
-import MaintenanceTypeDonutChart from './MaintenanceTypeDonutChart';
+import RouteFallback from '../RouteFallback';
 import {
   buildActiveMaintenanceTypeData,
   countActiveInMaintenance,
@@ -14,6 +13,9 @@ import {
 } from '../../lib/dashboardKpi';
 import type { ActionItem } from '../../lib/dashboardKpi';
 import type { MaintenanceOrderDashboard } from '../../types/maintenance';
+
+const VehicleTypeBarChart = lazy(() => import('./VehicleTypeBarChart'));
+const MaintenanceTypeDonutChart = lazy(() => import('./MaintenanceTypeDonutChart'));
 
 export interface VehicleRow {
   id: string;
@@ -249,46 +251,48 @@ export default function OperationalPanel({
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {maintenanceStatusData.length > 0 && (
+      <Suspense fallback={<RouteFallback />}>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {maintenanceStatusData.length > 0 && (
+            <VehicleTypeBarChart
+              data={maintenanceStatusData}
+              activeFilter={null}
+              onFilterChange={() => { }}
+              title="Fila de Manutenção por Status"
+            />
+          )}
+          {vehicleByOpUnitData.length > 0 && (
+            <VehicleTypeBarChart
+              data={vehicleByOpUnitData}
+              activeFilter={null}
+              onFilterChange={() => { }}
+              title="Frota por Unidade Operacional"
+            />
+          )}
+          {vehicleByShipperData.length > 0 && (
+            <VehicleTypeBarChart
+              data={vehicleByShipperData}
+              activeFilter={null}
+              onFilterChange={() => { }}
+              title="Frota por Embarcador"
+            />
+          )}
           <VehicleTypeBarChart
-            data={maintenanceStatusData}
-            activeFilter={null}
-            onFilterChange={() => { }}
-            title="Fila de Manutenção por Status"
+            data={vehicleTypeData}
+            activeFilter={filters.vehicleType}
+            onFilterChange={(t) => onFiltersChange({ ...filters, vehicleType: t })}
+            title="Frota por Tipo de Veículo"
           />
-        )}
-        {vehicleByOpUnitData.length > 0 && (
-          <VehicleTypeBarChart
-            data={vehicleByOpUnitData}
-            activeFilter={null}
-            onFilterChange={() => { }}
-            title="Frota por Unidade Operacional"
+          <MaintenanceTypeDonutChart
+            data={maintenanceTypeData}
+            activeFilter={filters.maintenanceType}
+            onFilterChange={(t) =>
+              onFiltersChange({ ...filters, maintenanceType: t })
+            }
+            title="Manutenções por Tipo"
           />
-        )}
-        {vehicleByShipperData.length > 0 && (
-          <VehicleTypeBarChart
-            data={vehicleByShipperData}
-            activeFilter={null}
-            onFilterChange={() => { }}
-            title="Frota por Embarcador"
-          />
-        )}
-        <VehicleTypeBarChart
-          data={vehicleTypeData}
-          activeFilter={filters.vehicleType}
-          onFilterChange={(t) => onFiltersChange({ ...filters, vehicleType: t })}
-          title="Frota por Tipo de Veículo"
-        />
-        <MaintenanceTypeDonutChart
-          data={maintenanceTypeData}
-          activeFilter={filters.maintenanceType}
-          onFilterChange={(t) =>
-            onFiltersChange({ ...filters, maintenanceType: t })
-          }
-          title="Manutenções por Tipo"
-        />
-      </div>
+        </div>
+      </Suspense>
     </div>
   );
 }

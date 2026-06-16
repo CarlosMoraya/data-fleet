@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-06-16T22:57:30.513Z",
-  "buildMs": 3441,
+  "generatedAt": "2026-06-16T23:26:03.358Z",
+  "buildMs": 3429,
   "bundle": {
-    "totalJsRaw": 3224965,
-    "totalJsGzip": 933209,
+    "totalJsRaw": 3231975,
+    "totalJsGzip": 942071,
     "totalCssRaw": 55065,
     "totalCssGzip": 10189,
     "largestChunk": {
@@ -13,119 +13,144 @@
     },
     "files": [
       {
-        "name": "ActionPlans--Jjh9MAI.js",
-        "raw": 18933,
-        "gzip": 5396
+        "name": "ActionPlans-Bu5jVaEx.js",
+        "raw": 18936,
+        "gzip": 5400
       },
       {
-        "name": "AdminClients-DOQKOV_I.js",
-        "raw": 9768,
-        "gzip": 3287
+        "name": "AdminClients-BiI9SZFN.js",
+        "raw": 9766,
+        "gzip": 3292
       },
       {
-        "name": "AdminUsers-DeWqf0G4.js",
-        "raw": 13545,
-        "gzip": 3298
+        "name": "AdminUsers-Db9B_R1Q.js",
+        "raw": 13548,
+        "gzip": 3308
       },
       {
-        "name": "BudgetApprovals-C51aLkdl.js",
-        "raw": 9127,
-        "gzip": 3206
+        "name": "BudgetApprovals-DnD8fF1c.js",
+        "raw": 9126,
+        "gzip": 3200
       },
       {
-        "name": "BudgetItemsTable-DhmrZ3sS.js",
-        "raw": 8730,
-        "gzip": 2742
+        "name": "BudgetItemsTable-MeicNaRf.js",
+        "raw": 8733,
+        "gzip": 2748
       },
       {
-        "name": "Cadastros-B5j_UGt2.js",
-        "raw": 2359,
-        "gzip": 817
+        "name": "Cadastros-DrLlp4rn.js",
+        "raw": 2362,
+        "gzip": 818
       },
       {
-        "name": "ChecklistFill-D5Ve-Piu.js",
-        "raw": 16993,
-        "gzip": 4914
+        "name": "CartesianChart-CYESO_kR.js",
+        "raw": 30241,
+        "gzip": 8039
       },
       {
-        "name": "ChecklistTemplates-D8I9H3_E.js",
-        "raw": 25167,
-        "gzip": 6853
+        "name": "CategoricalChart-Lj9Y4rcW.js",
+        "raw": 299771,
+        "gzip": 90230
       },
       {
-        "name": "Checklists-C16KhDlN.js",
-        "raw": 42830,
-        "gzip": 9494
+        "name": "ChecklistFill-DOplH_P_.js",
+        "raw": 17002,
+        "gzip": 4917
       },
       {
-        "name": "Dashboard-Bp6Wz-q2.js",
-        "raw": 421634,
-        "gzip": 118836
+        "name": "ChecklistTemplates-DxwLxozG.js",
+        "raw": 25170,
+        "gzip": 6854
       },
       {
-        "name": "Drivers-CBAKaQCz.js",
-        "raw": 34114,
-        "gzip": 8153
+        "name": "Checklists-Cl4lpj5S.js",
+        "raw": 42834,
+        "gzip": 9498
       },
       {
-        "name": "Maintenance-D8W6Uq9S.js",
-        "raw": 44284,
-        "gzip": 11042
+        "name": "CostTrendChart-BcrKbIz9.js",
+        "raw": 15793,
+        "gzip": 5250
       },
       {
-        "name": "OperationalUnits-BSHM8GO2.js",
-        "raw": 15725,
-        "gzip": 4336
+        "name": "Dashboard-BnBM2gRt.js",
+        "raw": 35943,
+        "gzip": 8967
       },
       {
-        "name": "SelectClientNotice-BYslpiZH.js",
-        "raw": 542,
-        "gzip": 367
+        "name": "Drivers-BmuEmDfZ.js",
+        "raw": 34117,
+        "gzip": 8161
       },
       {
-        "name": "Settings-DB1l93E5.js",
-        "raw": 28445,
-        "gzip": 5766
+        "name": "Maintenance-q8rI14tb.js",
+        "raw": 44281,
+        "gzip": 11032
       },
       {
-        "name": "Shippers-DpseDwEP.js",
-        "raw": 15081,
-        "gzip": 4422
+        "name": "MaintenanceTypeDonutChart-DVqigmIW.js",
+        "raw": 25954,
+        "gzip": 7785
       },
       {
-        "name": "TireInspectionFill-DlUZoN8h.js",
-        "raw": 15685,
-        "gzip": 5617
+        "name": "OperationalUnits-DDB8b8le.js",
+        "raw": 15728,
+        "gzip": 4340
       },
       {
-        "name": "Tires-CQeltNw_.js",
-        "raw": 58169,
-        "gzip": 11390
+        "name": "SelectClientNotice-Cawj6sAw.js",
+        "raw": 545,
+        "gzip": 369
       },
       {
-        "name": "Users-Yr8WGX7_.js",
-        "raw": 24891,
-        "gzip": 5484
+        "name": "Settings-CsFBrFCi.js",
+        "raw": 28448,
+        "gzip": 5764
       },
       {
-        "name": "Vehicles-DV5SJNmS.js",
-        "raw": 58235,
+        "name": "Shippers-B5PTWLO-.js",
+        "raw": 15084,
+        "gzip": 4427
+      },
+      {
+        "name": "TireInspectionFill-Brhan2GT.js",
+        "raw": 15689,
+        "gzip": 5620
+      },
+      {
+        "name": "Tires-Bg3O2GQh.js",
+        "raw": 58172,
+        "gzip": 11388
+      },
+      {
+        "name": "Users-B_qTnm-l.js",
+        "raw": 24894,
+        "gzip": 5467
+      },
+      {
+        "name": "VehicleTypeBarChart-1lWMrDGF.js",
+        "raw": 18335,
+        "gzip": 6511
+      },
+      {
+        "name": "Vehicles-CjTkbmNM.js",
+        "raw": 58238,
         "gzip": 13329
       },
       {
-        "name": "WorkshopJoin-DsWAUX0u.js",
-        "raw": 11000,
-        "gzip": 2996
+        "name": "WorkshopJoin-D7vYEv53.js",
+        "raw": 11009,
+        "gzip": 3003
       },
       {
-        "name": "WorkshopSchedules-BYupk8AU.js",
-        "raw": 25518,
-        "gzip": 6574
+        "name": "WorkshopSchedules-CGXhRJt3.js",
+        "raw": 25522,
+        "gzip": 6581
       },
       {
-        "name": "Workshops-D4LQrGPQ.js",
-        "raw": 33577,
-        "gzip": 7833
+        "name": "Workshops-kN4lzR5Q.js",
+        "raw": 33580,
+        "gzip": 7834
       },
       {
         "name": "actionPlanMappers-BIBNOaKe.js",
@@ -138,34 +163,34 @@
         "gzip": 385
       },
       {
-        "name": "ban-DH_lstxV.js",
+        "name": "ban-EvINzAvo.js",
         "raw": 170,
-        "gzip": 160
+        "gzip": 162
       },
       {
-        "name": "building-2-DD4qoL53.js",
+        "name": "building-2-yTKEa0Gh.js",
         "raw": 372,
-        "gzip": 230
+        "gzip": 233
       },
       {
-        "name": "calendar-days-y5kiHmRU.js",
+        "name": "calendar-days-bR33jxWj.js",
         "raw": 483,
-        "gzip": 256
+        "gzip": 258
       },
       {
-        "name": "camera-SSi1FmEQ.js",
+        "name": "camera-CrBBI8aP.js",
         "raw": 325,
-        "gzip": 241
+        "gzip": 243
       },
       {
-        "name": "check-hQXkZPug.js",
+        "name": "check-BVe-zelW.js",
         "raw": 113,
         "gzip": 130
       },
       {
-        "name": "checklistMappers-D8yf7rrL.js",
+        "name": "checklistMappers-Bi_jcU8w.js",
         "raw": 1050,
-        "gzip": 496
+        "gzip": 501
       },
       {
         "name": "checklistTemplateMappers-3OqrjRNN.js",
@@ -173,34 +198,34 @@
         "gzip": 603
       },
       {
-        "name": "chevron-left-DyJhh2nv.js",
+        "name": "chevron-left-BhCWZjBb.js",
         "raw": 119,
         "gzip": 136
       },
       {
-        "name": "chevron-right-PlF3PvHG.js",
+        "name": "chevron-right-2WBPhLiN.js",
         "raw": 119,
         "gzip": 132
       },
       {
-        "name": "chevron-up-iTYdlukS.js",
+        "name": "chevron-up-CSS39RRo.js",
         "raw": 117,
         "gzip": 131
       },
       {
-        "name": "circle-alert-Cg_Ukx58.js",
+        "name": "circle-alert-DtZ-U6ij.js",
         "raw": 239,
-        "gzip": 179
+        "gzip": 180
       },
       {
-        "name": "circle-check-D2HF2gP1.js",
+        "name": "circle-check-BWCQmfbb.js",
         "raw": 167,
-        "gzip": 161
+        "gzip": 162
       },
       {
-        "name": "circle-x-DRG1BaRm.js",
+        "name": "circle-x-DHZsGTeQ.js",
         "raw": 337,
-        "gzip": 242
+        "gzip": 243
       },
       {
         "name": "cnpjValidator-DPCyc9F1.js",
@@ -208,24 +233,24 @@
         "gzip": 270
       },
       {
-        "name": "documentOcr-CGPNb_nC.js",
+        "name": "documentOcr-C-iEL1_M.js",
         "raw": 7945,
-        "gzip": 3181
+        "gzip": 3179
       },
       {
-        "name": "dollar-sign-9uuhHVZI.js",
+        "name": "dollar-sign-Cre_oQKl.js",
         "raw": 324,
-        "gzip": 240
+        "gzip": 243
       },
       {
-        "name": "driverFieldSettingsMappers-CVrKCfv2.js",
+        "name": "driverFieldSettingsMappers-CBRXByO_.js",
         "raw": 3708,
-        "gzip": 932
+        "gzip": 931
       },
       {
-        "name": "external-link-oUUSlx5_.js",
+        "name": "external-link-Drq6__E-.js",
         "raw": 240,
-        "gzip": 189
+        "gzip": 191
       },
       {
         "name": "fieldSettingsMappers-DKW5_8ln.js",
@@ -233,19 +258,14 @@
         "gzip": 1876
       },
       {
-        "name": "gauge-CBDKDDC3.js",
+        "name": "gauge-BbaKlFAG.js",
         "raw": 165,
-        "gzip": 160
+        "gzip": 162
       },
       {
-        "name": "history-BDa3z7-W.js",
+        "name": "history-BXaDO-Mp.js",
         "raw": 226,
-        "gzip": 187
-      },
-      {
-        "name": "index-BMHc1_eo.js",
-        "raw": 412870,
-        "gzip": 129972
+        "gzip": 188
       },
       {
         "name": "index-BzI7hd2c.css",
@@ -253,39 +273,49 @@
         "gzip": 10189
       },
       {
+        "name": "index-V64RA4fW.js",
+        "raw": 577481,
+        "gzip": 172155
+      },
+      {
         "name": "inputHelpers-DFXC3NIM.js",
         "raw": 1136,
         "gzip": 420
       },
       {
-        "name": "invokeEdgeFn-DOUJFV0C.js",
-        "raw": 715,
-        "gzip": 560
+        "name": "invokeEdgeFn-D6tN65Dw.js",
+        "raw": 712,
+        "gzip": 562
       },
       {
-        "name": "loader-circle-CRjYa6bq.js",
+        "name": "jsx-runtime-DIAExeAg.js",
+        "raw": 8535,
+        "gzip": 3258
+      },
+      {
+        "name": "loader-circle-uF0GHW5R.js",
         "raw": 133,
-        "gzip": 146
+        "gzip": 148
       },
       {
-        "name": "lock-C0faoZ_e.js",
+        "name": "lock-gM9_rXzy.js",
         "raw": 195,
-        "gzip": 182
+        "gzip": 183
       },
       {
-        "name": "map-pin-CBt_Lz4C.js",
+        "name": "map-pin-Dozak5pD.js",
         "raw": 248,
-        "gzip": 216
+        "gzip": 218
       },
       {
-        "name": "ocrEngine-C9pUhBE-.js",
-        "raw": 400856,
-        "gzip": 118279
+        "name": "offlineCacheUpdates-CMgjaUMP.js",
+        "raw": 5699,
+        "gzip": 2270
       },
       {
-        "name": "offlineCacheUpdates-BiqRRUqx.js",
-        "raw": 5696,
-        "gzip": 2268
+        "name": "pdf-D4N2LH2z.js",
+        "raw": 399707,
+        "gzip": 117418
       },
       {
         "name": "pdf.worker.min-B_fnEKel.mjs",
@@ -293,49 +323,54 @@
         "gzip": 367284
       },
       {
-        "name": "pen-qiWR7bSc.js",
+        "name": "pdf.worker.min-By3NS0A0.js",
+        "raw": 65,
+        "gzip": 85
+      },
+      {
+        "name": "pdfLoader-DJHkYCu0.js",
+        "raw": 2750,
+        "gzip": 1556
+      },
+      {
+        "name": "pen-CLznjrWD.js",
         "raw": 224,
-        "gzip": 194
+        "gzip": 195
       },
       {
-        "name": "pencil-BKwO-Pky.js",
+        "name": "pencil-M-eDVSYJ.js",
         "raw": 265,
-        "gzip": 216
+        "gzip": 218
       },
       {
-        "name": "plus-D0En7DNm.js",
+        "name": "plus-CxSTPgZ4.js",
         "raw": 142,
         "gzip": 141
       },
       {
-        "name": "refresh-cw-F7NN8RIf.js",
+        "name": "refresh-cw-BBgoGVly.js",
         "raw": 310,
-        "gzip": 215
+        "gzip": 222
       },
       {
-        "name": "rotate-ccw-Bkj9-Ec-.js",
+        "name": "rotate-ccw-COjP16xE.js",
         "raw": 189,
-        "gzip": 174
+        "gzip": 175
       },
       {
-        "name": "search-BpDxMw_Z.js",
+        "name": "search-BbcRRh_F.js",
         "raw": 163,
-        "gzip": 159
+        "gzip": 160
       },
       {
-        "name": "storageHelpers-6DQpSkU5.js",
-        "raw": 3077,
-        "gzip": 1223
+        "name": "storageHelpers-CuVOs-Os.js",
+        "raw": 3041,
+        "gzip": 1205
       },
       {
-        "name": "supabase-D2mEEBiI.js",
-        "raw": 172748,
-        "gzip": 45664
-      },
-      {
-        "name": "tireInspectionService-DNzcH4n-.js",
-        "raw": 5944,
-        "gzip": 2090
+        "name": "tireInspectionService-BmTkRxhg.js",
+        "raw": 5941,
+        "gzip": 2091
       },
       {
         "name": "tirePositions-CbId8iPE.js",
@@ -343,29 +378,34 @@
         "gzip": 623
       },
       {
-        "name": "trash-2-DljB-gur.js",
+        "name": "tooltipContext-R7gWLoyp.js",
+        "raw": 510,
+        "gzip": 281
+      },
+      {
+        "name": "trash-2-DvJPXFsx.js",
         "raw": 317,
-        "gzip": 205
+        "gzip": 207
       },
       {
-        "name": "triangle-alert-DfqS02OB.js",
+        "name": "triangle-alert-Bk55Wrzj.js",
         "raw": 254,
-        "gzip": 206
+        "gzip": 203
       },
       {
-        "name": "truck-DdOB4L-V.js",
+        "name": "truck-ipE2NLep.js",
         "raw": 395,
-        "gzip": 259
+        "gzip": 260
       },
       {
-        "name": "useMutation-B4QgMT3l.js",
-        "raw": 2247,
-        "gzip": 927
+        "name": "useMutation-Cf50acwg.js",
+        "raw": 2250,
+        "gzip": 932
       },
       {
-        "name": "useQuery-BKE624NC.js",
-        "raw": 8736,
-        "gzip": 3179
+        "name": "useQuery-y9B8NfQ4.js",
+        "raw": 8739,
+        "gzip": 3192
       },
       {
         "name": "workshopMappers-D94uSLEx.js",
@@ -373,66 +413,66 @@
         "gzip": 667
       },
       {
-        "name": "x-Pcwf5dMI.js",
+        "name": "x-_Ytt6fLr.js",
         "raw": 143,
         "gzip": 142
       }
     ]
   },
   "coldStart": {
-    "shellMs": 2009,
-    "firstUsefulMs": 2144,
-    "requestCount": 22
+    "shellMs": 1984,
+    "firstUsefulMs": 1992,
+    "requestCount": 28
   },
   "routes": [
     {
       "key": "dashboard",
       "label": "Dashboard",
       "url": "/",
-      "entryMs": 1424,
-      "requestCount": 8
+      "entryMs": 859,
+      "requestCount": 0
     },
     {
       "key": "veiculos",
       "label": "Veículos",
       "url": "/cadastros/veiculos",
-      "entryMs": 205,
+      "entryMs": 172,
       "requestCount": 18
     },
     {
       "key": "motoristas",
       "label": "Motoristas",
       "url": "/cadastros/motoristas",
-      "entryMs": 91,
+      "entryMs": 95,
       "requestCount": 5
     },
     {
       "key": "manutencao",
       "label": "Manutenção",
       "url": "/manutencao",
-      "entryMs": 108,
-      "requestCount": 5
+      "entryMs": 107,
+      "requestCount": 6
     },
     {
       "key": "pneus",
       "label": "Pneus",
       "url": "/cadastros/pneus",
-      "entryMs": 162,
+      "entryMs": 178,
       "requestCount": 6
     },
     {
       "key": "checklists",
       "label": "Checklists",
       "url": "/checklists",
-      "entryMs": 971,
-      "requestCount": 12
+      "entryMs": 967,
+      "requestCount": 11
     }
   ],
   "returnBehavior": {
     "route": "veiculos",
-    "firstEntryMs": 171,
+    "firstEntryMs": 213,
     "firstRequestCount": 0,
-    "returnEntryMs": 156,
+    "returnEntryMs": 211,
     "returnRequestCount": 0
   }
 }
