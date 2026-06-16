@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import RouteFallback from './RouteFallback';
 import { useAuth } from '../context/AuthContext';
 import { useIdleTimeout } from '../hooks/useIdleTimeout';
 import { canAccessRoute, isOperationsManager } from '../lib/rolePermissions';
@@ -37,7 +38,9 @@ export default function Layout() {
         <Topbar onMenuClick={() => setIsSidebarOpen(true)} />
         <main className="flex-1 overflow-hidden flex flex-col p-4 md:p-8">
           <div className="mx-auto max-w-7xl w-full flex-1 min-h-0 flex flex-col">
-            <Outlet />
+            <Suspense fallback={<RouteFallback />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

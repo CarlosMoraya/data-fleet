@@ -4,6 +4,40 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 
 ## Arquivamento — 2026-06-16
 
+### Code splitting por rota com React.lazy/Suspense
+
+Implementado code splitting por rota no roteador central para eliminar o bundle monolítico inicial de páginas.
+
+**Arquivos criados:**
+- `src/components/RouteFallback.tsx`: fallback visual de carregamento de rota, reutilizando o spinner existente.
+- `src/components/RouteFallback.test.tsx`: cobertura unitária do estado `role="status"` e da classe `animate-spin`.
+
+**Arquivos modificados:**
+- `src/App.tsx`: 21 componentes de página convertidos para `React.lazy`; `Login` preservado como import estático; `<Routes>` envolvido em `Suspense`.
+- `src/components/Layout.tsx`: `<Outlet />` autenticado envolvido em `Suspense` para preservar sidebar/topbar durante carregamento de chunks.
+- `src/pages/Cadastros.tsx`: `<Outlet />` das abas envolvido em `Suspense` para preservar a barra de abas durante carregamento de sub-rotas.
+- `docs/reports/perf/perf-baseline.json`: baseline atualizado após aceite do resultado medido.
+- `docs/reports/perf/perf-latest.md`, `docs/reports/perf/perf-latest.json` e `docs/reports/perf/history/perf-2026-06-16-1957.md`: relatório e histórico da medição pós-split.
+
+**Decisões:**
+- Escopo restrito a `React.lazy` + `Suspense`; sem `manualChunks` nesta fase.
+- `Login` permanece eager para evitar spinner no primeiro acesso anônimo.
+- Três fronteiras de `Suspense` foram usadas para preservar shell autenticado e tabs de Cadastros.
+- Resultado aceito mesmo com aumento de `totalJsGzip`, porque o objetivo principal era quebrar o chunk monolítico e reduzir o maior chunk inicial.
+
+**Métricas antes/depois:**
+- Maior chunk raw: `1918.2 KB` (`index-*.js`) -> `1210.0 KB` (`pdf.worker.min-*.mjs`), redução de `36.9%`.
+- Maior chunk gzip: `520.7 KB` -> `358.7 KB`, redução aproximada de `31.1%`.
+- Total JS gzip: `867.1 KB` -> `911.3 KB`, aumento de `5.1%`.
+- Shell visível: baseline pré-split `1993 ms`; medição pós-split aceita `2009 ms`.
+- Primeira tela útil: baseline pré-split `2005 ms`; medição pós-split aceita `2144 ms`.
+
+**Validações:** `npx vitest run src/components/RouteFallback.test.tsx` ✅ (2 testes); `npm run lint` ✅; `npm run test:unit` ✅ (332 testes); `npm run test:smoke` ✅ (6 testes); `npm run perf -- --update-baseline` ✅.
+
+**Próxima fase sugerida:** investigar carregamento sob demanda de `pdf.worker`/`ocrEngine` e avaliar `manualChunks` em `vite.config.ts`.
+
+---
+
 ### Protocolo objetivo de medição de performance
 
 Implementado protocolo completo de medição de performance do βetaFleet (baseline + comparação antes/depois), conforme Fase 4 do SPEC.md.

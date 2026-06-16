@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { NavLink, Outlet, Navigate } from 'react-router-dom';
+import RouteFallback from '../components/RouteFallback';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
 
@@ -83,7 +84,9 @@ export default function Cadastros() {
 
       {/* Sub-page content */}
       <div className="flex-1 min-h-0">
-        <Outlet />
+        <Suspense fallback={<RouteFallback />}>
+          <Outlet />
+        </Suspense>
       </div>
     </div>
   );

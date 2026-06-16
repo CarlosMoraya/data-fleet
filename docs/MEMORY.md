@@ -10,8 +10,8 @@ Este arquivo registra apenas o estado vigente, as frentes ativas e os próximos 
 - **Pneus**: módulo funcional com inspeções, configuração de eixos e histórico.
 - **Oficinas**: modelo de parceria multi-tenant ativo.
 - **Dashboard Executivo**: 3 abas em produção (`Visão Geral`, `Operação`, `Custos`), com tendência histórica de custo, projeção financeira, métricas documentais incluindo CRLV e cards de KPI com título em até 2 linhas; na aba Operação, os cards usam os textos "Tempo médio de OS" e "Idade média de OS abertas", a grade de gráficos foi repriorizada para destacar primeiro o gargalo operacional (Fila de Manutenção por Status, Frota por Unidade Operacional, Frota por Embarcador), e a aba agora exibe uma Fila de Ação acionável com CNH/GR a vencer e destino de Aprovação de Orçamentos para `OS aguardando aprovação`.
-- **Protocolo de Performance**: disponível via `npm run perf`. Mede bundle (raw/gzip), cold start (shell + primeira tela útil), entrada por rota (6 rotas principais), contagem de requests e comportamento de voltar à página. Gera relatórios em `docs/reports/perf/` com diff contra baseline versionado e gate de regressão (tolerância 15%). Arquitetura: lógica pura em `src/lib/perfReport.ts`, scripts I/O em `scripts/`, spec Playwright isolada em `playwright.perf.config.ts`.
-- **Débito técnico de performance**: o `dist/assets/index-*.js` atual tem **~1,96 MB num único chunk**, porque `src/App.tsx` importa todas as páginas estaticamente (sem `React.lazy`/`Suspense`) e `vite.config.ts` não define `manualChunks`. O protocolo de medição existe justamente para quantificar o ganho futuro quando o code splitting for implementado.
+- **Protocolo de Performance**: disponível via `npm run perf`. Mede bundle (raw/gzip), cold start (shell + primeira tela útil), entrada por rota (6 rotas principais), contagem de requests e comportamento de voltar à página. Gera relatórios em `docs/reports/perf/` com diff contra baseline versionado e gate de regressão (tolerância 15%). Arquitetura: lógica pura em `src/lib/perfReport.ts`, scripts I/O em `scripts/`, spec Playwright isolada em `playwright.perf.config.ts`. O baseline vigente já reflete code splitting por rota com `React.lazy`/`Suspense`.
+- **Performance frontend**: o roteador central usa code splitting por rota. O antigo chunk único `index-*.js` de **~1,96 MB raw / ~520,7 KB gzip** foi quebrado em chunks sob demanda; o maior chunk atual é `pdf.worker.min-*.mjs` com **~1,21 MB raw / ~358,7 KB gzip**. Resultado aceito: menor maior chunk e carregamento inicial preservado, com aumento agregado de JS gzip de **~867,1 KB para ~911,3 KB** por overhead de chunks. Próxima fase: investigar `pdf.worker`/`ocrEngine` e avaliar `manualChunks`.
 
 ## Tarefas em Andamento
 
@@ -27,7 +27,7 @@ Este arquivo registra apenas o estado vigente, as frentes ativas e os próximos 
 1. Retomar os E2Es pendentes de inspeção de pneus após estabilização de seed/timing.
 2. Avaliar notificações de vencimento (CRLV/CNH) via Edge Functions.
 3. Considerar backfill futuro de `crlv_expiration_date` para veículos legados, se houver demanda.
-4. Implementar code splitting (`React.lazy` + `manualChunks`) para reduzir o bundle de ~1,96 MB — usar o protocolo de performance para medir o ganho.
+4. Evoluir performance pós-code splitting: investigar carregamento sob demanda de `pdf.worker`/`ocrEngine` e avaliar `manualChunks` em `vite.config.ts`.
 
 ## Decisões Vigentes
 
