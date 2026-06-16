@@ -2,6 +2,39 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Arquivamento — 2026-06-16
+
+### Protocolo objetivo de medição de performance
+
+Implementado protocolo completo de medição de performance do βetaFleet (baseline + comparação antes/depois), conforme Fase 4 do SPEC.md.
+
+**Arquivos criados:**
+- `src/lib/perfReport.ts`: lógica pura de agregação de bundle, diff contra baseline com tolerância de regressão, e formatação Markdown.
+- `src/lib/perfReport.test.ts`: testes unitários de `summarizeBundle`, `diffAgainstBaseline` e `formatPerfMarkdown`.
+- `scripts/measure-bundle.ts`: lê `dist/assets/`, calcula tamanho raw/gzip, grava `.last-bundle.json`.
+- `scripts/perf-report.ts`: orquestra leitura dos JSONs temporários + baseline + thresholds, gera `perf-latest.md`, `perf-latest.json` e histórico.
+- `scripts/run-perf.ts`: pipeline completo (build → bundle → playwright → relatório), propagando exit code do gate de regressão.
+- `playwright.perf.config.ts`: config Playwright isolada (porta 4173, preview, workers=1).
+- `e2e/perf/perf-routes.spec.ts`: spec que mede cold start, entrada nas 6 rotas principais, e comportamento de voltar à página (Veículos).
+- `docs/reports/perf/perf-thresholds.json`: limiares editáveis (shell 2500ms, firstUseful 3500ms, routeEntry 1500ms, largestChunk 800KB, tolerância 15%).
+
+**Arquivos modificados:**
+- `package.json`: adicionados scripts `perf` e `perf:bundle`.
+- `.gitignore`: adicionados `docs/reports/perf/.last-bundle.json` e `docs/reports/perf/.last-routes.json`.
+
+**Decisões:**
+- Medir contra `vite preview` (build de produção), não contra `npm run dev`.
+- Relatórios versionados em `docs/reports/perf/` (baseline committado), conforme política de artefatos persistentes.
+- Limiares por baseline + regra de regressão de 15% como gate principal; metas absolutas ficam informativas.
+- Config Playwright separada para isolar risco da suíte E2E existente.
+- Scripts em TypeScript via `tsx` para reaproveitar lógica pura de `src/lib`.
+
+**Débito identificado (NÃO tratado nesta sessão):** `dist/assets/index-*.js` tem ~1,96 MB num único chunk (sem code splitting).
+
+**Validações:** `npm run lint` ✅; `npm run test:unit` ✅ (330 testes); `npm run test:smoke` ✅ (6 testes).
+
+---
+
 ## Arquivamento — 2026-06-14
 
 ## 🆕 Atualização de Sessão (15/06/2026) — Fila operacional acionável na aba Operação

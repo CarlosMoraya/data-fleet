@@ -1,0 +1,7 @@
+{
+  "shellMs": 2500,
+  "firstUsefulMs": 3500,
+  "routeEntryMs": 1500,
+  "largestChunkRawBytes": 819200,
+  "regressionTolerance": 0.15
+}

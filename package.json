@@ -21,7 +21,9 @@
     "test:e2e:report": "playwright show-report",
     "test:shippers": "playwright test e2e/shippers-operational-units.spec.ts",
     "migrate:shippers": "node scripts/exec-migration.mjs",
-    "seed:demo:betafleet": "node scripts/seed-betafleet-demo.mjs"
+    "seed:demo:betafleet": "node scripts/seed-betafleet-demo.mjs",
+    "perf": "tsx scripts/run-perf.ts",
+    "perf:bundle": "tsx scripts/measure-bundle.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",

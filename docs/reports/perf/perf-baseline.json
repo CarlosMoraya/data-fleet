@@ -1,0 +1,88 @@
+{
+  "generatedAt": "2026-06-16T21:56:06.252Z",
+  "buildMs": 4068,
+  "bundle": {
+    "totalJsRaw": 3203304,
+    "totalJsGzip": 887953,
+    "totalCssRaw": 55065,
+    "totalCssGzip": 10189,
+    "largestChunk": {
+      "name": "index-DAvHKRzx.js",
+      "raw": 1964257,
+      "gzip": 520669
+    },
+    "files": [
+      {
+        "name": "index-BzI7hd2c.css",
+        "raw": 55065,
+        "gzip": 10189
+      },
+      {
+        "name": "index-DAvHKRzx.js",
+        "raw": 1964257,
+        "gzip": 520669
+      },
+      {
+        "name": "pdf.worker.min-B_fnEKel.mjs",
+        "raw": 1239047,
+        "gzip": 367284
+      }
+    ]
+  },
+  "coldStart": {
+    "shellMs": 1993,
+    "firstUsefulMs": 2005,
+    "requestCount": 19
+  },
+  "routes": [
+    {
+      "key": "dashboard",
+      "label": "Dashboard",
+      "url": "/",
+      "entryMs": 623,
+      "requestCount": 0
+    },
+    {
+      "key": "veiculos",
+      "label": "Veículos",
+      "url": "/cadastros/veiculos",
+      "entryMs": 142,
+      "requestCount": 1
+    },
+    {
+      "key": "motoristas",
+      "label": "Motoristas",
+      "url": "/cadastros/motoristas",
+      "entryMs": 92,
+      "requestCount": 2
+    },
+    {
+      "key": "manutencao",
+      "label": "Manutenção",
+      "url": "/manutencao",
+      "entryMs": 97,
+      "requestCount": 1
+    },
+    {
+      "key": "pneus",
+      "label": "Pneus",
+      "url": "/cadastros/pneus",
+      "entryMs": 170,
+      "requestCount": 2
+    },
+    {
+      "key": "checklists",
+      "label": "Checklists",
+      "url": "/checklists",
+      "entryMs": 958,
+      "requestCount": 3
+    }
+  ],
+  "returnBehavior": {
+    "route": "veiculos",
+    "firstEntryMs": 170,
+    "firstRequestCount": 0,
+    "returnEntryMs": 162,
+    "returnRequestCount": 0
+  }
+}

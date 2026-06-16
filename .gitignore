@@ -11,3 +11,5 @@ playwright-report/
 test-results/
 .demo-credentials/
 .vercel
+docs/reports/perf/.last-bundle.json
+docs/reports/perf/.last-routes.json
