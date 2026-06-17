@@ -2,6 +2,35 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Arquivamento — 2026-06-17
+
+### Agregações do Dashboard via RPCs Supabase
+
+Implementada otimização do Dashboard Executivo para mover agregações pesadas de custo e checklist do cliente para o Postgres, preservando os números exibidos e mantendo as funções puras de KPI intactas.
+
+**Arquivos criados:**
+- `supabase/migrations/20260617000000_create_dashboard_cost_rpcs.sql`: cria `dashboard_previous_period_cost` e `dashboard_cost_projection_monthly` com `SECURITY INVOKER`.
+- `supabase/migrations/20260617000100_create_dashboard_checklist_rpcs.sql`: cria `dashboard_last_checklist_per_vehicle` e `dashboard_vehicle_km_in_period` com `SECURITY INVOKER`.
+- `supabase/migrations/20260617000200_rollback_dashboard_rpcs.sql`: remove as quatro RPCs da sessão.
+- `src/lib/dashboardRpcParity.test.ts`: testes unitários de paridade entre o caminho antigo em linhas brutas e o novo formato agregado das RPCs.
+
+**Arquivos modificados:**
+- `src/pages/Dashboard.tsx`: queries `dashboard-maintenance-previous`, `dashboard-cost-projection` e checklist/KM passaram a usar `supabase.rpc(...)`; queries de veículos, manutenção do período, manutenção ativa, intervalos e motoristas permaneceram inalteradas.
+- `src/components/dashboard/CostPanel.tsx`: `Custo por KM` passou a consumir `vehicleKmRows` agregado por veículo, mantendo `dateRange` para série histórica/granularidade.
+- `docs/MEMORY.md`: estado vigente atualizado.
+
+**Decisões e segurança:**
+- RPCs usam `SECURITY INVOKER`, `SET search_path = public` e `GRANT EXECUTE ... TO authenticated`.
+- `p_client_id = NULL` preserva a visão agregada do Admin Master, deixando o RLS existente governar o acesso cross-tenant.
+- Média móvel, cálculo de período anterior e decisão de checklist vencido continuam no cliente via `dashboardKpi.ts`.
+- `sumApprovedCostByMonthKeys` permanece em `dashboardKpi.ts` e seus testes, mas não é mais usado pelo Dashboard.
+
+**Validações automatizadas:** `npm run lint` ✅; `npm run test:unit` ✅ (39 arquivos, 382 testes); `npm run test:smoke` ✅ (6 testes).
+
+**Validação manual:** migrations aplicadas no SQL Editor do Supabase sem erro em 17/06/2026; correção de serialização de `checklistIssues` validada manualmente pelo usuário na tela `/checklists`.
+
+---
+
 ## Arquivamento — 2026-06-16
 
 ### Política de persistência de cache React Query

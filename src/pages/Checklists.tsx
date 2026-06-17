@@ -206,10 +206,10 @@ export default function Checklists() {
   });
 
   // Query for issues (inconformidades) - mainly for Assistant+
-  const { data: issueChecklistIds = new Set<string>() } = useQuery({
+  const { data: rawIssueChecklistIds = [] } = useQuery<string[]>({
     queryKey: ['checklistIssues', currentClient?.id],
     queryFn: async () => {
-      if (!isAssistantPlus || checklists.length === 0) return new Set<string>();
+      if (!isAssistantPlus || checklists.length === 0) return [];
       
       const ids = checklists.map(r => r.id);
       const { data } = await supabase
@@ -218,10 +218,15 @@ export default function Checklists() {
         .in('checklist_id', ids)
         .eq('status', 'issue');
       
-      return new Set((data ?? []).map((r: any) => r.checklist_id));
+      return (data ?? []).map((r: any) => r.checklist_id);
     },
     enabled: isAssistantPlus && checklists.length > 0
   });
+
+  const issueChecklistIds = useMemo(
+    () => new Set(Array.isArray(rawIssueChecklistIds) ? rawIssueChecklistIds : []),
+    [rawIssueChecklistIds]
+  );
 
   // ── Tire inspection queries ───────────────────────────────────────────────
   const { data: tireInspections = [] } = useQuery({

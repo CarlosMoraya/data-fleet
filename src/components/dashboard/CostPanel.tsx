@@ -16,10 +16,9 @@ const MAINTENANCE_TYPES = ['Corretiva', 'Preventiva', 'Preditiva'] as const;
 const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatCurrency = (v: number) => fmt.format(v);
 
-interface ChecklistRow {
+interface VehicleKmRow {
   vehicle_id: string;
-  completed_at: string;
-  odometer_km: number | null;
+  km_driven: number;
 }
 
 interface CostPanelProps {
@@ -27,7 +26,7 @@ interface CostPanelProps {
   maintenanceOrders: MaintenanceOrderDashboard[];
   previousPeriodCost: number;
   projectedNextMonthCost: number | null;
-  checklistRows: ChecklistRow[];
+  vehicleKmRows: VehicleKmRow[];
   dateRange: { from: string; to: string };
   filters: DashboardFilters;
   onFiltersChange: (f: DashboardFilters) => void;
@@ -39,7 +38,7 @@ export default function CostPanel({
   maintenanceOrders,
   previousPeriodCost,
   projectedNextMonthCost,
-  checklistRows,
+  vehicleKmRows,
   dateRange,
   filters,
   onFiltersChange,
@@ -86,30 +85,16 @@ export default function CostPanel({
   const costPerVehicle =
     filteredVehicles.length > 0 ? totalCost / filteredVehicles.length : 0;
 
-  // Custo por KM: para cada veículo, MAX(odometer_km) - MIN(odometer_km) nos checklists do período
   const costPerKm = useMemo(() => {
-    const inPeriod = checklistRows.filter(
-      (r) =>
-        r.odometer_km !== null &&
-        r.completed_at >= dateRange.from &&
-        r.completed_at <= dateRange.to
-    );
-
     const vehicleIds = new Set(filteredVehicles.map((v) => v.id));
     let totalKm = 0;
 
-    for (const vId of vehicleIds) {
-      const kms = inPeriod
-        .filter((r) => r.vehicle_id === vId)
-        .map((r) => r.odometer_km as number);
-
-      if (kms.length < 2) continue;
-      const diff = Math.max(...kms) - Math.min(...kms);
-      if (diff > 0) totalKm += diff;
+    for (const row of vehicleKmRows) {
+      if (vehicleIds.has(row.vehicle_id)) totalKm += row.km_driven;
     }
 
     return totalKm > 0 ? totalCost / totalKm : 0;
-  }, [checklistRows, dateRange, filteredVehicles, totalCost]);
+  }, [vehicleKmRows, filteredVehicles, totalCost]);
 
   const granularity = chooseTrendGranularity(dateRange.from, dateRange.to);
 

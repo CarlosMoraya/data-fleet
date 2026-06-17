@@ -29,7 +29,6 @@ import {
   getExpiringSoonGrPlates,
   getExpiringSoonGrDriverNames,
   getTrailingMonthKeys,
-  sumApprovedCostByMonthKeys,
   calculateMovingAverageProjection,
   computeOverdueChecklistVehicleIds,
   type ActionItem,
@@ -147,26 +146,17 @@ export default function Dashboard() {
       gcTime: 30 * 60 * 1000,
     });
 
-  const { data: previousMaintenanceOrders = [], isLoading: loadingPreviousMaintenance } = useQuery<
-    { approved_cost: number | null }[]
-  >({
+  const { data: previousPeriodCost = 0, isLoading: loadingPreviousMaintenance } = useQuery<number>({
     queryKey: ['dashboard-maintenance-previous', currentClient?.id, dateRange.from, dateRange.to],
     queryFn: async () => {
       const previous = calculatePreviousPeriodRange(dateRange.from, dateRange.to);
-      let query = supabase
-        .from('maintenance_orders')
-        .select('id, approved_cost')
-        .gte('entry_date', previous.from)
-        .lte('entry_date', previous.to)
-        .neq('status', 'Cancelado');
-      if (currentClient?.id) {
-        query = query.eq('client_id', currentClient.id);
-      }
-      const { data, error } = await query;
+      const { data, error } = await supabase.rpc('dashboard_previous_period_cost', {
+        p_client_id: currentClient?.id ?? null,
+        p_from: previous.from,
+        p_to: previous.to,
+      });
       if (error) throw error;
-      return (data ?? []).map((row: Record<string, unknown>) => ({
-        approved_cost: row.approved_cost != null ? Number(row.approved_cost) : null,
-      }));
+      return Number(data ?? 0);
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -174,7 +164,7 @@ export default function Dashboard() {
   });
 
   const { data: costProjectionRows = [], isLoading: loadingCostProjection } = useQuery<
-    { entry_date: string | null; approved_cost: number | null }[]
+    { month_key: string; total: number | null }[]
   >({
     queryKey: ['dashboard-cost-projection', currentClient?.id],
     queryFn: async () => {
@@ -182,21 +172,13 @@ export default function Dashboard() {
       const inicio = `${keys[0]}-01`;
       const [y, m] = today.substring(0, 7).split('-').map(Number);
       const inicioMesCorrente = `${y}-${String(m).padStart(2, '0')}-01`;
-      let query = supabase
-        .from('maintenance_orders')
-        .select('entry_date, approved_cost')
-        .gte('entry_date', inicio)
-        .lt('entry_date', inicioMesCorrente)
-        .neq('status', 'Cancelado');
-      if (currentClient?.id) {
-        query = query.eq('client_id', currentClient.id);
-      }
-      const { data, error } = await query;
+      const { data, error } = await supabase.rpc('dashboard_cost_projection_monthly', {
+        p_client_id: currentClient?.id ?? null,
+        p_from: inicio,
+        p_to: inicioMesCorrente,
+      });
       if (error) throw error;
-      return (data ?? []).map((row: Record<string, unknown>) => ({
-        entry_date: row.entry_date != null ? (row.entry_date as string) : null,
-        approved_cost: row.approved_cost != null ? Number(row.approved_cost) : null,
-      }));
+      return (data ?? []) as { month_key: string; total: number | null }[];
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -239,31 +221,40 @@ export default function Dashboard() {
       gcTime: 30 * 60 * 1000,
     });
 
-  const { data: checklistRows = [], isLoading: loadingChecklists } = useQuery<
-    { vehicle_id: string; context: string; completed_at: string; odometer_km: number | null }[]
+  const { data: checklistRows = [], isLoading: loadingLastChecklists } = useQuery<
+    { vehicle_id: string; context: string; completed_at: string }[]
   >({
-    queryKey: ['dashboard-checklists', currentClient?.id],
+    queryKey: ['dashboard-last-checklists', currentClient?.id],
     queryFn: async () => {
-      let query = supabase
-        .from('checklists')
-        .select('vehicle_id, completed_at, odometer_km, checklist_templates(context)')
-        .eq('status', 'completed')
-        .not('vehicle_id', 'is', null);
-      if (currentClient?.id) {
-        query = query.eq('client_id', currentClient.id);
-      }
-      const { data, error } = await query;
+      const { data, error } = await supabase.rpc('dashboard_last_checklist_per_vehicle', {
+        p_client_id: currentClient?.id ?? null,
+      });
       if (error) throw error;
       return (data ?? []).map((row: Record<string, unknown>) => ({
         vehicle_id: row.vehicle_id as string,
-        context:
-          row.checklist_templates && typeof row.checklist_templates === 'object' && !Array.isArray(row.checklist_templates)
-            ? ((row.checklist_templates as Record<string, unknown>).context as string)
-            : Array.isArray(row.checklist_templates) && row.checklist_templates.length > 0
-              ? ((row.checklist_templates[0] as Record<string, unknown>).context as string)
-              : '',
+        context: (row.context as string) ?? '',
         completed_at: row.completed_at as string,
-        odometer_km: row.odometer_km != null ? Number(row.odometer_km) : null,
+      }));
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  const { data: vehicleKmRows = [], isLoading: loadingVehicleKm } = useQuery<
+    { vehicle_id: string; km_driven: number }[]
+  >({
+    queryKey: ['dashboard-vehicle-km', currentClient?.id, dateRange.from, dateRange.to],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('dashboard_vehicle_km_in_period', {
+        p_client_id: currentClient?.id ?? null,
+        p_from: dateRange.from,
+        p_to: dateRange.to,
+      });
+      if (error) throw error;
+      return (data ?? []).map((row: Record<string, unknown>) => ({
+        vehicle_id: row.vehicle_id as string,
+        km_driven: Number(row.km_driven ?? 0),
       }));
     },
     enabled: !!user,
@@ -380,17 +371,10 @@ export default function Dashboard() {
     [maintenanceOrders]
   );
 
-  const previousPeriodCost = useMemo(
-    () =>
-      previousMaintenanceOrders
-        .filter((o) => o.approved_cost !== null && o.approved_cost > 0)
-        .reduce((sum, o) => sum + (o.approved_cost ?? 0), 0),
-    [previousMaintenanceOrders]
-  );
-
   const projectedNextMonthCost = useMemo(() => {
     const monthKeys = getTrailingMonthKeys(today, PROJECTION_TRAILING_MONTHS);
-    const monthlyTotals = sumApprovedCostByMonthKeys(costProjectionRows, monthKeys);
+    const totalByKey = new Map(costProjectionRows.map((r) => [r.month_key, Number(r.total ?? 0)]));
+    const monthlyTotals = monthKeys.map((k) => totalByKey.get(k) ?? 0);
     return calculateMovingAverageProjection(monthlyTotals);
   }, [today, costProjectionRows]);
 
@@ -499,7 +483,8 @@ export default function Dashboard() {
     loadingActiveMaintenance ||
     loadingPreviousMaintenance ||
     loadingCostProjection ||
-    loadingChecklists ||
+    loadingLastChecklists ||
+    loadingVehicleKm ||
     loadingIntervals ||
     loadingDrivers;
 
@@ -616,7 +601,7 @@ export default function Dashboard() {
             maintenanceOrders={maintenanceOrders}
             previousPeriodCost={previousPeriodCost}
             projectedNextMonthCost={projectedNextMonthCost}
-            checklistRows={checklistRows}
+            vehicleKmRows={vehicleKmRows}
             dateRange={dateRange}
             filters={filters}
             onFiltersChange={setFilters}
