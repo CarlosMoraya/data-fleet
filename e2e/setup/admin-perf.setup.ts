@@ -20,6 +20,7 @@ setup('authenticate as Admin Master for perf', async ({ page }) => {
   await page.click('button[type="submit"]');
 
   await expect(page).toHaveURL('/', { timeout: 10000 });
+  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
   await page.context().storageState({ path: AUTH_FILE });
 });

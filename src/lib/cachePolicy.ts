@@ -41,6 +41,8 @@ export const PERSIST_ALLOWLIST: Record<string, number> = {
   'dashboard-maintenance-previous': CACHE_TTL.dashboard,
   'dashboard-cost-projection': CACHE_TTL.dashboard,
   'dashboard-checklists': CACHE_TTL.dashboard,
+  'dashboard-last-checklists': CACHE_TTL.dashboard,
+  'dashboard-vehicle-km': CACHE_TTL.dashboard,
   'dashboard-drivers': CACHE_TTL.dashboard,
 
   checklist: CACHE_TTL.offline,

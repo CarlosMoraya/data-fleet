@@ -29,6 +29,22 @@ Implementada otimização do Dashboard Executivo para mover agregações pesadas
 
 **Validação manual:** migrations aplicadas no SQL Editor do Supabase sem erro em 17/06/2026; correção de serialização de `checklistIssues` validada manualmente pelo usuário na tela `/checklists`.
 
+## Correção — 2026-06-17
+
+### Regressão de cache das RPCs do Dashboard
+
+Bug corrigido: regressão de requests do Dashboard no protocolo de performance após migração de checklists/KM para RPCs.
+
+**Causa raiz:** as novas query keys `dashboard-last-checklists` e `dashboard-vehicle-km` não estavam na allowlist de persistência React Query em `src/lib/cachePolicy.ts`, fazendo o `PersistQueryClientProvider` descartar essas queries por padrão (default-deny). Resultado: cada execução do protocolo de performance fazia 4 requests extras ao Dashboard, acusando regressão em `route.dashboard.requestCount`.
+
+**Correção aplicada:** adicionadas as duas query keys à seção de chaves `dashboard-*` com `CACHE_TTL.dashboard`. Criado teste unitário de regressão `persists aggregated dashboard RPC queries inside dashboard TTL` para proteger as novas chaves.
+
+**Arquivos modificados:** `src/lib/cachePolicy.ts`, `src/lib/cachePolicy.test.ts`, `e2e/setup/admin-perf.setup.ts`, `docs/MEMORY.md`, `docs/MEMORY-HISTORY.md`.
+
+**Achado adicional:** a correção de cachePolicy.ts isolada não era suficiente. O `admin-perf.setup.ts` salvava o `storageState` antes das queries RPC completarem, capturando localStorage vazio. Adicionado `waitForLoadState('networkidle')` antes do `storageState`, garantindo que o cache React Query seja persistido antes da captura. Com isso, o perf test inicia com cache aquecido e `route.dashboard.requestCount` volta a 0.
+
+**Validações:** `npm run lint` ✅; `npm run test:unit` ✅ (39 arquivos, 383 testes); `npm run perf` ✅ (route.dashboard.requestCount = 0; regressões residuais remanescentes: pneus e manutencao, fora do escopo).
+
 ---
 
 ## Arquivamento — 2026-06-16
