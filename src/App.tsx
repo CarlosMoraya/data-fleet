@@ -13,6 +13,7 @@ import Layout from './components/Layout';
 import RouteFallback from './components/RouteFallback';
 import Login from './pages/Login';
 import { getDefaultRouteForRole } from './lib/rolePermissions';
+import { shouldPersistQuery } from './lib/cachePolicy';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Vehicles = lazy(() => import('./pages/Vehicles'));
@@ -57,16 +58,9 @@ export default function App() {
       persistOptions={{
         persister,
         maxAge: 1000 * 60 * 60 * 24,
-        buster: 'v1',
+        buster: 'v2',
         dehydrateOptions: {
-          shouldDehydrateQuery: (q) => {
-            const k = q.queryKey?.[0];
-            return [
-              'checklist', 'checklistItems', 'checklistResponses',
-              'vehicleInitialKm', 'lastOdometerKm', 'workshops', 'openChecklist',
-              'tireInspection', 'tireInspectionResponses', 'tireInspectionItems',
-            ].includes(k as string);
-          },
+          shouldDehydrateQuery: (q) => shouldPersistQuery(q.queryKey, q.state.dataUpdatedAt, Date.now()),
         },
       }}
     >

@@ -4,6 +4,38 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 
 ## Arquivamento — 2026-06-16
 
+### Política de persistência de cache React Query
+
+Implementada política central e testável de persistência do cache React Query para telas operacionais, com isolamento multi-tenant preservado por `client_id` nas `queryKey`.
+
+**Arquivos criados:**
+- `src/lib/cachePolicy.ts`: fonte única default-deny com `CACHE_TTL`, `PERSIST_ALLOWLIST` e `shouldPersistQuery`.
+- `src/lib/cachePolicy.test.ts`: cobertura de allowlist, PII recusada, workflows voláteis recusados, helpers sem escopo recusados e TTL expirado.
+- `src/lib/cachePolicy.isolation.test.ts`: validação com `QueryClient` real de isolamento entre `['vehicles', 'clienteA']` e `['vehicles', 'clienteB']`, mantendo `drivers` fora da persistência.
+
+**Arquivos modificados:**
+- `src/App.tsx`: `PersistQueryClientProvider` passou a delegar `shouldDehydrateQuery` para `shouldPersistQuery`; `buster` atualizado de `v1` para `v2`.
+- `docs/MEMORY.md`: estado vigente atualizado com a política ativa e risco aceito.
+
+**Decisões e segurança:**
+- Allowlist por prefixo de `queryKey[0]`, com negação por padrão.
+- TTLs por tipo: referência 24h, operacional 8h, dashboard 1h e offline 24h.
+- PII (`drivers`, `users`, `admin-users`, `driverVehicleMap`), workflows voláteis (`maintenanceOrders`, `budgetApprovals`, `dashboard-active-maintenance`, `workshopSchedules`) e helpers sem escopo (`vehicleTireConfigs`, `availableDrivers`, `availableLogistics`, `availableShippers`) não são persistidos.
+- `switchClient` e logout não foram alterados; logout continua limpando `queryClient` e `persister`.
+- Risco aceito em 2026-06-16: listas operacionais ficam no `localStorage` sem criptografia até o logout, mas sem PII pesada e com limpeza confirmada.
+
+**Validação manual guiada executada em 16/06/2026 com `coordinator@demo.betafleet.local`:**
+- Login e abertura de Cadastros -> Veículos: OK.
+- Navegação Veículos -> Embarcadores -> Veículos: OK; tela de Veículos visível ao retornar.
+- Reload em Veículos: OK; tela de Veículos visível após recarregar.
+- Inspeção de `localStorage.betafleet-rq-cache`: OK; prefixos persistidos observados: `dashboard-checklists`, `dashboard-cost-projection`, `dashboard-drivers`, `dashboard-intervals`, `dashboard-maintenance`, `dashboard-maintenance-previous`, `dashboard-vehicles`, `operationalUnits`, `shippers`, `tires`, `vehicleFieldSettings`, `vehicles`, `vehiclesSimple`.
+- Ausência confirmada de prefixos proibidos: `drivers`, `users`, `maintenanceOrders`, `budgetApprovals`, `admin-users`.
+- Logout: OK; `betafleet-rq-cache` removido.
+
+**Validações automatizadas:** `npm run test:unit -- cachePolicy` ✅ (2 arquivos, 11 testes); `npm run lint` ✅; `npm run test:unit` ✅ (344 testes); `npm run test:smoke` ✅ (6 testes).
+
+---
+
 ### Lazy loading de pdfjs-dist e gráficos do Dashboard
 
 Implementado carregamento sob demanda de `pdfjs-dist` nos fluxos de OCR e dos gráficos do Dashboard que dependem de `recharts`.
