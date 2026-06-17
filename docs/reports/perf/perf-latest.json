@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-06-17T10:13:12.376Z",
-  "buildMs": 1785,
+  "generatedAt": "2026-06-17T16:32:30.925Z",
+  "buildMs": 1735,
   "bundle": {
-    "totalJsRaw": 3237804,
-    "totalJsGzip": 944907,
+    "totalJsRaw": 3237046,
+    "totalJsGzip": 944863,
     "totalCssRaw": 55065,
     "totalCssGzip": 10189,
     "largestChunk": {
@@ -13,142 +13,142 @@
     },
     "files": [
       {
-        "name": "ActionPlans-jx1Ea27Z.js",
+        "name": "ActionPlans-CskfZQ_d.js",
         "raw": 18936,
         "gzip": 5401
       },
       {
-        "name": "AdminClients-DREdElzg.js",
+        "name": "AdminClients-BDcVYIuf.js",
         "raw": 9772,
-        "gzip": 3289
+        "gzip": 3291
       },
       {
-        "name": "AdminUsers-8WEXomka.js",
+        "name": "AdminUsers-6Z9l9zH_.js",
         "raw": 13549,
-        "gzip": 3310
+        "gzip": 3312
       },
       {
-        "name": "BudgetApprovals-DiA6wYJV.js",
+        "name": "BudgetApprovals-YZ4hBo6H.js",
         "raw": 9136,
-        "gzip": 3212
+        "gzip": 3214
       },
       {
-        "name": "BudgetItemsTable-aSaZ9XUD.js",
+        "name": "BudgetItemsTable-P9DcVb3a.js",
         "raw": 8733,
-        "gzip": 2745
+        "gzip": 2746
       },
       {
-        "name": "Cadastros-yCqDzFWZ.js",
+        "name": "Cadastros-CYR2ai7O.js",
         "raw": 2365,
         "gzip": 818
       },
       {
-        "name": "CartesianChart-aSHObii_.js",
+        "name": "CartesianChart-qrESU-b1.js",
         "raw": 30241,
-        "gzip": 8039
+        "gzip": 8038
       },
       {
-        "name": "CategoricalChart-W_y5zT47.js",
+        "name": "CategoricalChart-DnoEVIKn.js",
         "raw": 299771,
-        "gzip": 90239
+        "gzip": 90240
       },
       {
-        "name": "ChecklistFill-DabnKX-h.js",
+        "name": "ChecklistFill-bjArJ9lg.js",
         "raw": 17002,
-        "gzip": 4916
+        "gzip": 4917
       },
       {
-        "name": "ChecklistTemplates-0tSqeBMS.js",
+        "name": "ChecklistTemplates-BNzwfg5E.js",
         "raw": 25170,
-        "gzip": 6853
+        "gzip": 6857
       },
       {
-        "name": "Checklists-DGYs4jt9.js",
-        "raw": 43146,
-        "gzip": 9637
+        "name": "Checklists-BVfPVYVe.js",
+        "raw": 43183,
+        "gzip": 9659
       },
       {
-        "name": "CostTrendChart-I75IzSau.js",
+        "name": "CostTrendChart-CiyF42RT.js",
         "raw": 15793,
-        "gzip": 5250
+        "gzip": 5249
       },
       {
-        "name": "Dashboard-CAKgjWmX.js",
-        "raw": 35821,
-        "gzip": 8950
+        "name": "Dashboard-oEMSWxDh.js",
+        "raw": 34951,
+        "gzip": 8860
       },
       {
-        "name": "Drivers-C9GBLGXz.js",
+        "name": "Drivers-3JcJ_Ig3.js",
         "raw": 33753,
-        "gzip": 8246
+        "gzip": 8245
       },
       {
-        "name": "Maintenance-uQTmn_2O.js",
+        "name": "Maintenance-BXGs-hEJ.js",
         "raw": 44283,
-        "gzip": 11180
+        "gzip": 11184
       },
       {
-        "name": "MaintenanceTypeDonutChart-BX6ruQ3x.js",
+        "name": "MaintenanceTypeDonutChart-BndrIQWj.js",
         "raw": 25949,
-        "gzip": 7786
+        "gzip": 7788
       },
       {
-        "name": "OperationalUnits-ClUD-qPk.js",
+        "name": "OperationalUnits-Chbzttci.js",
         "raw": 15729,
-        "gzip": 4342
+        "gzip": 4344
       },
       {
-        "name": "SelectClientNotice-CdQ2Vj_V.js",
+        "name": "SelectClientNotice-B0qe3Mhn.js",
         "raw": 545,
-        "gzip": 370
+        "gzip": 371
       },
       {
-        "name": "Settings-BP2fg1KH.js",
+        "name": "Settings-BGHFzCn1.js",
         "raw": 28449,
         "gzip": 5761
       },
       {
-        "name": "Shippers-DzqsyurW.js",
+        "name": "Shippers--MOUIgCN.js",
         "raw": 15085,
-        "gzip": 4427
+        "gzip": 4430
       },
       {
-        "name": "TireInspectionFill-D5x-g2Ep.js",
+        "name": "TireInspectionFill-Bfcx_rLS.js",
         "raw": 15689,
-        "gzip": 5623
+        "gzip": 5622
       },
       {
-        "name": "Tires-DyLux0AX.js",
+        "name": "Tires-CDM6qJiC.js",
         "raw": 58310,
         "gzip": 11629
       },
       {
-        "name": "Users-WIFGe3fm.js",
+        "name": "Users-DYoXOHsw.js",
         "raw": 24895,
-        "gzip": 5467
+        "gzip": 5469
       },
       {
-        "name": "VehicleTypeBarChart-3JHa8KBL.js",
+        "name": "VehicleTypeBarChart-CdvEIySm.js",
         "raw": 18335,
-        "gzip": 6511
+        "gzip": 6510
       },
       {
-        "name": "Vehicles-CVDkUTH9.js",
+        "name": "Vehicles-Dt-So6Dc.js",
         "raw": 58092,
         "gzip": 13481
       },
       {
-        "name": "WorkshopJoin-DwpGyba1.js",
+        "name": "WorkshopJoin-DWl6x5Fi.js",
         "raw": 11009,
-        "gzip": 3003
+        "gzip": 3002
       },
       {
-        "name": "WorkshopSchedules-Ky4oGkM4.js",
+        "name": "WorkshopSchedules-Dir6AHs-.js",
         "raw": 25523,
-        "gzip": 6580
+        "gzip": 6581
       },
       {
-        "name": "Workshops-BxeU1Vlp.js",
+        "name": "Workshops-PXJlB64A.js",
         "raw": 33581,
         "gzip": 7835
       },
@@ -163,34 +163,34 @@
         "gzip": 385
       },
       {
-        "name": "ban-B-kmDwm3.js",
+        "name": "ban-rrRE1OiT.js",
         "raw": 170,
         "gzip": 161
       },
       {
-        "name": "building-2-C6vrlLzF.js",
+        "name": "building-2-CrHlOcXM.js",
         "raw": 372,
-        "gzip": 234
+        "gzip": 232
       },
       {
-        "name": "calendar-days-WLh_ir0o.js",
+        "name": "calendar-days-881RfiWL.js",
         "raw": 483,
         "gzip": 257
       },
       {
-        "name": "camera-CIc3iPMX.js",
+        "name": "camera-DNiZv3Kg.js",
         "raw": 325,
         "gzip": 244
       },
       {
-        "name": "check-C4A-jNMR.js",
+        "name": "check-B7SzHJ-_.js",
         "raw": 113,
         "gzip": 130
       },
       {
-        "name": "checklistMappers-BroeGUpj.js",
+        "name": "checklistMappers-C6A6Tlhg.js",
         "raw": 1050,
-        "gzip": 498
+        "gzip": 499
       },
       {
         "name": "checklistTemplateMappers-3OqrjRNN.js",
@@ -198,32 +198,32 @@
         "gzip": 603
       },
       {
-        "name": "chevron-left-B3helV_h.js",
+        "name": "chevron-left-trNBn7Rs.js",
         "raw": 119,
-        "gzip": 136
+        "gzip": 135
       },
       {
-        "name": "chevron-right-LseNsdyz.js",
+        "name": "chevron-right-CpXOlaP4.js",
         "raw": 119,
         "gzip": 132
       },
       {
-        "name": "chevron-up-ChD6_a3a.js",
+        "name": "chevron-up-CRe1z2TJ.js",
         "raw": 117,
         "gzip": 131
       },
       {
-        "name": "circle-alert-B515lXvz.js",
+        "name": "circle-alert-DPB9HfxT.js",
         "raw": 239,
-        "gzip": 180
+        "gzip": 179
       },
       {
-        "name": "circle-check-Dtrc_CZB.js",
+        "name": "circle-check-XAQsnmkb.js",
         "raw": 167,
-        "gzip": 162
+        "gzip": 161
       },
       {
-        "name": "circle-x-Bkn3nksz.js",
+        "name": "circle-x-Dp_jJ3tu.js",
         "raw": 337,
         "gzip": 243
       },
@@ -233,24 +233,24 @@
         "gzip": 270
       },
       {
-        "name": "documentOcr-DlaE9ZhJ.js",
+        "name": "documentOcr-Cc0t6Xlj.js",
         "raw": 7945,
-        "gzip": 3178
+        "gzip": 3180
       },
       {
-        "name": "dollar-sign-1fLZH-6q.js",
+        "name": "dollar-sign-BUxrtobh.js",
         "raw": 324,
-        "gzip": 243
+        "gzip": 241
       },
       {
-        "name": "driverFieldSettingsMappers-C2tjvoRC.js",
+        "name": "driverFieldSettingsMappers-Bhc3CLqY.js",
         "raw": 3708,
-        "gzip": 930
+        "gzip": 931
       },
       {
-        "name": "external-link-DGHIqNqw.js",
+        "name": "external-link-BdHNUuLK.js",
         "raw": 240,
-        "gzip": 192
+        "gzip": 190
       },
       {
         "name": "fieldSettingsMappers-DKW5_8ln.js",
@@ -258,12 +258,12 @@
         "gzip": 1876
       },
       {
-        "name": "gauge-C1kAB5o9.js",
+        "name": "gauge-CMMG-U0m.js",
         "raw": 165,
         "gzip": 161
       },
       {
-        "name": "history-AozOJFqH.js",
+        "name": "history-B6QYCSlH.js",
         "raw": 226,
         "gzip": 187
       },
@@ -273,9 +273,9 @@
         "gzip": 10189
       },
       {
-        "name": "index-CL_RLALp.js",
-        "raw": 582032,
-        "gzip": 173583
+        "name": "index-QZZxty7U.js",
+        "raw": 582107,
+        "gzip": 173592
       },
       {
         "name": "inputHelpers-DFXC3NIM.js",
@@ -283,7 +283,7 @@
         "gzip": 420
       },
       {
-        "name": "invokeEdgeFn-MrCs6MfS.js",
+        "name": "invokeEdgeFn-DdFfR6K2.js",
         "raw": 712,
         "gzip": 561
       },
@@ -293,29 +293,29 @@
         "gzip": 3258
       },
       {
-        "name": "loader-circle-BU6Kq3-e.js",
+        "name": "loader-circle-BiycLNZN.js",
         "raw": 133,
         "gzip": 147
       },
       {
-        "name": "lock-DNIFE5qM.js",
+        "name": "lock-DRRvHhQV.js",
         "raw": 195,
-        "gzip": 184
+        "gzip": 182
       },
       {
-        "name": "map-pin-fvl39649.js",
+        "name": "map-pin-BvPOaVTI.js",
         "raw": 248,
         "gzip": 217
       },
       {
-        "name": "offlineCacheUpdates-B4a7Al9U.js",
+        "name": "offlineCacheUpdates-RaYTt_V4.js",
         "raw": 5699,
-        "gzip": 2271
+        "gzip": 2272
       },
       {
-        "name": "pdf-BNik8P4i.js",
+        "name": "pdf-BamKvHMF.js",
         "raw": 399707,
-        "gzip": 117417
+        "gzip": 117419
       },
       {
         "name": "pdf.worker.min-B_fnEKel.mjs",
@@ -328,49 +328,49 @@
         "gzip": 85
       },
       {
-        "name": "pdfLoader-BjZJdRwF.js",
+        "name": "pdfLoader-Cw0vZQeE.js",
         "raw": 2750,
-        "gzip": 1555
+        "gzip": 1556
       },
       {
-        "name": "pen-9Qba03gy.js",
+        "name": "pen-BbC_da0o.js",
         "raw": 224,
-        "gzip": 195
+        "gzip": 194
       },
       {
-        "name": "pencil-BufBKjZM.js",
+        "name": "pencil-BmOofZMN.js",
         "raw": 265,
-        "gzip": 217
+        "gzip": 216
       },
       {
-        "name": "plus-KDtuW8Bc.js",
+        "name": "plus-CfMZm7rI.js",
         "raw": 142,
         "gzip": 141
       },
       {
-        "name": "refresh-cw-CS17t3r3.js",
+        "name": "refresh-cw-D9rCQWQI.js",
         "raw": 310,
-        "gzip": 221
+        "gzip": 219
       },
       {
-        "name": "rotate-ccw-Dj-V1WCZ.js",
+        "name": "rotate-ccw-DjcVSttl.js",
         "raw": 189,
         "gzip": 174
       },
       {
-        "name": "search-1foZx7LJ.js",
+        "name": "search-DJmaUzf7.js",
         "raw": 163,
-        "gzip": 160
+        "gzip": 158
       },
       {
-        "name": "storageHelpers-BqL-55ci.js",
+        "name": "storageHelpers-BmzPX7Cw.js",
         "raw": 3041,
-        "gzip": 1206
+        "gzip": 1205
       },
       {
-        "name": "tireInspectionService-Dhs1PqqE.js",
+        "name": "tireInspectionService-KNhhf1n7.js",
         "raw": 5941,
-        "gzip": 2088
+        "gzip": 2090
       },
       {
         "name": "tirePositions-CbId8iPE.js",
@@ -378,39 +378,39 @@
         "gzip": 623
       },
       {
-        "name": "tooltipContext-CLKi_p3o.js",
+        "name": "tooltipContext-CRo4gYkC.js",
         "raw": 510,
-        "gzip": 281
+        "gzip": 277
       },
       {
-        "name": "trash-2-C11hSrpP.js",
+        "name": "trash-2-DGOLFzF1.js",
         "raw": 317,
-        "gzip": 208
+        "gzip": 206
       },
       {
-        "name": "triangle-alert-DQs10_D-.js",
+        "name": "triangle-alert-1W9z6MjB.js",
         "raw": 254,
-        "gzip": 202
+        "gzip": 203
       },
       {
-        "name": "truck-DCkjzOGU.js",
+        "name": "truck-DRrm73lf.js",
         "raw": 395,
-        "gzip": 262
+        "gzip": 260
       },
       {
-        "name": "useMutation-BfyLhDqw.js",
+        "name": "useMutation-CWwMUvNn.js",
         "raw": 2251,
-        "gzip": 930
+        "gzip": 931
       },
       {
-        "name": "usePersistentUiState-BC8Q-5M4.js",
+        "name": "usePersistentUiState-B-Y4Weni.js",
         "raw": 1434,
-        "gzip": 658
+        "gzip": 661
       },
       {
-        "name": "useQuery-CI9R4NrW.js",
+        "name": "useQuery-BqQw0PEL.js",
         "raw": 8741,
-        "gzip": 3188
+        "gzip": 3192
       },
       {
         "name": "workshopMappers-D94uSLEx.js",
@@ -418,66 +418,66 @@
         "gzip": 667
       },
       {
-        "name": "x-Cy9J2t2G.js",
+        "name": "x-N3EDDbFP.js",
         "raw": 143,
         "gzip": 142
       }
     ]
   },
   "coldStart": {
-    "shellMs": 1915,
-    "firstUsefulMs": 1922,
-    "requestCount": 29
+    "shellMs": 1911,
+    "firstUsefulMs": 1917,
+    "requestCount": 30
   },
   "routes": [
     {
       "key": "dashboard",
       "label": "Dashboard",
       "url": "/",
-      "entryMs": 1023,
+      "entryMs": 869,
       "requestCount": 0
     },
     {
       "key": "veiculos",
       "label": "Veículos",
       "url": "/cadastros/veiculos",
-      "entryMs": 142,
+      "entryMs": 112,
       "requestCount": 18
     },
     {
       "key": "motoristas",
       "label": "Motoristas",
       "url": "/cadastros/motoristas",
-      "entryMs": 195,
-      "requestCount": 5
+      "entryMs": 71,
+      "requestCount": 3
     },
     {
       "key": "manutencao",
       "label": "Manutenção",
       "url": "/manutencao",
-      "entryMs": 147,
-      "requestCount": 6
+      "entryMs": 150,
+      "requestCount": 8
     },
     {
       "key": "pneus",
       "label": "Pneus",
       "url": "/cadastros/pneus",
-      "entryMs": 145,
-      "requestCount": 5
+      "entryMs": 217,
+      "requestCount": 7
     },
     {
       "key": "checklists",
       "label": "Checklists",
       "url": "/checklists",
-      "entryMs": 932,
-      "requestCount": 12
+      "entryMs": 933,
+      "requestCount": 10
     }
   ],
   "returnBehavior": {
     "route": "veiculos",
-    "firstEntryMs": 87,
+    "firstEntryMs": 145,
     "firstRequestCount": 0,
-    "returnEntryMs": 108,
+    "returnEntryMs": 95,
     "returnRequestCount": 0
   }
 }
