@@ -4,6 +4,8 @@ import { cn } from '../lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
+import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import { Tire, VehicleTireConfig, AxleConfigEntry } from '../types';
 import { TireRow, tireFromRow, vehicleTireConfigFromRow, VehicleTireConfigRow } from '../lib/tireMappers';
 import { generatePositions, generatePositionsFromConfig } from '../lib/tirePositions';
@@ -307,25 +309,14 @@ export default function Tires() {
   const canView = ROLES_CAN_VIEW_TIRES.includes(profile?.role ?? '');
   const canDelete = ROLES_CAN_DELETE_TIRES.includes(profile?.role ?? '') && !blockWrite;
 
-  const [search, setSearch] = React.useState('');
+  const [search, setSearch] = usePersistentFilterState<string>('tires', 'search', '');
 
   // Modais
   const [addModeOpen, setAddModeOpen] = React.useState(false);
   const [vehiclePickerOpen, setVehiclePickerOpen] = React.useState(false);
-  const [selectedVehicle, setSelectedVehicle] = React.useState<{
-    id: string; licensePlate: string; model: string; type: string; eixos?: number;
-    axleConfig?: AxleConfigEntry[]; stepsCount?: number;
-  } | null>(() => {
-    const saved = sessionStorage.getItem('tireFormVehicle');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [tireFormOpen, setTireFormOpen] = React.useState<boolean>(() =>
-    sessionStorage.getItem('tireFormOpen') === 'true'
-  );
-  const [editingTire, setEditingTire] = React.useState<Tire | null>(() => {
-    const saved = sessionStorage.getItem('tireFormEditing');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [selectedVehicle, setSelectedVehicle] = useSessionUiState<VehicleSimpleForPicker | null>('tires', 'selection', 'vehicle', null, { legacyKeys: ['tireFormVehicle'] });
+  const [tireFormOpen, setTireFormOpen] = useSessionUiState<boolean>('tires', 'modal', 'form-open', false, { legacyKeys: ['tireFormOpen'] });
+  const [editingTire, setEditingTire] = useSessionUiState<Tire | null>('tires', 'selection', 'editing', null, { legacyKeys: ['tireFormEditing'] });
   const [batchFormOpen, setBatchFormOpen] = React.useState(false);
   const [historyTire, setHistoryTire] = React.useState<Tire | null>(null);
   const [toggleTire, setToggleTire] = React.useState<Tire | null>(null);
@@ -333,12 +324,19 @@ export default function Tires() {
   const [fullVehicleAlert, setFullVehicleAlert] = React.useState<string | null>(null);
   const [reactivateBlockedTire, setReactivateBlockedTire] = React.useState<Tire | null>(null);
 
-  // Sincronizar estado do formulário de pneu com sessionStorage
-  React.useEffect(() => {
-    sessionStorage.setItem('tireFormOpen', String(tireFormOpen));
-    sessionStorage.setItem('tireFormEditing', JSON.stringify(editingTire));
-    sessionStorage.setItem('tireFormVehicle', JSON.stringify(selectedVehicle));
-  }, [tireFormOpen, editingTire, selectedVehicle]);
+  const clearTireDraft = React.useCallback(() => {
+    const userId = profile?.id ?? 'anonymous';
+    const clientId = profile?.role === 'Admin Master' && !currentClient?.id
+      ? 'all-clients'
+      : (currentClient?.id ?? 'no-client');
+    const storage = window.sessionStorage;
+    removeUiState(storage, buildUiStateKey({ scope: 'session', userId, clientId, module: 'tires', stateKind: 'modal', name: 'form-open' }));
+    removeUiState(storage, buildUiStateKey({ scope: 'session', userId, clientId, module: 'tires', stateKind: 'selection', name: 'editing' }));
+    removeUiState(storage, buildUiStateKey({ scope: 'session', userId, clientId, module: 'tires', stateKind: 'selection', name: 'vehicle' }));
+    storage.removeItem('tireFormOpen');
+    storage.removeItem('tireFormEditing');
+    storage.removeItem('tireFormVehicle');
+  }, [profile?.id, profile?.role, currentClient?.id]);
 
   // ── Queries ──────────────────────────────────────────────────────────────
   const { data: tires = [], isLoading: tiresLoading } = useQuery({
@@ -436,9 +434,7 @@ export default function Tires() {
       setTireFormOpen(false);
       setEditingTire(null);
       setSelectedVehicle(null);
-      sessionStorage.removeItem('tireFormOpen');
-      sessionStorage.removeItem('tireFormEditing');
-      sessionStorage.removeItem('tireFormVehicle');
+      clearTireDraft();
     },
   });
 
@@ -724,9 +720,7 @@ export default function Tires() {
             setTireFormOpen(false);
             setEditingTire(null);
             setSelectedVehicle(null);
-            sessionStorage.removeItem('tireFormOpen');
-            sessionStorage.removeItem('tireFormEditing');
-            sessionStorage.removeItem('tireFormVehicle');
+            clearTireDraft();
           }}
           isSaving={saveMutation.isPending}
           saveError={saveMutation.error instanceof Error ? saveMutation.error.message : undefined}

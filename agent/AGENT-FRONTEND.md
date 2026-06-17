@@ -31,9 +31,12 @@ O frontend do **βetaFleet** é uma SPA (Single Page Application) moderna constr
 - **Cache**: `staleTime` de 3 minutos para navegação fluida.
 - **Offline**: Queries de preenchimento de checklist usam `networkMode: 'offlineFirst'`.
 
-### 3. Persistência de Formulários
-- Uso de `sessionStorage` para manter dados de formulários abertos durante a navegação entre abas dentro da mesma sessão.
-- Limpeza automática ao salvar ou fazer logout.
+### 3. Persistência de Estado de UI
+- Todo estado de UI persistido deve usar o hook padrão em `src/hooks/usePersistentUiState.ts` ou o utilitário puro em `src/lib/uiStateStorage.ts`.
+- Chaves obrigatoriamente seguem o formato `bf:v1:ui:{scope}:{userId}:{clientId}:{module}:{stateKind}:{name}`.
+- Escopos: `session` (sessionStorage), `preference` (localStorage), `draft` (sessionStorage).
+- Nunca usar `sessionStorage.setItem` ou `localStorage.setItem` diretamente para estado de UI — sempre passar pelo hook ou utilitário.
+- Dados sensíveis (senha, CPF, CNH, documento) nunca devem ser persistidos em storage simples.
 
 ---
 

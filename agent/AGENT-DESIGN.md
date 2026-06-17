@@ -69,7 +69,8 @@ O dashboard utiliza o princípio de "Progressive Disclosure", mostrando KPIs ger
 ### Formulários Modais
 - **Estrutura**: `fixed inset-0` com `backdrop-blur`.
 - **Transições**: Devem ser suaves (micro-animações).
-- **Persistência**: Estados de formulário abertos devem ser sincronizados com `sessionStorage`.
+- **Persistência**: Persistência de formulários modais deve usar `useFormDraftState` ou `useSessionUiState` para estado de sessão, e `useUiPreference` para preferências duradouras.
+- **Dados sensíveis**: Rascunhos sensíveis (senha, CPF, CNH) não são persistidos.
 
 ### Tabelas e Listas
 - **Padrão de Scroll**: O cabeçalho deve ser sempre `sticky top-0`.

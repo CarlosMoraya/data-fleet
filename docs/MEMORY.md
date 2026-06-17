@@ -37,6 +37,7 @@ Este arquivo registra apenas o estado vigente, as frentes ativas e os próximos 
 - **Fila de Ação** pode exibir placas e nomes dentro do tenant. **Risco aceito** em 2026-06-13.
 - **Cache operacional em repouso**: listas operacionais permitidas (`vehicles`, `shippers`, `operationalUnits`, `tires` e agregados de dashboard) podem residir no `localStorage` do usuário autenticado. Não incluem PII pesada e são limpas no logout, mas ficam em repouso sem criptografia. **Risco aceito** em 2026-06-16.
 - **Smoke oficial** do projeto é `npm run test:smoke`; em falha, a correção precede novas evoluções.
+- **Convenção `bf:v1:ui`** para persistência de estado de UI implementada em `src/lib/uiStateStorage.ts` e `src/hooks/usePersistentUiState.ts`. Todos os módulos prioritários migrados. Dados sensíveis removidos do storage.
 
 ## Referência Histórica
 

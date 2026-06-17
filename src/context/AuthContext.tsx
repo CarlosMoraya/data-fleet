@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { User, Role, Client, WorkshopAccount, WorkshopPartnership } from '../types';
 import { isOperationsManager } from '../lib/rolePermissions';
 import { queryClient, persister } from '../lib/react-query';
+import { clearCurrentUserUiState } from '../lib/uiStateStorage';
 
 interface AuthContextType {
   user: User | null;
@@ -222,15 +223,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(true);
         fetchProfile(session.user.id, session.user.email ?? '').finally(() => setLoading(false));
       } else if (event === 'SIGNED_OUT') {
+        const userId = user?.id;
         setUser(null);
         setCurrentClient(null);
         setAllClients([]);
         setWorkshopAccount(null);
         setWorkshopPartnerships([]);
         setActiveWorkshopId(null);
-        localStorage.removeItem('dashboard_date_filter');
-        localStorage.removeItem('workshop_active_client');
-        localStorage.removeItem('adminMasterActiveClient');
+        if (userId) {
+          clearCurrentUserUiState(userId);
+        } else {
+          localStorage.removeItem('dashboard_date_filter');
+          localStorage.removeItem('workshop_active_client');
+          localStorage.removeItem('adminMasterActiveClient');
+        }
       }
     });
 

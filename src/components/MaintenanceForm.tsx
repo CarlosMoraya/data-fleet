@@ -3,6 +3,7 @@ import { X, Wrench, Loader2, FileText, ExternalLink, AlertTriangle } from 'lucid
 import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType } from '../types/maintenance';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
 import type { BudgetItem } from '../lib/maintenanceMappers';
 import { budgetItemFromRow, type MaintenanceBudgetItemRow } from '../lib/maintenanceMappers';
 import { validateFile } from '../lib/storageHelpers';
@@ -37,16 +38,27 @@ interface VehicleOption { id: string; licensePlate: string; }
 interface WorkshopOption { id: string; name: string; }
 
 export default function MaintenanceForm({ order, prefill, mode = 'default', onClose, onSave }: MaintenanceFormProps) {
-  const { currentClient } = useAuth();
+  const { user, currentClient } = useAuth();
   const isWorkshopMode = mode === 'workshop';
 
+  const draftKey = user?.id
+    ? buildUiStateKey({ scope: 'draft', userId: user.id, clientId: currentClient?.id ?? 'no-client', module: 'maintenance', stateKind: 'draft', name: 'form' })
+    : '';
+
+  const defaultFormData: Partial<MaintenanceOrder> = order
+    ? { ...order }
+    : {
+      type: 'Preventiva' as MaintenanceType,
+      status: 'Aguardando orçamento' as MaintenanceStatus,
+      estimatedCost: 0,
+      ...prefill,
+    };
+
   const [formData, setFormData] = useState<Partial<MaintenanceOrder>>(() => {
-    try {
-      const saved = sessionStorage.getItem('maintenanceFormData');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
+    if (!draftKey) return defaultFormData;
+    return readUiState<Partial<MaintenanceOrder>>(window.sessionStorage, draftKey, defaultFormData, {
+      legacyKeys: ['maintenanceFormData'],
+    });
   });
 
   const [saving, setSaving] = useState(false);
@@ -74,8 +86,13 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
         ...prefill,
       };
     setFormData(initial);
-    sessionStorage.setItem('maintenanceFormData', JSON.stringify(initial));
   }, [order, prefill]);
+
+  useEffect(() => {
+    if (!draftKey) return;
+    const sanitized = sanitizeDraft('maintenance', formData as Record<string, unknown>);
+    writeUiState(window.sessionStorage, draftKey, sanitized as Partial<MaintenanceOrder>, defaultFormData, { removeLegacyKeys: ['maintenanceFormData'] });
+  }, [formData, draftKey]);
 
   // Carrega itens de orçamento existentes (modo edição)
   useEffect(() => {
@@ -126,7 +143,6 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
     }
     setFormData((prev) => {
       const next = { ...prev, [name]: parsedValue };
-      sessionStorage.setItem('maintenanceFormData', JSON.stringify(next));
       return next;
     });
   };
@@ -163,9 +179,10 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
   };
 
   const handleClose = () => {
-    sessionStorage.removeItem('maintenanceFormOpen');
-    sessionStorage.removeItem('maintenanceFormEditing');
-    sessionStorage.removeItem('maintenanceFormData');
+    if (draftKey) {
+      removeUiState(window.sessionStorage, draftKey);
+    }
+    removeUiState(window.sessionStorage, 'maintenanceFormData');
     onClose();
   };
 

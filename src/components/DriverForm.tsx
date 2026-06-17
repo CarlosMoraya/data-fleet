@@ -13,6 +13,8 @@ import {
   filterPhone,
 } from '../lib/inputHelpers';
 import { extractCnhData, ExtractionStatus, ExtractionResult } from '../lib/documentOcr';
+import { useAuth } from '../context/AuthContext';
+import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
 
 interface DriverFormFiles {
   cnh: File | null;
@@ -43,23 +45,21 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
 };
 
 export default function DriverForm({ driver, fieldSettings, clientId, onClose, onSave }: DriverFormProps) {
+  const { user, currentClient } = useAuth();
   const isCreating = !driver;
-  const [email, setEmail] = useState(() => {
-    return sessionStorage.getItem('driverFormEmail') ?? '';
-  });
-  const [password, setPassword] = useState(() => {
-    return sessionStorage.getItem('driverFormPassword') ?? '';
-  });
+  const draftKey = user?.id
+    ? buildUiStateKey({ scope: 'draft', userId: user.id, clientId: currentClient?.id ?? 'no-client', module: 'drivers', stateKind: 'draft', name: 'form' })
+    : '';
+
+  const defaultFormData = { ...driver };
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [formData, setFormData] = useState<Partial<Driver>>(() => {
-    try {
-      const savedData = sessionStorage.getItem('driverFormData');
-      if (savedData) {
-        return JSON.parse(savedData);
-      }
-    } catch (e) {
-      console.error('Failed to parse driverFormData from sessionStorage', e);
-    }
-    return { ...driver };
+    if (!draftKey) return defaultFormData;
+    const saved = readUiState<Partial<Driver>>(window.sessionStorage, draftKey, defaultFormData, {
+      legacyKeys: ['driverFormData'],
+    });
+    return saved;
   });
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -83,20 +83,10 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
   }, [driver]);
 
   useEffect(() => {
-    sessionStorage.setItem('driverFormData', JSON.stringify(formData));
-  }, [formData]);
-
-  useEffect(() => {
-    if (isCreating) {
-      sessionStorage.setItem('driverFormEmail', email);
-    }
-  }, [email, isCreating]);
-
-  useEffect(() => {
-    if (isCreating) {
-      sessionStorage.setItem('driverFormPassword', password);
-    }
-  }, [password, isCreating]);
+    if (!draftKey) return;
+    const sanitized = sanitizeDraft('drivers', formData as Record<string, unknown>);
+    writeUiState(window.sessionStorage, draftKey, sanitized as Partial<Driver>, defaultFormData, { removeLegacyKeys: ['driverFormData'] });
+  }, [formData, draftKey]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -242,11 +232,12 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
   };
 
   const handleClose = () => {
-    sessionStorage.removeItem('driverFormOpen');
-    sessionStorage.removeItem('driverFormEditing');
-    sessionStorage.removeItem('driverFormData');
-    sessionStorage.removeItem('driverFormEmail');
-    sessionStorage.removeItem('driverFormPassword');
+    if (draftKey) {
+      removeUiState(window.sessionStorage, draftKey);
+    }
+    removeUiState(window.sessionStorage, 'driverFormData');
+    removeUiState(window.sessionStorage, 'driverFormEmail');
+    removeUiState(window.sessionStorage, 'driverFormPassword');
     onClose();
   };
 

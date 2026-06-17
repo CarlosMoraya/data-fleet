@@ -21,6 +21,8 @@ import {
   clearVehicleDraftFiles,
   type VehicleDraftFileKey,
 } from '../lib/offline/vehicleDraftFiles';
+import { useAuth } from '../context/AuthContext';
+import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
 
 interface VehicleFormFiles {
   crlv: File | null;
@@ -91,28 +93,31 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
 };
 
 export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, availableShippers, availableOperationalUnits, restoreFiles, onClose, onSave }: VehicleFormProps) {
-  const [formData, setFormData] = useState<Partial<Vehicle>>(() => {
-    try {
-      const savedData = sessionStorage.getItem('vehicleFormData');
-      if (savedData) {
-        return JSON.parse(savedData);
-      }
-    } catch (e) {
-      console.error('Failed to parse vehicleFormData from sessionStorage', e);
-    }
+  const { user, currentClient } = useAuth();
 
-    return {
-      type: 'Passeio',
-      energySource: 'Combustão',
-      coolingEquipment: false,
-      acquisition: 'Owned',
-      spareKey: false,
-      vehicleManual: false,
-      warranty: false,
-      hasInsurance: false,
-      hasMaintenanceContract: false,
-      ...vehicle,
-    };
+  const draftKey = user?.id
+    ? buildUiStateKey({ scope: 'draft', userId: user.id, clientId: currentClient?.id ?? 'no-client', module: 'vehicles', stateKind: 'draft', name: 'form' })
+    : '';
+
+  const defaultFormData = {
+    type: 'Passeio',
+    energySource: 'Combustão',
+    coolingEquipment: false,
+    acquisition: 'Owned',
+    spareKey: false,
+    vehicleManual: false,
+    warranty: false,
+    hasInsurance: false,
+    hasMaintenanceContract: false,
+    ...vehicle,
+  };
+
+  const [formData, setFormData] = useState<Partial<Vehicle>>(() => {
+    if (!draftKey) return defaultFormData;
+    const saved = readUiState<Partial<Vehicle>>(window.sessionStorage, draftKey, defaultFormData, {
+      legacyKeys: ['vehicleFormData'],
+    });
+    return saved;
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,8 +143,10 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
   }, [vehicle]);
 
   useEffect(() => {
-    sessionStorage.setItem('vehicleFormData', JSON.stringify(formData));
-  }, [formData]);
+    if (!draftKey) return;
+    const sanitized = sanitizeDraft('vehicles', formData as Record<string, unknown>);
+    writeUiState(window.sessionStorage, draftKey, sanitized as Partial<Vehicle>, defaultFormData, { removeLegacyKeys: ['vehicleFormData'] });
+  }, [formData, draftKey]);
 
   useEffect(() => {
     if (!restoreFiles) return;
@@ -358,9 +365,10 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
   };
 
   const handleClose = () => {
-    sessionStorage.removeItem('vehicleFormOpen');
-    sessionStorage.removeItem('vehicleFormEditing');
-    sessionStorage.removeItem('vehicleFormData');
+    if (draftKey) {
+      removeUiState(window.sessionStorage, draftKey);
+    }
+    removeUiState(window.sessionStorage, 'vehicleFormData');
     void clearVehicleDraftFiles();
     onClose();
   };

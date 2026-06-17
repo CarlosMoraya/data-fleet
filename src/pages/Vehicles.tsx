@@ -14,6 +14,8 @@ import type { VehicleFiles } from '../services/vehicleService';
 import { requiresClientSelection } from '../lib/clientScope';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { clearVehicleDraftFiles } from '../lib/offline/vehicleDraftFiles';
+import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
+import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 
 interface AvailableDriver {
   id: string;
@@ -41,21 +43,20 @@ export default function Vehicles() {
   const { currentClient, user, clients } = useAuth();
   const queryClient = useQueryClient();
   const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
-  const [search, setSearch] = useState('');
-  const [isFormOpen, setIsFormOpen] = useState(() => {
-    return sessionStorage.getItem('vehicleFormOpen') === 'true';
-  });
-  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(() => {
-    try {
-      const savedVehicle = sessionStorage.getItem('vehicleFormEditing');
-      return savedVehicle ? JSON.parse(savedVehicle) : null;
-    } catch {
-      return null;
-    }
-  });
-  const [restoredAfterReload] = useState(() => sessionStorage.getItem('vehicleFormOpen') === 'true');
+  const [search, setSearch] = usePersistentFilterState<string>('vehicles', 'search', '');
+  const [isFormOpen, setIsFormOpen, , formOpenKey] = useSessionUiState<boolean>('vehicles', 'modal', 'form-open', false, { legacyKeys: ['vehicleFormOpen'] });
+  const [editingVehicle, setEditingVehicle, , editingKey] = useSessionUiState<Vehicle | null>('vehicles', 'selection', 'editing', null, { legacyKeys: ['vehicleFormEditing'] });
+  const [restoredAfterReload] = useState(() => isFormOpen);
 
   const [viewingVehicle, setViewingVehicle] = useState<Vehicle | null>(null);
+
+  const clearVehicleDraft = () => {
+    if (user?.id) {
+      const key = buildUiStateKey({ scope: 'draft', userId: user.id, clientId: currentClient?.id ?? 'no-client', module: 'vehicles', stateKind: 'draft', name: 'form' });
+      removeUiState(window.sessionStorage, key);
+    }
+    removeUiState(window.sessionStorage, 'vehicleFormData');
+  };
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '') && !blockWrite;
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '') && !blockWrite;
@@ -167,9 +168,7 @@ export default function Vehicles() {
       queryClient.invalidateQueries({ queryKey: ['availableDrivers'] });
       setIsFormOpen(false);
       setEditingVehicle(null);
-      sessionStorage.removeItem('vehicleFormOpen');
-      sessionStorage.removeItem('vehicleFormEditing');
-      sessionStorage.removeItem('vehicleFormData');
+      clearVehicleDraft();
       void clearVehicleDraftFiles();
     },
   });
@@ -230,10 +229,9 @@ export default function Vehicles() {
         {canCreate && (
           <button
             onClick={() => {
-              sessionStorage.removeItem('vehicleFormData');
+              clearVehicleDraft();
               void clearVehicleDraftFiles();
-              sessionStorage.setItem('vehicleFormOpen', 'true');
-              sessionStorage.removeItem('vehicleFormEditing');
+              setIsFormOpen(true);
               setEditingVehicle(null);
               setIsFormOpen(true);
             }}
@@ -367,12 +365,10 @@ export default function Vehicles() {
                         {canEdit && (
                           <button
                             onClick={() => {
-                              sessionStorage.removeItem('vehicleFormData'); // draft
+                              clearVehicleDraft();
                               void clearVehicleDraftFiles();
-                              sessionStorage.setItem('vehicleFormOpen', 'true');
-                              sessionStorage.setItem('vehicleFormEditing', JSON.stringify(vehicle));
-                              setEditingVehicle(vehicle);
                               setIsFormOpen(true);
+                              setEditingVehicle(vehicle);
                             }}
                             className="text-zinc-400 hover:text-zinc-900 transition-colors"
                           >

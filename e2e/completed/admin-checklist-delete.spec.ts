@@ -41,6 +41,7 @@ test.describe.serial('Exclusão de Checklists (Admin Master)', () => {
 
 // Fleet Assistant should NOT see delete button
 test.describe('Assistente NÃO deve ver botão de excluir', () => {
+  test.use({ storageState: 'e2e/.auth/pedro.json' });
   test('fleet assistant não tem botão de excluir checklists', async ({ page }) => {
     // This test uses assistant storageState when run from the assistant project
     await page.goto('/checklists');

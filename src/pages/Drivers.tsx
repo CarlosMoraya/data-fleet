@@ -13,6 +13,8 @@ import { saveDriver, deleteDriver } from '../services/driverService';
 import type { DriverFiles } from '../services/driverService';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import SelectClientNotice from '../components/SelectClientNotice';
+import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
+import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -29,19 +31,20 @@ export default function Drivers() {
   const { currentClient, user, clients } = useAuth();
   const queryClient = useQueryClient();
   const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
-  const [search, setSearch] = useState('');
-  const [isFormOpen, setIsFormOpen] = useState(() => {
-    return sessionStorage.getItem('driverFormOpen') === 'true';
-  });
-  const [editingDriver, setEditingDriver] = useState<Driver | null>(() => {
-    try {
-      const savedDriver = sessionStorage.getItem('driverFormEditing');
-      return savedDriver ? JSON.parse(savedDriver) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [search, setSearch] = usePersistentFilterState<string>('drivers', 'search', '');
+  const [isFormOpen, setIsFormOpen] = useSessionUiState<boolean>('drivers', 'modal', 'form-open', false, { legacyKeys: ['driverFormOpen'] });
+  const [editingDriver, setEditingDriver] = useSessionUiState<Driver | null>('drivers', 'selection', 'editing', null, { legacyKeys: ['driverFormEditing'] });
   const [viewingDriver, setViewingDriver] = useState<Driver | null>(null);
+
+  const clearDriverDraft = () => {
+    if (user?.id) {
+      const key = buildUiStateKey({ scope: 'draft', userId: user.id, clientId: currentClient?.id ?? 'no-client', module: 'drivers', stateKind: 'draft', name: 'form' });
+      removeUiState(window.sessionStorage, key);
+    }
+    removeUiState(window.sessionStorage, 'driverFormData');
+    removeUiState(window.sessionStorage, 'driverFormEmail');
+    removeUiState(window.sessionStorage, 'driverFormPassword');
+  };
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '') && !blockWrite;
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '') && !blockWrite;
@@ -112,11 +115,7 @@ export default function Drivers() {
     ]);
     setIsFormOpen(false);
     setEditingDriver(null);
-    sessionStorage.removeItem('driverFormOpen');
-    sessionStorage.removeItem('driverFormEditing');
-    sessionStorage.removeItem('driverFormData');
-    sessionStorage.removeItem('driverFormEmail');
-    sessionStorage.removeItem('driverFormPassword');
+    clearDriverDraft();
   };
 
   const handleDelete = async (driver: Driver) => {
@@ -161,9 +160,7 @@ export default function Drivers() {
         {canCreate && (
           <button
             onClick={() => {
-              sessionStorage.removeItem('driverFormData');
-              sessionStorage.setItem('driverFormOpen', 'true');
-              sessionStorage.removeItem('driverFormEditing');
+              clearDriverDraft();
               setEditingDriver(null);
               setIsFormOpen(true);
             }}
@@ -272,9 +269,7 @@ export default function Drivers() {
                         {canEdit && (
                           <button
                             onClick={() => {
-                              sessionStorage.removeItem('driverFormData');
-                              sessionStorage.setItem('driverFormOpen', 'true');
-                              sessionStorage.setItem('driverFormEditing', JSON.stringify(driver));
+                              clearDriverDraft();
                               setEditingDriver(driver);
                               setIsFormOpen(true);
                             }}

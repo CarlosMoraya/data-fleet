@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle, Disc } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -15,6 +15,8 @@ import {
   createTireInspection,
   findOpenTireInspection,
 } from '../services/tireInspectionService';
+import { usePersistentTabState, usePersistentFilterState, useSessionUiState } from '../hooks/usePersistentUiState';
+import { buildUiStateKey, safeParseJson } from '../lib/uiStateStorage';
 import { cn } from '../lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -28,10 +30,18 @@ const STATUS_COLOR: Record<string, string> = {
   completed: 'bg-green-100 text-green-800',
 };
 
-const TAB_STORAGE_KEY = 'checklists:activeTab';
+export function isValidChecklistTab(value: unknown): value is 'checklists' | 'tireInspections' {
+  return value === 'checklists' || value === 'tireInspections';
+}
+
+function isValidHistoryStatusFilter(value: unknown): value is 'all' | 'in_progress' | 'completed' {
+  return value === 'all' || value === 'in_progress' || value === 'completed';
+}
 
 export function getStoredChecklistTab(raw: string | null): 'checklists' | 'tireInspections' {
-  return raw === 'tireInspections' || raw === 'checklists' ? raw : 'checklists';
+  if (raw === null) return 'checklists';
+  const parsed = safeParseJson<string>(raw, raw);
+  return isValidChecklistTab(parsed) ? parsed : 'checklists';
 }
 
 export default function Checklists() {
@@ -47,14 +57,20 @@ export default function Checklists() {
   const isAnalystPlus = ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'].includes(user?.role ?? '');
   const isAdminMaster = user?.role === 'Admin Master';
 
-  // State for search/filters
-  const [historySearch, setHistorySearch] = useState('');
-  const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'in_progress' | 'completed'>('all');
-  const [onlyWithIssues, setOnlyWithIssues] = useState(false);
-  const [activeTab, setActiveTab] = useState<'checklists' | 'tireInspections'>(
-    () => getStoredChecklistTab(sessionStorage.getItem(TAB_STORAGE_KEY)),
+  const [activeTab, setActiveTab] = usePersistentTabState('checklists', 'active', 'checklists', {
+    legacyKeys: ['checklists:activeTab'],
+    validator: isValidChecklistTab,
+  });
+  const [historySearch, setHistorySearch] = usePersistentFilterState('checklists', 'history-search', '');
+  const [historyStatusFilter, setHistoryStatusFilter] = usePersistentFilterState<'all' | 'in_progress' | 'completed'>(
+    'checklists', 'history-status', 'all', { validator: isValidHistoryStatusFilter },
   );
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
+  const [onlyWithIssues, setOnlyWithIssues] = useSessionUiState<boolean>(
+    'checklists', 'filter', 'only-with-issues', false,
+  );
+  const [selectedVehicleId, setSelectedVehicleId] = useSessionUiState<string>(
+    'checklists', 'selection', 'auditor-vehicle', '',
+  );
 
   // Local UI state
   const [starting, setStarting] = useState<string | null>(null);
@@ -66,10 +82,6 @@ export default function Checklists() {
   const [startingTireInspection, setStartingTireInspection] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const isOnline = useOnlineStatus();
-
-  useEffect(() => {
-    sessionStorage.setItem(TAB_STORAGE_KEY, activeTab);
-  }, [activeTab]);
 
   // ── Queries for Driver ────────────────────────────────────────────────────
   const { data: vehicleInfo, isLoading: loadingVehicleInfo } = useQuery({

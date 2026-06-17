@@ -18,6 +18,8 @@ import {
 import { isOperationsManager } from '../lib/rolePermissions';
 import { requiresClientSelection } from '../lib/clientScope';
 import SelectClientNotice from '../components/SelectClientNotice';
+import { useSessionUiState, usePersistentFilterState, usePersistentTabState } from '../hooks/usePersistentUiState';
+import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 
 // Re-export para compatibilidade com componentes que importam daqui
 export type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus };
@@ -117,8 +119,8 @@ export default function Maintenance() {
   const operationsManager = isOperationsManager(profile?.role);
   const canWriteMaintenance = !operationsManager && !isWorkshopUser && !blockWrite;
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = React.useState<StatusFilter>('all');
-  const [search, setSearch] = React.useState('');
+  const [activeTab, setActiveTab] = usePersistentTabState('maintenance', 'status', 'all');
+  const [search, setSearch] = usePersistentFilterState<string>('maintenance', 'search', '');
   const [selectedOrder, setSelectedOrder] = React.useState<MaintenanceOrder | null>(null);
   const allowedRoles: Role[] = [
     'Workshop',
@@ -137,24 +139,20 @@ export default function Maintenance() {
     return <Navigate to={profile.role === 'Driver' || profile.role === 'Yard Auditor' ? '/checklists' : '/'} replace />;
   }
 
-  const [isFormOpen, setIsFormOpen] = React.useState<boolean>(() =>
-    !operationsManager && sessionStorage.getItem('maintenanceFormOpen') === 'true'
-  );
-  const [orderToEdit, setOrderToEdit] = React.useState<MaintenanceOrder | null>(() => {
-    if (operationsManager) return null;
-    const saved = sessionStorage.getItem('maintenanceFormEditing');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [isFormOpen, setIsFormOpen] = useSessionUiState<boolean>('maintenance', 'modal', 'form-open', false, { legacyKeys: ['maintenanceFormOpen'] });
+  const [orderToEdit, setOrderToEdit] = useSessionUiState<MaintenanceOrder | null>('maintenance', 'selection', 'editing', null, { legacyKeys: ['maintenanceFormEditing'] });
   const [prefillData, setPrefillData] = React.useState<Partial<MaintenanceOrder> | undefined>(
     () => (operationsManager ? undefined : (location.state as any)?.prefillMaintenance ?? undefined)
   );
   const [orderToCancel, setOrderToCancel] = React.useState<MaintenanceOrder | null>(null);
 
-  // Sincronizar estado do formulário com sessionStorage
-  React.useEffect(() => {
-    sessionStorage.setItem('maintenanceFormOpen', String(isFormOpen));
-    sessionStorage.setItem('maintenanceFormEditing', JSON.stringify(orderToEdit));
-  }, [isFormOpen, orderToEdit]);
+  const clearMaintenanceDraft = () => {
+    if (profile?.id) {
+      const key = buildUiStateKey({ scope: 'draft', userId: profile.id, clientId: currentClient?.id ?? 'no-client', module: 'maintenance', stateKind: 'draft', name: 'form' });
+      removeUiState(window.sessionStorage, key);
+    }
+    removeUiState(window.sessionStorage, 'maintenanceFormData');
+  };
 
   // Abrir form automaticamente se vier do fluxo agendamento → manutenção
   React.useEffect(() => {
@@ -257,9 +255,7 @@ export default function Maintenance() {
       queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
       setIsFormOpen(false);
       setOrderToEdit(null);
-      sessionStorage.removeItem('maintenanceFormOpen');
-      sessionStorage.removeItem('maintenanceFormEditing');
-      sessionStorage.removeItem('maintenanceFormData');
+      clearMaintenanceDraft();
     },
   });
 
@@ -579,9 +575,7 @@ export default function Maintenance() {
             setIsFormOpen(false);
             setOrderToEdit(null);
             setPrefillData(undefined);
-            sessionStorage.removeItem('maintenanceFormOpen');
-            sessionStorage.removeItem('maintenanceFormEditing');
-            sessionStorage.removeItem('maintenanceFormData');
+            clearMaintenanceDraft();
           }}
           onSave={async (data, budgetItems, budgetFile) => {
             await saveMutation.mutateAsync({ data, budgetItems, budgetFile });

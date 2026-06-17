@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useUiPreference, usePersistentTabState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { LayoutDashboard, DollarSign, CalendarDays, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -57,32 +58,19 @@ function getDefaultDateRange() {
 export default function Dashboard() {
   const { currentClient, user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>('geral');
-  const [filters, setFilters] = useState<DashboardFilters>({
+  const [activeTab, setActiveTab] = usePersistentTabState('dashboard', 'active', 'geral');
+  const [filters, setFilters] = usePersistentFilterState<DashboardFilters>('dashboard', 'chart-filters', {
     vehicleType: null,
     maintenanceType: null,
   });
 
-  const [dateRange, setDateRange] = useState<{ from: string; to: string }>(() => {
-    try {
-      const stored = localStorage.getItem('dashboard_date_filter');
-      return stored ? JSON.parse(stored) : getDefaultDateRange();
-    } catch {
-      return getDefaultDateRange();
-    }
-  });
-
-  function handleDateChange(field: 'from' | 'to', value: string) {
-    const next = { ...dateRange, [field]: value };
-    setDateRange(next);
-    localStorage.setItem('dashboard_date_filter', JSON.stringify(next));
-  }
-
-  function handleResetToCurrentMonth() {
-    const next = getDefaultDateRange();
-    setDateRange(next);
-    localStorage.setItem('dashboard_date_filter', JSON.stringify(next));
-  }
+  const [dateRange, setDateRange] = useUiPreference<{ from: string; to: string }>(
+    'dashboard',
+    'filter',
+    'date-range',
+    getDefaultDateRange(),
+    { legacyKeys: ['dashboard_date_filter'] },
+  );
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -538,7 +526,7 @@ export default function Dashboard() {
               type="date"
               value={dateRange.from}
               max={dateRange.to}
-              onChange={(e) => handleDateChange('from', e.target.value)}
+              onChange={(e) => setDateRange((prev) => ({ ...prev, from: e.target.value }))}
               className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
@@ -548,12 +536,12 @@ export default function Dashboard() {
               type="date"
               value={dateRange.to}
               min={dateRange.from}
-              onChange={(e) => handleDateChange('to', e.target.value)}
+              onChange={(e) => setDateRange((prev) => ({ ...prev, to: e.target.value }))}
               className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
           <button
-            onClick={handleResetToCurrentMonth}
+            onClick={() => setDateRange(getDefaultDateRange())}
             className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100 transition-colors"
           >
             Mês atual
