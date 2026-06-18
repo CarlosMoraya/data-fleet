@@ -459,13 +459,13 @@ export default function Dashboard() {
   const handleActionClick = (category: ActionItem['category']) => {
     const routes: Record<ActionItem['category'], string> = {
       checklist: '/checklists',
-      crlv: '/cadastros/veiculos',
-      crlv_expiring: '/cadastros/veiculos',
+      crlv: '/cadastros/veiculos?pendencia=crlv_vencido',
+      crlv_expiring: '/cadastros/veiculos?pendencia=crlv_a_vencer',
       cnh: '/cadastros/motoristas',
       cnh_expiring: '/cadastros/motoristas',
       os_overdue: '/manutencao',
       os_pending_approval: '/manutencao',
-      gr_vehicle_expiring: '/cadastros/veiculos',
+      gr_vehicle_expiring: '/cadastros/veiculos?pendencia=gr_a_vencer',
       gr_driver_expiring: '/cadastros/motoristas',
     };
     navigate(routes[category]);

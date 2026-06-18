@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { Vehicle, VehicleFieldSettings } from '../types';
@@ -16,6 +16,17 @@ import SelectClientNotice from '../components/SelectClientNotice';
 import { clearVehicleDraftFiles } from '../lib/offline/vehicleDraftFiles';
 import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
+import { computeOverdueChecklistVehicleIds } from '../lib/dashboardKpi';
+import {
+  PENDENCY_LABELS,
+  PENDENCY_VALUES,
+  applyVehicleFilters,
+  hasActiveStructuredFilters,
+  parseVehicleFiltersFromParams,
+  serializeVehicleFiltersToParams,
+  type VehiclePendency,
+  type VehicleStructuredFilters,
+} from '../lib/vehicleFilters';
 
 interface AvailableDriver {
   id: string;
@@ -44,6 +55,8 @@ export default function Vehicles() {
   const queryClient = useQueryClient();
   const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
   const [search, setSearch] = usePersistentFilterState<string>('vehicles', 'search', '');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filters = useMemo(() => parseVehicleFiltersFromParams(searchParams), [searchParams]);
   const [isFormOpen, setIsFormOpen, , formOpenKey] = useSessionUiState<boolean>('vehicles', 'modal', 'form-open', false, { legacyKeys: ['vehicleFormOpen'] });
   const [editingVehicle, setEditingVehicle, , editingKey] = useSessionUiState<Vehicle | null>('vehicles', 'selection', 'editing', null, { legacyKeys: ['vehicleFormEditing'] });
   const [restoredAfterReload] = useState(() => isFormOpen);
@@ -152,6 +165,118 @@ export default function Vehicles() {
     enabled: isFormOpen && !!currentClient?.id,
   });
 
+  const shipperOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const vehicle of vehicles) {
+      if (vehicle.shipperId && vehicle.shipperName) {
+        map.set(vehicle.shipperId, vehicle.shipperName);
+      }
+    }
+    return [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  }, [vehicles]);
+
+  const allUnitOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; shipperId: string }>();
+    for (const vehicle of vehicles) {
+      if (vehicle.operationalUnitId && vehicle.operationalUnitName && vehicle.shipperId) {
+        map.set(vehicle.operationalUnitId, {
+          id: vehicle.operationalUnitId,
+          name: vehicle.operationalUnitName,
+          shipperId: vehicle.shipperId,
+        });
+      }
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  }, [vehicles]);
+
+  const unitOptions = useMemo(() => {
+    if (!filters.shipperId) return allUnitOptions;
+    return allUnitOptions.filter((unit) => unit.shipperId === filters.shipperId);
+  }, [allUnitOptions, filters.shipperId]);
+
+  const { data: checklistRows = [] } = useQuery<
+    { vehicle_id: string; context: string; completed_at: string }[]
+  >({
+    queryKey: ['vehicles-overdue-checklists', currentClient?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('dashboard_last_checklist_per_vehicle', {
+        p_client_id: currentClient?.id ?? null,
+      });
+      if (error) throw error;
+      return (data ?? []).map((row: Record<string, unknown>) => ({
+        vehicle_id: row.vehicle_id as string,
+        context: (row.context as string) ?? '',
+        completed_at: row.completed_at as string,
+      }));
+    },
+    enabled: !!user && filters.pendency === 'checklist_vencido',
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  const { data: intervalRows = [] } = useQuery<
+    { client_id: string; rotina_day_interval: number | null; seguranca_day_interval: number | null }[]
+  >({
+    queryKey: ['vehicles-checklist-intervals', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from('checklist_day_intervals')
+        .select('client_id, rotina_day_interval, seguranca_day_interval');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as { client_id: string; rotina_day_interval: number | null; seguranca_day_interval: number | null }[];
+    },
+    enabled: !!user && filters.pendency === 'checklist_vencido',
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  const overdueChecklistVehicleIds = useMemo(() => {
+    if (filters.pendency !== 'checklist_vencido') return new Set<string>();
+    const intervalsByClient = new Map<string, { rotina_day_interval: number | null; seguranca_day_interval: number | null }>();
+    for (const row of intervalRows) {
+      intervalsByClient.set(row.client_id, {
+        rotina_day_interval: row.rotina_day_interval,
+        seguranca_day_interval: row.seguranca_day_interval,
+      });
+    }
+    return computeOverdueChecklistVehicleIds({
+      vehicles: vehicles.map((vehicle) => ({ id: vehicle.id, client_id: vehicle.clientId ?? null })),
+      checklistRows,
+      intervalsByClient,
+      today: new Date(),
+    });
+  }, [checklistRows, filters.pendency, intervalRows, vehicles]);
+
+  const pendencyCtx = useMemo(() => ({
+    todayIso: new Date().toISOString().slice(0, 10),
+    currentYear: String(new Date().getFullYear()),
+    overdueChecklistVehicleIds,
+  }), [overdueChecklistVehicleIds]);
+
+  const updateFilter = (patch: Partial<VehicleStructuredFilters>) => {
+    const next = { ...filters, ...patch };
+    if ('shipperId' in patch) {
+      const selectedUnit = next.operationalUnitId
+        ? allUnitOptions.find((unit) => unit.id === next.operationalUnitId)
+        : undefined;
+      if (selectedUnit && selectedUnit.shipperId !== next.shipperId) {
+        next.operationalUnitId = null;
+      }
+    }
+    setSearchParams(serializeVehicleFiltersToParams(next), { replace: false });
+  };
+
+  const clearAllFilters = () => {
+    setSearchParams(new URLSearchParams());
+    setSearch('');
+  };
+
   const availableShippers = logisticsData?.shippers ?? [];
   const availableOperationalUnits = logisticsData?.units ?? [];
 
@@ -199,17 +324,10 @@ export default function Vehicles() {
     deleteMutation.mutate(vehicle);
   };
 
-  const filteredVehicles = useMemo(() => {
-    return vehicles.filter(v => {
-      if (!search) return true;
-      const q = search.toLowerCase();
-      return (
-        v.licensePlate.toLowerCase().includes(q) ||
-        `${v.brand} ${v.model}`.toLowerCase().includes(q) ||
-        v.chassi.toLowerCase().includes(q)
-      );
-    });
-  }, [vehicles, search]);
+  const filteredVehicles = useMemo(
+    () => applyVehicleFilters(vehicles, search, filters, pendencyCtx),
+    [vehicles, search, filters, pendencyCtx]
+  );
 
   const clientNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -256,6 +374,49 @@ export default function Vehicles() {
             placeholder="Buscar por placa, modelo ou chassi..."
           />
         </div>
+        <select
+          aria-label="Embarcador"
+          value={filters.shipperId ?? ''}
+          onChange={(e) => updateFilter({ shipperId: e.target.value || null })}
+          className="rounded-xl border border-zinc-200 bg-white py-2.5 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="">Todos os embarcadores</option>
+          {shipperOptions.map((shipper) => (
+            <option key={shipper.id} value={shipper.id}>{shipper.name}</option>
+          ))}
+        </select>
+        <select
+          aria-label="Unidade Operacional"
+          value={filters.operationalUnitId ?? ''}
+          onChange={(e) => updateFilter({ operationalUnitId: e.target.value || null })}
+          className="rounded-xl border border-zinc-200 bg-white py-2.5 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="">Todas as unidades</option>
+          {unitOptions.map((unit) => (
+            <option key={unit.id} value={unit.id}>{unit.name}</option>
+          ))}
+        </select>
+        <select
+          aria-label="Pendência"
+          value={filters.pendency ?? ''}
+          onChange={(e) => updateFilter({ pendency: (e.target.value || null) as VehiclePendency | null })}
+          className="rounded-xl border border-zinc-200 bg-white py-2.5 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="">Todas as pendências</option>
+          {PENDENCY_VALUES.map((pendency) => (
+            <option key={pendency} value={pendency}>{PENDENCY_LABELS[pendency]}</option>
+          ))}
+        </select>
+        {(hasActiveStructuredFilters(filters) || !!search) && (
+          <button
+            type="button"
+            aria-label="Limpar filtros"
+            onClick={clearAllFilters}
+            className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+          >
+            Limpar filtros
+          </button>
+        )}
       </div>
 
       {vehiclesError && (
@@ -392,7 +553,7 @@ export default function Vehicles() {
                 {filteredVehicles.length === 0 && (
                   <tr>
                     <td colSpan={blockWrite ? 8 : 7} className="py-10 text-center text-sm text-zinc-500">
-                      {search ? 'Nenhum veículo encontrado para esta busca.' : blockWrite ? 'Nenhum veículo cadastrado em nenhum cliente.' : 'Nenhum veículo cadastrado para este cliente.'}
+                      {(search || hasActiveStructuredFilters(filters)) ? 'Nenhum veículo encontrado para os filtros aplicados.' : blockWrite ? 'Nenhum veículo cadastrado em nenhum cliente.' : 'Nenhum veículo cadastrado para este cliente.'}
                     </td>
                   </tr>
                 )}
