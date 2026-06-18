@@ -4,6 +4,54 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 
 ## Arquivamento — 2026-06-17
 
+### Bug corrigido — Dashboard com 404 nas RPCs de agregação (dev e produção)
+
+**Sintoma:** ao abrir o Dashboard (tanto em `localhost:3000` quanto em produção), o DevTools mostrava quatro `POST` com status **404 (Not Found)** para `rpc/dashboard_vehicle_km_in_period`, `rpc/dashboard_previous_period_cost`, `rpc/dashboard_cost_projection_monthly` e `rpc/dashboard_last_checklist_per_vehicle`. Os painéis de custo anterior/variação, projeção mensal, última checklist por veículo e KM rodado ficavam sem dados.
+
+**Causa raiz (Tipo D — regressão):** as quatro funções `public.dashboard_*` nunca foram criadas no projeto Supabase `oajfjdadcicgoxrfrnny`. As migrações `20260617000000_create_dashboard_cost_rpcs.sql` e `20260617000100_create_dashboard_checklist_rpcs.sql` foram commitadas (commit `d3fa705`) e o `src/pages/Dashboard.tsx` passou a chamá-las via `supabase.rpc(...)`, mas o SQL nunca foi executado no SQL Editor (migrações são manuais). Dev e produção usam o **mesmo** backend Supabase (`.env.local` → `VITE_SUPABASE_URL=https://oajfjdadcicgoxrfrnny.supabase.co`), por isso o 404 aparecia em todos os ambientes.
+
+**Correção aplicada:** execução, no SQL Editor do Supabase, do bloco idempotente `apply-dashboard-rpcs-production.sql` (CREATE OR REPLACE das 4 funções `SECURITY INVOKER` + `GRANT EXECUTE ... TO authenticated`), com conteúdo verbatim das duas migrações. Nenhum arquivo de `src/` foi alterado. Validado manualmente: Dashboard recarregado, as quatro RPCs retornam `200` e os painéis exibem dados. Aprovado pelo usuário em 2026-06-17.
+
+**Observações registradas (fora do escopo da correção):**
+- Dev e produção compartilham o mesmo projeto Supabase — não há banco de desenvolvimento isolado; avaliar projeto separado para dev.
+- Lacuna de processo: frontend faz deploy automático (Vercel) mas migrações são manuais — risco de "código novo dependente de migração não aplicada". Considerar checklist de deploy e smoke de saúde das RPCs do Dashboard.
+- Rollback disponível em `supabase/migrations/20260617000200_rollback_dashboard_rpcs.sql`.
+
+### Suíte E2E de regressão pós-otimização e correções de persistência
+
+Implementada suíte de regressão para validar que as otimizações recentes de cache, code splitting, lazy loading, persistência de UI e Dashboard não quebram fluxos críticos da SPA.
+
+**Correções aplicadas:**
+- `src/pages/Settings.tsx`: `saveDriverMutation.onSuccess` passou a invalidar `['driverFieldSettings', currentClient?.id]`, espelhando a mutação de veículo.
+- `src/lib/cachePolicy.ts`: removidas da allowlist persistida as chaves `vehicleFieldSettings`, `vehicleSettings`, `driverFieldSettings` e `driverSettings`, evitando reidratação stale em reload após save.
+- `src/pages/Checklists.tsx`: abas de Checklists receberam `role="tablist"`, `role="tab"` e `aria-selected`.
+- `src/context/AuthContext.tsx`: logout passou a chamar `clearCurrentUserUiState(user.id)` diretamente antes do `signOut`, garantindo limpeza de chaves `bf:v1:ui:*` mesmo quando o callback assíncrono de auth não captura o usuário atual.
+
+**Cobertura E2E adicionada:**
+- `e2e/completed/regression-optim-persistence-reload.spec.ts`: filtros persistem e conteúdo reidrata após reload em Veículos, Motoristas, Pneus e Manutenção.
+- `e2e/completed/regression-optim-tenant-isolation.spec.ts`: troca Admin Master entre Deluna Transportes e BetaFleet não vaza placas/dados do tenant anterior.
+- `e2e/completed/regression-optim-logout-clears-data.spec.ts`: logout via UI remove `betafleet-rq-cache`, chaves `bf:v1:ui:*` e legados sensíveis.
+- `e2e/completed/regression-optim-lazy-libs.spec.ts`: gráficos do Dashboard e rota de PDF não emitem erro de chunk/lazy loading.
+- `e2e/completed/regression-optim-routesplit-ttuc.spec.ts`: rotas principais resolvem chunks e conteúdo útil dentro de 10s, com logs de TTUC.
+- `e2e/completed/ui-state-persistence.spec.ts`: adicionada cobertura de Agendamentos para conteúdo útil, retorno à tela e rascunho sem dados sensíveis.
+
+**Ajustes de testes existentes:**
+- `src/lib/cachePolicy.test.ts`: teste de referência passou a usar chave ainda permitida e foi adicionada asserção explícita de que as 4 chaves de settings não persistem.
+- `e2e/completed/tire-inspection-assistant.spec.ts`: helper da aba de inspeções passou de `getByRole('button')` para `getByRole('tab')`, acompanhando a semântica ARIA correta.
+- `e2e/completed/ui-state-persistence.spec.ts`: teste de namespace agora provoca gravação de busca antes de inspecionar `sessionStorage`.
+
+**Validações executadas:**
+- `npm run lint` ✅
+- `npm run test:unit` ✅ (39 arquivos, 384 testes)
+- E2E direcionado de settings/UI state ✅ (15/15)
+- Specs novas pós-otimização ✅ (11/11)
+- `npm run test:smoke` ✅ (6/6)
+- `npx playwright test` ✅ (165/165)
+
+**Performance:** `npm run perf` executou build e testes Playwright de performance com sucesso, mas o gate comparativo acusou regressões acima de 15% em `route.veiculos.entryMs`, `route.pneus.requestCount` e `returnBehavior.returnEntryMs`. Em 17/06/2026, o usuário aceitou essas regressões como oportunidades de melhoria futura e decidiu seguir no desenvolvimento do sistema. O baseline de performance não foi atualizado nesta sessão.
+
+## Arquivamento — 2026-06-17
+
 ### Agregações do Dashboard via RPCs Supabase
 
 Implementada otimização do Dashboard Executivo para mover agregações pesadas de custo e checklist do cliente para o Postgres, preservando os números exibidos e mantendo as funções puras de KPI intactas.
