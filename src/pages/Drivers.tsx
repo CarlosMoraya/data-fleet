@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Driver, DriverFieldSettings } from '../types';
 import { Plus, Search, Edit2, Trash2, UserCircle, Truck, Eye } from 'lucide-react';
 import DriverForm from '../components/DriverForm';
 import DriverDetailModal from '../components/DriverDetailModal';
+import DriverActiveFilterBanner from '../components/DriverActiveFilterBanner';
 import { supabase } from '../lib/supabase';
 import { driverFromRow, DriverRow } from '../lib/driverMappers';
 import { driverFieldSettingsFromRow, defaultDriverFieldSettings, DriverFieldSettingsRow } from '../lib/driverFieldSettingsMappers';
@@ -15,6 +16,17 @@ import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
+import {
+  DRIVER_PENDENCY_LABELS,
+  DRIVER_PENDENCY_VALUES,
+  applyDriverFilters,
+  hasActiveDriverFilters,
+  parseDriverFiltersFromParams,
+  serializeDriverFiltersToParams,
+  type DriverPendency,
+  type DriverStructuredFilters,
+  type DriverVehicleLink,
+} from '../lib/driverFilters';
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -32,6 +44,8 @@ export default function Drivers() {
   const queryClient = useQueryClient();
   const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
   const [search, setSearch] = usePersistentFilterState<string>('drivers', 'search', '');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filters = useMemo(() => parseDriverFiltersFromParams(searchParams), [searchParams]);
   const [isFormOpen, setIsFormOpen] = useSessionUiState<boolean>('drivers', 'modal', 'form-open', false, { legacyKeys: ['driverFormOpen'] });
   const [editingDriver, setEditingDriver] = useSessionUiState<Driver | null>('drivers', 'selection', 'editing', null, { legacyKeys: ['driverFormEditing'] });
   const [viewingDriver, setViewingDriver] = useState<Driver | null>(null);
@@ -79,22 +93,111 @@ export default function Drivers() {
     enabled: !!currentClient?.id
   });
 
-  const { data: driverVehicleMap = {} } = useQuery({
-    queryKey: ['driverVehicleMap', currentClient?.id ?? 'all-clients'],
+  const { data: driverVehicleInfo = {} } = useQuery({
+    queryKey: ['driverVehicleInfo', currentClient?.id ?? 'all-clients'],
     queryFn: async () => {
-      let query = supabase.from('vehicles').select('driver_id, license_plate').not('driver_id', 'is', null);
+      let query = supabase
+        .from('vehicles')
+        .select('driver_id, license_plate, shipper_id, operational_unit_id, shippers(name), operational_units(name)')
+        .not('driver_id', 'is', null);
       if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
       }
       const { data } = await query;
-      const map: Record<string, string> = {};
-      (data ?? []).forEach((row: { driver_id: string; license_plate: string }) => {
-        map[row.driver_id] = row.license_plate;
+      const map: Record<string, {
+        plate: string;
+        shipperId: string | null;
+        shipperName: string | null;
+        operationalUnitId: string | null;
+        unitName: string | null;
+      }> = {};
+      (data ?? []).forEach((row: {
+        driver_id: string;
+        license_plate: string;
+        shipper_id: string | null;
+        operational_unit_id: string | null;
+        shippers?: { name?: string | null } | Array<{ name?: string | null }> | null;
+        operational_units?: { name?: string | null } | Array<{ name?: string | null }> | null;
+      }) => {
+        const shipper = Array.isArray(row.shippers) ? row.shippers[0] : row.shippers;
+        const operationalUnit = Array.isArray(row.operational_units) ? row.operational_units[0] : row.operational_units;
+        map[row.driver_id] = {
+          plate: row.license_plate,
+          shipperId: row.shipper_id,
+          shipperName: shipper?.name ?? null,
+          operationalUnitId: row.operational_unit_id,
+          unitName: operationalUnit?.name ?? null,
+        };
       });
       return map;
     },
     enabled: !!user && showsAggregatedData(user?.role, currentClient?.id)
   });
+
+  const vehicleByDriverId = useMemo<Record<string, DriverVehicleLink>>(() => {
+    const map: Record<string, DriverVehicleLink> = {};
+    Object.entries(driverVehicleInfo).forEach(([driverId, info]) => {
+      map[driverId] = {
+        shipperId: info.shipperId,
+        operationalUnitId: info.operationalUnitId,
+      };
+    });
+    return map;
+  }, [driverVehicleInfo]);
+
+  const filterCtx = useMemo(() => ({
+    todayIso: new Date().toISOString().slice(0, 10),
+    vehicleByDriverId,
+  }), [vehicleByDriverId]);
+
+  const shipperOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    Object.values(driverVehicleInfo).forEach((info) => {
+      if (info.shipperId && info.shipperName) {
+        map.set(info.shipperId, info.shipperName);
+      }
+    });
+    return [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  }, [driverVehicleInfo]);
+
+  const allUnitOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; shipperId: string }>();
+    Object.values(driverVehicleInfo).forEach((info) => {
+      if (info.operationalUnitId && info.unitName && info.shipperId) {
+        map.set(info.operationalUnitId, {
+          id: info.operationalUnitId,
+          name: info.unitName,
+          shipperId: info.shipperId,
+        });
+      }
+    });
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  }, [driverVehicleInfo]);
+
+  const unitOptions = useMemo(() => {
+    if (!filters.shipperId) return allUnitOptions;
+    return allUnitOptions.filter((unit) => unit.shipperId === filters.shipperId);
+  }, [allUnitOptions, filters.shipperId]);
+
+  const updateFilter = (patch: Partial<DriverStructuredFilters>) => {
+    const next = { ...filters, ...patch };
+    if ('shipperId' in patch) {
+      const selectedUnit = next.operationalUnitId
+        ? allUnitOptions.find((unit) => unit.id === next.operationalUnitId)
+        : undefined;
+      if (selectedUnit && selectedUnit.shipperId !== next.shipperId) {
+        next.operationalUnitId = null;
+      }
+    }
+    setSearchParams(serializeDriverFiltersToParams(next), { replace: false });
+  };
+
+  const clearAllFilters = () => {
+    setSearchParams(new URLSearchParams());
+    setSearch('');
+  };
 
   // Redirect Drivers and Yard Auditors
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
@@ -111,7 +214,7 @@ export default function Drivers() {
     await saveDriver(currentClient.id, driver, files, editingDriver?.id);
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['driverVehicleMap', currentClient?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['driverVehicleInfo', currentClient?.id ?? 'all-clients'] }),
     ]);
     setIsFormOpen(false);
     setEditingDriver(null);
@@ -124,23 +227,17 @@ export default function Drivers() {
     try {
       await deleteDriver(driver);
       queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] });
-      queryClient.invalidateQueries({ queryKey: ['driverVehicleMap', currentClient?.id] });
+      queryClient.invalidateQueries({ queryKey: ['driverVehicleInfo', currentClient?.id ?? 'all-clients'] });
     } catch (err) {
       console.error('Erro ao excluir motorista:', err);
       alert('Erro ao excluir motorista. Tente novamente.');
     }
   };
 
-  const filteredDrivers = useMemo(() => {
-    return drivers.filter(d => {
-      if (!search) return true;
-      const q = search.toLowerCase();
-      return (
-        d.name.toLowerCase().includes(q) ||
-        d.cpf.includes(q.replace(/\D/g, ''))
-      );
-    });
-  }, [drivers, search]);
+  const filteredDrivers = useMemo(
+    () => applyDriverFilters(drivers, search, filters, filterCtx),
+    [drivers, search, filters, filterCtx]
+  );
 
   const clientNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -172,18 +269,68 @@ export default function Drivers() {
         )}
       </div>
 
-      <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-          <Search className="h-5 w-5 text-zinc-400" aria-hidden="true" />
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+            <Search className="h-5 w-5 text-zinc-400" aria-hidden="true" />
+          </div>
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="block w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
+            placeholder="Buscar por nome ou CPF..."
+          />
         </div>
-        <input
-          type="text"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="block w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
-          placeholder="Buscar por nome ou CPF..."
-        />
+        <select
+          aria-label="Embarcador"
+          value={filters.shipperId ?? ''}
+          onChange={(e) => updateFilter({ shipperId: e.target.value || null })}
+          className="rounded-xl border border-zinc-200 bg-white py-2.5 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="">Todos os embarcadores</option>
+          {shipperOptions.map((shipper) => (
+            <option key={shipper.id} value={shipper.id}>{shipper.name}</option>
+          ))}
+        </select>
+        <select
+          aria-label="Base / Unidade Operacional"
+          value={filters.operationalUnitId ?? ''}
+          onChange={(e) => updateFilter({ operationalUnitId: e.target.value || null })}
+          className="rounded-xl border border-zinc-200 bg-white py-2.5 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="">Todas as unidades</option>
+          {unitOptions.map((unit) => (
+            <option key={unit.id} value={unit.id}>{unit.name}</option>
+          ))}
+        </select>
+        <select
+          aria-label="Situação"
+          value={filters.pendency ?? ''}
+          onChange={(e) => updateFilter({ pendency: (e.target.value || null) as DriverPendency | null })}
+          className="rounded-xl border border-zinc-200 bg-white py-2.5 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="">Todas as situações</option>
+          {DRIVER_PENDENCY_VALUES.map((pendency) => (
+            <option key={pendency} value={pendency}>{DRIVER_PENDENCY_LABELS[pendency]}</option>
+          ))}
+        </select>
+        {(hasActiveDriverFilters(filters) || !!search) && (
+          <button
+            type="button"
+            aria-label="Limpar filtros"
+            onClick={clearAllFilters}
+            className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+          >
+            Limpar filtros
+          </button>
+        )}
       </div>
+
+      <DriverActiveFilterBanner
+        situationLabel={filters.pendency ? DRIVER_PENDENCY_LABELS[filters.pendency] : null}
+        onClearSituation={() => updateFilter({ pendency: null })}
+      />
 
       {driversError && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -247,10 +394,10 @@ export default function Drivers() {
                       }
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
-                      {driverVehicleMap[driver.id] ? (
+                      {driverVehicleInfo[driver.id]?.plate ? (
                         <div className="flex items-center gap-1.5">
                           <Truck className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
-                          <span className="text-zinc-900 font-medium">{driverVehicleMap[driver.id]}</span>
+                          <span className="text-zinc-900 font-medium">{driverVehicleInfo[driver.id]?.plate}</span>
                         </div>
                       ) : (
                         <span className="text-zinc-400 italic">Sem veículo</span>
@@ -295,7 +442,7 @@ export default function Drivers() {
                 {filteredDrivers.length === 0 && (
                   <tr>
                     <td colSpan={blockWrite ? 7 : 6} className="py-10 text-center text-sm text-zinc-500">
-                      {search ? 'Nenhum motorista encontrado para esta busca.' : blockWrite ? 'Nenhum motorista cadastrado em nenhum cliente.' : 'Nenhum motorista cadastrado para este cliente.'}
+                      {search || hasActiveDriverFilters(filters) ? 'Nenhum motorista encontrado para os filtros aplicados.' : blockWrite ? 'Nenhum motorista cadastrado em nenhum cliente.' : 'Nenhum motorista cadastrado para este cliente.'}
                     </td>
                   </tr>
                 )}
@@ -308,7 +455,7 @@ export default function Drivers() {
       {viewingDriver && (
         <DriverDetailModal
           driver={viewingDriver}
-          vehiclePlate={driverVehicleMap[viewingDriver.id]}
+          vehiclePlate={driverVehicleInfo[viewingDriver.id]?.plate}
           onClose={() => setViewingDriver(null)}
         />
       )}

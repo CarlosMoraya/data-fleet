@@ -41,6 +41,7 @@ Este arquivo registra apenas o estado vigente, as frentes ativas e os próximos 
 - **Regressões de performance aceitas**: em 2026-06-17, o usuário aceitou seguir com regressões detectadas em `route.veiculos.entryMs`, `route.pneus.requestCount` e `returnBehavior.returnEntryMs` como oportunidades futuras. O baseline não foi atualizado nesta sessão.
 - **Smoke oficial** do projeto é `npm run test:smoke`; em falha, a correção precede novas evoluções.
 - **Convenção `bf:v1:ui`** para persistência de estado de UI implementada em `src/lib/uiStateStorage.ts` e `src/hooks/usePersistentUiState.ts`. Todos os módulos prioritários migrados. Dados sensíveis removidos do storage.
+- **Busca textual persistida em Motoristas**: em 2026-06-19, o usuário decidiu manter `drivers:filter:search` em `sessionStorage` mesmo podendo conter nome/CPF. Justificativa: preservar a UX atual e limitar o escopo desta sessão aos filtros estruturados, que seguem apenas na URL. **Risco aceito**.
 
 ## Referência Histórica
 
