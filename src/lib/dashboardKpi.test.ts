@@ -28,6 +28,10 @@ import {
   sumApprovedCostByMonthKeys,
   calculateMovingAverageProjection,
   computeOverdueChecklistVehicleIds,
+  resolveHorizonRange,
+  buildMonthlyOrderCounts,
+  buildMonthlyAverageCompletionDays,
+  buildMonthlyMaintenanceTypeCounts,
 } from './dashboardKpi';
 
 describe('countActiveInMaintenance', () => {
@@ -892,5 +896,116 @@ describe('computeOverdueChecklistVehicleIds', () => {
     const today = new Date('2026-06-14T12:00:00Z');
     const result = computeOverdueChecklistVehicleIds({ vehicles, checklistRows, intervalsByClient, today });
     expect(result.has('v1')).toBe(false);
+  });
+});
+
+// ─── Dashboard Evolução — Indicadores mensais ────────────────────────────────
+
+describe('resolveHorizonRange', () => {
+  it('6m em junho/2026 retorna jan a jun', () => {
+    expect(resolveHorizonRange('6m', '2026-06-19')).toEqual({
+      from: '2026-01-01',
+      to: '2026-06-30',
+    });
+  });
+
+  it('3m em junho/2026 retorna abr a jun', () => {
+    expect(resolveHorizonRange('3m', '2026-06-19')).toEqual({
+      from: '2026-04-01',
+      to: '2026-06-30',
+    });
+  });
+
+  it('12m em junho/2026 retorna jul/2025 a jun/2026', () => {
+    expect(resolveHorizonRange('12m', '2026-06-19')).toEqual({
+      from: '2025-07-01',
+      to: '2026-06-30',
+    });
+  });
+
+  it('current_year em junho/2026 retorna jan a jun', () => {
+    expect(resolveHorizonRange('current_year', '2026-06-19')).toEqual({
+      from: '2026-01-01',
+      to: '2026-06-30',
+    });
+  });
+
+  it('3m em janeiro/2026 (virada de ano) retorna nov/2025 a jan/2026', () => {
+    expect(resolveHorizonRange('3m', '2026-01-15')).toEqual({
+      from: '2025-11-01',
+      to: '2026-01-31',
+    });
+  });
+});
+
+describe('buildMonthlyOrderCounts', () => {
+  it('OS aberta em abril e concluída em maio conta opened no mês 04 e completed no mês 05', () => {
+    const orders = [
+      { status: 'Concluído', entry_date: '2026-04-10', actual_exit_date: '2026-05-15' },
+    ];
+    const result = buildMonthlyOrderCounts(orders, '2026-04-01', '2026-05-31');
+    expect(result).toEqual([
+      { name: '04/2026', opened: 1, completed: 0 },
+      { name: '05/2026', opened: 0, completed: 1 },
+    ]);
+  });
+
+  it('OS sem actual_exit_date ou não Concluído não conta em completed', () => {
+    const orders = [
+      { status: 'Aguardando orçamento', entry_date: '2026-04-10', actual_exit_date: null },
+      { status: 'Concluído', entry_date: '2026-04-10', actual_exit_date: null },
+    ];
+    const result = buildMonthlyOrderCounts(orders, '2026-04-01', '2026-04-30');
+    expect(result).toEqual([{ name: '04/2026', opened: 2, completed: 0 }]);
+  });
+
+  it('Mês sem OS retorna opened: 0, completed: 0', () => {
+    const orders: { status: string; entry_date: string | null; actual_exit_date: string | null }[] = [];
+    const result = buildMonthlyOrderCounts(orders, '2026-04-01', '2026-05-31');
+    expect(result).toEqual([
+      { name: '04/2026', opened: 0, completed: 0 },
+      { name: '05/2026', opened: 0, completed: 0 },
+    ]);
+  });
+});
+
+describe('buildMonthlyAverageCompletionDays', () => {
+  it('Duas OS concluídas no mesmo mês com 4 e 6 dias retorna value: 5', () => {
+    const orders = [
+      { status: 'Concluído', entry_date: '2026-04-01', actual_exit_date: '2026-04-05' },
+      { status: 'Concluído', entry_date: '2026-04-02', actual_exit_date: '2026-04-08' },
+    ];
+    const result = buildMonthlyAverageCompletionDays(orders, '2026-04-01', '2026-04-30');
+    expect(result).toEqual([{ name: '04/2026', value: 5 }]);
+  });
+
+  it('Mês sem conclusão retorna value: 0', () => {
+    const orders: { status: string; entry_date: string | null; actual_exit_date: string | null }[] = [];
+    const result = buildMonthlyAverageCompletionDays(orders, '2026-04-01', '2026-04-30');
+    expect(result).toEqual([{ name: '04/2026', value: 0 }]);
+  });
+
+  it('OS sem actual_exit_date ou não Concluído é ignorada', () => {
+    const orders = [
+      { status: 'Aguardando orçamento', entry_date: '2026-04-01', actual_exit_date: '2026-04-05' },
+      { status: 'Concluído', entry_date: '2026-04-01', actual_exit_date: null },
+      { status: 'Concluído', entry_date: '2026-04-01', actual_exit_date: '2026-04-10' },
+    ];
+    const result = buildMonthlyAverageCompletionDays(orders, '2026-04-01', '2026-04-30');
+    expect(result).toEqual([{ name: '04/2026', value: 9 }]);
+  });
+});
+
+describe('buildMonthlyMaintenanceTypeCounts', () => {
+  it('Mês com 2 Corretivas + 1 Preventiva retorna contadores corretos', () => {
+    const orders = [
+      { type: 'Corretiva' as const, entry_date: '2026-04-01' },
+      { type: 'Corretiva' as const, entry_date: '2026-04-10' },
+      { type: 'Preventiva' as const, entry_date: '2026-04-15' },
+    ];
+    const result = buildMonthlyMaintenanceTypeCounts(orders, '2026-04-01', '2026-04-30');
+    expect(result).toEqual([
+      { name: '04/2026', Corretiva: 2, Preventiva: 1, Preditiva: 0 },
+    ]);
   });
 });

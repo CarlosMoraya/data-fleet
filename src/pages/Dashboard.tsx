@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useUiPreference, usePersistentTabState, usePersistentFilterState } from '../hooks/usePersistentUiState';
-import { LayoutDashboard, DollarSign, Activity } from 'lucide-react';
+import { LayoutDashboard, DollarSign, Activity, LineChart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -10,6 +10,7 @@ import OperationalPanel from '../components/dashboard/OperationalPanel';
 import CostPanel from '../components/dashboard/CostPanel';
 import OverviewPanel from '../components/dashboard/OverviewPanel';
 import PeriodRangeFilter from '../components/dashboard/PeriodRangeFilter';
+import RouteFallback from '../components/RouteFallback';
 import type { VehicleRow, DashboardFilters } from '../components/dashboard/OperationalPanel';
 import type { MaintenanceOrderDashboard } from '../types/maintenance';
 import {
@@ -32,11 +33,15 @@ import {
   getTrailingMonthKeys,
   calculateMovingAverageProjection,
   computeOverdueChecklistVehicleIds,
+  resolveHorizonRange,
   type ActionItem,
+  type HorizonOption,
 } from '../lib/dashboardKpi';
 import { GENERAL_ACTION_ROUTES, OPERATIONAL_ACTION_ROUTES } from '../lib/actionQueueRoutes';
 
-type TabType = 'geral' | 'operacional' | 'custos';
+const EvolutionPanel = React.lazy(() => import('../components/dashboard/EvolutionPanel'));
+
+type TabType = 'geral' | 'operacional' | 'custos' | 'evolucao';
 const EXPIRING_SOON_WINDOW_DAYS = 30;
 const PROJECTION_TRAILING_MONTHS = 3;
 
@@ -44,6 +49,7 @@ const tabs: { id: TabType; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'geral', label: 'Visão Geral', icon: LayoutDashboard },
   { id: 'operacional', label: 'Operação', icon: Activity },
   { id: 'custos', label: 'Custos', icon: DollarSign },
+  { id: 'evolucao', label: 'Evolução', icon: LineChart },
 ];
 
 function getDefaultDateRange() {
@@ -71,7 +77,10 @@ export default function Dashboard() {
     getDefaultDateRange(),
     { legacyKeys: ['dashboard_date_filter'] },
   );
+  const [horizon, setHorizon] = useUiPreference<HorizonOption>('dashboard', 'filter', 'evolution-horizon', '6m');
   const currentMonthRange = useMemo(() => getDefaultDateRange(), []);
+  const today = new Date().toISOString().split('T')[0];
+  const evolutionRange = useMemo(() => resolveHorizonRange(horizon, today), [horizon, today]);
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -350,6 +359,43 @@ export default function Dashboard() {
     gcTime: 30 * 60 * 1000,
   });
 
+  const { data: evolutionOrders = [], isLoading: loadingEvolution } =
+    useQuery<MaintenanceOrderDashboard[]>({
+      queryKey: ['dashboard-evolution', currentClient?.id, evolutionRange.from, evolutionRange.to],
+      queryFn: async () => {
+        let query = supabase
+          .from('maintenance_orders')
+          .select('id, vehicle_id, type, status, approved_cost, current_km, expected_exit_date, entry_date, actual_exit_date, vehicles(type)')
+          .neq('status', 'Cancelado')
+          .or(`and(entry_date.gte.${evolutionRange.from},entry_date.lte.${evolutionRange.to}),and(actual_exit_date.gte.${evolutionRange.from},actual_exit_date.lte.${evolutionRange.to})`);
+        if (currentClient?.id) {
+          query = query.eq('client_id', currentClient.id);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        return (data ?? []).map((row: Record<string, unknown>) => ({
+          id: row.id as string,
+          vehicle_id: row.vehicle_id as string,
+          type: row.type as MaintenanceOrderDashboard['type'],
+          status: row.status as string,
+          approved_cost: row.approved_cost != null ? Number(row.approved_cost) : null,
+          current_km: row.current_km != null ? Number(row.current_km) : null,
+          vehicle_type:
+            row.vehicles && typeof row.vehicles === 'object' && !Array.isArray(row.vehicles)
+              ? (row.vehicles as Record<string, unknown>).type as string | null
+              : Array.isArray(row.vehicles) && row.vehicles.length > 0
+                ? (row.vehicles[0] as Record<string, unknown>).type as string | null
+                : null,
+          expected_exit_date: row.expected_exit_date != null ? (row.expected_exit_date as string) : null,
+          entry_date: row.entry_date != null ? (row.entry_date as string) : null,
+          actual_exit_date: row.actual_exit_date != null ? (row.actual_exit_date as string) : null,
+        }));
+      },
+      enabled: !!user && activeTab === 'evolucao',
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+    });
+
   // ── Computed values ───────────────────────────────────────────────────────
 
   const overdueChecklistVehicleIds = useMemo(
@@ -364,7 +410,6 @@ export default function Dashboard() {
   );
 
   const currentYear = new Date().getFullYear().toString();
-  const today = new Date().toISOString().split('T')[0];
   const expiredCrlvCount = useMemo(
     () =>
       vehicles.filter((v) => isCrlvExpired(v, currentYear, today)).length,
@@ -608,6 +653,17 @@ export default function Dashboard() {
               isLoading={isPanelLoading}
             />
           </div>
+        )}
+        {activeTab === 'evolucao' && (
+          <Suspense fallback={<RouteFallback />}>
+            <EvolutionPanel
+              orders={evolutionOrders}
+              horizon={horizon}
+              onHorizonChange={setHorizon}
+              dateRange={evolutionRange}
+              isLoading={loadingEvolution}
+            />
+          </Suspense>
         )}
       </div>
     </div>

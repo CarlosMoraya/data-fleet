@@ -455,3 +455,110 @@ export function calculateMovingAverageProjection(monthlyTotals: number[]): numbe
   if (monthlyTotals.length === 0) return null;
   return Math.round(monthlyTotals.reduce((sum, v) => sum + v, 0) / monthlyTotals.length);
 }
+
+// ─── Dashboard Evolução — Indicadores mensais com seletor de horizonte ──────
+
+export type HorizonOption = '3m' | '6m' | '12m' | 'current_year';
+
+export function resolveHorizonRange(horizon: HorizonOption, todayIso: string): { from: string; to: string } {
+  const [yStr, mStr] = todayIso.split('-');
+  const year = Number(yStr);
+  const month = Number(mStr);
+
+  const lastDayOfMonth = new Date(Date.UTC(year, month, 0));
+  const to = lastDayOfMonth.toISOString().split('T')[0];
+
+  let from: string;
+
+  if (horizon === 'current_year') {
+    from = `${year}-01-01`;
+  } else {
+    const n = horizon === '3m' ? 3 : horizon === '6m' ? 6 : 12;
+    const firstDay = new Date(Date.UTC(year, month - 1 - (n - 1), 1));
+    from = firstDay.toISOString().split('T')[0];
+  }
+
+  return { from, to };
+}
+
+export function buildMonthlyOrderCounts(
+  orders: Pick<MaintenanceOrderDashboard, 'status' | 'entry_date' | 'actual_exit_date'>[],
+  from: string,
+  to: string
+): { name: string; opened: number; completed: number }[] {
+  const buckets = enumerateBucketKeys(from, to, 'month');
+  const openedByKey = new Map<string, number>();
+  const completedByKey = new Map<string, number>();
+
+  for (const order of orders) {
+    if (order.entry_date != null) {
+      const key = order.entry_date.substring(0, 7);
+      openedByKey.set(key, (openedByKey.get(key) ?? 0) + 1);
+    }
+    if (order.status === 'Concluído' && order.actual_exit_date != null) {
+      const key = order.actual_exit_date.substring(0, 7);
+      completedByKey.set(key, (completedByKey.get(key) ?? 0) + 1);
+    }
+  }
+
+  return buckets.map((b) => ({
+    name: b.name,
+    opened: openedByKey.get(b.key) ?? 0,
+    completed: completedByKey.get(b.key) ?? 0,
+  }));
+}
+
+export function buildMonthlyAverageCompletionDays(
+  orders: Pick<MaintenanceOrderDashboard, 'status' | 'entry_date' | 'actual_exit_date'>[],
+  from: string,
+  to: string
+): { name: string; value: number }[] {
+  const buckets = enumerateBucketKeys(from, to, 'month');
+  const daysByKey = new Map<string, number[]>();
+
+  for (const order of orders) {
+    if (order.status === 'Concluído' && order.entry_date != null && order.actual_exit_date != null) {
+      const exitMs = new Date(order.actual_exit_date).getTime();
+      const entryMs = new Date(order.entry_date).getTime();
+      const days = Math.floor((exitMs - entryMs) / 86400000);
+      if (days >= 0) {
+        const key = order.actual_exit_date.substring(0, 7);
+        if (!daysByKey.has(key)) daysByKey.set(key, []);
+        daysByKey.get(key)!.push(days);
+      }
+    }
+  }
+
+  return buckets.map((b) => {
+    const days = daysByKey.get(b.key);
+    if (!days || days.length === 0) return { name: b.name, value: 0 };
+    return { name: b.name, value: Math.round(days.reduce((s, d) => s + d, 0) / days.length) };
+  });
+}
+
+export function buildMonthlyMaintenanceTypeCounts(
+  orders: Pick<MaintenanceOrderDashboard, 'type' | 'entry_date'>[],
+  from: string,
+  to: string
+): { name: string; Corretiva: number; Preventiva: number; Preditiva: number }[] {
+  const buckets = enumerateBucketKeys(from, to, 'month');
+  const countsByKey = new Map<string, { Corretiva: number; Preventiva: number; Preditiva: number }>();
+
+  for (const order of orders) {
+    if (order.entry_date != null) {
+      const key = order.entry_date.substring(0, 7);
+      if (!countsByKey.has(key)) {
+        countsByKey.set(key, { Corretiva: 0, Preventiva: 0, Preditiva: 0 });
+      }
+      const entry = countsByKey.get(key)!;
+      if (order.type === 'Corretiva') entry.Corretiva += 1;
+      else if (order.type === 'Preventiva') entry.Preventiva += 1;
+      else if (order.type === 'Preditiva') entry.Preditiva += 1;
+    }
+  }
+
+  return buckets.map((b) => {
+    const c = countsByKey.get(b.key) ?? { Corretiva: 0, Preventiva: 0, Preditiva: 0 };
+    return { name: b.name, ...c };
+  });
+}

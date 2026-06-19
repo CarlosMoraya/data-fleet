@@ -2,6 +2,42 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Feature — 2026-06-19
+
+### Nova aba "Evolução" no Dashboard — análise mensal e tendência histórica com seletor de horizonte
+
+**O que foi implementado:** 4ª aba do Dashboard (`Evolução`), dedicada a indicadores mensais e tendência histórica, com seletor de horizonte (3/6/12 meses ou ano atual) em vez de datas soltas.
+
+**Arquivos criados:**
+- `src/components/dashboard/MonthlyMultiBarChart.tsx`: gráfico de barras multi-série (agrupado ou empilhado), reutilizável.
+- `src/components/dashboard/HorizonSelector.tsx`: controle segmentado com 4 opções fixas.
+- `src/components/dashboard/EvolutionPanel.tsx`: painel da aba, com `HorizonSelector` + 4 gráficos (2 linha, 2 barras).
+- `src/components/dashboard/EvolutionPanel.test.tsx`: 4 testes de render (labels, títulos, interação, empty state).
+
+**Arquivos modificados:**
+- `src/lib/dashboardKpi.ts`: adicionados `HorizonOption`, `resolveHorizonRange`, `buildMonthlyOrderCounts`, `buildMonthlyAverageCompletionDays`, `buildMonthlyMaintenanceTypeCounts`.
+- `src/lib/dashboardKpi.test.ts`: 12 testes novos para as funções acima.
+- `src/pages/Dashboard.tsx`: adicionada aba `evolucao` (ícone `LineChart`), estado `horizon` persistido (default `6m`), query `dashboard-evolution` gated por `activeTab === 'evolucao'`, render do `EvolutionPanel`.
+
+**Decisões tomadas:**
+- Custo por KM mensal: FORA da v1 (dados esparsos → adiado para v2).
+- Documentos/checklists vencidos: excluídos por design (estado atual, sem histórico armazenado).
+- Tempo médio por mês mostra `0` em meses sem conclusão (limitação aceita; interrupção de linha fica como melhoria futura).
+- Horizonte padrão: `6m`, persistido via `useUiPreference`.
+- Aba `Custos` permanece intacta (reúso de `buildCostTrendSeries` + `CostTrendChart`, sem migração).
+
+**Validações executadas:**
+- `npm run lint` ✅ (`tsc --noEmit` limpo)
+- `npm run test:unit` ✅ (434 testes, +16 novos)
+- `npm run test:smoke` ✅ (6/6)
+
+**Débitos para v2:**
+- Custo por KM mensal — exige KM-rodado por mês confiável (nova RPC mensal ou modelo de odômetro por período).
+- Tornar gráficos da Evolução interativos (drill-down por tipo/mês).
+- "Tempo médio por mês" com interrupção de linha em meses vazios.
+
+---
+
 ## Correção — 2026-06-19
 
 ### Bug corrigido — Fila de Ação não aplicava filtro ao navegar para Motoristas
