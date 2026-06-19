@@ -13,6 +13,7 @@ import { saveVehicle, deleteVehicle } from '../services/vehicleService';
 import type { VehicleFiles } from '../services/vehicleService';
 import { requiresClientSelection } from '../lib/clientScope';
 import SelectClientNotice from '../components/SelectClientNotice';
+import VehicleActiveFilterBanner from '../components/VehicleActiveFilterBanner';
 import { clearVehicleDraftFiles } from '../lib/offline/vehicleDraftFiles';
 import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
@@ -418,6 +419,11 @@ export default function Vehicles() {
           </button>
         )}
       </div>
+
+      <VehicleActiveFilterBanner
+        pendencyLabel={filters.pendency ? PENDENCY_LABELS[filters.pendency] : null}
+        onClearPendency={() => updateFilter({ pendency: null })}
+      />
 
       {vehiclesError && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

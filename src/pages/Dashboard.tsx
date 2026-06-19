@@ -33,7 +33,7 @@ import {
   computeOverdueChecklistVehicleIds,
   type ActionItem,
 } from '../lib/dashboardKpi';
-import { OPERATIONAL_ACTION_ROUTES } from '../lib/operationalActionRoutes';
+import { GENERAL_ACTION_ROUTES, OPERATIONAL_ACTION_ROUTES } from '../lib/actionQueueRoutes';
 
 type TabType = 'geral' | 'operacional' | 'custos';
 const EXPIRING_SOON_WINDOW_DAYS = 30;
@@ -457,18 +457,7 @@ export default function Dashboard() {
   );
 
   const handleActionClick = (category: ActionItem['category']) => {
-    const routes: Record<ActionItem['category'], string> = {
-      checklist: '/checklists',
-      crlv: '/cadastros/veiculos?pendencia=crlv_vencido',
-      crlv_expiring: '/cadastros/veiculos?pendencia=crlv_a_vencer',
-      cnh: '/cadastros/motoristas',
-      cnh_expiring: '/cadastros/motoristas',
-      os_overdue: '/manutencao',
-      os_pending_approval: '/manutencao',
-      gr_vehicle_expiring: '/cadastros/veiculos?pendencia=gr_a_vencer',
-      gr_driver_expiring: '/cadastros/motoristas',
-    };
-    navigate(routes[category]);
+    navigate(GENERAL_ACTION_ROUTES[category]);
   };
 
   const handleOperationalActionClick = (category: ActionItem['category']) => {
