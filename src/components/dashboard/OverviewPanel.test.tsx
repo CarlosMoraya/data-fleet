@@ -52,4 +52,14 @@ describe('OverviewPanel — "Documentos a Vencer (30d)" subtitle', () => {
     expect(text).toContain('GR');
     expect(text).toContain('Documentos a Vencer (30d)');
   });
+
+  it('renders current-state copy and current month cost label', () => {
+    renderWithAct(<OverviewPanel {...baseProps} />);
+
+    const text = container.textContent ?? '';
+
+    expect(text).toContain('Situação atual da frota');
+    expect(text).toContain('Custo do Mês Atual');
+    expect(text).not.toContain('Custo Total do Período');
+  });
 });

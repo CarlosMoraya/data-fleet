@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useUiPreference, usePersistentTabState, usePersistentFilterState } from '../hooks/usePersistentUiState';
-import { LayoutDashboard, DollarSign, CalendarDays, Activity } from 'lucide-react';
+import { LayoutDashboard, DollarSign, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -9,6 +9,7 @@ import { cn } from '../lib/utils';
 import OperationalPanel from '../components/dashboard/OperationalPanel';
 import CostPanel from '../components/dashboard/CostPanel';
 import OverviewPanel from '../components/dashboard/OverviewPanel';
+import PeriodRangeFilter from '../components/dashboard/PeriodRangeFilter';
 import type { VehicleRow, DashboardFilters } from '../components/dashboard/OperationalPanel';
 import type { MaintenanceOrderDashboard } from '../types/maintenance';
 import {
@@ -70,6 +71,7 @@ export default function Dashboard() {
     getDefaultDateRange(),
     { legacyKeys: ['dashboard_date_filter'] },
   );
+  const currentMonthRange = useMemo(() => getDefaultDateRange(), []);
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -117,6 +119,44 @@ export default function Dashboard() {
           .select('id, vehicle_id, type, status, approved_cost, current_km, expected_exit_date, entry_date, actual_exit_date, vehicles(type)')
           .gte('entry_date', dateRange.from)
           .lte('entry_date', dateRange.to)
+          .neq('status', 'Cancelado');
+        if (currentClient?.id) {
+          query = query.eq('client_id', currentClient.id);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        return (data ?? []).map((row: Record<string, unknown>) => ({
+          id: row.id as string,
+          vehicle_id: row.vehicle_id as string,
+          type: row.type as MaintenanceOrderDashboard['type'],
+          status: row.status as string,
+          approved_cost: row.approved_cost != null ? Number(row.approved_cost) : null,
+          current_km: row.current_km != null ? Number(row.current_km) : null,
+          vehicle_type:
+            row.vehicles && typeof row.vehicles === 'object' && !Array.isArray(row.vehicles)
+              ? (row.vehicles as Record<string, unknown>).type as string | null
+              : Array.isArray(row.vehicles) && row.vehicles.length > 0
+                ? (row.vehicles[0] as Record<string, unknown>).type as string | null
+                : null,
+          expected_exit_date: row.expected_exit_date != null ? (row.expected_exit_date as string) : null,
+          entry_date: row.entry_date != null ? (row.entry_date as string) : null,
+          actual_exit_date: row.actual_exit_date != null ? (row.actual_exit_date as string) : null,
+        }));
+      },
+      enabled: !!user,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+    });
+
+  const { data: currentMonthOrders = [], isLoading: loadingCurrentMonthOrders } =
+    useQuery<MaintenanceOrderDashboard[]>({
+      queryKey: ['dashboard-maintenance-current-month', currentClient?.id],
+      queryFn: async () => {
+        let query = supabase
+          .from('maintenance_orders')
+          .select('id, vehicle_id, type, status, approved_cost, current_km, expected_exit_date, entry_date, actual_exit_date, vehicles(type)')
+          .gte('entry_date', currentMonthRange.from)
+          .lte('entry_date', currentMonthRange.to)
           .neq('status', 'Cancelado');
         if (currentClient?.id) {
           query = query.eq('client_id', currentClient.id);
@@ -365,10 +405,10 @@ export default function Dashboard() {
 
   const totalApprovedCost = useMemo(
     () =>
-      maintenanceOrders
+      currentMonthOrders
         .filter((o) => o.approved_cost !== null && o.approved_cost > 0)
         .reduce((sum, o) => sum + (o.approved_cost ?? 0), 0),
-    [maintenanceOrders]
+    [currentMonthOrders]
   );
 
   const projectedNextMonthCost = useMemo(() => {
@@ -469,6 +509,7 @@ export default function Dashboard() {
   const isPanelLoading =
     loadingVehicles ||
     loadingMaintenance ||
+    loadingCurrentMonthOrders ||
     loadingActiveMaintenance ||
     loadingPreviousMaintenance ||
     loadingCostProjection ||
@@ -485,42 +526,6 @@ export default function Dashboard() {
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
           Dashboard
         </h1>
-      </div>
-
-      {/* Filtro de Período */}
-      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-zinc-500" />
-          <span className="text-sm font-medium text-zinc-700">Período</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-zinc-500">De</label>
-            <input
-              type="date"
-              value={dateRange.from}
-              max={dateRange.to}
-              onChange={(e) => setDateRange((prev) => ({ ...prev, from: e.target.value }))}
-              className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-zinc-500">Até</label>
-            <input
-              type="date"
-              value={dateRange.to}
-              min={dateRange.from}
-              onChange={(e) => setDateRange((prev) => ({ ...prev, to: e.target.value }))}
-              className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
-            />
-          </div>
-          <button
-            onClick={() => setDateRange(getDefaultDateRange())}
-            className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100 transition-colors"
-          >
-            Mês atual
-          </button>
-        </div>
       </div>
 
       {/* Tabs */}
@@ -570,7 +575,7 @@ export default function Dashboard() {
         {activeTab === 'operacional' && (
           <OperationalPanel
             vehicles={vehicles}
-            maintenanceOrders={maintenanceOrders}
+            maintenanceOrders={currentMonthOrders}
             activeMaintenanceOrders={activeMaintenanceOrders}
             overdueChecklistVehicleIds={overdueChecklistVehicleIds}
             expiredCrlvCount={expiredCrlvCount}
@@ -585,17 +590,24 @@ export default function Dashboard() {
           />
         )}
         {activeTab === 'custos' && (
-          <CostPanel
-            vehicles={vehicles}
-            maintenanceOrders={maintenanceOrders}
-            previousPeriodCost={previousPeriodCost}
-            projectedNextMonthCost={projectedNextMonthCost}
-            vehicleKmRows={vehicleKmRows}
-            dateRange={dateRange}
-            filters={filters}
-            onFiltersChange={setFilters}
-            isLoading={isPanelLoading}
-          />
+          <div className="space-y-6">
+            <PeriodRangeFilter
+              value={dateRange}
+              onChange={setDateRange}
+              onReset={() => setDateRange(getDefaultDateRange())}
+            />
+            <CostPanel
+              vehicles={vehicles}
+              maintenanceOrders={maintenanceOrders}
+              previousPeriodCost={previousPeriodCost}
+              projectedNextMonthCost={projectedNextMonthCost}
+              vehicleKmRows={vehicleKmRows}
+              dateRange={dateRange}
+              filters={filters}
+              onFiltersChange={setFilters}
+              isLoading={isPanelLoading}
+            />
+          </div>
         )}
       </div>
     </div>

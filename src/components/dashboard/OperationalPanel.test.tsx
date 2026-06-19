@@ -279,6 +279,7 @@ describe('OperationalPanel — legibilidade dos títulos de KPI', () => {
     );
 
     expect(findCardValueByLabel('Tempo médio de OS')).toBe('—');
+    expect(container.textContent).toContain('OS concluídas no mês');
   });
 
   it('renders the shortened title "Idade média de OS abertas"', () => {

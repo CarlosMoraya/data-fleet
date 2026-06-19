@@ -59,6 +59,10 @@ export default function OverviewPanel({
 
   return (
     <div className="space-y-6">
+      <div>
+        <h3 className="text-base font-semibold text-zinc-900">Situação atual da frota</h3>
+        <p className="text-sm text-zinc-500">Retrato de agora — não depende do período</p>
+      </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         <DashboardKpiCard
           icon={Truck}
@@ -107,8 +111,9 @@ export default function OverviewPanel({
           icon={DollarSign}
           iconBgClass="bg-green-50"
           iconColorClass="text-green-600"
-          label="Custo Total do Período"
+          label="Custo do Mês Atual"
           value={fmt.format(totalApprovedCost)}
+          subtitle="mês corrente"
         />
         <DashboardKpiCard
           icon={ListChecks}

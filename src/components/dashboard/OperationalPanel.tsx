@@ -235,7 +235,7 @@ export default function OperationalPanel({
             iconColorClass="text-sky-600"
             label="Tempo médio de OS"
             value={avgMaintenanceDays != null ? `${avgMaintenanceDays} dias` : '—'}
-            subtitle="OS concluídas no período"
+            subtitle="OS concluídas no mês"
             variant="muted"
           />
           <DashboardKpiCard

@@ -923,6 +923,15 @@ Pendente (próximas fases): Fase 2 — tempos médios em manutenção/permanênc
 ## 📜 Histórico de Sessões e Mudanças
 
 ### Junho 2026
+- **Dashboard Executivo — filtro de período restrito à aba Custos (19/06/2026)**:
+  - Motivação: remover a ambiguidade do filtro de período global, que afetava somente os custos e dois indicadores fora da aba `Custos`.
+  - Mudança: novo componente apresentacional `PeriodRangeFilter`; o filtro de datas foi removido do topo do Dashboard e renderizado apenas na aba `Custos`.
+  - Escopo temporal: `Visão Geral` e `Operação` passam a representar situação atual da frota. O card "Custo Total do Período" virou "Custo do Mês Atual" com subtítulo "mês corrente"; o KPI "Tempo médio de OS" usa ordens concluídas no mês corrente.
+  - Dados: adicionada query `dashboard-maintenance-current-month` em `Dashboard.tsx`, reutilizando o mesmo select/mapeamento da query de manutenção por período, mas com janela fixa de mês corrente via `getDefaultDateRange()`. A query por `dateRange` permanece ativa e continua alimentando `CostPanel`.
+  - Restrições preservadas: Fila de Ação intocada; cálculos da aba `Custos` intocados; nenhuma RPC, migration ou dependência nova.
+  - Testes: `PeriodRangeFilter.test.tsx` criado; `OverviewPanel.test.tsx` e `OperationalPanel.test.tsx` atualizados; E2E `dashboard-period-scope.spec.ts` criado.
+  - Validações: `npm run lint` ✅; `npm run test:unit` ✅ (418 testes); `npm run test:smoke` ✅ (6); `npx playwright test e2e/completed/dashboard-period-scope.spec.ts --project=chromium` ✅.
+
 - **CRLV a vencer: campo + alerta preventivo no Dashboard (14/06/2026)**:
   - Motivação: eliminar a contradição em que um CRLV podia ser "vencido pelo ano" e "a vencer pela data" ao mesmo tempo; habilitar alerta preventivo "CRLV a vencer (30d)" no Dashboard.
   - Mudança: coluna `crlv_expiration_date DATE NULL` adicionada à tabela `vehicles` (migration aditiva, sem backfill); campo de data no formulário de veículo; predicado puro `isCrlvExpired` com precedência data→ano; `getExpiringSoonCrlvPlates` para a Fila de Ação; `buildActionQueue` estendida com categoria `crlv_expiring` (severity medium).
