@@ -9,18 +9,18 @@ export const VEHICLE_PENDENCY_ACTION_ROUTES = {
 
 export const GENERAL_ACTION_ROUTES: Record<ActionItem['category'], string> = {
   ...VEHICLE_PENDENCY_ACTION_ROUTES,
-  cnh: '/cadastros/motoristas',
-  cnh_expiring: '/cadastros/motoristas',
+  cnh: '/cadastros/motoristas?situacao=cnh_vencida',
+  cnh_expiring: '/cadastros/motoristas?situacao=cnh_a_vencer',
   os_overdue: '/manutencao',
   os_pending_approval: '/manutencao',
-  gr_driver_expiring: '/cadastros/motoristas',
+  gr_driver_expiring: '/cadastros/motoristas?situacao=gr_a_vencer',
 };
 
 export const OPERATIONAL_ACTION_ROUTES: Record<ActionItem['category'], string> = {
   ...VEHICLE_PENDENCY_ACTION_ROUTES,
-  cnh: '/cadastros/motoristas',
-  cnh_expiring: '/cadastros/motoristas',
+  cnh: '/cadastros/motoristas?situacao=cnh_vencida',
+  cnh_expiring: '/cadastros/motoristas?situacao=cnh_a_vencer',
   os_overdue: '/manutencao',
   os_pending_approval: '/aprovacao-orcamentos',
-  gr_driver_expiring: '/cadastros/motoristas',
+  gr_driver_expiring: '/cadastros/motoristas?situacao=gr_a_vencer',
 };

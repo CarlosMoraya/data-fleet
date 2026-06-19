@@ -2,6 +2,150 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Correção — 2026-06-19
+
+### Bug corrigido — Fila de Ação não aplicava filtro ao navegar para Motoristas
+
+**Sintoma:** clicar num item de motorista da Fila de Ação do Dashboard (Motoristas com CNH vencida, CNH a vencer ou GR do motorista a vencer) navegava para `/cadastros/motoristas` sem o parâmetro de filtro. A tela abria listando todos os motoristas, sem filtro aplicado, sem banner de "Filtro ativo" e sem o botão "Limpar filtros".
+
+**Causa raiz (Tipo A — bug isolado):** `src/lib/actionQueueRoutes.ts` mapeava as 3 categorias de motorista (`cnh`, `cnh_expiring`, `gr_driver_expiring`) para a rota crua `/cadastros/motoristas`, sem o query param `?situacao=`. O Dashboard navega exatamente com a string desses mapas; a tela de Motoristas lê `situacao` corretamente — faltou estender o mapa de rotas, análogo ao `?pendencia=` que já existe para veículos.
+
+**Correção aplicada:** adicionado `?situacao=cnh_vencida`, `?situacao=cnh_a_vencer` e `?situacao=gr_a_vencer` às chaves `cnh`, `cnh_expiring` e `gr_driver_expiring` em `GENERAL_ACTION_ROUTES` e `OPERATIONAL_ACTION_ROUTES`.
+
+**Arquivos modificados:**
+- `src/lib/actionQueueRoutes.ts`: valores das 3 chaves de motorista nos dois mapas.
+- `src/lib/actionQueueRoutes.test.ts`: asserções atualizadas para as rotas com query param + novo teste de regressão "uses only valid driver situation values in driver routes".
+
+**Validações executadas:**
+- `npx vitest run src/lib/actionQueueRoutes.test.ts` ✅ (5 testes)
+- `npm run test:unit` ✅ (414 testes, +1 novo de regressão)
+- `npm run lint` ✅ (`tsc --noEmit` limpo)
+
+**Observações para sessões futuras:**
+- Débito técnico opcional: as rotas de veículo usam `pendencia` e as de motorista usam `situacao`. A divergência é intencional (cada tela tem sua chave), mas uma sessão futura poderia avaliar unificar ou centralizar a construção das rotas a partir das constantes de cada módulo.
+
+---
+
+### Bug corrigido — 404 (PGRST202) nas RPCs de agregação do Dashboard
+
+**Sintoma:** ao abrir o Dashboard, o DevTools mostrava `POST 404 (Not Found)` para `dashboard_previous_period_cost`, `dashboard_cost_projection_monthly` e `dashboard_vehicle_km_in_period`. Os painéis de custo anterior/variação, projeção mensal e KM rodado ficavam sem dados. `dashboard_last_checklist_per_vehicle` funcionava normalmente (HTTP 200).
+
+**Causa raiz (Tipo D — regressão):** as 3 funções `public.dashboard_previous_period_cost`, `public.dashboard_cost_projection_monthly` e `public.dashboard_vehicle_km_in_period` não existiam no banco Dev (`vvbnbzzhpiksacqudmfu`). Cronologia: em 2026-06-17 as 4 RPCs foram criadas e o bug de 404 foi corrigido; em 2026-06-19, um rollback removeu as 4 RPCs de ambos os bancos (`20260619000003`); a reversão subsequente recriou apenas `dashboard_last_checklist_per_vehicle` (`20260619000005`), e as outras 3 nunca foram reexecutadas no SQL Editor — migrações são manuais, então commitar o SQL não o aplica ao banco.
+
+**Correção aplicada:** CREATE OR REPLACE das 3 funções `SECURITY INVOKER` + `GRANT EXECUTE TO authenticated` + `NOTIFY pgrst 'reload schema'` no SQL Editor do Supabase Dev (`vvbnbzzhpiksacqudmfu`). Conteúdo verbatim das migrações `20260617000000` e `20260617000100`. Nenhum arquivo de `src/` alterado.
+
+**Arquivos criados:**
+- `e2e/smoke/dashboard-rpcs-health.spec.ts`: teste E2E de regressão que valida que nenhuma das 4 RPCs do Dashboard retorna 404/PGRST202.
+
+**Arquivos modificados:**
+- `docs/MEMORY.md`: decisão "Dashboard RPCs removidas" atualizada para refletir que as RPCs são a abordagem vigente; registro do bug corrigido adicionado.
+- `docs/MEMORY-HISTORY.md`: este arquivamento.
+
+**Observações:**
+- A lacuna de processo — deploy do frontend é automático (Vercel) mas migrações são manuais — pode causar reincidência deste tipo exato de bug. Avaliar gate de deploy com smoke de saúde das RPCs.
+- Arquivos soltos no working tree (`manual-dev-migrations*.sql`, `apply-production-migration.sql`, `apply-dashboard-rpcs-production.sql`) sugerem histórico de migração fora de sync. Consolidação fora do escopo desta correção.
+- Produção (`oajfjdadcicgoxrfrnny`) provavelmente está no mesmo estado (3 RPCs faltantes). Aplicar o mesmo SQL no SQL Editor de produção se autorizado pelo usuário.
+
+---
+
+## Arquivamento — 2026-06-19
+
+### Separação do ambiente Dev e massa oficial de testes
+
+**Objetivo:** deixar o desenvolvimento isolado em um Supabase próprio, com dados de teste consistentes e compatíveis com a suíte E2E atual.
+
+**Mudanças aplicadas:**
+- `.env.local` passou a apontar o app local para o projeto Supabase Dev `vvbnbzzhpiksacqudmfu`.
+- Criado `scripts/seed-betafleet-demo.mjs` como seed oficial idempotente para Dev.
+- Criada a migration `supabase/migrations/20260619000000_align_vehicle_columns.sql` para alinhar `vehicles` ao schema atual usado pelo frontend e pelos testes.
+- Publicadas no Dev as Edge Functions `create-user`, `delete-user`, `workshop-invitation`, `workshop-accept-invitation` e `workshop-partnership-manage`.
+
+**Massa oficial criada no Dev:**
+- Clientes: `BetaFleet Demo`, `BetaFleet Isolamento`, `Deluna Transportes` e `BetaFleet`.
+- Usuários alinhados ao Playwright: Admin Master, Fleet Analyst, Fleet Assistant, Manager, Yard Auditor, Driver, Coordinator, Supervisor, Operations Manager e Workshop.
+- Dados operacionais: veículos, motoristas, oficina, conta de oficina, agendamento, checklist, plano de ação, OS de manutenção, pneus e inspeção de pneus.
+
+**Ajustes de teste feitos:**
+- `e2e/completed/driver-checklist-visibility.spec.ts` passou a usar o cliente do Dev e o schema atual.
+- `e2e/completed/driver-user-integration.spec.ts` passou a fazer login explícito com `TEST_ANALYST_*` e `TEST_MANAGER_*`, removendo dependência de `storageState` frágil.
+- `e2e/completed/regression-optim-tenant-isolation.spec.ts` passou a escolher o tenant por texto exato, evitando ambiguidade entre `BetaFleet` e `BetaFleet Demo`.
+
+**Validação final:**
+- `npm run lint` ✅
+- `npm run build` ✅
+- `npm run test:smoke` ✅
+- `npm run test:e2e` ✅ (`170/170`)
+
+**Nota operacional:** não houve commit nem push desta sessão; as mudanças ficaram apenas no worktree local.
+
+### Auditoria e sincronização dos bancos Dev e Prod
+
+**Objetivo:** garantir que os bancos de dados de desenvolvimento (`vvbnbzzhpiksacqudmfu`) e produção (`oajfjdadcicgoxrfrnny`) espelhem 100% a mesma estrutura — tabelas, colunas, funções, constraints, índices, triggers e RLS policies.
+
+**Método:** extração de schema completo via `pg_dump --schema-only` de ambos os bancos (conexão direta via Docker com `public.ecr.aws/supabase/postgres:17.6.1.127`), comparação com `diff` e aplicação de migrations de sincronização.
+
+**Migrations criadas:**
+- `supabase/migrations/20260619000001_sync_dev_to_prod.sql`: aplica no DEV tudo que existe no PROD e ainda não foi aplicado (8 mudanças aditivas).
+- `supabase/migrations/20260619000002_sync_prod_additions.sql`: aplica no PROD tudo que existe no DEV e ainda não foi aplicado (5 mudanças aditivas).
+- `supabase/migrations/20260619000003_register_missing_schema.sql`: registra no projeto todos os elementos de schema que existem nos bancos mas nunca foram capturados em arquivos de migration.
+
+**Sincronização DEV → espelhar PROD (aplicado no DEV):**
+
+| # | Mudança | Impacto |
+|---|---------|---------|
+| 1 | Adicionar `'Agregado'` ao CHECK `vehicles_acquisition_check` | Expande opções, não remove dados |
+| 2 | Remover coluna `brand_model` | Redundante (já existe `brand` + `model`) |
+| 3 | Tornar `brand` e `model` NOT NULL com `DEFAULT ''` | Veículos sem marca recebem `''` |
+| 4 | Criar função `handle_updated_at()` | Nova função, não conflita com a existente |
+| 5 | Trocar trigger `set_maintenance_updated_at` para usar `handle_updated_at()` | Mesmo comportamento, função padronizada |
+| 6 | Remover `CASCADE` da FK `vehicle_field_settings_client_id_fkey` | Igual ao PROD: bloqueia exclusão se houver settings |
+| 7 | Adicionar 3 policies `tenant_managers_*` em `profiles` | Aditivas, não conflitam |
+| 8 | Atualizar 3 policies de `drivers` (insert/update/delete) | Adiciona Supervisor e Coordinator |
+
+**Sincronização PROD → adicionar do DEV (aplicado no PROD):**
+
+| # | Mudança | Impacto |
+|---|---------|---------|
+| 1 | Adicionar coluna `status` com `DEFAULT 'Available'` | Veículos existentes recebem "Available" |
+| 2 | Adicionar CHECK `vehicles_status_check` | Valida novos registros |
+| 3 | Adicionar coluna `is_free_form` com `DEFAULT false` | Templates existentes recebem `false` |
+| 4 | Tornar `vehicle_category` nullable | Permite categoria livre |
+| 5 | Adicionar CHECK `check_free_form_or_category` | Garante consistência |
+
+**Lacunas de migration registradas (elementos que existiam no DB mas nunca tiveram migration):**
+
+| Elemento | Situação anterior | Status |
+|----------|-------------------|--------|
+| Tabela `vehicles` (base + todas as colunas) | Criada manualmente via Dashboard | ✅ Registrada |
+| Tabela `vehicle_field_settings` (base + todas as colunas) | Criada manualmente via Dashboard | ✅ Registrada |
+| Função `get_my_client_id()` | Usada por 7+ migrations, nunca criada | ✅ Registrada |
+| Função `get_my_role()` | Usada por 5+ migrations, nunca criada | ✅ Registrada |
+| Função `is_admin_master()` | Usada por 3+ migrations, nunca criada | ✅ Registrada |
+| Função `set_updated_at()` | Usada pelo trigger, nunca criada | ✅ Registrada |
+| Função `role_rank()` | Apenas `CREATE OR REPLACE`, sem criação inicial | ✅ Registrada |
+| Função `handle_updated_at()` | Criada no sync | ✅ Registrada |
+| Trigger `vehicles_updated_at` | Criado manualmente, sem migration | ✅ Registrado |
+| Index `vehicles_client_plate_uniq` | Criado manualmente, sem migration | ✅ Registrado |
+| Constraint `vehicles_energy_source_check` | Criada manualmente, sem migration | ✅ Registrada |
+| Constraint `vehicles_category_check` | Existia só no DEV | ✅ Adicionada no PROD |
+| Coluna `profiles.can_delete_vehicles` | Referenciada mas nunca adicionada | ✅ Registrada |
+| Coluna `profiles.can_delete_workshops` | Referenciada mas nunca adicionada | ✅ Registrada |
+| Dashboard RPCs (4 funções) | Deveriam ter sido removidas pelo rollback | ✅ Removidas de ambos |
+
+**Resultado final:**
+- DEV: 33 tabelas, 24 funções, 139 RLS policies, 5 triggers
+- PROD: 33 tabelas, 24 funções, 139 RLS policies, 5 triggers
+- Diferenças restantes: apenas cosméticas (formatação de funções e ordem de colunas — sem impacto funcional)
+
+**Decisões tomadas:**
+- `brand_model` removido do DEV (redundante com `brand` + `model` separados já usados pelo código).
+- `status` adicionado ao PROD com `DEFAULT 'Available'` (aditivo, zero risco).
+- `is_free_form` adicionado ao PROD com `DEFAULT false` (aditivo, zero risco).
+- CASCADE removido da FK `vehicle_field_settings` no DEV (igual ao PROD: protege exclusão de cliente com settings).
+- Dashboard RPCs removidas de ambos os bancos (rollback aplicado via `20260619000003`).
+
+---
+
 ## Arquivamento — 2026-06-17
 
 ### Bug corrigido — Dashboard com 404 nas RPCs de agregação (dev e produção)

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DRIVER_PENDENCY_VALUES } from './driverFilters';
 import { PENDENCY_VALUES } from './vehicleFilters';
 import {
   GENERAL_ACTION_ROUTES,
@@ -24,18 +25,28 @@ describe('actionQueueRoutes', () => {
   it('preserves intentional non-vehicle destinations', () => {
     expect(OPERATIONAL_ACTION_ROUTES.os_pending_approval).toBe('/aprovacao-orcamentos');
     expect(GENERAL_ACTION_ROUTES.os_pending_approval).toBe('/manutencao');
-    expect(GENERAL_ACTION_ROUTES.cnh).toBe('/cadastros/motoristas');
-    expect(GENERAL_ACTION_ROUTES.cnh_expiring).toBe('/cadastros/motoristas');
-    expect(GENERAL_ACTION_ROUTES.gr_driver_expiring).toBe('/cadastros/motoristas');
-    expect(OPERATIONAL_ACTION_ROUTES.cnh).toBe('/cadastros/motoristas');
-    expect(OPERATIONAL_ACTION_ROUTES.cnh_expiring).toBe('/cadastros/motoristas');
-    expect(OPERATIONAL_ACTION_ROUTES.gr_driver_expiring).toBe('/cadastros/motoristas');
+    expect(GENERAL_ACTION_ROUTES.cnh).toBe('/cadastros/motoristas?situacao=cnh_vencida');
+    expect(GENERAL_ACTION_ROUTES.cnh_expiring).toBe('/cadastros/motoristas?situacao=cnh_a_vencer');
+    expect(GENERAL_ACTION_ROUTES.gr_driver_expiring).toBe('/cadastros/motoristas?situacao=gr_a_vencer');
+    expect(OPERATIONAL_ACTION_ROUTES.cnh).toBe('/cadastros/motoristas?situacao=cnh_vencida');
+    expect(OPERATIONAL_ACTION_ROUTES.cnh_expiring).toBe('/cadastros/motoristas?situacao=cnh_a_vencer');
+    expect(OPERATIONAL_ACTION_ROUTES.gr_driver_expiring).toBe('/cadastros/motoristas?situacao=gr_a_vencer');
   });
 
   it('uses only valid pendency values in vehicle routes', () => {
     for (const route of Object.values(VEHICLE_PENDENCY_ACTION_ROUTES)) {
       const pendency = new URL(`https://betafleet.local${route}`).searchParams.get('pendencia');
       expect(PENDENCY_VALUES).toContain(pendency);
+    }
+  });
+
+  it('uses only valid driver situation values in driver routes', () => {
+    const driverKeys = ['cnh', 'cnh_expiring', 'gr_driver_expiring'] as const;
+    for (const map of [GENERAL_ACTION_ROUTES, OPERATIONAL_ACTION_ROUTES]) {
+      for (const key of driverKeys) {
+        const situacao = new URL(`https://betafleet.local${map[key]}`).searchParams.get('situacao');
+        expect(DRIVER_PENDENCY_VALUES).toContain(situacao);
+      }
     }
   });
 });
