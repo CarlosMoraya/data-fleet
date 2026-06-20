@@ -1,7 +1,7 @@
 import React, { useMemo, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useUiPreference, usePersistentTabState, usePersistentFilterState } from '../hooks/usePersistentUiState';
-import { LayoutDashboard, DollarSign, Activity, LineChart } from 'lucide-react';
+import { LayoutDashboard, DollarSign, Activity, LineChart, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -9,6 +9,7 @@ import { cn } from '../lib/utils';
 import OperationalPanel from '../components/dashboard/OperationalPanel';
 import CostPanel from '../components/dashboard/CostPanel';
 import OverviewPanel from '../components/dashboard/OverviewPanel';
+import ConformityPanel from '../components/dashboard/ConformityPanel';
 import PeriodRangeFilter from '../components/dashboard/PeriodRangeFilter';
 import RouteFallback from '../components/RouteFallback';
 import type { VehicleRow, DashboardFilters } from '../components/dashboard/OperationalPanel';
@@ -37,17 +38,18 @@ import {
   type ActionItem,
   type HorizonOption,
 } from '../lib/dashboardKpi';
-import { GENERAL_ACTION_ROUTES, OPERATIONAL_ACTION_ROUTES } from '../lib/actionQueueRoutes';
+import { OPERATIONAL_ACTION_ROUTES } from '../lib/actionQueueRoutes';
 
 const EvolutionPanel = React.lazy(() => import('../components/dashboard/EvolutionPanel'));
 
-type TabType = 'geral' | 'operacional' | 'custos' | 'evolucao';
+type TabType = 'geral' | 'operacional' | 'conformidade' | 'custos' | 'evolucao';
 const EXPIRING_SOON_WINDOW_DAYS = 30;
 const PROJECTION_TRAILING_MONTHS = 3;
 
 const tabs: { id: TabType; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'geral', label: 'Visão Geral', icon: LayoutDashboard },
   { id: 'operacional', label: 'Operação', icon: Activity },
+  { id: 'conformidade', label: 'Conformidade', icon: ShieldCheck },
   { id: 'custos', label: 'Custos', icon: DollarSign },
   { id: 'evolucao', label: 'Evolução', icon: LineChart },
 ];
@@ -468,8 +470,6 @@ export default function Dashboard() {
     [vehicles.length, overdueChecklistVehicleIds.size]
   );
 
-  const expiredDocsCount = expiredCrlvCount + expiredCnhCount;
-
   const plateByVehicleId = useMemo(
     () => new Map(vehicles.map((vehicle) => [vehicle.id, vehicle.license_plate ?? null])),
     [vehicles]
@@ -512,19 +512,6 @@ export default function Dashboard() {
     [activeMaintenanceOrders, plateByVehicleId]
   );
 
-  const actionItems = useMemo(
-    () =>
-      buildActionQueue({
-        checklist: mapVehicleIdsToPlates([...overdueChecklistVehicleIds], plateByVehicleId),
-        crlv: getExpiredCrlvPlates(vehicles, currentYear, today),
-        crlvExpiring: getExpiringSoonCrlvPlates(vehicles, today, EXPIRING_SOON_WINDOW_DAYS),
-        cnh: getExpiredCnhNames(drivers, today),
-        osOverdue: overdueOrderPlates,
-        osPendingApproval: pendingApprovalPlates,
-      }),
-    [currentYear, drivers, overdueChecklistVehicleIds, overdueOrderPlates, pendingApprovalPlates, plateByVehicleId, today, vehicles]
-  );
-
   const operationalActionItems = useMemo(
     () =>
       buildActionQueue({
@@ -540,10 +527,6 @@ export default function Dashboard() {
       }),
     [currentYear, drivers, overdueChecklistVehicleIds, overdueOrderPlates, pendingApprovalPlates, plateByVehicleId, today, vehicles]
   );
-
-  const handleActionClick = (category: ActionItem['category']) => {
-    navigate(GENERAL_ACTION_ROUTES[category]);
-  };
 
   const handleOperationalActionClick = (category: ActionItem['category']) => {
     navigate(OPERATIONAL_ACTION_ROUTES[category]);
@@ -610,10 +593,6 @@ export default function Dashboard() {
             pendingApprovalCount={pendingApprovalCount}
             totalApprovedCost={totalApprovedCost}
             complianceRate={complianceRate}
-            expiredDocsCount={expiredDocsCount}
-            expiringSoonDocsCount={expiringSoonDocsCount}
-            actionItems={actionItems}
-            onActionClick={handleActionClick}
             isLoading={isPanelLoading}
           />
         )}
@@ -634,6 +613,7 @@ export default function Dashboard() {
             isLoading={isPanelLoading}
           />
         )}
+        {activeTab === 'conformidade' && <ConformityPanel />}
         {activeTab === 'custos' && (
           <div className="space-y-6">
             <PeriodRangeFilter

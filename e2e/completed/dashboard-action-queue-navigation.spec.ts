@@ -21,6 +21,8 @@ test.describe.serial('Dashboard: navegação da fila de ação', () => {
     await page.goto('/dashboard');
     await expect(page.locator('h1', { hasText: 'Dashboard' })).toBeVisible({ timeout: 10000 });
 
+    await page.getByRole('button', { name: /Operação/ }).click();
+
     const vehicleActionButton = page.getByRole('button').filter({ hasText: /CRLV|GR a vencer|checklist vencido/i }).first();
     if (await vehicleActionButton.count() === 0) {
       test.info().annotations.push({

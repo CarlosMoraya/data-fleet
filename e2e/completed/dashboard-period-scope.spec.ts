@@ -16,6 +16,10 @@ test.describe('Dashboard: escopo do filtro de período', () => {
     await expect(page.getByText('Período de análise')).not.toBeVisible();
     await expect(page.locator('input[type="date"]')).toHaveCount(0);
 
+    await page.getByRole('button', { name: /Conformidade/ }).click();
+    await expect(page.getByText('Período de análise')).not.toBeVisible();
+    await expect(page.locator('input[type="date"]')).toHaveCount(0);
+
     await page.getByRole('button', { name: /Custos/ }).click();
     await expect(page.getByText('Período de análise')).toBeVisible();
     await expect(page.locator('input[type="date"]')).toHaveCount(2);

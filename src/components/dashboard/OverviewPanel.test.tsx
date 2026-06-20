@@ -35,22 +35,25 @@ const baseProps = {
   pendingApprovalCount: 0,
   totalApprovedCost: 5000,
   complianceRate: 95,
-  expiredDocsCount: 2,
-  expiringSoonDocsCount: 5,
-  actionItems: [],
   isLoading: false,
 };
 
-describe('OverviewPanel — "Documentos a Vencer (30d)" subtitle', () => {
-  it('subtitle mentions CRLV, CNH and GR to match the calculation', () => {
+describe('OverviewPanel — regressão de conteúdo removido', () => {
+  it('não exibe Documentos Vencidos nem Documentos a Vencer (30d)', () => {
     renderWithAct(<OverviewPanel {...baseProps} />);
 
     const text = container.textContent ?? '';
 
-    expect(text).toContain('CRLV');
-    expect(text).toContain('CNH');
-    expect(text).toContain('GR');
-    expect(text).toContain('Documentos a Vencer (30d)');
+    expect(text).not.toContain('Documentos a Vencer (30d)');
+    expect(text).not.toContain('Documentos Vencidos');
+  });
+
+  it('não exibe Fila de Ação', () => {
+    renderWithAct(<OverviewPanel {...baseProps} />);
+
+    const text = container.textContent ?? '';
+
+    expect(text).not.toContain('Fila de Ação');
   });
 
   it('renders current-state copy and current month cost label', () => {

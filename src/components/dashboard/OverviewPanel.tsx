@@ -8,13 +8,9 @@ import {
   Clock,
   DollarSign,
   ListChecks,
-  FileWarning,
   Loader2,
-  CalendarClock,
 } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
-import ActionQueue from './ActionQueue';
-import type { ActionItem } from '../../lib/dashboardKpi';
 
 const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -27,10 +23,6 @@ interface OverviewPanelProps {
   pendingApprovalCount: number;
   totalApprovedCost: number;
   complianceRate: number;
-  expiredDocsCount: number;
-  expiringSoonDocsCount: number;
-  actionItems: ActionItem[];
-  onActionClick?: (category: ActionItem['category']) => void;
   isLoading?: boolean;
 }
 
@@ -43,10 +35,6 @@ export default function OverviewPanel({
   pendingApprovalCount,
   totalApprovedCost,
   complianceRate,
-  expiredDocsCount,
-  expiringSoonDocsCount,
-  actionItems,
-  onActionClick,
   isLoading = false,
 }: OverviewPanelProps) {
   if (isLoading) {
@@ -123,26 +111,7 @@ export default function OverviewPanel({
           value={`${complianceRate}%`}
           subtitle="veículos com checklist em dia"
         />
-        <DashboardKpiCard
-          icon={FileWarning}
-          iconBgClass="bg-red-50"
-          iconColorClass="text-red-600"
-          label="Documentos Vencidos"
-          value={expiredDocsCount}
-          subtitle="CRLV + CNH"
-          isAlert
-        />
-        <DashboardKpiCard
-          icon={CalendarClock}
-          iconBgClass="bg-orange-50"
-          iconColorClass="text-orange-600"
-          label="Documentos a Vencer (30d)"
-          value={expiringSoonDocsCount}
-          subtitle="CRLV + CNH + GR nos próximos 30 dias"
-          isAlert
-        />
       </div>
-      <ActionQueue items={actionItems} onItemClick={onActionClick} />
     </div>
   );
 }
