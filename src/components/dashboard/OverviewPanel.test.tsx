@@ -27,14 +27,15 @@ function renderWithAct(ui: React.ReactElement) {
 }
 
 const baseProps = {
+  vehicles: [],
   totalVehicles: 10,
-  vehiclesInMaintenance: 2,
+  availableVehicles: 8,
+  unavailableVehicles: 2,
   availabilityRate: 80,
-  openOrdersCount: 3,
-  overdueOrdersCount: 1,
-  pendingApprovalCount: 0,
   totalApprovedCost: 5000,
   complianceRate: 95,
+  trackerCoverageRate: 70,
+  insuranceCoverageRate: 80,
   isLoading: false,
 };
 
@@ -54,6 +55,34 @@ describe('OverviewPanel — regressão de conteúdo removido', () => {
     const text = container.textContent ?? '';
 
     expect(text).not.toContain('Fila de Ação');
+  });
+
+  it('não exibe cards removidos e itens fora de escopo', () => {
+    renderWithAct(<OverviewPanel {...baseProps} />);
+
+    const text = container.textContent ?? '';
+
+    expect(text).not.toContain('OS Abertas');
+    expect(text).not.toContain('OS em Atraso');
+    expect(text).not.toContain('OS Aguardando Aprovação');
+    expect(text).not.toContain('Veículos em Manutenção');
+    expect(text).not.toContain('Veículos sem Motorista');
+  });
+
+  it('exibe os 8 rótulos executivos e o cabeçalho Mapa da Frota', () => {
+    renderWithAct(<OverviewPanel {...baseProps} />);
+
+    const text = container.textContent ?? '';
+
+    expect(text).toContain('Total de Veículos');
+    expect(text).toContain('Veículos Disponíveis');
+    expect(text).toContain('Veículos Indisponíveis');
+    expect(text).toContain('Disponibilidade da Frota');
+    expect(text).toContain('Custo do Mês Atual');
+    expect(text).toContain('Conformidade de Checklist');
+    expect(text).toContain('Cobertura de Rastreador');
+    expect(text).toContain('Cobertura de Seguro');
+    expect(text).toContain('Mapa da Frota');
   });
 
   it('renders current-state copy and current month cost label', () => {

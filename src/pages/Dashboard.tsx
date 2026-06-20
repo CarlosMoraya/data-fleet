@@ -19,7 +19,8 @@ import {
   countVehiclesInMaintenance,
   calculateChecklistComplianceRate,
   countOverdueMaintenanceOrders,
-  countPendingApprovalOrders,
+  calculateInsuranceCoverageRate,
+  calculateTrackerCoverageRate,
   buildActionQueue,
   calculatePreviousPeriodRange,
   countExpiringSoon,
@@ -91,7 +92,7 @@ export default function Dashboard() {
     queryFn: async () => {
       let query = supabase
         .from('vehicles')
-        .select('id, type, crlv_year, crlv_expiration_date, driver_id, license_plate, gr_expiration_date, client_id, shippers(name), operational_units(name)');
+        .select('id, type, crlv_year, crlv_expiration_date, driver_id, license_plate, gr_expiration_date, client_id, category, brand, model, acquisition, has_insurance, tracker, shippers(name), operational_units(name)');
       if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
       }
@@ -106,6 +107,12 @@ export default function Dashboard() {
         client_id: row.client_id as string | null,
         license_plate: row.license_plate != null ? (row.license_plate as string) : null,
         gr_expiration_date: row.gr_expiration_date != null ? (row.gr_expiration_date as string) : null,
+        category: row.category != null ? (row.category as string) : null,
+        brand: row.brand != null ? (row.brand as string) : null,
+        model: row.model != null ? (row.model as string) : null,
+        acquisition: row.acquisition != null ? (row.acquisition as string) : null,
+        has_insurance: row.has_insurance != null ? Boolean(row.has_insurance) : null,
+        tracker: row.tracker != null ? (row.tracker as string) : null,
         shipper_name:
           row.shippers && typeof row.shippers === 'object' && !Array.isArray(row.shippers)
             ? (row.shippers as Record<string, unknown>).name as string | null
@@ -438,16 +445,26 @@ export default function Dashboard() {
     [vehicles.length, vehiclesInMaintenance]
   );
 
-  const openOrdersCount = activeMaintenanceOrders.length;
+  const unavailableVehicles = vehiclesInMaintenance;
+
+  const availableVehicles = useMemo(
+    () => Math.max(0, vehicles.length - vehiclesInMaintenance),
+    [vehicles.length, vehiclesInMaintenance]
+  );
 
   const overdueOrdersCount = useMemo(
     () => countOverdueMaintenanceOrders(activeMaintenanceOrders, today),
     [activeMaintenanceOrders, today]
   );
 
-  const pendingApprovalCount = useMemo(
-    () => countPendingApprovalOrders(activeMaintenanceOrders),
-    [activeMaintenanceOrders]
+  const insuranceCoverageRate = useMemo(
+    () => calculateInsuranceCoverageRate(vehicles),
+    [vehicles]
+  );
+
+  const trackerCoverageRate = useMemo(
+    () => calculateTrackerCoverageRate(vehicles),
+    [vehicles]
   );
 
   const totalApprovedCost = useMemo(
@@ -585,14 +602,15 @@ export default function Dashboard() {
       <div className="flex-1 min-h-0 overflow-y-auto">
         {activeTab === 'geral' && (
           <OverviewPanel
+            vehicles={vehicles}
             totalVehicles={vehicles.length}
-            vehiclesInMaintenance={vehiclesInMaintenance}
+            availableVehicles={availableVehicles}
+            unavailableVehicles={unavailableVehicles}
             availabilityRate={availabilityRate}
-            openOrdersCount={openOrdersCount}
-            overdueOrdersCount={overdueOrdersCount}
-            pendingApprovalCount={pendingApprovalCount}
             totalApprovedCost={totalApprovedCost}
             complianceRate={complianceRate}
+            trackerCoverageRate={trackerCoverageRate}
+            insuranceCoverageRate={insuranceCoverageRate}
             isLoading={isPanelLoading}
           />
         )}

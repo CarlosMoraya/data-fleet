@@ -29,6 +29,12 @@ export interface VehicleRow {
   initial_km?: number | null;
   shipper_name?: string | null;
   operational_unit_name?: string | null;
+  category?: string | null;
+  brand?: string | null;
+  model?: string | null;
+  acquisition?: string | null;
+  has_insurance?: boolean | null;
+  tracker?: string | null;
 }
 
 export interface DashboardFilters {

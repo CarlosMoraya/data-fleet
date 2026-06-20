@@ -353,6 +353,47 @@ export function getExpiringSoonGrDriverNames(
     .map((driver) => driver.name as string);
 }
 
+// ─── Visão Geral — Cobertura e Mapa da Frota ───────────────────────────────
+
+export function calculateInsuranceCoverageRate(vehicles: Pick<VehicleRow, 'has_insurance'>[]): number {
+  if (vehicles.length === 0) return 0;
+  const covered = vehicles.filter((vehicle) => vehicle.has_insurance === true).length;
+  return Math.max(0, Math.min(100, Math.round((covered / vehicles.length) * 100)));
+}
+
+export function calculateTrackerCoverageRate(vehicles: Pick<VehicleRow, 'tracker'>[]): number {
+  if (vehicles.length === 0) return 0;
+  const covered = vehicles.filter((vehicle) => typeof vehicle.tracker === 'string' && vehicle.tracker.trim().length > 0).length;
+  return Math.max(0, Math.min(100, Math.round((covered / vehicles.length) * 100)));
+}
+
+export function buildFleetCountByKey(
+  vehicles: VehicleRow[],
+  keyAccessor: (v: VehicleRow) => string | null | undefined,
+  fallbackLabel: string
+): { name: string; value: number }[] {
+  const counts = new Map<string, number>();
+
+  for (const vehicle of vehicles) {
+    const rawKey = keyAccessor(vehicle);
+    const key = typeof rawKey === 'string' && rawKey.trim().length > 0 ? rawKey.trim() : fallbackLabel;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([name, value]) => ({ name, value }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value);
+}
+
+export function buildTopFleetModels(
+  vehicles: Pick<VehicleRow, 'model'>[],
+  limit: number,
+  fallbackLabel: string
+): { name: string; value: number }[] {
+  return buildFleetCountByKey(vehicles as VehicleRow[], (vehicle) => vehicle.model, fallbackLabel).slice(0, limit);
+}
+
 // ─── Dashboard Fase 3 — Tendência histórica e projeção ────────────────────
 
 function enumerateBucketKeys(from: string, to: string, granularity: 'day' | 'month'): { key: string; name: string }[] {

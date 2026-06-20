@@ -7,6 +7,10 @@ import {
   calculateChecklistComplianceRate,
   countOverdueMaintenanceOrders,
   countPendingApprovalOrders,
+  calculateInsuranceCoverageRate,
+  calculateTrackerCoverageRate,
+  buildFleetCountByKey,
+  buildTopFleetModels,
   buildActionQueue,
   calculateAverageMaintenanceDays,
   calculateAverageOpenOrderAgeDays,
@@ -200,6 +204,116 @@ describe('calculateChecklistComplianceRate', () => {
 
   it('retorna 100 quando não há frota (sem pendência)', () => {
     expect(calculateChecklistComplianceRate(0, 0)).toBe(100);
+  });
+});
+
+describe('calculateInsuranceCoverageRate', () => {
+  it('retorna 80 quando 8 de 10 veículos têm seguro', () => {
+    const vehicles = [
+      { has_insurance: true },
+      { has_insurance: true },
+      { has_insurance: true },
+      { has_insurance: true },
+      { has_insurance: true },
+      { has_insurance: true },
+      { has_insurance: true },
+      { has_insurance: true },
+      { has_insurance: false },
+      { has_insurance: false },
+    ];
+
+    expect(calculateInsuranceCoverageRate(vehicles)).toBe(80);
+  });
+
+  it('retorna 0 quando a lista está vazia', () => {
+    expect(calculateInsuranceCoverageRate([])).toBe(0);
+  });
+
+  it('conta has_insurance null como não coberto', () => {
+    expect(calculateInsuranceCoverageRate([{ has_insurance: true }, { has_insurance: null }])).toBe(50);
+  });
+});
+
+describe('calculateTrackerCoverageRate', () => {
+  it('retorna 50 quando 2 de 4 veículos têm rastreador', () => {
+    const vehicles = [
+      { tracker: 'Sascar' },
+      { tracker: 'Sascar' },
+      { tracker: null },
+      { tracker: null },
+    ];
+
+    expect(calculateTrackerCoverageRate(vehicles)).toBe(50);
+  });
+
+  it('conta tracker só com espaços como não coberto', () => {
+    expect(calculateTrackerCoverageRate([{ tracker: '   ' }, { tracker: 'Positron' }])).toBe(50);
+  });
+
+  it('retorna 0 quando a lista está vazia', () => {
+    expect(calculateTrackerCoverageRate([])).toBe(0);
+  });
+});
+
+describe('buildFleetCountByKey', () => {
+  it('agrupa por categoria em buckets ordenados por valor decrescente', () => {
+    const vehicles = [
+      { id: '1', type: 'Truck', crlv_year: null, crlv_expiration_date: null, driver_id: null, category: 'Pesado' },
+      { id: '2', type: 'Truck', crlv_year: null, crlv_expiration_date: null, driver_id: null, category: 'Pesado' },
+      { id: '3', type: 'Van', crlv_year: null, crlv_expiration_date: null, driver_id: null, category: 'Leve' },
+      { id: '4', type: 'Moto', crlv_year: null, crlv_expiration_date: null, driver_id: null, category: 'Moto' },
+    ];
+
+    expect(buildFleetCountByKey(vehicles, (vehicle) => vehicle.category, 'Sem Categoria')).toEqual([
+      { name: 'Pesado', value: 2 },
+      { name: 'Leve', value: 1 },
+      { name: 'Moto', value: 1 },
+    ]);
+  });
+
+  it('usa fallback quando a chave é nula', () => {
+    const vehicles = [
+      { id: '1', type: 'Truck', crlv_year: null, crlv_expiration_date: null, driver_id: null, category: null },
+    ];
+
+    expect(buildFleetCountByKey(vehicles, (vehicle) => vehicle.category, 'Sem Categoria')).toEqual([
+      { name: 'Sem Categoria', value: 1 },
+    ]);
+  });
+
+  it('não retorna buckets com value igual a zero', () => {
+    const vehicles = [
+      { id: '1', type: 'Truck', crlv_year: null, crlv_expiration_date: null, driver_id: null, category: 'Pesado' },
+    ];
+
+    expect(buildFleetCountByKey(vehicles, (vehicle) => vehicle.category, 'Sem Categoria').every((item) => item.value > 0)).toBe(true);
+  });
+});
+
+describe('buildTopFleetModels', () => {
+  it('retorna os 3 modelos com maior contagem quando limit é 3', () => {
+    const vehicles = [
+      { model: 'Atego' },
+      { model: 'Atego' },
+      { model: 'Daily' },
+      { model: 'Daily' },
+      { model: 'Daily' },
+      { model: 'Sprinter' },
+      { model: 'Transit' },
+      { model: 'HR' },
+    ];
+
+    expect(buildTopFleetModels(vehicles, 3, 'Sem Modelo')).toEqual([
+      { name: 'Daily', value: 3 },
+      { name: 'Atego', value: 2 },
+      { name: 'Sprinter', value: 1 },
+    ]);
+  });
+
+  it('usa fallback quando model é nulo', () => {
+    expect(buildTopFleetModels([{ model: null }], 10, 'Sem Modelo')).toEqual([
+      { name: 'Sem Modelo', value: 1 },
+    ]);
   });
 });
 

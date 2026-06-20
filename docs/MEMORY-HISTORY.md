@@ -2,6 +2,39 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-06-20 (10:00)
+
+### Visão Geral do Dashboard reescrita como raio-x executivo da frota
+
+**O que foi implementado:** reescrita da aba `Visão Geral` do Dashboard para exibir exatamente 8 cards executivos e o bloco `Mapa da Frota` com 6 gráficos, sem alterar schema de banco e sem mexer na lógica/render da aba `Operação` além da ampliação opcional do tipo `VehicleRow`.
+
+**Arquivos modificados:**
+- `src/components/dashboard/OperationalPanel.tsx`: interface `VehicleRow` expandida com `category`, `brand`, `model`, `acquisition`, `has_insurance` e `tracker` como campos opcionais.
+- `src/pages/Dashboard.tsx`: query `dashboard-vehicles` expandida para ler os 6 novos campos; cálculo e injeção dos novos KPIs executivos (`availableVehicles`, `unavailableVehicles`, `trackerCoverageRate`, `insuranceCoverageRate`) no `OverviewPanel`; remoção das props antigas de OS da Visão Geral.
+- `src/lib/dashboardKpi.ts`: adicionadas funções puras `calculateInsuranceCoverageRate`, `calculateTrackerCoverageRate`, `buildFleetCountByKey` e `buildTopFleetModels`.
+- `src/lib/dashboardKpi.test.ts`: cobertura unitária para os novos cálculos de cobertura e agrupamento.
+- `src/components/dashboard/OverviewPanel.tsx`: painel reescrito para renderizar os 8 cards aprovados e o bloco `Mapa da Frota` com 6 instâncias de `VehicleTypeBarChart` em `Suspense`.
+- `src/components/dashboard/OverviewPanel.test.tsx`: regressões atualizadas para ausência dos cards removidos e presença dos novos rótulos/cabeçalho.
+- `docs/MEMORY.md`: estado vigente do Dashboard atualizado.
+- `docs/MEMORY-HISTORY.md`: este arquivamento.
+
+**Decisões tomadas:**
+- `Veículos Indisponíveis` reutiliza `countVehiclesInMaintenance(...)` por equivalência exata com a definição de veículo com OS ativa.
+- `Veículos Disponíveis` = total da frota menos indisponíveis; `Disponibilidade da Frota` continua derivada por `calculateFleetAvailability(...)`.
+- `Cobertura de Seguro` usa `has_insurance`; `Cobertura de Rastreador` usa `tracker` não-vazio, sem heurística semântica nesta sessão.
+- Os 6 gráficos do `Mapa da Frota` são apenas exibição nesta v1: `activeFilter={null}` e `onFilterChange={() => {}}`, sem deep link novo.
+
+**Validações executadas:**
+- `npm run lint` ✅
+- `npm run test:unit` ✅ (460 testes)
+- `npm run test:smoke` ✅ (6/6)
+
+**Observações para sessões futuras:**
+- Migrar `Cobertura de Rastreador` para coluna booleana dedicada (`has_tracker`) com backfill aditivo no banco.
+- Avaliar drill-down interativo nos gráficos do `Mapa da Frota` em sessão separada.
+
+---
+
 ## Sessão — 2026-06-19 (21:20)
 
 ### Padronização de deep links de filtros operacionais (Veículos e Motoristas)
