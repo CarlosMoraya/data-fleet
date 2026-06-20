@@ -12,7 +12,7 @@ import OverviewPanel from '../components/dashboard/OverviewPanel';
 import ConformityPanel from '../components/dashboard/ConformityPanel';
 import PeriodRangeFilter from '../components/dashboard/PeriodRangeFilter';
 import RouteFallback from '../components/RouteFallback';
-import type { VehicleRow, DashboardFilters } from '../components/dashboard/OperationalPanel';
+import type { VehicleRow } from '../components/dashboard/OperationalPanel';
 import type { MaintenanceOrderDashboard } from '../types/maintenance';
 import {
   buildComplianceActionQueue,
@@ -25,7 +25,6 @@ import {
   calculateInsuranceCoverageRate,
   calculateTrackerCoverageRate,
   buildOperationalActionQueue,
-  calculatePreviousPeriodRange,
   mapVehicleIdsToPlates,
   getDriversMissingCnhUploadNames,
   getDriversWithVehicleMissingGrNames,
@@ -40,7 +39,6 @@ import {
   getActiveOrdersDueWithinDaysVehicleIds,
   getPendingBudgetVehicleIds,
   getTrailingMonthKeys,
-  calculateMovingAverageProjection,
   countIrregularDrivers,
   countIrregularVehicles,
   computeOverdueChecklistVehicleIds,
@@ -57,6 +55,7 @@ import {
   resolveHorizonRange,
   type ComplianceActionCategory,
   type ComplianceActionItem,
+  type CostDashboardFilters,
   type OperationalActionItem,
   type OperationalActionCategory,
   type HorizonOption,
@@ -87,14 +86,23 @@ function getDefaultDateRange() {
   return { from, to };
 }
 
+const DEFAULT_COST_FILTERS: CostDashboardFilters = {
+  category: null,
+  model: null,
+  shipper: null,
+  operationalUnit: null,
+  maintenanceType: null,
+};
+
 export default function Dashboard() {
   const { currentClient, user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = usePersistentTabState('dashboard', 'active', 'geral');
-  const [filters, setFilters] = usePersistentFilterState<DashboardFilters>('dashboard', 'chart-filters', {
-    vehicleType: null,
-    maintenanceType: null,
-  });
+  const [costFilters, setCostFilters] = usePersistentFilterState<CostDashboardFilters>(
+    'dashboard',
+    'cost-filters',
+    DEFAULT_COST_FILTERS,
+  );
 
   const [dateRange, setDateRange] = useUiPreference<{ from: string; to: string }>(
     'dashboard',
@@ -264,39 +272,37 @@ export default function Dashboard() {
       gcTime: 30 * 60 * 1000,
     });
 
-  const { data: previousPeriodCost = 0, isLoading: loadingPreviousMaintenance } = useQuery<number>({
-    queryKey: ['dashboard-maintenance-previous', currentClient?.id, dateRange.from, dateRange.to],
-    queryFn: async () => {
-      const previous = calculatePreviousPeriodRange(dateRange.from, dateRange.to);
-      const { data, error } = await supabase.rpc('dashboard_previous_period_cost', {
-        p_client_id: currentClient?.id ?? null,
-        p_from: previous.from,
-        p_to: previous.to,
-      });
-      if (error) throw error;
-      return Number(data ?? 0);
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-  });
-
-  const { data: costProjectionRows = [], isLoading: loadingCostProjection } = useQuery<
-    { month_key: string; total: number | null }[]
-  >({
-    queryKey: ['dashboard-cost-projection', currentClient?.id],
+  const { data: projectionSourceOrders = [], isLoading: loadingProjectionSource } =
+    useQuery<MaintenanceOrderDashboard[]>({
+    queryKey: ['dashboard-maintenance-projection-source', currentClient?.id],
     queryFn: async () => {
       const keys = getTrailingMonthKeys(today, PROJECTION_TRAILING_MONTHS);
       const inicio = `${keys[0]}-01`;
       const [y, m] = today.substring(0, 7).split('-').map(Number);
       const inicioMesCorrente = `${y}-${String(m).padStart(2, '0')}-01`;
-      const { data, error } = await supabase.rpc('dashboard_cost_projection_monthly', {
-        p_client_id: currentClient?.id ?? null,
-        p_from: inicio,
-        p_to: inicioMesCorrente,
-      });
+      let query = supabase
+        .from('maintenance_orders')
+        .select('id, vehicle_id, type, status, approved_cost, entry_date')
+        .gte('entry_date', inicio)
+        .lt('entry_date', inicioMesCorrente)
+        .neq('status', 'Cancelado');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as { month_key: string; total: number | null }[];
+      return (data ?? []).map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        vehicle_id: row.vehicle_id as string,
+        type: row.type as MaintenanceOrderDashboard['type'],
+        status: row.status as string,
+        approved_cost: row.approved_cost != null ? Number(row.approved_cost) : null,
+        current_km: null,
+        vehicle_type: null,
+        expected_exit_date: null,
+        entry_date: row.entry_date != null ? (row.entry_date as string) : null,
+        actual_exit_date: null,
+      }));
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -672,13 +678,6 @@ export default function Dashboard() {
     [currentMonthOrders]
   );
 
-  const projectedNextMonthCost = useMemo(() => {
-    const monthKeys = getTrailingMonthKeys(today, PROJECTION_TRAILING_MONTHS);
-    const totalByKey = new Map(costProjectionRows.map((r) => [r.month_key, Number(r.total ?? 0)]));
-    const monthlyTotals = monthKeys.map((k) => totalByKey.get(k) ?? 0);
-    return calculateMovingAverageProjection(monthlyTotals);
-  }, [today, costProjectionRows]);
-
   const complianceRate = useMemo(
     () => calculateChecklistComplianceRate(vehicles.length, overdueChecklistVehicleIds.size),
     [vehicles.length, overdueChecklistVehicleIds.size]
@@ -799,8 +798,7 @@ export default function Dashboard() {
     loadingMaintenance ||
     loadingCurrentMonthOrders ||
     loadingActiveMaintenance ||
-    loadingPreviousMaintenance ||
-    loadingCostProjection ||
+    loadingProjectionSource ||
     loadingLastChecklists ||
     loadingActionPlans ||
     loadingVehicleKm ||
@@ -896,12 +894,13 @@ export default function Dashboard() {
             <CostPanel
               vehicles={vehicles}
               maintenanceOrders={maintenanceOrders}
-              previousPeriodCost={previousPeriodCost}
-              projectedNextMonthCost={projectedNextMonthCost}
+              currentMonthOrders={currentMonthOrders}
+              projectionSourceOrders={projectionSourceOrders}
               vehicleKmRows={vehicleKmRows}
               dateRange={dateRange}
-              filters={filters}
-              onFiltersChange={setFilters}
+              filters={costFilters}
+              onFiltersChange={setCostFilters}
+              onResetFilters={() => setCostFilters(DEFAULT_COST_FILTERS)}
               isLoading={isPanelLoading}
             />
           </div>

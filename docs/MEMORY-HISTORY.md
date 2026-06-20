@@ -2,6 +2,27 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-06-20 (16:30)
+
+### Aba Custos — filtros aprovados, Custo por KM e validação E2E
+
+**O que foi implementado / validado:**
+- Etapa 1: comentário SQL na RPC `dashboard_vehicle_km_in_period` explicando que `MAX−MIN` de `odometer_km` é a regra aprovada de KM rodado no período (não "último por data − primeiro"); decisão registrada em `docs/MEMORY.md` como decisão vigente.
+- Etapa 2: seed estendido com veículos `DEV4D56` (Médio) e `DEV5E67` (Pesado) para `primaryClient`, OS `DEV-OS-002` para o veículo Médio (com `approved_cost: 950`), e segundo checklist para `vehicle` (DEV1A23) com `odometer_km: 25820` (crescente). Race condition identificada e corrigida: `openCostsTab` ganhou `waitForLoadState('networkidle')` antes do clique na aba; teste #4 ganhou `await expect(page.getByLabel('Categoria')).toBeVisible()` após o `fill` de data (que dispara re-fetch de ordens e coloca `CostPanel` em loading-spinner temporariamente). Resultado: 4/4 testes passando, 0 skips.
+- Etapa 3 (banco Prod): verificação das 4 RPCs e coluna `odometer_km` no Prod (`oajfjdadcicgoxrfrnny`) é operação manual a ser executada pelo usuário no SQL Editor do Supabase (SQL especificado no IMPLEMENTATION.md Etapa 3).
+- Etapa 4: typecheck 0 erros, unit 513/513, smoke 6/6, E2E de custos 4/4, RPC health 1/1.
+
+**Decisões confirmadas:**
+- `MAX(odometer_km) − MIN(odometer_km)` como KM por veículo no período (aprovado 2026-06-20).
+- Filtros de Custos permanecem em `usePersistentFilterState` (session), não em deep links.
+- Race condition em testes E2E corrigida com waits explícitos (não alteração de condições de skip).
+
+**Arquivos modificados nesta sessão:**
+- `supabase/migrations/20260617000100_create_dashboard_checklist_rpcs.sql` — comentário na RPC
+- `docs/MEMORY.md` — decisão KM + atualização do estado da aba Custos
+- `scripts/seed-betafleet-demo.mjs` — veículos DEV4D56/DEV5E67 + OS DEV-OS-002 + checklist KM
+- `e2e/completed/dashboard-costs-filters.spec.ts` — waits para corrigir race condition
+
 ## Sessão — 2026-06-20 (13:20)
 
 ### Aba Conformidade como tela própria de regularidade documental

@@ -1,6 +1,120 @@
 import type { MaintenanceOrderDashboard } from '../types/maintenance';
 import type { VehicleRow } from '../components/dashboard/OperationalPanel';
 
+export interface CostDashboardFilters {
+  category: string | null;
+  model: string | null;
+  shipper: string | null;
+  operationalUnit: string | null;
+  maintenanceType: MaintenanceOrderDashboard['type'] | null;
+}
+
+export function normalizeCostFilterValue(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+export function buildCostFilterOptions(
+  vehicles: Pick<VehicleRow, 'category' | 'model' | 'shipper_name' | 'operational_unit_name'>[]
+): { categories: string[]; models: string[]; shippers: string[]; operationalUnits: string[] } {
+  const categories = new Set<string>();
+  const models = new Set<string>();
+  const shippers = new Set<string>();
+  const operationalUnits = new Set<string>();
+
+  for (const vehicle of vehicles) {
+    const category = normalizeCostFilterValue(vehicle.category);
+    const model = normalizeCostFilterValue(vehicle.model);
+    const shipper = normalizeCostFilterValue(vehicle.shipper_name);
+    const operationalUnit = normalizeCostFilterValue(vehicle.operational_unit_name);
+
+    if (category) categories.add(category);
+    if (model) models.add(model);
+    if (shipper) shippers.add(shipper);
+    if (operationalUnit) operationalUnits.add(operationalUnit);
+  }
+
+  const sortPtBr = (a: string, b: string) => a.localeCompare(b, 'pt-BR');
+
+  return {
+    categories: [...categories].sort(sortPtBr),
+    models: [...models].sort(sortPtBr),
+    shippers: [...shippers].sort(sortPtBr),
+    operationalUnits: [...operationalUnits].sort(sortPtBr),
+  };
+}
+
+export function applyCostFilters<T extends Pick<MaintenanceOrderDashboard, 'vehicle_id' | 'type'>>(input: {
+  vehicles: VehicleRow[];
+  orders: T[];
+  filters: CostDashboardFilters;
+}): { filteredVehicles: VehicleRow[]; filteredOrders: T[] } {
+  const { vehicles, orders, filters } = input;
+
+  const filteredVehicles = vehicles.filter((vehicle) => {
+    if (filters.category && normalizeCostFilterValue(vehicle.category) !== filters.category) return false;
+    if (filters.model && normalizeCostFilterValue(vehicle.model) !== filters.model) return false;
+    if (filters.shipper && normalizeCostFilterValue(vehicle.shipper_name) !== filters.shipper) return false;
+    if (filters.operationalUnit && normalizeCostFilterValue(vehicle.operational_unit_name) !== filters.operationalUnit) return false;
+    return true;
+  });
+
+  const allowedVehicleIds = new Set(filteredVehicles.map((vehicle) => vehicle.id));
+  const filteredOrders = orders.filter((order) => {
+    if (!allowedVehicleIds.has(order.vehicle_id)) return false;
+    if (filters.maintenanceType && order.type !== filters.maintenanceType) return false;
+    return true;
+  });
+
+  return { filteredVehicles, filteredOrders };
+}
+
+export function sumApprovedMaintenanceCost(
+  orders: Pick<MaintenanceOrderDashboard, 'approved_cost' | 'status'>[]
+): number {
+  return orders.reduce((sum, order) => {
+    if (order.status === 'Cancelado' || order.approved_cost == null || order.approved_cost <= 0) {
+      return sum;
+    }
+    return sum + order.approved_cost;
+  }, 0);
+}
+
+export function calculateAverageApprovedTicket(
+  orders: Pick<MaintenanceOrderDashboard, 'approved_cost' | 'status'>[]
+): number | null {
+  const approvedOrders = orders.filter(
+    (order) => order.status !== 'Cancelado' && order.approved_cost != null && order.approved_cost > 0
+  );
+
+  if (approvedOrders.length === 0) return null;
+
+  return sumApprovedMaintenanceCost(approvedOrders) / approvedOrders.length;
+}
+
+export function calculateCostPerKm(input: {
+  totalCost: number;
+  vehicleKmRows: { vehicle_id: string; km_driven: number }[];
+  allowedVehicleIds: Set<string>;
+}): { value: number | null; totalKm: number } {
+  const totalKm = input.vehicleKmRows.reduce((sum, row) => {
+    if (!input.allowedVehicleIds.has(row.vehicle_id) || row.km_driven <= 0) {
+      return sum;
+    }
+    return sum + row.km_driven;
+  }, 0);
+
+  if (totalKm <= 0) {
+    return { value: null, totalKm: 0 };
+  }
+
+  return {
+    value: input.totalCost / totalKm,
+    totalKm,
+  };
+}
+
 export function countActiveInMaintenance(
   orders: Pick<MaintenanceOrderDashboard, 'vehicle_id' | 'status'>[],
   vehicles: Pick<VehicleRow, 'id' | 'type'>[],

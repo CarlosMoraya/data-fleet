@@ -1,10 +1,23 @@
 import React, { useMemo, lazy, Suspense } from 'react';
-import { DollarSign, Truck, Gauge, Loader2, History, TrendingUp } from 'lucide-react';
+import { DollarSign, Truck, Gauge, Loader2, TrendingUp, ReceiptText, Wrench } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
 import RouteFallback from '../RouteFallback';
-import type { VehicleRow, DashboardFilters } from './OperationalPanel';
+import type { VehicleRow } from './OperationalPanel';
 import type { MaintenanceOrderDashboard } from '../../types/maintenance';
-import { calculateCostVariation, chooseTrendGranularity, buildCostTrendSeries } from '../../lib/dashboardKpi';
+import CostFilters from './CostFilters';
+import {
+  applyCostFilters,
+  buildCostFilterOptions,
+  buildCostTrendSeries,
+  calculateAverageApprovedTicket,
+  calculateCostPerKm,
+  calculateMovingAverageProjection,
+  chooseTrendGranularity,
+  getTrailingMonthKeys,
+  sumApprovedCostByMonthKeys,
+  sumApprovedMaintenanceCost,
+  type CostDashboardFilters,
+} from '../../lib/dashboardKpi';
 
 const VehicleTypeBarChart = lazy(() => import('./VehicleTypeBarChart'));
 const MaintenanceTypeDonutChart = lazy(() => import('./MaintenanceTypeDonutChart'));
@@ -24,77 +37,76 @@ interface VehicleKmRow {
 interface CostPanelProps {
   vehicles: VehicleRow[];
   maintenanceOrders: MaintenanceOrderDashboard[];
-  previousPeriodCost: number;
-  projectedNextMonthCost: number | null;
+  currentMonthOrders: MaintenanceOrderDashboard[];
+  projectionSourceOrders: MaintenanceOrderDashboard[];
   vehicleKmRows: VehicleKmRow[];
   dateRange: { from: string; to: string };
-  filters: DashboardFilters;
-  onFiltersChange: (f: DashboardFilters) => void;
+  filters: CostDashboardFilters;
+  onFiltersChange: (f: CostDashboardFilters) => void;
+  onResetFilters: () => void;
   isLoading?: boolean;
 }
 
 export default function CostPanel({
   vehicles,
   maintenanceOrders,
-  previousPeriodCost,
-  projectedNextMonthCost,
+  currentMonthOrders,
+  projectionSourceOrders,
   vehicleKmRows,
   dateRange,
   filters,
   onFiltersChange,
+  onResetFilters,
   isLoading = false,
 }: CostPanelProps) {
-  const { filteredVehicles, filteredOrders } = useMemo((): {
-    filteredVehicles: VehicleRow[];
-    filteredOrders: MaintenanceOrderDashboard[];
-  } => {
-    let fv = vehicles;
-    let fo = maintenanceOrders.filter((o) => o.status !== 'Cancelado');
+  const filterOptions = useMemo(() => buildCostFilterOptions(vehicles), [vehicles]);
 
-    if (filters.vehicleType) {
-      fv = vehicles.filter((v) => v.type === filters.vehicleType);
-      const vIds = new Set(fv.map((v) => v.id));
-      fo = maintenanceOrders.filter((o) => vIds.has(o.vehicle_id));
-    }
-
-    if (filters.maintenanceType) {
-      fo = fo.filter((o) => o.type === filters.maintenanceType);
-      if (!filters.vehicleType) {
-        const vIds = new Set(fo.map((o) => o.vehicle_id));
-        fv = vehicles.filter((v) => vIds.has(v.id));
-      }
-    }
-
-    return { filteredVehicles: fv, filteredOrders: fo };
-  }, [vehicles, maintenanceOrders, filters]);
-
-  // Only count orders with approved cost
-  const approvedOrders = filteredOrders.filter(
-    (o) => o.approved_cost !== null && o.approved_cost > 0
+  const { filteredVehicles, filteredOrders } = useMemo(
+    () => applyCostFilters({ vehicles, orders: maintenanceOrders, filters }),
+    [vehicles, maintenanceOrders, filters]
   );
 
-  const totalCost = approvedOrders.reduce(
-    (sum, o) => sum + (o.approved_cost ?? 0),
-    0
+  const { filteredOrders: filteredCurrentMonthOrders } = useMemo(
+    () => applyCostFilters({ vehicles, orders: currentMonthOrders, filters }),
+    [vehicles, currentMonthOrders, filters]
   );
-  const variation = calculateCostVariation(totalCost, previousPeriodCost);
-  const variationSubtitle = variation.percent != null
-    ? `${variation.percent > 0 ? '+' : ''}${variation.percent}% vs período anterior`
-    : 'sem base no período anterior';
 
-  const costPerVehicle =
-    filteredVehicles.length > 0 ? totalCost / filteredVehicles.length : 0;
+  const { filteredOrders: filteredProjectionOrders } = useMemo(
+    () => applyCostFilters({ vehicles, orders: projectionSourceOrders, filters }),
+    [vehicles, projectionSourceOrders, filters]
+  );
 
-  const costPerKm = useMemo(() => {
-    const vehicleIds = new Set(filteredVehicles.map((v) => v.id));
-    let totalKm = 0;
+  const totalCost = useMemo(() => sumApprovedMaintenanceCost(filteredOrders), [filteredOrders]);
 
-    for (const row of vehicleKmRows) {
-      if (vehicleIds.has(row.vehicle_id)) totalKm += row.km_driven;
-    }
+  const currentMonthCost = useMemo(
+    () => sumApprovedMaintenanceCost(filteredCurrentMonthOrders),
+    [filteredCurrentMonthOrders]
+  );
 
-    return totalKm > 0 ? totalCost / totalKm : 0;
-  }, [vehicleKmRows, filteredVehicles, totalCost]);
+  const approvedOrdersCount = useMemo(
+    () => filteredOrders.filter((order) => order.status !== 'Cancelado' && (order.approved_cost ?? 0) > 0).length,
+    [filteredOrders]
+  );
+
+  const averageApprovedTicket = useMemo(
+    () => calculateAverageApprovedTicket(filteredOrders),
+    [filteredOrders]
+  );
+
+  const costPerKm = useMemo(
+    () => calculateCostPerKm({
+      totalCost,
+      vehicleKmRows,
+      allowedVehicleIds: new Set(filteredVehicles.map((vehicle) => vehicle.id)),
+    }),
+    [totalCost, vehicleKmRows, filteredVehicles]
+  );
+
+  const projectedNextMonthCost = useMemo(() => {
+    const monthKeys = getTrailingMonthKeys(new Date().toISOString().split('T')[0], 3);
+    const monthlyTotals = sumApprovedCostByMonthKeys(filteredProjectionOrders, monthKeys);
+    return calculateMovingAverageProjection(monthlyTotals);
+  }, [filteredProjectionOrders]);
 
   const granularity = chooseTrendGranularity(dateRange.from, dateRange.to);
 
@@ -103,10 +115,8 @@ export default function CostPanel({
     [filteredOrders, dateRange.from, dateRange.to, granularity]
   );
 
-  // Bar chart: custo por tipo de veículo
   const costByTypeData = useMemo(() => {
-    // Build vehicle_id → type map from all vehicles (not filtered by type)
-    const vehicleTypeMap = new Map(vehicles.map((v) => [v.id, v.type]));
+    const vehicleTypeMap = new Map(filteredVehicles.map((v) => [v.id, v.type]));
 
     return VEHICLE_TYPES.map((t) => {
       const cost = filteredOrders
@@ -118,15 +128,14 @@ export default function CostPanel({
         )
         .reduce((sum, o) => sum + (o.approved_cost ?? 0), 0);
       return { name: t, value: cost };
-    });
-  }, [vehicles, filteredOrders]);
+    }).filter((entry) => entry.value > 0);
+  }, [filteredVehicles, filteredOrders]);
 
-  // Bar chart: custo por embarcador
   const costByShipperData = useMemo(() => {
     const vehicleShipperMap = new Map(
-      vehicles.map((v) => [v.id, v.shipper_name ?? 'Sem Embarcador'])
+      filteredVehicles.map((v) => [v.id, v.shipper_name ?? 'Sem Embarcador'])
     );
-    const names = [...new Set(vehicles.map((v) => v.shipper_name ?? 'Sem Embarcador'))];
+    const names = [...new Set(filteredVehicles.map((v) => v.shipper_name ?? 'Sem Embarcador'))];
     return names.map((name) => ({
       name,
       value: filteredOrders
@@ -138,14 +147,13 @@ export default function CostPanel({
         )
         .reduce((sum, o) => sum + (o.approved_cost ?? 0), 0),
     })).filter((d) => d.value > 0);
-  }, [vehicles, filteredOrders]);
+  }, [filteredVehicles, filteredOrders]);
 
-  // Bar chart: custo por unidade operacional
   const costByOpUnitData = useMemo(() => {
     const vehicleOpUnitMap = new Map(
-      vehicles.map((v) => [v.id, v.operational_unit_name ?? 'Sem Unidade'])
+      filteredVehicles.map((v) => [v.id, v.operational_unit_name ?? 'Sem Unidade'])
     );
-    const names = [...new Set(vehicles.map((v) => v.operational_unit_name ?? 'Sem Unidade'))];
+    const names = [...new Set(filteredVehicles.map((v) => v.operational_unit_name ?? 'Sem Unidade'))];
     return names.map((name) => ({
       name,
       value: filteredOrders
@@ -157,21 +165,11 @@ export default function CostPanel({
         )
         .reduce((sum, o) => sum + (o.approved_cost ?? 0), 0),
     })).filter((d) => d.value > 0);
-  }, [vehicles, filteredOrders]);
-
-  // Donut: custo por tipo de manutenção
-  const ordersForDonut = filters.vehicleType
-    ? maintenanceOrders.filter((o) => {
-      const vIds = new Set(
-        vehicles.filter((v) => v.type === filters.vehicleType).map((v) => v.id)
-      );
-      return vIds.has(o.vehicle_id);
-    })
-    : maintenanceOrders;
+  }, [filteredVehicles, filteredOrders]);
 
   const costByMaintenanceTypeData = MAINTENANCE_TYPES.map((t) => ({
     name: t,
-    value: ordersForDonut
+    value: filteredOrders
       .filter(
         (o) =>
           o.type === t && o.approved_cost !== null && o.approved_cost > 0
@@ -189,51 +187,65 @@ export default function CostPanel({
 
   return (
     <div className="space-y-6">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <CostFilters
+        value={filters}
+        options={filterOptions}
+        onChange={onFiltersChange}
+        onReset={onResetFilters}
+      />
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <DashboardKpiCard
           icon={DollarSign}
           iconBgClass="bg-green-50"
           iconColorClass="text-green-600"
-          label="Custo Total"
+          label="Custo no Período"
           value={formatCurrency(totalCost)}
-          subtitle={variationSubtitle}
-        />
-        <DashboardKpiCard
-          icon={History}
-          iconBgClass="bg-zinc-100"
-          iconColorClass="text-zinc-600"
-          label="Custo Período Anterior"
-          value={formatCurrency(previousPeriodCost)}
-          subtitle="orçamentos aprovados"
-        />
-        <DashboardKpiCard
-          icon={Truck}
-          iconBgClass="bg-blue-50"
-          iconColorClass="text-blue-600"
-          label="Custo por Veículo"
-          value={formatCurrency(costPerVehicle)}
-          subtitle={
-            filteredVehicles.length > 0
-              ? `${filteredVehicles.length} veículo${filteredVehicles.length > 1 ? 's' : ''}`
-              : 'sem dados'
-          }
+          subtitle="orçamentos aprovados no período"
         />
         <DashboardKpiCard
           icon={Gauge}
           iconBgClass="bg-purple-50"
           iconColorClass="text-purple-600"
           label="Custo por KM"
-          value={costPerKm > 0 ? formatCurrency(costPerKm) : '—'}
-          subtitle="por KM rodado"
+          value={costPerKm.value != null ? formatCurrency(costPerKm.value) : 'sem dados suficientes'}
+          subtitle={
+            costPerKm.value != null
+              ? `${costPerKm.totalKm.toLocaleString('pt-BR')} km válidos`
+              : 'KM válido indisponível'
+          }
+        />
+        <DashboardKpiCard
+          icon={Truck}
+          iconBgClass="bg-blue-50"
+          iconColorClass="text-blue-600"
+          label="Custo do Mês Atual"
+          value={formatCurrency(currentMonthCost)}
+          subtitle="mês corrente"
         />
         <DashboardKpiCard
           icon={TrendingUp}
           iconBgClass="bg-orange-50"
           iconColorClass="text-orange-500"
           label="Projeção Próximo Mês"
-          value={projectedNextMonthCost != null ? formatCurrency(projectedNextMonthCost) : '—'}
+          value={projectedNextMonthCost != null ? formatCurrency(projectedNextMonthCost) : 'sem dados suficientes'}
           subtitle="média móvel 3 meses"
+        />
+        <DashboardKpiCard
+          icon={ReceiptText}
+          iconBgClass="bg-sky-50"
+          iconColorClass="text-sky-600"
+          label="Ticket Médio por OS"
+          value={averageApprovedTicket != null ? formatCurrency(averageApprovedTicket) : 'sem dados suficientes'}
+          subtitle={`${approvedOrdersCount} OS consideradas`}
+        />
+        <DashboardKpiCard
+          icon={Wrench}
+          iconBgClass="bg-zinc-100"
+          iconColorClass="text-zinc-600"
+          label="Custos com Reboque"
+          value="sem dados confiáveis"
+          subtitle="aguarda gestão de reboques"
         />
       </div>
 
@@ -244,12 +256,11 @@ export default function CostPanel({
           valueFormatter={formatCurrency}
         />
 
-        {/* Charts */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <VehicleTypeBarChart
             data={costByTypeData}
-            activeFilter={filters.vehicleType}
-            onFilterChange={(t) => onFiltersChange({ ...filters, vehicleType: t })}
+            activeFilter={null}
+            onFilterChange={() => {}}
             title="Custo por Tipo de Veículo"
             valueFormatter={formatCurrency}
             yAxisLabel="R$"

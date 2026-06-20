@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+  applyCostFilters,
   countActiveInMaintenance,
   buildActiveMaintenanceTypeData,
+  buildCostFilterOptions,
+  calculateAverageApprovedTicket,
+  calculateCostPerKm,
   calculateFleetAvailability,
   countVehiclesInMaintenance,
   calculateChecklistComplianceRate,
@@ -60,9 +64,185 @@ import {
   getVehiclesMissingInsurancePlates,
   getVehiclesMissingMaintenanceContractPlates,
   isBlank,
+  normalizeCostFilterValue,
+  sumApprovedMaintenanceCost,
   isDriverDocumentallyIrregular,
   isVehicleDocumentallyIrregular,
 } from './dashboardKpi';
+
+describe('cost dashboard filters and KPIs', () => {
+  const vehicles = [
+    {
+      id: 'v1',
+      type: 'Truck',
+      crlv_year: null,
+      crlv_expiration_date: null,
+      driver_id: null,
+      category: 'Pesado',
+      model: 'Atego',
+      shipper_name: 'Alpha',
+      operational_unit_name: 'Campinas',
+    },
+    {
+      id: 'v2',
+      type: 'Van',
+      crlv_year: null,
+      crlv_expiration_date: null,
+      driver_id: null,
+      category: 'Leve',
+      model: 'Daily',
+      shipper_name: 'Beta',
+      operational_unit_name: 'Santos',
+    },
+    {
+      id: 'v3',
+      type: 'Truck',
+      crlv_year: null,
+      crlv_expiration_date: null,
+      driver_id: null,
+      category: 'Pesado',
+      model: 'Actros',
+      shipper_name: 'Alpha',
+      operational_unit_name: 'Santos',
+    },
+  ];
+
+  const orders = [
+    { vehicle_id: 'v1', type: 'Corretiva' as const, status: 'Orçamento aprovado', approved_cost: 1200 },
+    { vehicle_id: 'v2', type: 'Preventiva' as const, status: 'Orçamento aprovado', approved_cost: 600 },
+    { vehicle_id: 'v3', type: 'Preditiva' as const, status: 'Aguardando aprovação', approved_cost: 300 },
+    { vehicle_id: 'v3', type: 'Corretiva' as const, status: 'Cancelado', approved_cost: 999 },
+  ];
+
+  const emptyFilters = {
+    category: null,
+    model: null,
+    shipper: null,
+    operationalUnit: null,
+    maintenanceType: null,
+  } as const;
+
+  it('normalizeCostFilterValue normaliza vazio e espaços para null', () => {
+    expect(normalizeCostFilterValue(undefined)).toBeNull();
+    expect(normalizeCostFilterValue('   ')).toBeNull();
+    expect(normalizeCostFilterValue(' Atego ')).toBe('Atego');
+  });
+
+  it('buildCostFilterOptions retorna opções únicas ordenadas', () => {
+    expect(buildCostFilterOptions(vehicles)).toEqual({
+      categories: ['Leve', 'Pesado'],
+      models: ['Actros', 'Atego', 'Daily'],
+      shippers: ['Alpha', 'Beta'],
+      operationalUnits: ['Campinas', 'Santos'],
+    });
+  });
+
+  it('applyCostFilters filtra veículos e ordens por Categoria', () => {
+    const result = applyCostFilters({
+      vehicles,
+      orders,
+      filters: { ...emptyFilters, category: 'Pesado' },
+    });
+
+    expect(result.filteredVehicles.map((vehicle) => vehicle.id)).toEqual(['v1', 'v3']);
+    expect(result.filteredOrders.map((order) => order.vehicle_id)).toEqual(['v1', 'v3', 'v3']);
+  });
+
+  it('applyCostFilters filtra por Modelo', () => {
+    const result = applyCostFilters({
+      vehicles,
+      orders,
+      filters: { ...emptyFilters, model: 'Daily' },
+    });
+
+    expect(result.filteredVehicles.map((vehicle) => vehicle.id)).toEqual(['v2']);
+    expect(result.filteredOrders.map((order) => order.vehicle_id)).toEqual(['v2']);
+  });
+
+  it('applyCostFilters filtra por Embarcador', () => {
+    const result = applyCostFilters({
+      vehicles,
+      orders,
+      filters: { ...emptyFilters, shipper: 'Alpha' },
+    });
+
+    expect(result.filteredVehicles.map((vehicle) => vehicle.id)).toEqual(['v1', 'v3']);
+    expect(result.filteredOrders.map((order) => order.vehicle_id)).toEqual(['v1', 'v3', 'v3']);
+  });
+
+  it('applyCostFilters filtra por Unidade Operacional', () => {
+    const result = applyCostFilters({
+      vehicles,
+      orders,
+      filters: { ...emptyFilters, operationalUnit: 'Campinas' },
+    });
+
+    expect(result.filteredVehicles.map((vehicle) => vehicle.id)).toEqual(['v1']);
+    expect(result.filteredOrders.map((order) => order.vehicle_id)).toEqual(['v1']);
+  });
+
+  it('combinação de filtros aplica interseção, não união', () => {
+    const result = applyCostFilters({
+      vehicles,
+      orders,
+      filters: { ...emptyFilters, category: 'Pesado', shipper: 'Alpha', operationalUnit: 'Campinas' },
+    });
+
+    expect(result.filteredVehicles.map((vehicle) => vehicle.id)).toEqual(['v1']);
+    expect(result.filteredOrders.map((order) => order.vehicle_id)).toEqual(['v1']);
+  });
+
+  it('sumApprovedMaintenanceCost ignora canceladas e custos não positivos', () => {
+    expect(sumApprovedMaintenanceCost(orders)).toBe(2100);
+  });
+
+  it('calculateAverageApprovedTicket retorna null sem OS aprovada', () => {
+    expect(
+      calculateAverageApprovedTicket([
+        { status: 'Cancelado', approved_cost: 100 },
+        { status: 'Aguardando aprovação', approved_cost: 0 },
+      ])
+    ).toBeNull();
+  });
+
+  it('calculateCostPerKm retorna valor quando há custo e KM válido', () => {
+    expect(
+      calculateCostPerKm({
+        totalCost: 2000,
+        vehicleKmRows: [
+          { vehicle_id: 'v1', km_driven: 400 },
+          { vehicle_id: 'v2', km_driven: 100 },
+        ],
+        allowedVehicleIds: new Set(['v1', 'v2']),
+      })
+    ).toEqual({ value: 4, totalKm: 500 });
+  });
+
+  it('calculateCostPerKm retorna value null quando KM total é zero', () => {
+    expect(
+      calculateCostPerKm({
+        totalCost: 2000,
+        vehicleKmRows: [{ vehicle_id: 'v1', km_driven: 0 }],
+        allowedVehicleIds: new Set(['v1']),
+      })
+    ).toEqual({ value: null, totalKm: 0 });
+  });
+
+  it('calculateCostPerKm ignora KM zero, negativo ou de veículo fora do filtro', () => {
+    expect(
+      calculateCostPerKm({
+        totalCost: 900,
+        vehicleKmRows: [
+          { vehicle_id: 'v1', km_driven: 300 },
+          { vehicle_id: 'v2', km_driven: 0 },
+          { vehicle_id: 'v3', km_driven: -10 },
+          { vehicle_id: 'v4', km_driven: 500 },
+        ],
+        allowedVehicleIds: new Set(['v1', 'v2', 'v3']),
+      })
+    ).toEqual({ value: 3, totalKm: 300 });
+  });
+});
 
 describe('countActiveInMaintenance', () => {
   it('retorna 2 quando há 2 ordens ativas e nenhum filtro de tipo', () => {

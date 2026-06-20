@@ -35,6 +35,7 @@ STABLE
 SECURITY INVOKER
 SET search_path = public
 AS $$
+  -- MAX−MIN é a regra aprovada de KM rodado no período (2026-06-20): idêntico ao "último−primeiro" quando o odômetro é monotônico e mais robusto contra leituras fora de ordem. Não trocar pela versão literal por data.
   SELECT c.vehicle_id,
          (MAX(c.odometer_km) - MIN(c.odometer_km))::NUMERIC AS km_driven
   FROM public.checklists c
