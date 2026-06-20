@@ -15,19 +15,19 @@ test.describe.serial('Motoristas: filtros estruturados', () => {
   });
 
   test('aplicar situação atualiza URL e mostra banner', async ({ page }) => {
-    await page.getByLabel('Situação').selectOption('sem_veiculo');
+    await page.getByLabel('Situação').selectOption('without_vehicle');
 
-    await expect(page).toHaveURL(/situacao=sem_veiculo/);
+    await expect(page).toHaveURL(/issue=without_vehicle/);
     await expect(page.getByTestId('active-filter-banner')).toBeVisible();
   });
 
   test('limpar filtros remove parâmetros e banner', async ({ page }) => {
-    await page.getByLabel('Situação').selectOption('sem_veiculo');
+    await page.getByLabel('Situação').selectOption('without_vehicle');
     await expect(page.getByTestId('active-filter-banner')).toBeVisible();
 
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
 
-    await expect(page).not.toHaveURL(/situacao=|embarcador=|unidade=/);
+    await expect(page).not.toHaveURL(/issue=|shipper=|unit=|q=/);
     await expect(page.getByTestId('active-filter-banner')).toHaveCount(0);
   });
 
@@ -47,10 +47,10 @@ test.describe.serial('Motoristas: filtros estruturados', () => {
       await shipperSelect.selectOption(firstShipper);
     }
 
-    await page.getByLabel('Situação').selectOption('com_veiculo');
-    await expect(page).toHaveURL(/situacao=com_veiculo/);
+    await page.getByLabel('Situação').selectOption('with_vehicle');
+    await expect(page).toHaveURL(/issue=with_vehicle/);
     if (firstShipper) {
-      await expect(page).toHaveURL(/embarcador=/);
+      await expect(page).toHaveURL(/shipper=/);
     }
 
     const persistedStructuredFilters = await page.evaluate(() => {
@@ -70,9 +70,9 @@ test.describe.serial('Motoristas: filtros estruturados', () => {
 
     expect(persistedStructuredFilters.local).toEqual([]);
     expect(persistedStructuredFilters.session).toEqual([]);
-    expect(persistedStructuredFilters.search).toContain('situacao=com_veiculo');
+    expect(persistedStructuredFilters.search).toContain('issue=with_vehicle');
     if (firstShipper) {
-      expect(persistedStructuredFilters.search).toContain('embarcador=');
+      expect(persistedStructuredFilters.search).toContain('shipper=');
     }
   });
 });

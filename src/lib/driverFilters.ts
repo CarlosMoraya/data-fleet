@@ -1,16 +1,27 @@
 import type { Driver } from '../types';
 import { isWithinExpiryWindow } from './dashboardKpi';
+import { SEARCH_PARAM, parseSearchFromParams as _parseSearchFromParams } from './vehicleFilters';
 
-export const DRIVER_PENDENCY_VALUES = ['cnh_vencida', 'cnh_a_vencer', 'gr_a_vencer', 'com_veiculo', 'sem_veiculo'] as const;
+export { SEARCH_PARAM, _parseSearchFromParams as parseSearchFromParams };
+
+export const DRIVER_PENDENCY_VALUES = ['cnh_expired', 'cnh_expiring', 'gr_expiring', 'with_vehicle', 'without_vehicle'] as const;
 
 export type DriverPendency = typeof DRIVER_PENDENCY_VALUES[number];
 
 export const DRIVER_PENDENCY_LABELS: Record<DriverPendency, string> = {
-  cnh_vencida: 'CNH vencida',
-  cnh_a_vencer: 'CNH a vencer (30 dias)',
-  gr_a_vencer: 'GR a vencer (30 dias)',
-  com_veiculo: 'Com veículo',
-  sem_veiculo: 'Sem veículo',
+  cnh_expired: 'CNH vencida',
+  cnh_expiring: 'CNH a vencer (30 dias)',
+  gr_expiring: 'GR a vencer (30 dias)',
+  with_vehicle: 'Com veículo',
+  without_vehicle: 'Sem veículo',
+};
+
+export const LEGACY_DRIVER_ISSUE_VALUES: Record<string, DriverPendency> = {
+  cnh_vencida: 'cnh_expired',
+  cnh_a_vencer: 'cnh_expiring',
+  gr_a_vencer: 'gr_expiring',
+  com_veiculo: 'with_vehicle',
+  sem_veiculo: 'without_vehicle',
 };
 
 export const DRIVER_PENDENCY_EXPIRY_WINDOW_DAYS = 30;
@@ -42,20 +53,26 @@ export function isDriverPendency(value: string | null): value is DriverPendency 
 }
 
 export function parseDriverFiltersFromParams(params: URLSearchParams): DriverStructuredFilters {
-  const pendency = params.get('situacao');
+  const rawIssue = params.get('issue') ?? params.get('situacao');
+  const issue = rawIssue ? (LEGACY_DRIVER_ISSUE_VALUES[rawIssue] ?? rawIssue) : null;
   return {
-    shipperId: params.get('embarcador') || null,
-    operationalUnitId: params.get('unidade') || null,
-    pendency: isDriverPendency(pendency) ? pendency : null,
+    shipperId: params.get('shipper') || params.get('embarcador') || null,
+    operationalUnitId: params.get('unit') || params.get('unidade') || null,
+    pendency: isDriverPendency(issue) ? issue : null,
   };
 }
 
-export function serializeDriverFiltersToParams(filters: DriverStructuredFilters): URLSearchParams {
+export function serializeDriverFiltersToParams(filters: DriverStructuredFilters, search?: string): URLSearchParams {
   const params = new URLSearchParams();
-  if (filters.shipperId) params.set('embarcador', filters.shipperId);
-  if (filters.operationalUnitId) params.set('unidade', filters.operationalUnitId);
-  if (filters.pendency) params.set('situacao', filters.pendency);
+  if (filters.shipperId) params.set('shipper', filters.shipperId);
+  if (filters.operationalUnitId) params.set('unit', filters.operationalUnitId);
+  if (filters.pendency) params.set('issue', filters.pendency);
+  if (search) params.set(SEARCH_PARAM, search);
   return params;
+}
+
+export function hasLegacyDriverParams(params: URLSearchParams): boolean {
+  return params.has('situacao') || params.has('embarcador') || params.has('unidade');
 }
 
 export function hasActiveDriverFilters(filters: DriverStructuredFilters): boolean {
@@ -73,15 +90,15 @@ export function driverMatchesSearch(driver: Driver, search: string): boolean {
 
 export function driverMatchesPendency(driver: Driver, pendency: DriverPendency, ctx: DriverFilterContext): boolean {
   switch (pendency) {
-    case 'cnh_vencida':
+    case 'cnh_expired':
       return driver.expirationDate != null && driver.expirationDate < ctx.todayIso;
-    case 'cnh_a_vencer':
+    case 'cnh_expiring':
       return isWithinExpiryWindow(driver.expirationDate ?? null, ctx.todayIso, DRIVER_PENDENCY_EXPIRY_WINDOW_DAYS);
-    case 'gr_a_vencer':
+    case 'gr_expiring':
       return isWithinExpiryWindow(driver.grExpirationDate ?? null, ctx.todayIso, DRIVER_PENDENCY_EXPIRY_WINDOW_DAYS);
-    case 'com_veiculo':
+    case 'with_vehicle':
       return !!ctx.vehicleByDriverId[driver.id];
-    case 'sem_veiculo':
+    case 'without_vehicle':
       return !ctx.vehicleByDriverId[driver.id];
   }
 }

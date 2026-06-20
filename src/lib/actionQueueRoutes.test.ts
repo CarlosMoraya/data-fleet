@@ -9,10 +9,10 @@ import {
 
 describe('actionQueueRoutes', () => {
   it('maps general vehicle categories to filtered vehicle routes', () => {
-    expect(GENERAL_ACTION_ROUTES.checklist).toBe('/cadastros/veiculos?pendencia=checklist_vencido');
-    expect(GENERAL_ACTION_ROUTES.crlv).toBe('/cadastros/veiculos?pendencia=crlv_vencido');
-    expect(GENERAL_ACTION_ROUTES.crlv_expiring).toBe('/cadastros/veiculos?pendencia=crlv_a_vencer');
-    expect(GENERAL_ACTION_ROUTES.gr_vehicle_expiring).toBe('/cadastros/veiculos?pendencia=gr_a_vencer');
+    expect(GENERAL_ACTION_ROUTES.checklist).toBe('/cadastros/veiculos?issue=checklist_overdue');
+    expect(GENERAL_ACTION_ROUTES.crlv).toBe('/cadastros/veiculos?issue=crlv_expired');
+    expect(GENERAL_ACTION_ROUTES.crlv_expiring).toBe('/cadastros/veiculos?issue=crlv_expiring');
+    expect(GENERAL_ACTION_ROUTES.gr_vehicle_expiring).toBe('/cadastros/veiculos?issue=gr_expiring');
   });
 
   it('reuses the same vehicle routes in the operational queue', () => {
@@ -25,27 +25,27 @@ describe('actionQueueRoutes', () => {
   it('preserves intentional non-vehicle destinations', () => {
     expect(OPERATIONAL_ACTION_ROUTES.os_pending_approval).toBe('/aprovacao-orcamentos');
     expect(GENERAL_ACTION_ROUTES.os_pending_approval).toBe('/manutencao');
-    expect(GENERAL_ACTION_ROUTES.cnh).toBe('/cadastros/motoristas?situacao=cnh_vencida');
-    expect(GENERAL_ACTION_ROUTES.cnh_expiring).toBe('/cadastros/motoristas?situacao=cnh_a_vencer');
-    expect(GENERAL_ACTION_ROUTES.gr_driver_expiring).toBe('/cadastros/motoristas?situacao=gr_a_vencer');
-    expect(OPERATIONAL_ACTION_ROUTES.cnh).toBe('/cadastros/motoristas?situacao=cnh_vencida');
-    expect(OPERATIONAL_ACTION_ROUTES.cnh_expiring).toBe('/cadastros/motoristas?situacao=cnh_a_vencer');
-    expect(OPERATIONAL_ACTION_ROUTES.gr_driver_expiring).toBe('/cadastros/motoristas?situacao=gr_a_vencer');
+    expect(GENERAL_ACTION_ROUTES.cnh).toBe('/cadastros/motoristas?issue=cnh_expired');
+    expect(GENERAL_ACTION_ROUTES.cnh_expiring).toBe('/cadastros/motoristas?issue=cnh_expiring');
+    expect(GENERAL_ACTION_ROUTES.gr_driver_expiring).toBe('/cadastros/motoristas?issue=gr_expiring');
+    expect(OPERATIONAL_ACTION_ROUTES.cnh).toBe('/cadastros/motoristas?issue=cnh_expired');
+    expect(OPERATIONAL_ACTION_ROUTES.cnh_expiring).toBe('/cadastros/motoristas?issue=cnh_expiring');
+    expect(OPERATIONAL_ACTION_ROUTES.gr_driver_expiring).toBe('/cadastros/motoristas?issue=gr_expiring');
   });
 
   it('uses only valid pendency values in vehicle routes', () => {
     for (const route of Object.values(VEHICLE_PENDENCY_ACTION_ROUTES)) {
-      const pendency = new URL(`https://betafleet.local${route}`).searchParams.get('pendencia');
+      const pendency = new URL(`https://betafleet.local${route}`).searchParams.get('issue');
       expect(PENDENCY_VALUES).toContain(pendency);
     }
   });
 
-  it('uses only valid driver situation values in driver routes', () => {
+  it('uses only valid driver issue values in driver routes', () => {
     const driverKeys = ['cnh', 'cnh_expiring', 'gr_driver_expiring'] as const;
     for (const map of [GENERAL_ACTION_ROUTES, OPERATIONAL_ACTION_ROUTES]) {
       for (const key of driverKeys) {
-        const situacao = new URL(`https://betafleet.local${map[key]}`).searchParams.get('situacao');
-        expect(DRIVER_PENDENCY_VALUES).toContain(situacao);
+        const issue = new URL(`https://betafleet.local${map[key]}`).searchParams.get('issue');
+        expect(DRIVER_PENDENCY_VALUES).toContain(issue);
       }
     }
   });

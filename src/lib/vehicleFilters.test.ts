@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { Vehicle } from '../types';
 import {
   EMPTY_STRUCTURED_FILTERS,
+  LEGACY_VEHICLE_ISSUE_VALUES,
+  SEARCH_PARAM,
   applyVehicleFilters,
   hasActiveStructuredFilters,
+  hasLegacyVehicleParams,
   isVehiclePendency,
+  parseSearchFromParams,
   parseVehicleFiltersFromParams,
   serializeVehicleFiltersToParams,
   vehicleMatchesPendency,
@@ -44,12 +48,41 @@ function vehicle(overrides: Partial<Vehicle>): Vehicle {
 }
 
 describe('vehicleFilters', () => {
-  it('faz round-trip parse/serialize preservando chaves válidas', () => {
-    const params = new URLSearchParams('embarcador=s1&unidade=u1&pendencia=gr_a_vencer');
+  it('faz round-trip parse/serialize com nomes novos', () => {
+    const params = new URLSearchParams('issue=gr_expiring&shipper=s1&unit=u1');
     const parsed = parseVehicleFiltersFromParams(params);
 
-    expect(parsed).toEqual({ shipperId: 's1', operationalUnitId: 'u1', pendency: 'gr_a_vencer' });
-    expect(serializeVehicleFiltersToParams(parsed).toString()).toBe('embarcador=s1&unidade=u1&pendencia=gr_a_vencer');
+    expect(parsed).toEqual({ shipperId: 's1', operationalUnitId: 'u1', pendency: 'gr_expiring' });
+    expect(serializeVehicleFiltersToParams(parsed).toString()).toBe('shipper=s1&unit=u1&issue=gr_expiring');
+  });
+
+  it('faz parse com nomes legados (retrocompat) e converte valores', () => {
+    const params = new URLSearchParams('embarcador=s1&unidade=u1&pendencia=crlv_vencido');
+    const parsed = parseVehicleFiltersFromParams(params);
+
+    expect(parsed).toEqual({ shipperId: 's1', operationalUnitId: 'u1', pendency: 'crlv_expired' });
+  });
+
+  it('serialize inclui busca textual como q', () => {
+    const params = serializeVehicleFiltersToParams(
+      { shipperId: 's1', operationalUnitId: null, pendency: 'crlv_expired' },
+      'ABC'
+    );
+    expect(params.get('issue')).toBe('crlv_expired');
+    expect(params.get('shipper')).toBe('s1');
+    expect(params.get('q')).toBe('ABC');
+  });
+
+  it('parseSearchFromParams extrai q', () => {
+    expect(parseSearchFromParams(new URLSearchParams('q=teste'))).toBe('teste');
+    expect(parseSearchFromParams(new URLSearchParams())).toBe('');
+  });
+
+  it('hasLegacyVehicleParams detecta params legados', () => {
+    expect(hasLegacyVehicleParams(new URLSearchParams('pendencia=crlv_vencido'))).toBe(true);
+    expect(hasLegacyVehicleParams(new URLSearchParams('embarcador=s1'))).toBe(true);
+    expect(hasLegacyVehicleParams(new URLSearchParams('unidade=u1'))).toBe(true);
+    expect(hasLegacyVehicleParams(new URLSearchParams('issue=crlv_expired&shipper=s1&unit=u1'))).toBe(false);
   });
 
   it('normaliza pendência inválida para null', () => {
@@ -61,47 +94,55 @@ describe('vehicleFilters', () => {
   });
 
   it('valida pendências conhecidas', () => {
-    expect(isVehiclePendency('crlv_vencido')).toBe(true);
-    expect(isVehiclePendency('crlv_a_vencer')).toBe(true);
-    expect(isVehiclePendency('gr_a_vencer')).toBe(true);
-    expect(isVehiclePendency('sem_motorista')).toBe(true);
-    expect(isVehiclePendency('checklist_vencido')).toBe(true);
+    expect(isVehiclePendency('crlv_expired')).toBe(true);
+    expect(isVehiclePendency('crlv_expiring')).toBe(true);
+    expect(isVehiclePendency('gr_expiring')).toBe(true);
+    expect(isVehiclePendency('no_driver')).toBe(true);
+    expect(isVehiclePendency('checklist_overdue')).toBe(true);
     expect(isVehiclePendency(null)).toBe(false);
     expect(isVehiclePendency('desconhecida')).toBe(false);
+  });
+
+  it('migra valores legados corretamente', () => {
+    expect(LEGACY_VEHICLE_ISSUE_VALUES['crlv_vencido']).toBe('crlv_expired');
+    expect(LEGACY_VEHICLE_ISSUE_VALUES['crlv_a_vencer']).toBe('crlv_expiring');
+    expect(LEGACY_VEHICLE_ISSUE_VALUES['gr_a_vencer']).toBe('gr_expiring');
+    expect(LEGACY_VEHICLE_ISSUE_VALUES['sem_motorista']).toBe('no_driver');
+    expect(LEGACY_VEHICLE_ISSUE_VALUES['checklist_vencido']).toBe('checklist_overdue');
   });
 
   it('indica presença de filtros estruturados ativos', () => {
     expect(hasActiveStructuredFilters(EMPTY_STRUCTURED_FILTERS)).toBe(false);
     expect(hasActiveStructuredFilters({ ...EMPTY_STRUCTURED_FILTERS, shipperId: 's1' })).toBe(true);
     expect(hasActiveStructuredFilters({ ...EMPTY_STRUCTURED_FILTERS, operationalUnitId: 'u1' })).toBe(true);
-    expect(hasActiveStructuredFilters({ ...EMPTY_STRUCTURED_FILTERS, pendency: 'sem_motorista' })).toBe(true);
+    expect(hasActiveStructuredFilters({ ...EMPTY_STRUCTURED_FILTERS, pendency: 'no_driver' })).toBe(true);
   });
 
-  it('aplica pendência crlv_vencido', () => {
-    expect(vehicleMatchesPendency(vehicle({ crlvExpirationDate: '2026-01-01' }), 'crlv_vencido', ctx)).toBe(true);
-    expect(vehicleMatchesPendency(vehicle({ crlvExpirationDate: '2026-12-31' }), 'crlv_vencido', ctx)).toBe(false);
-    expect(vehicleMatchesPendency(vehicle({ crlvYear: '2025' }), 'crlv_vencido', ctx)).toBe(true);
+  it('aplica pendência crlv_expired', () => {
+    expect(vehicleMatchesPendency(vehicle({ crlvExpirationDate: '2026-01-01' }), 'crlv_expired', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ crlvExpirationDate: '2026-12-31' }), 'crlv_expired', ctx)).toBe(false);
+    expect(vehicleMatchesPendency(vehicle({ crlvYear: '2025' }), 'crlv_expired', ctx)).toBe(true);
   });
 
-  it('aplica pendência crlv_a_vencer', () => {
-    expect(vehicleMatchesPendency(vehicle({ crlvExpirationDate: '2026-06-27' }), 'crlv_a_vencer', ctx)).toBe(true);
-    expect(vehicleMatchesPendency(vehicle({ crlvExpirationDate: '2026-07-27' }), 'crlv_a_vencer', ctx)).toBe(false);
-    expect(vehicleMatchesPendency(vehicle({ crlvExpirationDate: '2026-06-01' }), 'crlv_a_vencer', ctx)).toBe(false);
+  it('aplica pendência crlv_expiring', () => {
+    expect(vehicleMatchesPendency(vehicle({ crlvExpirationDate: '2026-06-27' }), 'crlv_expiring', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ crlvExpirationDate: '2026-07-27' }), 'crlv_expiring', ctx)).toBe(false);
+    expect(vehicleMatchesPendency(vehicle({ crlvExpirationDate: '2026-06-01' }), 'crlv_expiring', ctx)).toBe(false);
   });
 
-  it('aplica pendência gr_a_vencer', () => {
-    expect(vehicleMatchesPendency(vehicle({ grExpirationDate: '2026-06-22' }), 'gr_a_vencer', ctx)).toBe(true);
-    expect(vehicleMatchesPendency(vehicle({ grExpirationDate: '2026-08-16' }), 'gr_a_vencer', ctx)).toBe(false);
+  it('aplica pendência gr_expiring', () => {
+    expect(vehicleMatchesPendency(vehicle({ grExpirationDate: '2026-06-22' }), 'gr_expiring', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ grExpirationDate: '2026-08-16' }), 'gr_expiring', ctx)).toBe(false);
   });
 
-  it('aplica pendência sem_motorista', () => {
-    expect(vehicleMatchesPendency(vehicle({ driverId: undefined }), 'sem_motorista', ctx)).toBe(true);
-    expect(vehicleMatchesPendency(vehicle({ driverId: 'd1' }), 'sem_motorista', ctx)).toBe(false);
+  it('aplica pendência no_driver', () => {
+    expect(vehicleMatchesPendency(vehicle({ driverId: undefined }), 'no_driver', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ driverId: 'd1' }), 'no_driver', ctx)).toBe(false);
   });
 
-  it('aplica pendência checklist_vencido', () => {
-    expect(vehicleMatchesPendency(vehicle({ id: 'v-overdue' }), 'checklist_vencido', ctx)).toBe(true);
-    expect(vehicleMatchesPendency(vehicle({ id: 'v-ok' }), 'checklist_vencido', ctx)).toBe(false);
+  it('aplica pendência checklist_overdue', () => {
+    expect(vehicleMatchesPendency(vehicle({ id: 'v-overdue' }), 'checklist_overdue', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ id: 'v-ok' }), 'checklist_overdue', ctx)).toBe(false);
   });
 
   it('busca por placa, modelo e chassi sem diferenciar maiúsculas', () => {
@@ -121,7 +162,7 @@ describe('vehicleFilters', () => {
       vehicle({ id: 'v3', licensePlate: 'DEF1D23', shipperId: 's1', crlvExpirationDate: '2026-12-31' }),
     ];
 
-    expect(applyVehicleFilters(vehicles, 'abc', { shipperId: 's1', operationalUnitId: null, pendency: 'crlv_vencido' }, ctx))
+    expect(applyVehicleFilters(vehicles, 'abc', { shipperId: 's1', operationalUnitId: null, pendency: 'crlv_expired' }, ctx))
       .toEqual([vehicles[0]]);
   });
 

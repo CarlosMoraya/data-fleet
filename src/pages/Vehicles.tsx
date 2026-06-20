@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
@@ -15,7 +15,7 @@ import { requiresClientSelection } from '../lib/clientScope';
 import SelectClientNotice from '../components/SelectClientNotice';
 import VehicleActiveFilterBanner from '../components/VehicleActiveFilterBanner';
 import { clearVehicleDraftFiles } from '../lib/offline/vehicleDraftFiles';
-import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
+import { useSessionUiState } from '../hooks/usePersistentUiState';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import { computeOverdueChecklistVehicleIds } from '../lib/dashboardKpi';
 import {
@@ -23,6 +23,8 @@ import {
   PENDENCY_VALUES,
   applyVehicleFilters,
   hasActiveStructuredFilters,
+  hasLegacyVehicleParams,
+  parseSearchFromParams,
   parseVehicleFiltersFromParams,
   serializeVehicleFiltersToParams,
   type VehiclePendency,
@@ -55,8 +57,8 @@ export default function Vehicles() {
   const { currentClient, user, clients } = useAuth();
   const queryClient = useQueryClient();
   const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
-  const [search, setSearch] = usePersistentFilterState<string>('vehicles', 'search', '');
   const [searchParams, setSearchParams] = useSearchParams();
+  const search = parseSearchFromParams(searchParams);
   const filters = useMemo(() => parseVehicleFiltersFromParams(searchParams), [searchParams]);
   const [isFormOpen, setIsFormOpen, , formOpenKey] = useSessionUiState<boolean>('vehicles', 'modal', 'form-open', false, { legacyKeys: ['vehicleFormOpen'] });
   const [editingVehicle, setEditingVehicle, , editingKey] = useSessionUiState<Vehicle | null>('vehicles', 'selection', 'editing', null, { legacyKeys: ['vehicleFormEditing'] });
@@ -212,7 +214,7 @@ export default function Vehicles() {
         completed_at: row.completed_at as string,
       }));
     },
-    enabled: !!user && filters.pendency === 'checklist_vencido',
+    enabled: !!user && filters.pendency === 'checklist_overdue',
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
@@ -232,13 +234,13 @@ export default function Vehicles() {
       if (error) throw error;
       return (data ?? []) as { client_id: string; rotina_day_interval: number | null; seguranca_day_interval: number | null }[];
     },
-    enabled: !!user && filters.pendency === 'checklist_vencido',
+    enabled: !!user && filters.pendency === 'checklist_overdue',
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
 
   const overdueChecklistVehicleIds = useMemo(() => {
-    if (filters.pendency !== 'checklist_vencido') return new Set<string>();
+    if (filters.pendency !== 'checklist_overdue') return new Set<string>();
     const intervalsByClient = new Map<string, { rotina_day_interval: number | null; seguranca_day_interval: number | null }>();
     for (const row of intervalRows) {
       intervalsByClient.set(row.client_id, {
@@ -260,6 +262,10 @@ export default function Vehicles() {
     overdueChecklistVehicleIds,
   }), [overdueChecklistVehicleIds]);
 
+  const setSearch = (value: string) => {
+    setSearchParams(serializeVehicleFiltersToParams(filters, value), { replace: true });
+  };
+
   const updateFilter = (patch: Partial<VehicleStructuredFilters>) => {
     const next = { ...filters, ...patch };
     if ('shipperId' in patch) {
@@ -270,13 +276,21 @@ export default function Vehicles() {
         next.operationalUnitId = null;
       }
     }
-    setSearchParams(serializeVehicleFiltersToParams(next), { replace: false });
+    setSearchParams(serializeVehicleFiltersToParams(next, search), { replace: false });
   };
 
   const clearAllFilters = () => {
     setSearchParams(new URLSearchParams());
-    setSearch('');
   };
+
+  useEffect(() => {
+    if (hasLegacyVehicleParams(searchParams)) {
+      setSearchParams(
+        serializeVehicleFiltersToParams(parseVehicleFiltersFromParams(searchParams), parseSearchFromParams(searchParams)),
+        { replace: true }
+      );
+    }
+  }, [searchParams]);
 
   const availableShippers = logisticsData?.shippers ?? [];
   const availableOperationalUnits = logisticsData?.units ?? [];
@@ -421,8 +435,8 @@ export default function Vehicles() {
       </div>
 
       <VehicleActiveFilterBanner
-        pendencyLabel={filters.pendency ? PENDENCY_LABELS[filters.pendency] : null}
-        onClearPendency={() => updateFilter({ pendency: null })}
+        issueLabel={filters.pendency ? PENDENCY_LABELS[filters.pendency] : null}
+        onClearIssue={() => updateFilter({ pendency: null })}
       />
 
       {vehiclesError && (

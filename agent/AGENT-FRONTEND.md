@@ -53,3 +53,55 @@ O módulo de preenchimento de checklists é crítico e deve funcionar sem intern
 Os gráficos do Dashboard devem ser interativos:
 - **Filtros**: Clicar em uma barra ou fatia do gráfico deve filtrar os dados da página.
 - **Performance**: Todos os filtros de dashboard são processados client-side via `useMemo` para evitar latência.
+
+---
+
+## 🔗 Deep links de filtros operacionais
+
+### Regra de persistência
+Filtros de navegação acionável vivem em query params da URL. São filtros de passagem e NÃO entram em `bf:v1:ui` — não são preferências persistentes. A URL é a fonte de verdade.
+
+### Convenção de nomes (inglês)
+
+| Param | Uso |
+|---|---|
+| `issue` | Pendência/situação do registro |
+| `shipper` | Embarcador |
+| `unit` | Unidade operacional |
+| `q` | Busca textual livre |
+
+**Valores de `issue` — VEÍCULOS:**
+
+| Valor | Rótulo (PT) |
+|---|---|
+| `crlv_expired` | CRLV vencido |
+| `crlv_expiring` | CRLV a vencer (30 dias) |
+| `gr_expiring` | GR a vencer (30 dias) |
+| `no_driver` | Sem motorista |
+| `checklist_overdue` | Checklist vencido |
+
+**Valores de `issue` — MOTORISTAS:**
+
+| Valor | Rótulo (PT) |
+|---|---|
+| `cnh_expired` | CNH vencida |
+| `cnh_expiring` | CNH a vencer (30 dias) |
+| `gr_expiring` | GR a vencer (30 dias) |
+| `with_vehicle` | Com veículo |
+| `without_vehicle` | Sem veículo |
+
+### Comportamento de `setSearchParams`
+- **Filtros estruturados** (`issue`, `shipper`, `unit`): `replace: false` — cada mudança entra no histórico do navegador, permitindo que o botão voltar desfaça o filtro.
+- **Digitação de busca** (`q`): `replace: true` — não polui o histórico a cada tecla digitada.
+
+### Retrocompatibilidade
+O parser entende os nomes/valores legados:
+- `pendencia` → `issue` (com mapa `LEGACY_VEHICLE_ISSUE_VALUES` PT→EN)
+- `situacao` → `issue` (com mapa `LEGACY_DRIVER_ISSUE_VALUES` PT→EN)
+- `embarcador` → `shipper`
+- `unidade` → `unit`
+
+Ao detectar params legados na URL, um `useEffect` na tela reescreve a URL para o padrão novo automaticamente (`replace: true`).
+
+### Preferências persistentes
+Preferências que devem sobreviver entre sessões continuam em `bf:v1:ui` via `usePersistentUiState` (escopo `preference` em localStorage). A busca textual (`q`) NÃO é mais persistida em `sessionStorage` — nas telas de Veículos e Motoristas ela vive exclusivamente na URL.

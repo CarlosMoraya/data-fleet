@@ -2,6 +2,50 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-06-19 (21:20)
+
+### Padronização de deep links de filtros operacionais (Veículos e Motoristas)
+
+**O que foi implementado:** padronização dos filtros de navegação acionável das telas de Veículos e Motoristas como deep links em query params, com nomes unificados em inglês (`issue`, `shipper`, `unit`, `q`), mantendo retrocompatibilidade com nomes/valores legados em português.
+
+**Arquivos criados:**
+- `e2e/completed/filter-deeplink-standard.spec.ts`: 6 testes E2E cobrindo link compartilhável, botão voltar, limpar filtro, não persistência, retrocompat e busca na URL.
+
+**Arquivos modificados:**
+- `src/lib/vehicleFilters.ts`: valores de `VehiclePendency` renomeados para inglês (`crlv_expired`/`crlv_expiring`/`gr_expiring`/`no_driver`/`checklist_overdue`); `parseVehicleFiltersFromParams` lê `issue`/`shipper`/`unit` com fallback legado; `serializeVehicleFiltersToParams` escreve nomes novos + `q` opcional; adicionados `LEGACY_VEHICLE_ISSUE_VALUES`, `SEARCH_PARAM`, `parseSearchFromParams`, `hasLegacyVehicleParams`.
+- `src/lib/vehicleFilters.test.ts`: atualizados para novos valores + testes de retrocompat, serialize com `q`, `hasLegacyVehicleParams`, migração de legado.
+- `src/lib/driverFilters.ts`: valores de `DriverPendency` renomeados para inglês (`cnh_expired`/`cnh_expiring`/`gr_expiring`/`with_vehicle`/`without_vehicle`); `parseDriverFiltersFromParams` lê `issue` com fallback `situacao`; `serializeDriverFiltersToParams` escreve nomes novos; adicionados `LEGACY_DRIVER_ISSUE_VALUES`, `hasLegacyDriverParams`.
+- `src/lib/driverFilters.test.ts`: idem com retrocompat e novos testes.
+- `src/lib/actionQueueRoutes.ts`: rotas atualizadas para `?issue=` com valores em inglês.
+- `src/lib/actionQueueRoutes.test.ts`: asserções atualizadas.
+- `src/pages/Vehicles.tsx`: busca derivada da URL (`parseSearchFromParams`); `setSearch` com `replace: true`; `updateFilter` preserva search com `replace: false`; `clearAllFilters` sem `setSearch('')`; `useEffect` de normalização de legado; removido `usePersistentFilterState` para search.
+- `src/pages/Drivers.tsx`: idem com funções de `driverFilters.ts`.
+- `src/components/VehicleActiveFilterBanner.tsx`: props renomeadas (`pendencyLabel`→`issueLabel`, `onClearPendency`→`onClearIssue`); `aria-label` → "Remover filtro".
+- `src/components/DriverActiveFilterBanner.tsx`: idem (`situationLabel`→`issueLabel`, `onClearSituation`→`onClearIssue`).
+- `e2e/completed/vehicles-structured-filters.spec.ts`: atualizado para novos params/valores.
+- `e2e/completed/driver-structured-filters.spec.ts`: idem.
+- `e2e/completed/dashboard-action-queue-navigation.spec.ts`: idem + `aria-label` "Remover filtro".
+- `agent/AGENT-FRONTEND.md`: adicionada seção "Deep links de filtros operacionais" com regras, convenção de nomes, comportamento de `setSearchParams` e retrocompat.
+
+**Decisões tomadas:**
+- Valores internos do enum passam a ser idênticos aos valores da URL (inglês), eliminando camada de tradução.
+- Busca textual movida de `sessionStorage` para a URL em ambas as telas — risco LGPD aceito (sistema enterprise interno, autenticado, multi-tenant com RLS).
+- Banners continuam exibindo apenas o `issue` ativo (não `shipper`/`unit`/`q`).
+- `uiStateStorage.ts` sem alterações de lógica; chaves antigas de search são limpas no logout pelo prefixo `session` existente.
+
+**Validações executadas:**
+- `npm run lint` ✅ (0 erros)
+- `npm run test:unit` ✅ (444 testes, +14 novos)
+- `npm run test:smoke` ✅ (6/6)
+- `npx playwright test e2e/completed/filter-deeplink-* e2e/completed/vehicles-structured-filters.spec.ts e2e/completed/driver-structured-filters.spec.ts e2e/completed/dashboard-action-queue-navigation.spec.ts` ✅ (19/19)
+
+**Observações para sessões futuras:**
+- Considerar exibir `shipper`/`unit`/`q` no banner de filtro ativo.
+- Convenção `q` pode ser estendida a outras telas com busca (Manutenção, Pneus).
+- Avaliar `useUiPreference` para filtro padrão por usuário (ex: unidade fixa).
+
+---
+
 ## Feature — 2026-06-19
 
 ### Nova aba "Evolução" no Dashboard — análise mensal e tendência histórica com seletor de horizonte

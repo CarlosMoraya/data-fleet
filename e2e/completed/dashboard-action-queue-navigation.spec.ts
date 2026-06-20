@@ -7,12 +7,12 @@ test.describe.serial('Dashboard: navegação da fila de ação', () => {
   });
 
   test('deep-link exibe chip ativo e não falha no filtro de checklist', async ({ page }) => {
-    await page.goto('/cadastros/veiculos?pendencia=checklist_vencido');
+    await page.goto('/cadastros/veiculos?issue=checklist_overdue');
     await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId('active-filter-banner')).toContainText('Checklist vencido');
     await expect(page.getByText('Erro ao carregar veículos')).not.toBeVisible();
 
-    await page.goto('/cadastros/veiculos?pendencia=crlv_vencido');
+    await page.goto('/cadastros/veiculos?issue=crlv_expired');
     await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId('active-filter-banner')).toContainText('CRLV vencido');
   });
@@ -31,16 +31,16 @@ test.describe.serial('Dashboard: navegação da fila de ação', () => {
     }
 
     await vehicleActionButton.click();
-    await expect(page).toHaveURL(/\/cadastros\/veiculos\?pendencia=/);
+    await expect(page).toHaveURL(/\/cadastros\/veiculos\?issue=/);
     await expect(page.getByTestId('active-filter-banner')).toBeVisible();
   });
 
   test('remover filtro pelo chip limpa a pendência da URL', async ({ page }) => {
-    await page.goto('/cadastros/veiculos?pendencia=crlv_vencido');
+    await page.goto('/cadastros/veiculos?issue=crlv_expired');
     await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 10000 });
 
-    await page.getByRole('button', { name: 'Remover filtro de pendência' }).click();
-    await expect(page).not.toHaveURL(/pendencia=/);
+    await page.getByRole('button', { name: 'Remover filtro' }).click();
+    await expect(page).not.toHaveURL(/issue=/);
     await expect(page.getByTestId('active-filter-banner')).not.toBeVisible();
   });
 });

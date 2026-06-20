@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Driver, DriverFieldSettings } from '../types';
@@ -14,14 +14,16 @@ import { saveDriver, deleteDriver } from '../services/driverService';
 import type { DriverFiles } from '../services/driverService';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import SelectClientNotice from '../components/SelectClientNotice';
-import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
+import { useSessionUiState } from '../hooks/usePersistentUiState';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import {
   DRIVER_PENDENCY_LABELS,
   DRIVER_PENDENCY_VALUES,
   applyDriverFilters,
   hasActiveDriverFilters,
+  hasLegacyDriverParams,
   parseDriverFiltersFromParams,
+  parseSearchFromParams,
   serializeDriverFiltersToParams,
   type DriverPendency,
   type DriverStructuredFilters,
@@ -43,8 +45,8 @@ export default function Drivers() {
   const { currentClient, user, clients } = useAuth();
   const queryClient = useQueryClient();
   const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
-  const [search, setSearch] = usePersistentFilterState<string>('drivers', 'search', '');
   const [searchParams, setSearchParams] = useSearchParams();
+  const search = parseSearchFromParams(searchParams);
   const filters = useMemo(() => parseDriverFiltersFromParams(searchParams), [searchParams]);
   const [isFormOpen, setIsFormOpen] = useSessionUiState<boolean>('drivers', 'modal', 'form-open', false, { legacyKeys: ['driverFormOpen'] });
   const [editingDriver, setEditingDriver] = useSessionUiState<Driver | null>('drivers', 'selection', 'editing', null, { legacyKeys: ['driverFormEditing'] });
@@ -191,13 +193,25 @@ export default function Drivers() {
         next.operationalUnitId = null;
       }
     }
-    setSearchParams(serializeDriverFiltersToParams(next), { replace: false });
+    setSearchParams(serializeDriverFiltersToParams(next, search), { replace: false });
+  };
+
+  const setSearch = (value: string) => {
+    setSearchParams(serializeDriverFiltersToParams(filters, value), { replace: true });
   };
 
   const clearAllFilters = () => {
     setSearchParams(new URLSearchParams());
-    setSearch('');
   };
+
+  useEffect(() => {
+    if (hasLegacyDriverParams(searchParams)) {
+      setSearchParams(
+        serializeDriverFiltersToParams(parseDriverFiltersFromParams(searchParams), parseSearchFromParams(searchParams)),
+        { replace: true }
+      );
+    }
+  }, [searchParams]);
 
   // Redirect Drivers and Yard Auditors
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
@@ -328,8 +342,8 @@ export default function Drivers() {
       </div>
 
       <DriverActiveFilterBanner
-        situationLabel={filters.pendency ? DRIVER_PENDENCY_LABELS[filters.pendency] : null}
-        onClearSituation={() => updateFilter({ pendency: null })}
+        issueLabel={filters.pendency ? DRIVER_PENDENCY_LABELS[filters.pendency] : null}
+        onClearIssue={() => updateFilter({ pendency: null })}
       />
 
       {driversError && (

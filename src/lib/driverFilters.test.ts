@@ -3,12 +3,15 @@ import type { Driver } from '../types';
 import {
   DRIVER_PENDENCY_VALUES,
   EMPTY_DRIVER_FILTERS,
+  LEGACY_DRIVER_ISSUE_VALUES,
   applyDriverFilters,
   driverMatchesPendency,
   driverMatchesSearch,
   hasActiveDriverFilters,
+  hasLegacyDriverParams,
   isDriverPendency,
   parseDriverFiltersFromParams,
+  parseSearchFromParams,
   serializeDriverFiltersToParams,
   type DriverFilterContext,
 } from './driverFilters';
@@ -32,12 +35,41 @@ function driver(overrides: Partial<Driver>): Driver {
 }
 
 describe('driverFilters', () => {
-  it('faz round-trip parse/serialize preservando chaves válidas', () => {
-    const params = new URLSearchParams('embarcador=s1&unidade=u1&situacao=gr_a_vencer');
+  it('faz round-trip parse/serialize com nomes novos', () => {
+    const params = new URLSearchParams('issue=gr_expiring&shipper=s1&unit=u1');
     const parsed = parseDriverFiltersFromParams(params);
 
-    expect(parsed).toEqual({ shipperId: 's1', operationalUnitId: 'u1', pendency: 'gr_a_vencer' });
-    expect(serializeDriverFiltersToParams(parsed).toString()).toBe('embarcador=s1&unidade=u1&situacao=gr_a_vencer');
+    expect(parsed).toEqual({ shipperId: 's1', operationalUnitId: 'u1', pendency: 'gr_expiring' });
+    expect(serializeDriverFiltersToParams(parsed).toString()).toBe('shipper=s1&unit=u1&issue=gr_expiring');
+  });
+
+  it('faz parse com nomes legados (retrocompat) e converte valores', () => {
+    const params = new URLSearchParams('embarcador=s1&unidade=u1&situacao=cnh_vencida');
+    const parsed = parseDriverFiltersFromParams(params);
+
+    expect(parsed).toEqual({ shipperId: 's1', operationalUnitId: 'u1', pendency: 'cnh_expired' });
+  });
+
+  it('serialize inclui busca textual como q', () => {
+    const params = serializeDriverFiltersToParams(
+      { shipperId: 's1', operationalUnitId: null, pendency: 'cnh_expired' },
+      'maria'
+    );
+    expect(params.get('issue')).toBe('cnh_expired');
+    expect(params.get('shipper')).toBe('s1');
+    expect(params.get('q')).toBe('maria');
+  });
+
+  it('parseSearchFromParams extrai q (reusado de vehicleFilters)', () => {
+    expect(parseSearchFromParams(new URLSearchParams('q=teste'))).toBe('teste');
+    expect(parseSearchFromParams(new URLSearchParams())).toBe('');
+  });
+
+  it('hasLegacyDriverParams detecta params legados', () => {
+    expect(hasLegacyDriverParams(new URLSearchParams('situacao=cnh_vencida'))).toBe(true);
+    expect(hasLegacyDriverParams(new URLSearchParams('embarcador=s1'))).toBe(true);
+    expect(hasLegacyDriverParams(new URLSearchParams('unidade=u1'))).toBe(true);
+    expect(hasLegacyDriverParams(new URLSearchParams('issue=cnh_expired&shipper=s1&unit=u1'))).toBe(false);
   });
 
   it('normaliza situação inválida para null', () => {
@@ -56,35 +88,43 @@ describe('driverFilters', () => {
     expect(isDriverPendency('desconhecida')).toBe(false);
   });
 
+  it('migra valores legados corretamente', () => {
+    expect(LEGACY_DRIVER_ISSUE_VALUES['cnh_vencida']).toBe('cnh_expired');
+    expect(LEGACY_DRIVER_ISSUE_VALUES['cnh_a_vencer']).toBe('cnh_expiring');
+    expect(LEGACY_DRIVER_ISSUE_VALUES['gr_a_vencer']).toBe('gr_expiring');
+    expect(LEGACY_DRIVER_ISSUE_VALUES['com_veiculo']).toBe('with_vehicle');
+    expect(LEGACY_DRIVER_ISSUE_VALUES['sem_veiculo']).toBe('without_vehicle');
+  });
+
   it('indica presença de filtros estruturados ativos', () => {
     expect(hasActiveDriverFilters(EMPTY_DRIVER_FILTERS)).toBe(false);
     expect(hasActiveDriverFilters({ ...EMPTY_DRIVER_FILTERS, shipperId: 's1' })).toBe(true);
     expect(hasActiveDriverFilters({ ...EMPTY_DRIVER_FILTERS, operationalUnitId: 'u1' })).toBe(true);
-    expect(hasActiveDriverFilters({ ...EMPTY_DRIVER_FILTERS, pendency: 'sem_veiculo' })).toBe(true);
+    expect(hasActiveDriverFilters({ ...EMPTY_DRIVER_FILTERS, pendency: 'without_vehicle' })).toBe(true);
   });
 
-  it('aplica situação cnh_vencida', () => {
-    expect(driverMatchesPendency(driver({ expirationDate: '2026-06-01' }), 'cnh_vencida', ctx)).toBe(true);
-    expect(driverMatchesPendency(driver({ expirationDate: '2026-07-01' }), 'cnh_vencida', ctx)).toBe(false);
-    expect(driverMatchesPendency(driver({ expirationDate: undefined }), 'cnh_vencida', ctx)).toBe(false);
+  it('aplica situação cnh_expired', () => {
+    expect(driverMatchesPendency(driver({ expirationDate: '2026-06-01' }), 'cnh_expired', ctx)).toBe(true);
+    expect(driverMatchesPendency(driver({ expirationDate: '2026-07-01' }), 'cnh_expired', ctx)).toBe(false);
+    expect(driverMatchesPendency(driver({ expirationDate: undefined }), 'cnh_expired', ctx)).toBe(false);
   });
 
-  it('aplica situação cnh_a_vencer', () => {
-    expect(driverMatchesPendency(driver({ expirationDate: '2026-06-25' }), 'cnh_a_vencer', ctx)).toBe(true);
-    expect(driverMatchesPendency(driver({ expirationDate: '2026-08-01' }), 'cnh_a_vencer', ctx)).toBe(false);
-    expect(driverMatchesPendency(driver({ expirationDate: '2026-06-01' }), 'cnh_a_vencer', ctx)).toBe(false);
+  it('aplica situação cnh_expiring', () => {
+    expect(driverMatchesPendency(driver({ expirationDate: '2026-06-25' }), 'cnh_expiring', ctx)).toBe(true);
+    expect(driverMatchesPendency(driver({ expirationDate: '2026-08-01' }), 'cnh_expiring', ctx)).toBe(false);
+    expect(driverMatchesPendency(driver({ expirationDate: '2026-06-01' }), 'cnh_expiring', ctx)).toBe(false);
   });
 
-  it('aplica situação gr_a_vencer', () => {
-    expect(driverMatchesPendency(driver({ grExpirationDate: '2026-06-20' }), 'gr_a_vencer', ctx)).toBe(true);
-    expect(driverMatchesPendency(driver({ grExpirationDate: '2026-08-01' }), 'gr_a_vencer', ctx)).toBe(false);
+  it('aplica situação gr_expiring', () => {
+    expect(driverMatchesPendency(driver({ grExpirationDate: '2026-06-20' }), 'gr_expiring', ctx)).toBe(true);
+    expect(driverMatchesPendency(driver({ grExpirationDate: '2026-08-01' }), 'gr_expiring', ctx)).toBe(false);
   });
 
-  it('aplica situação com_veiculo e sem_veiculo', () => {
-    expect(driverMatchesPendency(driver({ id: 'd1' }), 'com_veiculo', ctx)).toBe(true);
-    expect(driverMatchesPendency(driver({ id: 'd2' }), 'com_veiculo', ctx)).toBe(false);
-    expect(driverMatchesPendency(driver({ id: 'd2' }), 'sem_veiculo', ctx)).toBe(true);
-    expect(driverMatchesPendency(driver({ id: 'd1' }), 'sem_veiculo', ctx)).toBe(false);
+  it('aplica situação with_vehicle e without_vehicle', () => {
+    expect(driverMatchesPendency(driver({ id: 'd1' }), 'with_vehicle', ctx)).toBe(true);
+    expect(driverMatchesPendency(driver({ id: 'd2' }), 'with_vehicle', ctx)).toBe(false);
+    expect(driverMatchesPendency(driver({ id: 'd2' }), 'without_vehicle', ctx)).toBe(true);
+    expect(driverMatchesPendency(driver({ id: 'd1' }), 'without_vehicle', ctx)).toBe(false);
   });
 
   it('busca por nome e CPF sem casar CPF quando não há dígitos', () => {
@@ -104,7 +144,7 @@ describe('driverFilters', () => {
       driver({ id: 'd3', name: 'Maria Costa', cpf: '55566677788', expirationDate: '2026-12-01' }),
     ];
 
-    expect(applyDriverFilters(drivers, 'maria', { shipperId: 's1', operationalUnitId: null, pendency: 'cnh_vencida' }, ctx))
+    expect(applyDriverFilters(drivers, 'maria', { shipperId: 's1', operationalUnitId: null, pendency: 'cnh_expired' }, ctx))
       .toEqual([drivers[0]]);
   });
 
@@ -122,12 +162,12 @@ describe('driverFilters', () => {
     const params = serializeDriverFiltersToParams({
       shipperId: 's1',
       operationalUnitId: 'u1',
-      pendency: 'gr_a_vencer',
+      pendency: 'gr_expiring',
     });
     const serialized = params.toString();
     const sampleDriver = driver({ name: 'Maria da Silva', cpf: '12345678901' });
 
-    expect([...params.keys()]).toEqual(['embarcador', 'unidade', 'situacao']);
+    expect([...params.keys()]).toEqual(['shipper', 'unit', 'issue']);
     expect(serialized).not.toContain(sampleDriver.name);
     expect(serialized).not.toContain(sampleDriver.cpf);
   });
