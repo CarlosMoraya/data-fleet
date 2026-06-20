@@ -7,6 +7,17 @@ import {
   calculateChecklistComplianceRate,
   countOverdueMaintenanceOrders,
   countPendingApprovalOrders,
+  getEndOfWeekIso,
+  countVehiclesWithoutDriver,
+  getVehiclesWithoutDriverPlates,
+  countOpenOrders,
+  countActiveOrdersExitingByEndOfWeek,
+  getActiveOrdersExitingByEndOfWeekVehicleIds,
+  countActiveOrdersDueWithinDays,
+  getActiveOrdersDueWithinDaysVehicleIds,
+  countPendingBudgetOrders,
+  getPendingBudgetVehicleIds,
+  buildOperationalActionQueue,
   calculateInsuranceCoverageRate,
   calculateTrackerCoverageRate,
   buildFleetCountByKey,
@@ -352,6 +363,160 @@ describe('countPendingApprovalOrders', () => {
       { status: 'Orçamento aprovado' },
     ];
     expect(countPendingApprovalOrders(orders)).toBe(1);
+  });
+});
+
+describe('getEndOfWeekIso', () => {
+  it('retorna o domingo da semana para uma terça-feira', () => {
+    expect(getEndOfWeekIso('2026-06-16')).toBe('2026-06-21');
+  });
+
+  it('retorna o próprio domingo quando hoje já é domingo', () => {
+    expect(getEndOfWeekIso('2026-06-21')).toBe('2026-06-21');
+  });
+
+  it('retorna o domingo seguinte quando hoje é sábado', () => {
+    expect(getEndOfWeekIso('2026-06-20')).toBe('2026-06-21');
+  });
+
+  it('lida com virada de mês', () => {
+    expect(getEndOfWeekIso('2026-05-29')).toBe('2026-05-31');
+    expect(getEndOfWeekIso('2026-08-31')).toBe('2026-09-06');
+  });
+});
+
+describe('countVehiclesWithoutDriver / getVehiclesWithoutDriverPlates', () => {
+  it('conta apenas veículos sem motorista e retorna só placas válidas', () => {
+    const vehicles = [
+      { driver_id: null, license_plate: 'ABC1D23' },
+      { driver_id: undefined, license_plate: 'DEF4G56' },
+      { driver_id: 'driver-1', license_plate: 'GHI7J89' },
+      { driver_id: null, license_plate: null },
+    ];
+
+    expect(countVehiclesWithoutDriver(vehicles)).toBe(3);
+    expect(getVehiclesWithoutDriverPlates(vehicles)).toEqual(['ABC1D23', 'DEF4G56']);
+  });
+});
+
+describe('countOpenOrders', () => {
+  it('ignora ordens concluídas e canceladas', () => {
+    expect(
+      countOpenOrders([
+        { status: 'Aguardando orçamento' },
+        { status: 'Serviço em execução' },
+        { status: 'Concluído' },
+        { status: 'Cancelado' },
+      ])
+    ).toBe(2);
+  });
+});
+
+describe('countActiveOrdersExitingByEndOfWeek / getActiveOrdersExitingByEndOfWeekVehicleIds', () => {
+  it('inclui somente OS ativas com saída entre hoje e fim da semana', () => {
+    const orders = [
+      { vehicle_id: 'v1', status: 'Aguardando orçamento', expected_exit_date: '2026-06-16' },
+      { vehicle_id: 'v2', status: 'Serviço em execução', expected_exit_date: '2026-06-21' },
+      { vehicle_id: 'v3', status: 'Serviço em execução', expected_exit_date: '2026-06-15' },
+      { vehicle_id: 'v4', status: 'Serviço em execução', expected_exit_date: '2026-06-22' },
+      { vehicle_id: 'v5', status: 'Serviço em execução', expected_exit_date: null },
+      { vehicle_id: 'v6', status: 'Concluído', expected_exit_date: '2026-06-18' },
+      { vehicle_id: 'v7', status: 'Cancelado', expected_exit_date: '2026-06-18' },
+    ];
+
+    expect(countActiveOrdersExitingByEndOfWeek(orders, '2026-06-16', '2026-06-21')).toBe(2);
+    expect(getActiveOrdersExitingByEndOfWeekVehicleIds(orders, '2026-06-16', '2026-06-21')).toEqual(['v1', 'v2']);
+  });
+});
+
+describe('countActiveOrdersDueWithinDays / getActiveOrdersDueWithinDaysVehicleIds', () => {
+  it('inclui hoje até hoje+7 e exclui dia 8, passado, null e concluído', () => {
+    const orders = [
+      { vehicle_id: 'v1', status: 'Aguardando orçamento', expected_exit_date: '2026-06-16' },
+      { vehicle_id: 'v2', status: 'Serviço em execução', expected_exit_date: '2026-06-23' },
+      { vehicle_id: 'v3', status: 'Serviço em execução', expected_exit_date: '2026-06-24' },
+      { vehicle_id: 'v4', status: 'Serviço em execução', expected_exit_date: '2026-06-15' },
+      { vehicle_id: 'v5', status: 'Serviço em execução', expected_exit_date: null },
+      { vehicle_id: 'v6', status: 'Concluído', expected_exit_date: '2026-06-20' },
+    ];
+
+    expect(countActiveOrdersDueWithinDays(orders, '2026-06-16', 7)).toBe(2);
+    expect(getActiveOrdersDueWithinDaysVehicleIds(orders, '2026-06-16', 7)).toEqual(['v1', 'v2']);
+  });
+});
+
+describe('countPendingBudgetOrders / getPendingBudgetVehicleIds', () => {
+  it('considera apenas status Aguardando orçamento', () => {
+    const orders = [
+      { vehicle_id: 'v1', status: 'Aguardando orçamento' },
+      { vehicle_id: 'v2', status: 'Aguardando aprovação' },
+      { vehicle_id: 'v3', status: 'Aguardando orçamento' },
+    ];
+
+    expect(countPendingBudgetOrders(orders)).toBe(2);
+    expect(getPendingBudgetVehicleIds(orders)).toEqual(['v1', 'v3']);
+  });
+});
+
+describe('buildOperationalActionQueue', () => {
+  it('mantém a ordem fixa dos 9 itens quando todos têm dados', () => {
+    const result = buildOperationalActionQueue({
+      vehiclesUnavailable: ['ABC1D23'],
+      vehiclesNoDriver: ['DEF4G56'],
+      osOverdue: ['GHI7J89'],
+      checklistOverdue: ['JKL0M12'],
+      osExitThisWeek: ['NOP3Q45'],
+      osPendingApproval: ['RST6U78'],
+      osPendingBudget: ['VWX9Y01'],
+      actionPlansOpen: ['ZAB2C34'],
+      osDueSoon: ['CDE5F67'],
+    });
+
+    expect(result.map((item) => item.category)).toEqual([
+      'vehicles_unavailable',
+      'vehicles_no_driver',
+      'os_overdue',
+      'checklist_overdue',
+      'os_exit_this_week',
+      'os_pending_approval',
+      'os_pending_budget',
+      'action_plans_open',
+      'os_due_soon',
+    ]);
+  });
+
+  it('filtra itens com count zero e mantém count igual aos details', () => {
+    const result = buildOperationalActionQueue({
+      vehiclesUnavailable: [],
+      vehiclesNoDriver: ['DEF4G56'],
+      osOverdue: [],
+      checklistOverdue: ['JKL0M12', 'NOP3Q45'],
+      osExitThisWeek: [],
+      osPendingApproval: [],
+      osPendingBudget: [],
+      actionPlansOpen: [],
+      osDueSoon: [],
+    });
+
+    expect(result).toHaveLength(2);
+    expect(result[0].count).toBe(result[0].details.length);
+    expect(result[1].count).toBe(result[1].details.length);
+  });
+
+  it('retorna array vazio quando tudo está vazio', () => {
+    expect(
+      buildOperationalActionQueue({
+        vehiclesUnavailable: [],
+        vehiclesNoDriver: [],
+        osOverdue: [],
+        checklistOverdue: [],
+        osExitThisWeek: [],
+        osPendingApproval: [],
+        osPendingBudget: [],
+        actionPlansOpen: [],
+        osDueSoon: [],
+      })
+    ).toEqual([]);
   });
 });
 

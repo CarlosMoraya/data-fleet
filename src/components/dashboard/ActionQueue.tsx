@@ -1,17 +1,25 @@
 import React from 'react';
 import { AlertTriangle, Clock } from 'lucide-react';
-import type { ActionItem } from '../../lib/dashboardKpi';
 
-interface ActionQueueProps {
-  items: ActionItem[];
-  onItemClick?: (category: ActionItem['category']) => void;
+interface ActionQueueItemLike {
+  category: string;
+  label: string;
+  count: number;
+  severity: 'high' | 'medium';
+  details: string[];
 }
 
-export default function ActionQueue({ items, onItemClick }: ActionQueueProps) {
+interface ActionQueueProps {
+  items: ActionQueueItemLike[];
+  onItemClick?: (category: string) => void;
+  title?: string;
+}
+
+export default function ActionQueue({ items, onItemClick, title = 'Fila de Ação' }: ActionQueueProps) {
   if (items.length === 0) {
     return (
       <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <h3 className="text-base font-semibold text-zinc-900">Fila de Ação</h3>
+        <h3 className="text-base font-semibold text-zinc-900">{title}</h3>
         <p className="mt-3 text-sm text-zinc-500">
           Nenhuma ação crítica pendente. Frota em dia.
         </p>
@@ -21,7 +29,7 @@ export default function ActionQueue({ items, onItemClick }: ActionQueueProps) {
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-      <h3 className="text-base font-semibold text-zinc-900">Fila de Ação</h3>
+      <h3 className="text-base font-semibold text-zinc-900">{title}</h3>
       <div className="mt-4 space-y-2">
         {items.map((item) => {
           const isHigh = item.severity === 'high';

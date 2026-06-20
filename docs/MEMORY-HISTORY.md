@@ -2,6 +2,42 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-06-20 (10:45)
+
+### Reescrita da aba Operação do Dashboard
+
+**O que foi implementado:** a aba `Operação` do Dashboard foi reescrita para focar exclusivamente em disponibilidade, manutenção, checklists, recuperação de frota e gargalos de rodagem. O painel agora renderiza exatamente 8 cards fixos e a `Fila de Ação Operacional`, sem gráficos e sem cards/filas de documentos.
+
+**Arquivos modificados:**
+- `src/lib/dashboardKpi.ts`: adicionados `OperationalActionCategory`, `OperationalActionItem`, `buildOperationalActionQueue` e as novas funções puras `getEndOfWeekIso`, `countVehiclesWithoutDriver`, `getVehiclesWithoutDriverPlates`, `countOpenOrders`, `countActiveOrdersExitingByEndOfWeek`, `getActiveOrdersExitingByEndOfWeekVehicleIds`, `countActiveOrdersDueWithinDays`, `getActiveOrdersDueWithinDaysVehicleIds`, `countPendingBudgetOrders` e `getPendingBudgetVehicleIds`.
+- `src/lib/dashboardKpi.test.ts`: cobertura unitária das novas regras de KPI e da fila operacional.
+- `src/lib/actionQueueRoutes.ts`: adicionado `OPERATIONAL_QUEUE_ROUTES` com cobertura total das categorias operacionais.
+- `src/lib/actionQueueRoutes.test.ts`: validação das novas rotas operacionais e dos deep links existentes.
+- `src/components/dashboard/ActionQueue.tsx`: generalizado para item estrutural e novo `title` opcional, preservando o visual e o comportamento da fila.
+- `src/components/dashboard/OperationalPanel.tsx`: reescrito como componente apresentacional com 8 cards fixos e `Fila de Ação Operacional`.
+- `src/components/dashboard/OperationalPanel.test.tsx`: suíte reescrita para refletir a nova composição da aba.
+- `src/pages/Dashboard.tsx`: nova query `dashboard-action-plans-open`, novos cálculos operacionais em `useMemo`, novo handler via `OPERATIONAL_QUEUE_ROUTES` e remoção da antiga fila documental da aba `Operação`.
+- `e2e/completed/dashboard-action-queue-navigation.spec.ts`: navegação operacional alinhada aos itens atuais da fila na aba `Operação`.
+- `docs/MEMORY.md`: estado vigente atualizado.
+- `docs/MEMORY-HISTORY.md`: este arquivamento.
+
+**Decisões tomadas:**
+- `Veículos Indisponíveis` reutiliza a mesma regra da Visão Geral (`countVehiclesInMaintenance(...)` sobre veículos distintos com OS ativa).
+- `OS com Prazo Vencido` substitui apenas o rótulo anterior `OS em Atraso`; a regra permanece `expected_exit_date < hoje` em OS ativa.
+- `Saída Prevista até Fim da Semana` usa janela `today..domingo da semana corrente`; `OS vencendo nos próximos 7 dias` permanece apenas na fila.
+- `Planos de Ação Abertos` usam SELECT direto em `action_plans` com status `pending`, `in_progress` e `awaiting_conclusion`, sem migration e sem nova RPC.
+- O card de planos mostra o total de planos abertos; o item da fila usa apenas placas resolvidas por `vehicle_id`.
+
+**Validações executadas:**
+- `npm run lint` ✅
+- `npm run test:unit -- dashboardKpi actionQueueRoutes OperationalPanel` ✅
+
+**Observações para sessões futuras:**
+- A aba `Conformidade` continua sendo o destino natural para a fila documental removida da Operação; `buildActionQueue` e os mapas antigos foram preservados para esse uso futuro.
+- Se a tela de `Manutenção` ganhar deep links por status, `OPERATIONAL_QUEUE_ROUTES` deve ser refinado para os cards e itens hoje apontando genericamente para `/manutencao`.
+
+---
+
 ## Sessão — 2026-06-20 (10:00)
 
 ### Visão Geral do Dashboard reescrita como raio-x executivo da frota

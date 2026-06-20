@@ -23,11 +23,11 @@ test.describe.serial('Dashboard: navegação da fila de ação', () => {
 
     await page.getByRole('button', { name: /Operação/ }).click();
 
-    const vehicleActionButton = page.getByRole('button').filter({ hasText: /CRLV|GR a vencer|checklist vencido/i }).first();
+    const vehicleActionButton = page.getByRole('button').filter({ hasText: /Veículos sem motorista|checklist vencido/i }).first();
     if (await vehicleActionButton.count() === 0) {
       test.info().annotations.push({
         type: 'not-covered',
-        description: 'Seed sem pendências de veículo na Fila de Ação; rotas cobertas pelos testes unitários de actionQueueRoutes.',
+        description: 'Seed sem pendências operacionais de veículo na Fila de Ação; deep links seguem cobertos pelos testes unitários de actionQueueRoutes.',
       });
       return;
     }

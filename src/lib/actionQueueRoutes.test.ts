@@ -4,6 +4,7 @@ import { PENDENCY_VALUES } from './vehicleFilters';
 import {
   GENERAL_ACTION_ROUTES,
   OPERATIONAL_ACTION_ROUTES,
+  OPERATIONAL_QUEUE_ROUTES,
   VEHICLE_PENDENCY_ACTION_ROUTES,
 } from './actionQueueRoutes';
 
@@ -47,6 +48,33 @@ describe('actionQueueRoutes', () => {
         const issue = new URL(`https://betafleet.local${map[key]}`).searchParams.get('issue');
         expect(DRIVER_PENDENCY_VALUES).toContain(issue);
       }
+    }
+  });
+
+  it('covers all operational queue categories', () => {
+    expect(Object.keys(OPERATIONAL_QUEUE_ROUTES)).toEqual([
+      'vehicles_unavailable',
+      'vehicles_no_driver',
+      'os_open',
+      'os_overdue',
+      'os_exit_this_week',
+      'os_pending_approval',
+      'checklist_overdue',
+      'action_plans_open',
+      'os_pending_budget',
+      'os_due_soon',
+    ]);
+  });
+
+  it('maps the required operational queue deep links and routes', () => {
+    expect(OPERATIONAL_QUEUE_ROUTES.vehicles_no_driver).toBe('/cadastros/veiculos?issue=no_driver');
+    expect(OPERATIONAL_QUEUE_ROUTES.checklist_overdue).toBe('/cadastros/veiculos?issue=checklist_overdue');
+    expect(OPERATIONAL_QUEUE_ROUTES.os_pending_approval).toBe('/aprovacao-orcamentos');
+  });
+
+  it('uses absolute app routes in the operational queue', () => {
+    for (const route of Object.values(OPERATIONAL_QUEUE_ROUTES)) {
+      expect(route.startsWith('/')).toBe(true);
     }
   });
 });

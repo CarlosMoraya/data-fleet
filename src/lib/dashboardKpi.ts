@@ -61,6 +61,26 @@ export interface ActionItem {
   details: string[];
 }
 
+export type OperationalActionCategory =
+  | 'vehicles_unavailable'
+  | 'vehicles_no_driver'
+  | 'os_open'
+  | 'os_overdue'
+  | 'os_exit_this_week'
+  | 'os_pending_approval'
+  | 'checklist_overdue'
+  | 'action_plans_open'
+  | 'os_pending_budget'
+  | 'os_due_soon';
+
+export interface OperationalActionItem {
+  category: OperationalActionCategory;
+  label: string;
+  count: number;
+  severity: ActionSeverity;
+  details: string[];
+}
+
 export function calculateFleetAvailability(totalVehicles: number, vehiclesInMaintenance: number): number {
   if (totalVehicles <= 0) return 0;
   const result = Math.round(((totalVehicles - vehiclesInMaintenance) / totalVehicles) * 100);
@@ -163,6 +183,112 @@ export function countPendingApprovalOrders(
   return orders.filter((o) => o.status === 'Aguardando aprovação').length;
 }
 
+export function getEndOfWeekIso(todayIso: string): string {
+  const [year, month, day] = todayIso.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const daysToAdd = (7 - date.getUTCDay()) % 7;
+  date.setUTCDate(date.getUTCDate() + daysToAdd);
+  return date.toISOString().split('T')[0];
+}
+
+export function countVehiclesWithoutDriver(vehicles: Pick<VehicleRow, 'driver_id'>[]): number {
+  return vehicles.filter((vehicle) => vehicle.driver_id == null).length;
+}
+
+export function getVehiclesWithoutDriverPlates(vehicles: Pick<VehicleRow, 'driver_id' | 'license_plate'>[]): string[] {
+  return vehicles
+    .filter((vehicle) => vehicle.driver_id == null && vehicle.license_plate)
+    .map((vehicle) => vehicle.license_plate as string);
+}
+
+export function countOpenOrders(orders: Pick<MaintenanceOrderDashboard, 'status'>[]): number {
+  return orders.filter((order) => order.status !== 'Concluído' && order.status !== 'Cancelado').length;
+}
+
+export function countActiveOrdersExitingByEndOfWeek(
+  orders: Pick<MaintenanceOrderDashboard, 'status' | 'expected_exit_date'>[],
+  todayIso: string,
+  endOfWeekIso: string
+): number {
+  return orders.filter(
+    (order) =>
+      order.status !== 'Concluído' &&
+      order.status !== 'Cancelado' &&
+      order.expected_exit_date != null &&
+      order.expected_exit_date >= todayIso &&
+      order.expected_exit_date <= endOfWeekIso
+  ).length;
+}
+
+export function getActiveOrdersExitingByEndOfWeekVehicleIds(
+  orders: Pick<MaintenanceOrderDashboard, 'vehicle_id' | 'status' | 'expected_exit_date'>[],
+  todayIso: string,
+  endOfWeekIso: string
+): string[] {
+  return orders
+    .filter(
+      (order) =>
+        order.status !== 'Concluído' &&
+        order.status !== 'Cancelado' &&
+        order.expected_exit_date != null &&
+        order.expected_exit_date >= todayIso &&
+        order.expected_exit_date <= endOfWeekIso
+    )
+    .map((order) => order.vehicle_id);
+}
+
+export function countActiveOrdersDueWithinDays(
+  orders: Pick<MaintenanceOrderDashboard, 'status' | 'expected_exit_date'>[],
+  todayIso: string,
+  days: number
+): number {
+  const today = new Date(todayIso).getTime();
+  return orders.filter((order) => {
+    if (
+      order.status === 'Concluído' ||
+      order.status === 'Cancelado' ||
+      order.expected_exit_date == null ||
+      order.expected_exit_date < todayIso
+    ) {
+      return false;
+    }
+    return Math.floor((new Date(order.expected_exit_date).getTime() - today) / 86400000) <= days;
+  }).length;
+}
+
+export function getActiveOrdersDueWithinDaysVehicleIds(
+  orders: Pick<MaintenanceOrderDashboard, 'vehicle_id' | 'status' | 'expected_exit_date'>[],
+  todayIso: string,
+  days: number
+): string[] {
+  const today = new Date(todayIso).getTime();
+  return orders
+    .filter((order) => {
+      if (
+        order.status === 'Concluído' ||
+        order.status === 'Cancelado' ||
+        order.expected_exit_date == null ||
+        order.expected_exit_date < todayIso
+      ) {
+        return false;
+      }
+      return Math.floor((new Date(order.expected_exit_date).getTime() - today) / 86400000) <= days;
+    })
+    .map((order) => order.vehicle_id);
+}
+
+export function countPendingBudgetOrders(orders: Pick<MaintenanceOrderDashboard, 'status'>[]): number {
+  return orders.filter((order) => order.status === 'Aguardando orçamento').length;
+}
+
+export function getPendingBudgetVehicleIds(
+  orders: Pick<MaintenanceOrderDashboard, 'vehicle_id' | 'status'>[]
+): string[] {
+  return orders
+    .filter((order) => order.status === 'Aguardando orçamento')
+    .map((order) => order.vehicle_id);
+}
+
 export function isWithinExpiryWindow(date: string | null, todayIso: string, windowDays: number): boolean {
   if (date == null || date < todayIso) return false;
   return Math.floor((new Date(date).getTime() - new Date(todayIso).getTime()) / 86400000) <= windowDays;
@@ -200,6 +326,32 @@ export function buildActionQueue(input: {
       const order = { high: 0, medium: 1 };
       return order[a.severity] - order[b.severity];
     });
+}
+
+export function buildOperationalActionQueue(input: {
+  vehiclesUnavailable: string[];
+  vehiclesNoDriver: string[];
+  osOverdue: string[];
+  checklistOverdue: string[];
+  osExitThisWeek: string[];
+  osPendingApproval: string[];
+  osPendingBudget: string[];
+  actionPlansOpen: string[];
+  osDueSoon: string[];
+}): OperationalActionItem[] {
+  const items: OperationalActionItem[] = [
+    { category: 'vehicles_unavailable', label: 'Veículos indisponíveis', count: input.vehiclesUnavailable.length, severity: 'high', details: input.vehiclesUnavailable },
+    { category: 'vehicles_no_driver', label: 'Veículos sem motorista', count: input.vehiclesNoDriver.length, severity: 'medium', details: input.vehiclesNoDriver },
+    { category: 'os_overdue', label: 'OS com prazo de saída vencido', count: input.osOverdue.length, severity: 'high', details: input.osOverdue },
+    { category: 'checklist_overdue', label: 'Veículos com checklist vencido', count: input.checklistOverdue.length, severity: 'high', details: input.checklistOverdue },
+    { category: 'os_exit_this_week', label: 'Veículos com saída prevista até fim da semana', count: input.osExitThisWeek.length, severity: 'medium', details: input.osExitThisWeek },
+    { category: 'os_pending_approval', label: 'OS aguardando aprovação', count: input.osPendingApproval.length, severity: 'medium', details: input.osPendingApproval },
+    { category: 'os_pending_budget', label: 'OS aguardando orçamento', count: input.osPendingBudget.length, severity: 'medium', details: input.osPendingBudget },
+    { category: 'action_plans_open', label: 'Planos de ação de checklist abertos', count: input.actionPlansOpen.length, severity: 'medium', details: input.actionPlansOpen },
+    { category: 'os_due_soon', label: 'OS vencendo nos próximos 7 dias', count: input.osDueSoon.length, severity: 'medium', details: input.osDueSoon },
+  ];
+
+  return items.filter((item) => item.count > 0);
 }
 
 export function calculateAverageMaintenanceDays(

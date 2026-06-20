@@ -19,32 +19,33 @@ import {
   countVehiclesInMaintenance,
   calculateChecklistComplianceRate,
   countOverdueMaintenanceOrders,
+  countPendingApprovalOrders,
   calculateInsuranceCoverageRate,
   calculateTrackerCoverageRate,
-  buildActionQueue,
+  buildOperationalActionQueue,
   calculatePreviousPeriodRange,
-  countExpiringSoon,
   mapVehicleIdsToPlates,
-  isCrlvExpired,
-  getExpiredCrlvPlates,
-  getExpiringSoonCrlvPlates,
-  getExpiredCnhNames,
-  getExpiringSoonCnhNames,
-  getExpiringSoonGrPlates,
-  getExpiringSoonGrDriverNames,
+  countVehiclesWithoutDriver,
+  getVehiclesWithoutDriverPlates,
+  countOpenOrders,
+  getEndOfWeekIso,
+  countActiveOrdersExitingByEndOfWeek,
+  getActiveOrdersExitingByEndOfWeekVehicleIds,
+  getActiveOrdersDueWithinDaysVehicleIds,
+  getPendingBudgetVehicleIds,
   getTrailingMonthKeys,
   calculateMovingAverageProjection,
   computeOverdueChecklistVehicleIds,
   resolveHorizonRange,
-  type ActionItem,
+  type OperationalActionItem,
+  type OperationalActionCategory,
   type HorizonOption,
 } from '../lib/dashboardKpi';
-import { OPERATIONAL_ACTION_ROUTES } from '../lib/actionQueueRoutes';
+import { OPERATIONAL_QUEUE_ROUTES } from '../lib/actionQueueRoutes';
 
 const EvolutionPanel = React.lazy(() => import('../components/dashboard/EvolutionPanel'));
 
 type TabType = 'geral' | 'operacional' | 'conformidade' | 'custos' | 'evolucao';
-const EXPIRING_SOON_WINDOW_DAYS = 30;
 const PROJECTION_TRAILING_MONTHS = 3;
 
 const tabs: { id: TabType; label: string; icon: typeof LayoutDashboard }[] = [
@@ -299,6 +300,31 @@ export default function Dashboard() {
     gcTime: 30 * 60 * 1000,
   });
 
+  const { data: openActionPlans = [], isLoading: loadingActionPlans } = useQuery<
+    { id: string; vehicle_id: string | null; status: string }[]
+  >({
+    queryKey: ['dashboard-action-plans-open', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from('action_plans')
+        .select('id, vehicle_id, status')
+        .in('status', ['pending', 'in_progress', 'awaiting_conclusion']);
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []).map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        vehicle_id: row.vehicle_id != null ? (row.vehicle_id as string) : null,
+        status: row.status as string,
+      }));
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
   const { data: vehicleKmRows = [], isLoading: loadingVehicleKm } = useQuery<
     { vehicle_id: string; km_driven: number }[]
   >({
@@ -348,26 +374,6 @@ export default function Dashboard() {
     return map;
   }, [intervalRows]);
 
-  const { data: drivers = [], isLoading: loadingDrivers } = useQuery<
-    { id: string; name: string | null; expiration_date: string | null; gr_expiration_date: string | null }[]
-  >({
-    queryKey: ['dashboard-drivers', currentClient?.id],
-    queryFn: async () => {
-      let query = supabase
-        .from('drivers')
-        .select('id, name, expiration_date, gr_expiration_date');
-      if (currentClient?.id) {
-        query = query.eq('client_id', currentClient.id);
-      }
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data ?? []) as { id: string; name: string | null; expiration_date: string | null; gr_expiration_date: string | null }[];
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-  });
-
   const { data: evolutionOrders = [], isLoading: loadingEvolution } =
     useQuery<MaintenanceOrderDashboard[]>({
       queryKey: ['dashboard-evolution', currentClient?.id, evolutionRange.from, evolutionRange.to],
@@ -416,21 +422,6 @@ export default function Dashboard() {
         today: new Date(),
       }),
     [vehicles, checklistRows, intervalsByClient]
-  );
-
-  const currentYear = new Date().getFullYear().toString();
-  const expiredCrlvCount = useMemo(
-    () =>
-      vehicles.filter((v) => isCrlvExpired(v, currentYear, today)).length,
-    [vehicles, currentYear, today]
-  );
-
-  const expiredCnhCount = useMemo(
-    () =>
-      drivers.filter(
-        (d) => d.expiration_date !== null && d.expiration_date < today
-      ).length,
-    [drivers, today]
   );
 
   // ── Executive KPIs (Visão Geral) ─────────────────────────────────────────
@@ -492,15 +483,6 @@ export default function Dashboard() {
     [vehicles]
   );
 
-  const expiringSoonDocsCount = useMemo(
-    () =>
-      countExpiringSoon(drivers.map((driver) => driver.expiration_date), today, EXPIRING_SOON_WINDOW_DAYS) +
-      countExpiringSoon(drivers.map((driver) => driver.gr_expiration_date), today, EXPIRING_SOON_WINDOW_DAYS) +
-      countExpiringSoon(vehicles.map((vehicle) => vehicle.gr_expiration_date ?? null), today, EXPIRING_SOON_WINDOW_DAYS) +
-      countExpiringSoon(vehicles.map((vehicle) => vehicle.crlv_expiration_date ?? null), today, EXPIRING_SOON_WINDOW_DAYS),
-    [drivers, today, vehicles]
-  );
-
   const overdueOrderPlates = useMemo(
     () =>
       mapVehicleIdsToPlates(
@@ -529,24 +511,74 @@ export default function Dashboard() {
     [activeMaintenanceOrders, plateByVehicleId]
   );
 
-  const operationalActionItems = useMemo(
-    () =>
-      buildActionQueue({
-        checklist: mapVehicleIdsToPlates([...overdueChecklistVehicleIds], plateByVehicleId),
-        crlv: getExpiredCrlvPlates(vehicles, currentYear, today),
-        crlvExpiring: getExpiringSoonCrlvPlates(vehicles, today, EXPIRING_SOON_WINDOW_DAYS),
-        cnh: getExpiredCnhNames(drivers, today),
-        osOverdue: overdueOrderPlates,
-        osPendingApproval: pendingApprovalPlates,
-        cnhExpiring: getExpiringSoonCnhNames(drivers, today, EXPIRING_SOON_WINDOW_DAYS),
-        grVehicleExpiring: getExpiringSoonGrPlates(vehicles, today, EXPIRING_SOON_WINDOW_DAYS),
-        grDriverExpiring: getExpiringSoonGrDriverNames(drivers, today, EXPIRING_SOON_WINDOW_DAYS),
-      }),
-    [currentYear, drivers, overdueChecklistVehicleIds, overdueOrderPlates, pendingApprovalPlates, plateByVehicleId, today, vehicles]
+  const endOfWeekIso = useMemo(() => getEndOfWeekIso(today), [today]);
+
+  const vehiclesWithoutDriverCount = useMemo(
+    () => countVehiclesWithoutDriver(vehicles),
+    [vehicles]
   );
 
-  const handleOperationalActionClick = (category: ActionItem['category']) => {
-    navigate(OPERATIONAL_ACTION_ROUTES[category]);
+  const openOrdersCount = useMemo(
+    () => countOpenOrders(activeMaintenanceOrders),
+    [activeMaintenanceOrders]
+  );
+
+  const exitByEndOfWeekCount = useMemo(
+    () => countActiveOrdersExitingByEndOfWeek(activeMaintenanceOrders, today, endOfWeekIso),
+    [activeMaintenanceOrders, today, endOfWeekIso]
+  );
+
+  const pendingApprovalCount = useMemo(
+    () => countPendingApprovalOrders(activeMaintenanceOrders),
+    [activeMaintenanceOrders]
+  );
+
+  const unavailableVehiclePlates = useMemo(
+    () => mapVehicleIdsToPlates([...new Set(activeMaintenanceOrders.map((order) => order.vehicle_id))], plateByVehicleId),
+    [activeMaintenanceOrders, plateByVehicleId]
+  );
+
+  const operationalActionItems = useMemo<OperationalActionItem[]>(
+    () =>
+      buildOperationalActionQueue({
+        vehiclesUnavailable: unavailableVehiclePlates,
+        vehiclesNoDriver: getVehiclesWithoutDriverPlates(vehicles),
+        osOverdue: overdueOrderPlates,
+        checklistOverdue: mapVehicleIdsToPlates([...overdueChecklistVehicleIds], plateByVehicleId),
+        osExitThisWeek: mapVehicleIdsToPlates(
+          getActiveOrdersExitingByEndOfWeekVehicleIds(activeMaintenanceOrders, today, endOfWeekIso),
+          plateByVehicleId
+        ),
+        osPendingApproval: pendingApprovalPlates,
+        osPendingBudget: mapVehicleIdsToPlates(
+          getPendingBudgetVehicleIds(activeMaintenanceOrders),
+          plateByVehicleId
+        ),
+        actionPlansOpen: mapVehicleIdsToPlates(
+          openActionPlans.map((plan) => plan.vehicle_id).filter(Boolean) as string[],
+          plateByVehicleId
+        ),
+        osDueSoon: mapVehicleIdsToPlates(
+          getActiveOrdersDueWithinDaysVehicleIds(activeMaintenanceOrders, today, 7),
+          plateByVehicleId
+        ),
+      }),
+    [
+      activeMaintenanceOrders,
+      endOfWeekIso,
+      openActionPlans,
+      overdueChecklistVehicleIds,
+      overdueOrderPlates,
+      pendingApprovalPlates,
+      plateByVehicleId,
+      today,
+      unavailableVehiclePlates,
+      vehicles,
+    ]
+  );
+
+  const handleOperationalActionClick = (category: OperationalActionCategory) => {
+    navigate(OPERATIONAL_QUEUE_ROUTES[category]);
   };
 
   // ── Loading state ─────────────────────────────────────────────────────────
@@ -559,9 +591,9 @@ export default function Dashboard() {
     loadingPreviousMaintenance ||
     loadingCostProjection ||
     loadingLastChecklists ||
+    loadingActionPlans ||
     loadingVehicleKm ||
-    loadingIntervals ||
-    loadingDrivers;
+    loadingIntervals;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -616,17 +648,15 @@ export default function Dashboard() {
         )}
         {activeTab === 'operacional' && (
           <OperationalPanel
-            vehicles={vehicles}
-            maintenanceOrders={currentMonthOrders}
-            activeMaintenanceOrders={activeMaintenanceOrders}
-            overdueChecklistVehicleIds={overdueChecklistVehicleIds}
-            expiredCrlvCount={expiredCrlvCount}
-            expiredCnhCount={expiredCnhCount}
+            unavailableVehiclesCount={unavailableVehicles}
+            vehiclesWithoutDriverCount={vehiclesWithoutDriverCount}
+            openOrdersCount={openOrdersCount}
             overdueOrdersCount={overdueOrdersCount}
-            expiringSoonDocsCount={expiringSoonDocsCount}
+            exitByEndOfWeekCount={exitByEndOfWeekCount}
+            pendingApprovalCount={pendingApprovalCount}
+            overdueChecklistsCount={overdueChecklistVehicleIds.size}
+            openActionPlansCount={openActionPlans.length}
             actionItems={operationalActionItems}
-            filters={filters}
-            onFiltersChange={setFilters}
             onActionClick={handleOperationalActionClick}
             isLoading={isPanelLoading}
           />
