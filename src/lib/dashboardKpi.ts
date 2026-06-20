@@ -1,5 +1,6 @@
 import type { MaintenanceOrderDashboard } from '../types/maintenance';
 import type { VehicleRow } from '../components/dashboard/OperationalPanel';
+import { normalizeBudgetSystem } from './budgetSystems';
 
 export interface CostDashboardFilters {
   category: string | null;
@@ -113,6 +114,134 @@ export function calculateCostPerKm(input: {
     value: input.totalCost / totalKm,
     totalKm,
   };
+}
+
+export interface BudgetItemForCost {
+  maintenance_order_id: string;
+  system: string | null;
+  value: number;
+}
+
+export interface VehicleFinancialRankingRow {
+  vehicleId: string;
+  plate: string | null;
+  model: string | null;
+  totalCost: number;
+  orderCount: number;
+  correctiveOrderCount: number;
+  kmDriven: number | null;
+  costPerKm: number | null;
+}
+
+export function buildCostByVehicleAttribute(
+  filteredVehicles: Pick<VehicleRow, 'id' | 'category' | 'model' | 'shipper_name' | 'operational_unit_name'>[],
+  filteredOrders: Pick<MaintenanceOrderDashboard, 'vehicle_id' | 'approved_cost' | 'status'>[],
+  attribute: 'category' | 'model' | 'shipper_name' | 'operational_unit_name',
+  fallbackLabel: string,
+): { name: string; value: number }[] {
+  const vehicleAttrMap = new Map<string, string>();
+  for (const v of filteredVehicles) {
+    const raw = v[attribute];
+    vehicleAttrMap.set(v.id, typeof raw === 'string' && raw.trim().length > 0 ? raw : fallbackLabel);
+  }
+
+  const totals = new Map<string, number>();
+  for (const order of filteredOrders) {
+    if (order.status === 'Cancelado' || order.approved_cost == null || order.approved_cost <= 0) continue;
+    const attr = vehicleAttrMap.get(order.vehicle_id) ?? fallbackLabel;
+    totals.set(attr, (totals.get(attr) ?? 0) + order.approved_cost);
+  }
+
+  return [...totals.entries()]
+    .map(([name, value]) => ({ name, value }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, 'pt-BR'));
+}
+
+export function buildCostBySystemData(
+  filteredOrders: Pick<MaintenanceOrderDashboard, 'id' | 'approved_cost' | 'status'>[],
+  budgetItems: BudgetItemForCost[],
+): { name: string; value: number }[] {
+  const allowedOrderIds = new Set(filteredOrders.map((o) => o.id));
+
+  const itemsByOrder = new Map<string, BudgetItemForCost[]>();
+  for (const item of budgetItems) {
+    if (!allowedOrderIds.has(item.maintenance_order_id)) continue;
+    const list = itemsByOrder.get(item.maintenance_order_id) ?? [];
+    list.push(item);
+    itemsByOrder.set(item.maintenance_order_id, list);
+  }
+
+  const totals = new Map<string, number>();
+  for (const order of filteredOrders) {
+    if (order.status === 'Cancelado' || order.approved_cost == null || order.approved_cost <= 0) continue;
+    const items = itemsByOrder.get(order.id) ?? [];
+    const sumItems = items.reduce((sum, item) => sum + (item.value > 0 ? item.value : 0), 0);
+
+    if (sumItems > 0) {
+      for (const item of items) {
+        if (item.value <= 0) continue;
+        const system = normalizeBudgetSystem(item.system);
+        totals.set(system, (totals.get(system) ?? 0) + order.approved_cost * (item.value / sumItems));
+      }
+    } else {
+      totals.set('Outros', (totals.get('Outros') ?? 0) + order.approved_cost);
+    }
+  }
+
+  return [...totals.entries()]
+    .map(([name, value]) => ({ name, value }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, 'pt-BR'));
+}
+
+export function buildVehicleFinancialRanking(input: {
+  filteredVehicles: Pick<VehicleRow, 'id' | 'license_plate' | 'model'>[];
+  filteredOrders: Pick<MaintenanceOrderDashboard, 'vehicle_id' | 'type' | 'approved_cost' | 'status'>[];
+  vehicleKmRows: { vehicle_id: string; km_driven: number }[];
+}): VehicleFinancialRankingRow[] {
+  const kmByVehicle = new Map<string, number>();
+  for (const row of input.vehicleKmRows) {
+    kmByVehicle.set(row.vehicle_id, row.km_driven);
+  }
+
+  const ordersByVehicle = new Map<string, typeof input.filteredOrders>();
+  for (const order of input.filteredOrders) {
+    if (order.status === 'Cancelado') continue;
+    const list = ordersByVehicle.get(order.vehicle_id) ?? [];
+    list.push(order);
+    ordersByVehicle.set(order.vehicle_id, list);
+  }
+
+  const rows: VehicleFinancialRankingRow[] = [];
+  for (const vehicle of input.filteredVehicles) {
+    const group = ordersByVehicle.get(vehicle.id);
+    if (!group || group.length === 0) continue;
+
+    const totalCost = sumApprovedMaintenanceCost(group);
+    const orderCount = group.length;
+    const correctiveOrderCount = group.filter((o) => o.type === 'Corretiva').length;
+    const km = kmByVehicle.get(vehicle.id);
+    const kmDriven = km != null && km > 0 ? km : null;
+    const costPerKm = kmDriven != null ? totalCost / kmDriven : null;
+
+    rows.push({
+      vehicleId: vehicle.id,
+      plate: vehicle.license_plate ?? null,
+      model: vehicle.model ?? null,
+      totalCost,
+      orderCount,
+      correctiveOrderCount,
+      kmDriven,
+      costPerKm,
+    });
+  }
+
+  return rows.sort((a, b) => {
+    if (b.totalCost !== a.totalCost) return b.totalCost - a.totalCost;
+    if (b.correctiveOrderCount !== a.correctiveOrderCount) return b.correctiveOrderCount - a.correctiveOrderCount;
+    return (a.plate ?? '').localeCompare(b.plate ?? '', 'pt-BR');
+  });
 }
 
 export function countActiveInMaintenance(

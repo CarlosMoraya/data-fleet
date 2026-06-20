@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, Ban, RotateCcw } from 'lucide-react';
 import { cn } from '../lib/utils';
 import MaintenanceDetailModal from '../components/MaintenanceDetailModal';
@@ -121,6 +121,17 @@ export default function Maintenance() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = usePersistentTabState('maintenance', 'status', 'all');
   const [search, setSearch] = usePersistentFilterState<string>('maintenance', 'search', '');
+  const [searchParams, setSearchParams] = useSearchParams();
+  React.useEffect(() => {
+    const placa = searchParams.get('placa');
+    if (placa) {
+      setSearch(placa);
+      const next = new URLSearchParams(searchParams);
+      next.delete('placa');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [selectedOrder, setSelectedOrder] = React.useState<MaintenanceOrder | null>(null);
   const allowedRoles: Role[] = [
     'Workshop',

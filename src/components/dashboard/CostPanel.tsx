@@ -2,6 +2,7 @@ import React, { useMemo, lazy, Suspense } from 'react';
 import { DollarSign, Truck, Gauge, Loader2, TrendingUp, ReceiptText, Wrench } from 'lucide-react';
 import DashboardKpiCard from './DashboardKpiCard';
 import RouteFallback from '../RouteFallback';
+import VehicleFinancialRanking from './VehicleFinancialRanking';
 import type { VehicleRow } from './OperationalPanel';
 import type { MaintenanceOrderDashboard } from '../../types/maintenance';
 import CostFilters from './CostFilters';
@@ -9,6 +10,9 @@ import {
   applyCostFilters,
   buildCostFilterOptions,
   buildCostTrendSeries,
+  buildCostByVehicleAttribute,
+  buildCostBySystemData,
+  buildVehicleFinancialRanking,
   calculateAverageApprovedTicket,
   calculateCostPerKm,
   calculateMovingAverageProjection,
@@ -17,6 +21,7 @@ import {
   sumApprovedCostByMonthKeys,
   sumApprovedMaintenanceCost,
   type CostDashboardFilters,
+  type BudgetItemForCost,
 } from '../../lib/dashboardKpi';
 
 const VehicleTypeBarChart = lazy(() => import('./VehicleTypeBarChart'));
@@ -45,6 +50,8 @@ interface CostPanelProps {
   onFiltersChange: (f: CostDashboardFilters) => void;
   onResetFilters: () => void;
   isLoading?: boolean;
+  budgetItems: BudgetItemForCost[];
+  onViewVehicleHistory: (plate: string) => void;
 }
 
 export default function CostPanel({
@@ -58,6 +65,8 @@ export default function CostPanel({
   onFiltersChange,
   onResetFilters,
   isLoading = false,
+  budgetItems,
+  onViewVehicleHistory,
 }: CostPanelProps) {
   const filterOptions = useMemo(() => buildCostFilterOptions(vehicles), [vehicles]);
 
@@ -131,41 +140,35 @@ export default function CostPanel({
     }).filter((entry) => entry.value > 0);
   }, [filteredVehicles, filteredOrders]);
 
-  const costByShipperData = useMemo(() => {
-    const vehicleShipperMap = new Map(
-      filteredVehicles.map((v) => [v.id, v.shipper_name ?? 'Sem Embarcador'])
-    );
-    const names = [...new Set(filteredVehicles.map((v) => v.shipper_name ?? 'Sem Embarcador'))];
-    return names.map((name) => ({
-      name,
-      value: filteredOrders
-        .filter(
-          (o) =>
-            vehicleShipperMap.get(o.vehicle_id) === name &&
-            o.approved_cost !== null &&
-            o.approved_cost > 0
-        )
-        .reduce((sum, o) => sum + (o.approved_cost ?? 0), 0),
-    })).filter((d) => d.value > 0);
-  }, [filteredVehicles, filteredOrders]);
+  const costByShipperData = useMemo(
+    () => buildCostByVehicleAttribute(filteredVehicles, filteredOrders, 'shipper_name', 'Sem Embarcador'),
+    [filteredVehicles, filteredOrders],
+  );
 
-  const costByOpUnitData = useMemo(() => {
-    const vehicleOpUnitMap = new Map(
-      filteredVehicles.map((v) => [v.id, v.operational_unit_name ?? 'Sem Unidade'])
-    );
-    const names = [...new Set(filteredVehicles.map((v) => v.operational_unit_name ?? 'Sem Unidade'))];
-    return names.map((name) => ({
-      name,
-      value: filteredOrders
-        .filter(
-          (o) =>
-            vehicleOpUnitMap.get(o.vehicle_id) === name &&
-            o.approved_cost !== null &&
-            o.approved_cost > 0
-        )
-        .reduce((sum, o) => sum + (o.approved_cost ?? 0), 0),
-    })).filter((d) => d.value > 0);
-  }, [filteredVehicles, filteredOrders]);
+  const costByOpUnitData = useMemo(
+    () => buildCostByVehicleAttribute(filteredVehicles, filteredOrders, 'operational_unit_name', 'Sem Unidade'),
+    [filteredVehicles, filteredOrders],
+  );
+
+  const costByCategoryData = useMemo(
+    () => buildCostByVehicleAttribute(filteredVehicles, filteredOrders, 'category', 'Sem Categoria'),
+    [filteredVehicles, filteredOrders],
+  );
+
+  const costByModelData = useMemo(
+    () => buildCostByVehicleAttribute(filteredVehicles, filteredOrders, 'model', 'Sem Modelo'),
+    [filteredVehicles, filteredOrders],
+  );
+
+  const costBySystemData = useMemo(
+    () => buildCostBySystemData(filteredOrders, budgetItems),
+    [filteredOrders, budgetItems],
+  );
+
+  const vehicleRanking = useMemo(
+    () => buildVehicleFinancialRanking({ filteredVehicles, filteredOrders, vehicleKmRows }),
+    [filteredVehicles, filteredOrders, vehicleKmRows],
+  );
 
   const costByMaintenanceTypeData = MAINTENANCE_TYPES.map((t) => ({
     name: t,
@@ -257,14 +260,6 @@ export default function CostPanel({
         />
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <VehicleTypeBarChart
-            data={costByTypeData}
-            activeFilter={null}
-            onFilterChange={() => {}}
-            title="Custo por Tipo de Veículo"
-            valueFormatter={formatCurrency}
-            yAxisLabel="R$"
-          />
           <MaintenanceTypeDonutChart
             data={costByMaintenanceTypeData}
             activeFilter={filters.maintenanceType}
@@ -274,6 +269,36 @@ export default function CostPanel({
             title="Custo por Tipo de Manutenção"
             valueFormatter={formatCurrency}
           />
+          {costBySystemData.length > 0 && (
+            <VehicleTypeBarChart
+              data={costBySystemData}
+              activeFilter={null}
+              onFilterChange={() => {}}
+              title="Custo por Sistema"
+              valueFormatter={formatCurrency}
+              yAxisLabel="R$"
+            />
+          )}
+          {costByCategoryData.length > 0 && (
+            <VehicleTypeBarChart
+              data={costByCategoryData}
+              activeFilter={null}
+              onFilterChange={() => {}}
+              title="Custo por Categoria"
+              valueFormatter={formatCurrency}
+              yAxisLabel="R$"
+            />
+          )}
+          {costByModelData.length > 0 && (
+            <VehicleTypeBarChart
+              data={costByModelData}
+              activeFilter={null}
+              onFilterChange={() => {}}
+              title="Custo por Modelo"
+              valueFormatter={formatCurrency}
+              yAxisLabel="R$"
+            />
+          )}
           {costByShipperData.length > 0 && (
             <VehicleTypeBarChart
               data={costByShipperData}
@@ -294,7 +319,23 @@ export default function CostPanel({
               yAxisLabel="R$"
             />
           )}
+          {costByTypeData.length > 0 && (
+            <VehicleTypeBarChart
+              data={costByTypeData}
+              activeFilter={null}
+              onFilterChange={() => {}}
+              title="Custo por Tipo de Veículo"
+              valueFormatter={formatCurrency}
+              yAxisLabel="R$"
+            />
+          )}
         </div>
+
+        <VehicleFinancialRanking
+          rows={vehicleRanking}
+          onViewHistory={onViewVehicleHistory}
+          valueFormatter={formatCurrency}
+        />
       </Suspense>
     </div>
   );

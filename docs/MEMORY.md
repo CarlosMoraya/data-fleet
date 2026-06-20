@@ -68,6 +68,37 @@ Correção aplicada: adicionado ?situacao=cnh_vencida / cnh_a_vencer / gr_a_venc
 Arquivos modificados: src/lib/actionQueueRoutes.ts, src/lib/actionQueueRoutes.test.ts.
 Testes adicionados: actionQueueRoutes.test.ts — "uses only valid driver situation values in driver routes" (regressão) + atualização das asserções de rota de motorista.
 
+## Protocolo oficial de smoke
+
+**Comando oficial:** `npm run test:smoke`
+
+**Objetivo:** Responder se a aplicação sobe, autentica, protege rotas e mantém a navegação crítica funcionando.
+
+**Pré-condições ambientais:**
+- Dependências instaladas.
+- `.env.local` válido com `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`.
+- Dados demo mínimos existentes para `admin@demo.betafleet.local` e `coordinator@demo.betafleet.local`.
+
+**Escopo incluído:**
+- Tela pública de login renderiza.
+- Rota protegida redireciona usuário anônimo para login.
+- Sessão autenticada (admin) chega ao Dashboard.
+- Shell de Cadastros renderiza e abas mudam rota/conteúdo (admin).
+- Coordinator mantém navegação responsiva nas abas de Cadastros após idle (regressão específica).
+
+**Escopo excluído:**
+- CRUD completo, OCR, upload/importação, fluxos destrutivos.
+- Todos os papéis do sistema.
+- Todos os módulos do menu.
+- Specs em `e2e/pending/**`.
+- Matriz completa de permissões.
+
+**Conduta em falha:** Parar, registrar o teste falho com erro e evidência, corrigir antes de prosseguir com qualquer outra tarefa.
+
+**Observação:** `npm run test:e2e` é regressão completa e não substitui o smoke; smoke não substitui regressão completa.
+
+**Spec dedicada:** `e2e/smoke/app-smoke.spec.ts`
+
 ## Referência Histórica
 
 - Todo o histórico anterior deste arquivo foi arquivado em `docs/MEMORY-HISTORY.md`, sob `## Arquivamento — 2026-06-14`.

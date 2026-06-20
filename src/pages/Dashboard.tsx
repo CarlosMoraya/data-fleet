@@ -59,6 +59,7 @@ import {
   type OperationalActionItem,
   type OperationalActionCategory,
   type HorizonOption,
+  type BudgetItemForCost,
 } from '../lib/dashboardKpi';
 import { COMPLIANCE_ACTION_ROUTES, OPERATIONAL_QUEUE_ROUTES } from '../lib/actionQueueRoutes';
 
@@ -407,6 +408,31 @@ export default function Dashboard() {
       }));
     },
     enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  const { data: budgetItems = [] } = useQuery<BudgetItemForCost[]>({
+    queryKey: ['dashboard-budget-items', currentClient?.id, dateRange.from, dateRange.to],
+    queryFn: async () => {
+      let query = supabase
+        .from('maintenance_budget_items')
+        .select('maintenance_order_id, system, value, maintenance_orders!inner(entry_date, status, client_id)')
+        .gte('maintenance_orders.entry_date', dateRange.from)
+        .lte('maintenance_orders.entry_date', dateRange.to)
+        .neq('maintenance_orders.status', 'Cancelado');
+      if (currentClient?.id) {
+        query = query.eq('maintenance_orders.client_id', currentClient.id);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []).map((row: Record<string, unknown>) => ({
+        maintenance_order_id: row.maintenance_order_id as string,
+        system: row.system != null ? (row.system as string) : null,
+        value: row.value != null ? Number(row.value) : 0,
+      }));
+    },
+    enabled: !!user && activeTab === 'custos',
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
@@ -790,6 +816,10 @@ export default function Dashboard() {
     navigate(COMPLIANCE_ACTION_ROUTES[category]);
   };
 
+  const handleViewVehicleHistory = (plate: string) => {
+    navigate(`/manutencao?placa=${encodeURIComponent(plate)}`);
+  };
+
   // ── Loading state ─────────────────────────────────────────────────────────
 
   const isPanelLoading =
@@ -902,6 +932,8 @@ export default function Dashboard() {
               onFiltersChange={setCostFilters}
               onResetFilters={() => setCostFilters(DEFAULT_COST_FILTERS)}
               isLoading={isPanelLoading}
+              budgetItems={budgetItems}
+              onViewVehicleHistory={handleViewVehicleHistory}
             />
           </div>
         )}

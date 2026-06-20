@@ -68,6 +68,10 @@ import {
   sumApprovedMaintenanceCost,
   isDriverDocumentallyIrregular,
   isVehicleDocumentallyIrregular,
+  buildCostByVehicleAttribute,
+  buildCostBySystemData,
+  buildVehicleFinancialRanking,
+  type BudgetItemForCost,
 } from './dashboardKpi';
 
 describe('cost dashboard filters and KPIs', () => {
@@ -1690,5 +1694,165 @@ describe('Conformidade documental', () => {
       { license_plate: 'DEF4G56', has_maintenance_contract: null },
       { license_plate: 'GHI7J89', has_maintenance_contract: true },
     ])).toEqual(['ABC1D23', 'DEF4G56']);
+  });
+});
+
+describe('buildCostByVehicleAttribute', () => {
+  const vehicles = [
+    { id: 'v1', category: 'Pesado', model: 'Atego', shipper_name: 'Alpha', operational_unit_name: 'Campinas' },
+    { id: 'v2', category: 'Leve', model: 'Daily', shipper_name: 'Beta', operational_unit_name: 'Santos' },
+    { id: 'v3', category: 'Pesado', model: null, shipper_name: 'Alpha', operational_unit_name: 'Campinas' },
+  ];
+
+  const orders = [
+    { vehicle_id: 'v1', approved_cost: 1000, status: 'Orçamento aprovado' },
+    { vehicle_id: 'v2', approved_cost: 500, status: 'Orçamento aprovado' },
+    { vehicle_id: 'v3', approved_cost: 300, status: 'Orçamento aprovado' },
+    { vehicle_id: 'v1', approved_cost: 200, status: 'Cancelado' },
+    { vehicle_id: 'v2', approved_cost: 0, status: 'Orçamento aprovado' },
+  ];
+
+  it('soma custo por categoria corretamente, ordenado desc', () => {
+    const result = buildCostByVehicleAttribute(vehicles, orders, 'category', 'Sem Categoria');
+    expect(result).toEqual([
+      { name: 'Pesado', value: 1300 },
+      { name: 'Leve', value: 500 },
+    ]);
+  });
+
+  it('fallback para modelo null agrupa em label customizado', () => {
+    const result = buildCostByVehicleAttribute(vehicles, orders, 'model', 'Sem Modelo');
+    expect(result).toContainEqual({ name: 'Sem Modelo', value: 300 });
+    expect(result).toContainEqual({ name: 'Atego', value: 1000 });
+    expect(result).toContainEqual({ name: 'Daily', value: 500 });
+  });
+
+  it('ignora ordens Cancelado e approved_cost <= 0', () => {
+    const result = buildCostByVehicleAttribute(vehicles, orders, 'shipper_name', 'Sem Embarcador');
+    expect(result).toEqual([
+      { name: 'Alpha', value: 1300 },
+      { name: 'Beta', value: 500 },
+    ]);
+  });
+});
+
+describe('buildCostBySystemData', () => {
+  it('rateia approved_cost proporcionalmente aos itens de orçamento', () => {
+    const orders = [
+      { id: 'os1', approved_cost: 1000, status: 'Orçamento aprovado' },
+    ];
+    const budgetItems: BudgetItemForCost[] = [
+      { maintenance_order_id: 'os1', system: 'Motor', value: 600 },
+      { maintenance_order_id: 'os1', system: 'Sistema de Freio', value: 400 },
+    ];
+
+    const result = buildCostBySystemData(orders, budgetItems);
+    expect(result).toEqual([
+      { name: 'Motor', value: 600 },
+      { name: 'Sistema de Freio', value: 400 },
+    ]);
+  });
+
+  it('system null normaliza para Outros', () => {
+    const orders = [
+      { id: 'os1', approved_cost: 500, status: 'Orçamento aprovado' },
+    ];
+    const budgetItems: BudgetItemForCost[] = [
+      { maintenance_order_id: 'os1', system: null, value: 500 },
+    ];
+
+    const result = buildCostBySystemData(orders, budgetItems);
+    expect(result).toEqual([{ name: 'Outros', value: 500 }]);
+  });
+
+  it('OS aprovada sem itens vai inteira para Outros', () => {
+    const orders = [
+      { id: 'os1', approved_cost: 800, status: 'Orçamento aprovado' },
+    ];
+    const budgetItems: BudgetItemForCost[] = [];
+
+    const result = buildCostBySystemData(orders, budgetItems);
+    expect(result).toEqual([{ name: 'Outros', value: 800 }]);
+  });
+
+  it('invariante: soma dos valores == sumApprovedMaintenanceCost', () => {
+    const orders = [
+      { id: 'os1', approved_cost: 1000, status: 'Orçamento aprovado' },
+      { id: 'os2', approved_cost: 500, status: 'Orçamento aprovado' },
+      { id: 'os3', approved_cost: 200, status: 'Cancelado' },
+    ];
+    const budgetItems: BudgetItemForCost[] = [
+      { maintenance_order_id: 'os1', system: 'Motor', value: 700 },
+      { maintenance_order_id: 'os1', system: 'Suspensão', value: 300 },
+      { maintenance_order_id: 'os2', system: 'Motor', value: 500 },
+    ];
+
+    const result = buildCostBySystemData(orders, budgetItems);
+    const totalSystemCost = result.reduce((sum, item) => sum + item.value, 0);
+    const expectedTotal = sumApprovedMaintenanceCost(orders);
+    expect(Math.abs(totalSystemCost - expectedTotal)).toBeLessThan(0.01);
+  });
+});
+
+describe('buildVehicleFinancialRanking', () => {
+  const vehicles = [
+    { id: 'v1', license_plate: 'ABC1D23', model: 'Atego' },
+    { id: 'v2', license_plate: 'DEF4G56', model: 'Daily' },
+    { id: 'v3', license_plate: null, model: 'Actros' },
+  ];
+
+  const orders = [
+    { vehicle_id: 'v1', type: 'Corretiva' as const, approved_cost: 1000, status: 'Orçamento aprovado' },
+    { vehicle_id: 'v1', type: 'Corretiva' as const, approved_cost: 500, status: 'Orçamento aprovado' },
+    { vehicle_id: 'v1', type: 'Preventiva' as const, approved_cost: 300, status: 'Orçamento aprovado' },
+    { vehicle_id: 'v2', type: 'Preventiva' as const, approved_cost: 200, status: 'Orçamento aprovado' },
+    { vehicle_id: 'v3', type: 'Corretiva' as const, approved_cost: 800, status: 'Orçamento aprovado' },
+  ];
+
+  it('cenário feliz: agrega métricas corretamente com KM válido', () => {
+    const vehicleKmRows = [
+      { vehicle_id: 'v1', km_driven: 1000 },
+      { vehicle_id: 'v2', km_driven: 500 },
+    ];
+
+    const result = buildVehicleFinancialRanking({ filteredVehicles: vehicles, filteredOrders: orders, vehicleKmRows });
+
+    const v1Row = result.find((r) => r.vehicleId === 'v1')!;
+    expect(v1Row.totalCost).toBe(1800);
+    expect(v1Row.orderCount).toBe(3);
+    expect(v1Row.correctiveOrderCount).toBe(2);
+    expect(v1Row.kmDriven).toBe(1000);
+    expect(v1Row.costPerKm).toBe(1.8);
+  });
+
+  it('veículo sem KM: kmDriven=null, costPerKm=null, ainda presente', () => {
+    const vehicleKmRows = [
+      { vehicle_id: 'v1', km_driven: 1000 },
+      { vehicle_id: 'v2', km_driven: 0 },
+    ];
+
+    const result = buildVehicleFinancialRanking({ filteredVehicles: vehicles, filteredOrders: orders, vehicleKmRows });
+
+    const v3Row = result.find((r) => r.vehicleId === 'v3')!;
+    expect(v3Row.totalCost).toBe(800);
+    expect(v3Row.kmDriven).toBeNull();
+    expect(v3Row.costPerKm).toBeNull();
+
+    const v2Row = result.find((r) => r.vehicleId === 'v2')!;
+    expect(v2Row.kmDriven).toBeNull();
+    expect(v2Row.costPerKm).toBeNull();
+  });
+
+  it('ordenação: maior totalCost primeiro, depois correctiveOrderCount, depois placa', () => {
+    const vehicleKmRows = [
+      { vehicle_id: 'v1', km_driven: 1000 },
+      { vehicle_id: 'v2', km_driven: 500 },
+      { vehicle_id: 'v3', km_driven: 800 },
+    ];
+
+    const result = buildVehicleFinancialRanking({ filteredVehicles: vehicles, filteredOrders: orders, vehicleKmRows });
+    expect(result[0].vehicleId).toBe('v1');
+    expect(result[1].vehicleId).toBe('v3');
+    expect(result[2].vehicleId).toBe('v2');
   });
 });
