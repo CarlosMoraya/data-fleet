@@ -1,10 +1,10 @@
 import type { Driver } from '../types';
-import { isWithinExpiryWindow } from './dashboardKpi';
+import { isBlank, isWithinExpiryWindow } from './dashboardKpi';
 import { SEARCH_PARAM, parseSearchFromParams as _parseSearchFromParams } from './vehicleFilters';
 
 export { SEARCH_PARAM, _parseSearchFromParams as parseSearchFromParams };
 
-export const DRIVER_PENDENCY_VALUES = ['cnh_expired', 'cnh_expiring', 'gr_expiring', 'with_vehicle', 'without_vehicle'] as const;
+export const DRIVER_PENDENCY_VALUES = ['cnh_expired', 'cnh_expiring', 'gr_expiring', 'gr_expired', 'cnh_missing', 'gr_missing', 'with_vehicle', 'without_vehicle'] as const;
 
 export type DriverPendency = typeof DRIVER_PENDENCY_VALUES[number];
 
@@ -12,6 +12,9 @@ export const DRIVER_PENDENCY_LABELS: Record<DriverPendency, string> = {
   cnh_expired: 'CNH vencida',
   cnh_expiring: 'CNH a vencer (30 dias)',
   gr_expiring: 'GR a vencer (30 dias)',
+  gr_expired: 'GR vencida',
+  cnh_missing: 'Sem CNH anexada',
+  gr_missing: 'Sem GR',
   with_vehicle: 'Com veículo',
   without_vehicle: 'Sem veículo',
 };
@@ -96,6 +99,12 @@ export function driverMatchesPendency(driver: Driver, pendency: DriverPendency, 
       return isWithinExpiryWindow(driver.expirationDate ?? null, ctx.todayIso, DRIVER_PENDENCY_EXPIRY_WINDOW_DAYS);
     case 'gr_expiring':
       return isWithinExpiryWindow(driver.grExpirationDate ?? null, ctx.todayIso, DRIVER_PENDENCY_EXPIRY_WINDOW_DAYS);
+    case 'gr_expired':
+      return driver.grExpirationDate != null && driver.grExpirationDate < ctx.todayIso;
+    case 'cnh_missing':
+      return isBlank(driver.cnhUpload);
+    case 'gr_missing':
+      return isBlank(driver.grUpload) && !!ctx.vehicleByDriverId[driver.id];
     case 'with_vehicle':
       return !!ctx.vehicleByDriverId[driver.id];
     case 'without_vehicle':

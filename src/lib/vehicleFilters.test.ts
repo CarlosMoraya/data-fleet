@@ -97,6 +97,11 @@ describe('vehicleFilters', () => {
     expect(isVehiclePendency('crlv_expired')).toBe(true);
     expect(isVehiclePendency('crlv_expiring')).toBe(true);
     expect(isVehiclePendency('gr_expiring')).toBe(true);
+    expect(isVehiclePendency('gr_expired')).toBe(true);
+    expect(isVehiclePendency('crlv_missing')).toBe(true);
+    expect(isVehiclePendency('gr_missing')).toBe(true);
+    expect(isVehiclePendency('insurance_missing')).toBe(true);
+    expect(isVehiclePendency('maintenance_contract_missing')).toBe(true);
     expect(isVehiclePendency('no_driver')).toBe(true);
     expect(isVehiclePendency('checklist_overdue')).toBe(true);
     expect(isVehiclePendency(null)).toBe(false);
@@ -133,6 +138,34 @@ describe('vehicleFilters', () => {
   it('aplica pendência gr_expiring', () => {
     expect(vehicleMatchesPendency(vehicle({ grExpirationDate: '2026-06-22' }), 'gr_expiring', ctx)).toBe(true);
     expect(vehicleMatchesPendency(vehicle({ grExpirationDate: '2026-08-16' }), 'gr_expiring', ctx)).toBe(false);
+  });
+
+  it('aplica pendência gr_expired', () => {
+    expect(vehicleMatchesPendency(vehicle({ grExpirationDate: '2026-06-10' }), 'gr_expired', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ grExpirationDate: '2026-06-17' }), 'gr_expired', ctx)).toBe(false);
+  });
+
+  it('aplica pendência crlv_missing', () => {
+    expect(vehicleMatchesPendency(vehicle({ crlvUpload: '' }), 'crlv_missing', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ crlvUpload: '   ' }), 'crlv_missing', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ crlvUpload: 'file.pdf' }), 'crlv_missing', ctx)).toBe(false);
+  });
+
+  it('aplica pendência gr_missing', () => {
+    expect(vehicleMatchesPendency(vehicle({ grUpload: '' }), 'gr_missing', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ grUpload: 'gr.pdf' }), 'gr_missing', ctx)).toBe(false);
+  });
+
+  it('aplica pendência insurance_missing', () => {
+    expect(vehicleMatchesPendency(vehicle({ hasInsurance: false }), 'insurance_missing', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ hasInsurance: undefined }), 'insurance_missing', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ hasInsurance: true }), 'insurance_missing', ctx)).toBe(false);
+  });
+
+  it('aplica pendência maintenance_contract_missing', () => {
+    expect(vehicleMatchesPendency(vehicle({ hasMaintenanceContract: false }), 'maintenance_contract_missing', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ hasMaintenanceContract: undefined }), 'maintenance_contract_missing', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ hasMaintenanceContract: true }), 'maintenance_contract_missing', ctx)).toBe(false);
   });
 
   it('aplica pendência no_driver', () => {
@@ -176,5 +209,13 @@ describe('vehicleFilters', () => {
     const vehicles = [vehicle({ id: 'v1', shipperId: 's1' })];
 
     expect(applyVehicleFilters(vehicles, '', { ...EMPTY_STRUCTURED_FILTERS, shipperId: 's2' }, ctx)).toEqual([]);
+  });
+
+  it('preserva os valores legados de issue', () => {
+    expect(LEGACY_VEHICLE_ISSUE_VALUES['crlv_vencido']).toBe('crlv_expired');
+    expect(LEGACY_VEHICLE_ISSUE_VALUES['crlv_a_vencer']).toBe('crlv_expiring');
+    expect(LEGACY_VEHICLE_ISSUE_VALUES['gr_a_vencer']).toBe('gr_expiring');
+    expect(LEGACY_VEHICLE_ISSUE_VALUES['sem_motorista']).toBe('no_driver');
+    expect(LEGACY_VEHICLE_ISSUE_VALUES['checklist_vencido']).toBe('checklist_overdue');
   });
 });

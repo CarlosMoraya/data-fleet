@@ -1,7 +1,7 @@
 import type { Vehicle } from '../types';
-import { isCrlvExpired, isWithinExpiryWindow } from './dashboardKpi';
+import { isBlank, isCrlvExpired, isWithinExpiryWindow } from './dashboardKpi';
 
-export const PENDENCY_VALUES = ['crlv_expired', 'crlv_expiring', 'gr_expiring', 'no_driver', 'checklist_overdue'] as const;
+export const PENDENCY_VALUES = ['crlv_expired', 'crlv_expiring', 'gr_expiring', 'gr_expired', 'crlv_missing', 'gr_missing', 'insurance_missing', 'maintenance_contract_missing', 'no_driver', 'checklist_overdue'] as const;
 
 export type VehiclePendency = typeof PENDENCY_VALUES[number];
 
@@ -9,6 +9,11 @@ export const PENDENCY_LABELS: Record<VehiclePendency, string> = {
   crlv_expired: 'CRLV vencido',
   crlv_expiring: 'CRLV a vencer (30 dias)',
   gr_expiring: 'GR a vencer (30 dias)',
+  gr_expired: 'GR vencida',
+  crlv_missing: 'Sem CRLV anexado',
+  gr_missing: 'Sem GR',
+  insurance_missing: 'Sem apólice de seguro',
+  maintenance_contract_missing: 'Sem contrato de manutenção',
   no_driver: 'Sem motorista',
   checklist_overdue: 'Checklist vencido',
 };
@@ -99,6 +104,16 @@ export function vehicleMatchesPendency(vehicle: Vehicle, pendency: VehiclePenden
       return isWithinExpiryWindow(vehicle.crlvExpirationDate ?? null, ctx.todayIso, PENDENCY_EXPIRY_WINDOW_DAYS);
     case 'gr_expiring':
       return isWithinExpiryWindow(vehicle.grExpirationDate ?? null, ctx.todayIso, PENDENCY_EXPIRY_WINDOW_DAYS);
+    case 'gr_expired':
+      return vehicle.grExpirationDate != null && vehicle.grExpirationDate < ctx.todayIso;
+    case 'crlv_missing':
+      return isBlank(vehicle.crlvUpload);
+    case 'gr_missing':
+      return isBlank(vehicle.grUpload);
+    case 'insurance_missing':
+      return vehicle.hasInsurance !== true;
+    case 'maintenance_contract_missing':
+      return vehicle.hasMaintenanceContract !== true;
     case 'no_driver':
       return !vehicle.driverId;
     case 'checklist_overdue':

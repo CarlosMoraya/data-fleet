@@ -80,7 +80,7 @@ describe('driverFilters', () => {
     expect(parseDriverFiltersFromParams(new URLSearchParams())).toEqual(EMPTY_DRIVER_FILTERS);
   });
 
-  it('valida as 5 situações conhecidas', () => {
+  it('valida as situações conhecidas', () => {
     for (const value of DRIVER_PENDENCY_VALUES) {
       expect(isDriverPendency(value)).toBe(true);
     }
@@ -118,6 +118,23 @@ describe('driverFilters', () => {
   it('aplica situação gr_expiring', () => {
     expect(driverMatchesPendency(driver({ grExpirationDate: '2026-06-20' }), 'gr_expiring', ctx)).toBe(true);
     expect(driverMatchesPendency(driver({ grExpirationDate: '2026-08-01' }), 'gr_expiring', ctx)).toBe(false);
+  });
+
+  it('aplica situação gr_expired', () => {
+    expect(driverMatchesPendency(driver({ grExpirationDate: '2026-06-10' }), 'gr_expired', ctx)).toBe(true);
+    expect(driverMatchesPendency(driver({ grExpirationDate: '2026-06-19' }), 'gr_expired', ctx)).toBe(false);
+  });
+
+  it('aplica situação cnh_missing', () => {
+    expect(driverMatchesPendency(driver({ cnhUpload: '' }), 'cnh_missing', ctx)).toBe(true);
+    expect(driverMatchesPendency(driver({ cnhUpload: '   ' }), 'cnh_missing', ctx)).toBe(true);
+    expect(driverMatchesPendency(driver({ cnhUpload: 'cnh.pdf' }), 'cnh_missing', ctx)).toBe(false);
+  });
+
+  it('aplica situação gr_missing apenas para motorista com veículo', () => {
+    expect(driverMatchesPendency(driver({ id: 'd1', grUpload: '' }), 'gr_missing', ctx)).toBe(true);
+    expect(driverMatchesPendency(driver({ id: 'd2', grUpload: '' }), 'gr_missing', ctx)).toBe(false);
+    expect(driverMatchesPendency(driver({ id: 'd1', grUpload: 'gr.pdf' }), 'gr_missing', ctx)).toBe(false);
   });
 
   it('aplica situação with_vehicle e without_vehicle', () => {
@@ -170,5 +187,13 @@ describe('driverFilters', () => {
     expect([...params.keys()]).toEqual(['shipper', 'unit', 'issue']);
     expect(serialized).not.toContain(sampleDriver.name);
     expect(serialized).not.toContain(sampleDriver.cpf);
+  });
+
+  it('preserva os valores legados de issue', () => {
+    expect(LEGACY_DRIVER_ISSUE_VALUES['cnh_vencida']).toBe('cnh_expired');
+    expect(LEGACY_DRIVER_ISSUE_VALUES['cnh_a_vencer']).toBe('cnh_expiring');
+    expect(LEGACY_DRIVER_ISSUE_VALUES['gr_a_vencer']).toBe('gr_expiring');
+    expect(LEGACY_DRIVER_ISSUE_VALUES['com_veiculo']).toBe('with_vehicle');
+    expect(LEGACY_DRIVER_ISSUE_VALUES['sem_veiculo']).toBe('without_vehicle');
   });
 });

@@ -755,3 +755,175 @@ export function buildMonthlyMaintenanceTypeCounts(
     return { name: b.name, ...c };
   });
 }
+
+// ─── Conformidade Documental ───────────────────────────────────────────────
+
+export function isBlank(value: string | null | undefined): boolean {
+  return value == null || value.trim().length === 0;
+}
+
+export function getExpiredGrVehiclePlates(
+  vehicles: Pick<VehicleRow, 'license_plate' | 'gr_expiration_date'>[],
+  todayIso: string
+): string[] {
+  return vehicles
+    .filter((vehicle) => vehicle.gr_expiration_date != null && vehicle.gr_expiration_date < todayIso && vehicle.license_plate)
+    .map((vehicle) => vehicle.license_plate as string);
+}
+
+export function getExpiredGrDriverNames(
+  drivers: { name: string | null; gr_expiration_date: string | null }[],
+  todayIso: string
+): string[] {
+  return drivers
+    .filter((driver) => driver.gr_expiration_date != null && driver.gr_expiration_date < todayIso && driver.name)
+    .map((driver) => driver.name as string);
+}
+
+export function getVehiclesMissingCrlvUploadPlates(
+  vehicles: Pick<VehicleRow, 'license_plate' | 'crlv_upload'>[]
+): string[] {
+  return vehicles
+    .filter((vehicle) => isBlank(vehicle.crlv_upload) && vehicle.license_plate)
+    .map((vehicle) => vehicle.license_plate as string);
+}
+
+export function getVehiclesMissingGrPlates(
+  vehicles: Pick<VehicleRow, 'license_plate' | 'gr_upload'>[]
+): string[] {
+  return vehicles
+    .filter((vehicle) => isBlank(vehicle.gr_upload) && vehicle.license_plate)
+    .map((vehicle) => vehicle.license_plate as string);
+}
+
+export function getVehiclesMissingInsurancePlates(
+  vehicles: Pick<VehicleRow, 'license_plate' | 'has_insurance'>[]
+): string[] {
+  return vehicles
+    .filter((vehicle) => vehicle.has_insurance !== true && vehicle.license_plate)
+    .map((vehicle) => vehicle.license_plate as string);
+}
+
+export function getVehiclesMissingMaintenanceContractPlates(
+  vehicles: Pick<VehicleRow, 'license_plate' | 'has_maintenance_contract'>[]
+): string[] {
+  return vehicles
+    .filter((vehicle) => vehicle.has_maintenance_contract !== true && vehicle.license_plate)
+    .map((vehicle) => vehicle.license_plate as string);
+}
+
+export function getDriversMissingCnhUploadNames(
+  drivers: { name: string | null; cnh_upload: string | null }[]
+): string[] {
+  return drivers
+    .filter((driver) => isBlank(driver.cnh_upload) && driver.name)
+    .map((driver) => driver.name as string);
+}
+
+export function getDriversWithVehicleMissingGrNames(
+  drivers: { id: string; name: string | null; gr_upload: string | null }[],
+  driverIdsWithVehicle: Set<string>
+): string[] {
+  return drivers
+    .filter((driver) => driverIdsWithVehicle.has(driver.id) && isBlank(driver.gr_upload) && driver.name)
+    .map((driver) => driver.name as string);
+}
+
+export function isVehicleDocumentallyIrregular(
+  vehicle: VehicleRow,
+  currentYear: string,
+  todayIso: string,
+  windowDays: number
+): boolean {
+  return isCrlvExpired(vehicle, currentYear, todayIso)
+    || isWithinExpiryWindow(vehicle.crlv_expiration_date, todayIso, windowDays)
+    || (vehicle.gr_expiration_date != null && vehicle.gr_expiration_date < todayIso)
+    || isWithinExpiryWindow(vehicle.gr_expiration_date ?? null, todayIso, windowDays)
+    || isBlank(vehicle.crlv_upload)
+    || isBlank(vehicle.gr_upload)
+    || vehicle.has_insurance !== true
+    || vehicle.has_maintenance_contract !== true;
+}
+
+export function isDriverDocumentallyIrregular(
+  driver: { id: string; expiration_date: string | null; gr_expiration_date: string | null; cnh_upload: string | null; gr_upload: string | null },
+  driverIdsWithVehicle: Set<string>,
+  todayIso: string,
+  windowDays: number
+): boolean {
+  return (driver.expiration_date != null && driver.expiration_date < todayIso)
+    || isWithinExpiryWindow(driver.expiration_date, todayIso, windowDays)
+    || isBlank(driver.cnh_upload)
+    || (driver.gr_expiration_date != null && driver.gr_expiration_date < todayIso)
+    || isWithinExpiryWindow(driver.gr_expiration_date, todayIso, windowDays)
+    || (driverIdsWithVehicle.has(driver.id) && isBlank(driver.gr_upload));
+}
+
+export function countIrregularVehicles(
+  vehicles: VehicleRow[],
+  currentYear: string,
+  todayIso: string,
+  windowDays: number
+): number {
+  return vehicles.filter((vehicle) => isVehicleDocumentallyIrregular(vehicle, currentYear, todayIso, windowDays)).length;
+}
+
+export function countIrregularDrivers(
+  drivers: { id: string; expiration_date: string | null; gr_expiration_date: string | null; cnh_upload: string | null; gr_upload: string | null }[],
+  driverIdsWithVehicle: Set<string>,
+  todayIso: string,
+  windowDays: number
+): number {
+  return drivers.filter((driver) => isDriverDocumentallyIrregular(driver, driverIdsWithVehicle, todayIso, windowDays)).length;
+}
+
+export function calculateDocumentaryComplianceRate(totalEntities: number, irregularEntities: number): number {
+  if (totalEntities <= 0) return 100;
+  const result = Math.round(((totalEntities - irregularEntities) / totalEntities) * 100);
+  return Math.max(0, Math.min(100, result));
+}
+
+export type ComplianceActionCategory =
+  | 'crlv_expired' | 'cnh_expired' | 'gr_vehicle_expired' | 'gr_driver_expired'
+  | 'crlv_expiring' | 'cnh_expiring' | 'gr_vehicle_expiring' | 'gr_driver_expiring'
+  | 'crlv_missing' | 'cnh_missing' | 'gr_vehicle_missing' | 'gr_driver_missing'
+  | 'insurance_missing' | 'maintenance_contract_missing';
+
+export interface ComplianceActionItem {
+  category: ComplianceActionCategory;
+  label: string;
+  count: number;
+  severity: ActionSeverity;
+  details: string[];
+}
+
+export function buildComplianceActionQueue(input: {
+  crlvExpired: string[]; cnhExpired: string[]; grVehicleExpired: string[]; grDriverExpired: string[];
+  crlvExpiring: string[]; cnhExpiring: string[]; grVehicleExpiring: string[]; grDriverExpiring: string[];
+  crlvMissing: string[]; cnhMissing: string[]; grVehicleMissing: string[]; grDriverMissing: string[];
+  insuranceMissing: string[]; maintenanceContractMissing: string[];
+}): ComplianceActionItem[] {
+  const items: ComplianceActionItem[] = [
+    { category: 'crlv_expired', label: 'Veículos com CRLV Vencido', count: input.crlvExpired.length, severity: 'high', details: input.crlvExpired },
+    { category: 'cnh_expired', label: 'Motoristas com CNH Vencida', count: input.cnhExpired.length, severity: 'high', details: input.cnhExpired },
+    { category: 'gr_vehicle_expired', label: 'GR de Veículo Vencida', count: input.grVehicleExpired.length, severity: 'high', details: input.grVehicleExpired },
+    { category: 'gr_driver_expired', label: 'GR de Motorista Vencida', count: input.grDriverExpired.length, severity: 'high', details: input.grDriverExpired },
+    { category: 'crlv_expiring', label: 'CRLV a Vencer em 30 dias', count: input.crlvExpiring.length, severity: 'medium', details: input.crlvExpiring },
+    { category: 'cnh_expiring', label: 'CNH a Vencer em 30 dias', count: input.cnhExpiring.length, severity: 'medium', details: input.cnhExpiring },
+    { category: 'gr_vehicle_expiring', label: 'GR de Veículo a Vencer em 30 dias', count: input.grVehicleExpiring.length, severity: 'medium', details: input.grVehicleExpiring },
+    { category: 'gr_driver_expiring', label: 'GR de Motorista a Vencer em 30 dias', count: input.grDriverExpiring.length, severity: 'medium', details: input.grDriverExpiring },
+    { category: 'crlv_missing', label: 'Veículos sem CRLV Anexado', count: input.crlvMissing.length, severity: 'high', details: input.crlvMissing },
+    { category: 'cnh_missing', label: 'Motoristas sem CNH Anexada', count: input.cnhMissing.length, severity: 'high', details: input.cnhMissing },
+    { category: 'gr_vehicle_missing', label: 'Veículos sem GR', count: input.grVehicleMissing.length, severity: 'high', details: input.grVehicleMissing },
+    { category: 'gr_driver_missing', label: 'Motoristas sem GR', count: input.grDriverMissing.length, severity: 'high', details: input.grDriverMissing },
+    { category: 'insurance_missing', label: 'Veículo sem Apólice de Seguro', count: input.insuranceMissing.length, severity: 'high', details: input.insuranceMissing },
+    { category: 'maintenance_contract_missing', label: 'Veículo sem Contrato de Manutenção', count: input.maintenanceContractMissing.length, severity: 'high', details: input.maintenanceContractMissing },
+  ];
+
+  return items
+    .filter((item) => item.count > 0)
+    .sort((a, b) => {
+      const order = { high: 0, medium: 1 };
+      return order[a.severity] - order[b.severity];
+    });
+}

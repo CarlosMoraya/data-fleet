@@ -47,6 +47,21 @@ import {
   buildMonthlyOrderCounts,
   buildMonthlyAverageCompletionDays,
   buildMonthlyMaintenanceTypeCounts,
+  buildComplianceActionQueue,
+  calculateDocumentaryComplianceRate,
+  countIrregularDrivers,
+  countIrregularVehicles,
+  getDriversMissingCnhUploadNames,
+  getDriversWithVehicleMissingGrNames,
+  getExpiredGrDriverNames,
+  getExpiredGrVehiclePlates,
+  getVehiclesMissingCrlvUploadPlates,
+  getVehiclesMissingGrPlates,
+  getVehiclesMissingInsurancePlates,
+  getVehiclesMissingMaintenanceContractPlates,
+  isBlank,
+  isDriverDocumentallyIrregular,
+  isVehicleDocumentallyIrregular,
 } from './dashboardKpi';
 
 describe('countActiveInMaintenance', () => {
@@ -1286,5 +1301,214 @@ describe('buildMonthlyMaintenanceTypeCounts', () => {
     expect(result).toEqual([
       { name: '04/2026', Corretiva: 2, Preventiva: 1, Preditiva: 0 },
     ]);
+  });
+});
+
+describe('Conformidade documental', () => {
+  it('isBlank trata null, undefined e strings em branco como ausente', () => {
+    expect(isBlank(null)).toBe(true);
+    expect(isBlank(undefined)).toBe(true);
+    expect(isBlank('')).toBe(true);
+    expect(isBlank('   ')).toBe(true);
+    expect(isBlank('file.pdf')).toBe(false);
+  });
+
+  it('getExpiredGrVehiclePlates retorna apenas placas com GR vencida', () => {
+    expect(getExpiredGrVehiclePlates([
+      { license_plate: 'ABC1D23', gr_expiration_date: '2026-06-10' },
+      { license_plate: 'DEF4G56', gr_expiration_date: '2026-06-25' },
+    ], '2026-06-20')).toEqual(['ABC1D23']);
+  });
+
+  it('getExpiredGrVehiclePlates retorna vazio para lista vazia', () => {
+    expect(getExpiredGrVehiclePlates([], '2026-06-20')).toEqual([]);
+  });
+
+  it('getExpiredGrVehiclePlates não considera data igual a hoje como vencida', () => {
+    expect(getExpiredGrVehiclePlates([
+      { license_plate: 'ABC1D23', gr_expiration_date: '2026-06-20' },
+    ], '2026-06-20')).toEqual([]);
+  });
+
+  it('getDriversWithVehicleMissingGrNames inclui apenas motorista com veículo e sem GR', () => {
+    expect(getDriversWithVehicleMissingGrNames([
+      { id: 'd1', name: 'Maria', gr_upload: '' },
+      { id: 'd2', name: 'João', gr_upload: '' },
+      { id: 'd3', name: 'Ana', gr_upload: 'gr.pdf' },
+    ], new Set(['d1', 'd3']))).toEqual(['Maria']);
+  });
+
+  it('getVehiclesMissingInsurancePlates inclui false, null e undefined e exclui true', () => {
+    expect(getVehiclesMissingInsurancePlates([
+      { license_plate: 'ABC1D23', has_insurance: false },
+      { license_plate: 'DEF4G56', has_insurance: null },
+      { license_plate: 'GHI7J89', has_insurance: undefined },
+      { license_plate: 'JKL0M12', has_insurance: true },
+    ])).toEqual(['ABC1D23', 'DEF4G56', 'GHI7J89']);
+  });
+
+  it('helpers de documentos ausentes tratam string vazia e em branco como ausente', () => {
+    expect(getVehiclesMissingCrlvUploadPlates([
+      { license_plate: 'ABC1D23', crlv_upload: '' },
+      { license_plate: 'DEF4G56', crlv_upload: '   ' },
+      { license_plate: 'GHI7J89', crlv_upload: 'crlv.pdf' },
+    ])).toEqual(['ABC1D23', 'DEF4G56']);
+
+    expect(getVehiclesMissingGrPlates([
+      { license_plate: 'ABC1D23', gr_upload: '' },
+      { license_plate: 'DEF4G56', gr_upload: '   ' },
+      { license_plate: 'GHI7J89', gr_upload: 'gr.pdf' },
+    ])).toEqual(['ABC1D23', 'DEF4G56']);
+
+    expect(getDriversMissingCnhUploadNames([
+      { name: 'Maria', cnh_upload: '' },
+      { name: 'João', cnh_upload: '   ' },
+      { name: 'Ana', cnh_upload: 'cnh.pdf' },
+    ])).toEqual(['Maria', 'João']);
+  });
+
+  it('isVehicleDocumentallyIrregular retorna false para veículo em dia', () => {
+    expect(isVehicleDocumentallyIrregular({
+      id: 'v1',
+      type: 'Truck',
+      crlv_year: '2026',
+      crlv_expiration_date: '2026-12-31',
+      driver_id: 'd1',
+      gr_expiration_date: '2026-12-31',
+      crlv_upload: 'crlv.pdf',
+      gr_upload: 'gr.pdf',
+      has_insurance: true,
+      has_maintenance_contract: true,
+    }, '2026', '2026-06-20', 30)).toBe(false);
+  });
+
+  it('isVehicleDocumentallyIrregular retorna true com uma pendência de cada tipo', () => {
+    const today = '2026-06-20';
+    expect(isVehicleDocumentallyIrregular({ id: '1', type: 'Truck', crlv_year: '2025', crlv_expiration_date: null, driver_id: null }, '2026', today, 30)).toBe(true);
+    expect(isVehicleDocumentallyIrregular({ id: '2', type: 'Truck', crlv_year: '2026', crlv_expiration_date: '2026-06-25', driver_id: null }, '2026', today, 30)).toBe(true);
+    expect(isVehicleDocumentallyIrregular({ id: '3', type: 'Truck', crlv_year: '2026', crlv_expiration_date: '2026-12-31', driver_id: null, gr_expiration_date: '2026-06-10' }, '2026', today, 30)).toBe(true);
+    expect(isVehicleDocumentallyIrregular({ id: '4', type: 'Truck', crlv_year: '2026', crlv_expiration_date: '2026-12-31', driver_id: null, gr_expiration_date: '2026-06-25' }, '2026', today, 30)).toBe(true);
+    expect(isVehicleDocumentallyIrregular({ id: '5', type: 'Truck', crlv_year: '2026', crlv_expiration_date: '2026-12-31', driver_id: null, crlv_upload: '' }, '2026', today, 30)).toBe(true);
+    expect(isVehicleDocumentallyIrregular({ id: '6', type: 'Truck', crlv_year: '2026', crlv_expiration_date: '2026-12-31', driver_id: null, crlv_upload: 'crlv.pdf', gr_upload: '' }, '2026', today, 30)).toBe(true);
+    expect(isVehicleDocumentallyIrregular({ id: '7', type: 'Truck', crlv_year: '2026', crlv_expiration_date: '2026-12-31', driver_id: null, crlv_upload: 'crlv.pdf', gr_upload: 'gr.pdf', has_insurance: false }, '2026', today, 30)).toBe(true);
+    expect(isVehicleDocumentallyIrregular({ id: '8', type: 'Truck', crlv_year: '2026', crlv_expiration_date: '2026-12-31', driver_id: null, crlv_upload: 'crlv.pdf', gr_upload: 'gr.pdf', has_insurance: true, has_maintenance_contract: false }, '2026', today, 30)).toBe(true);
+  });
+
+  it('isDriverDocumentallyIrregular retorna false para motorista em dia', () => {
+    expect(isDriverDocumentallyIrregular({
+      id: 'd1',
+      expiration_date: '2026-12-31',
+      gr_expiration_date: '2026-12-31',
+      cnh_upload: 'cnh.pdf',
+      gr_upload: 'gr.pdf',
+    }, new Set(['d1']), '2026-06-20', 30)).toBe(false);
+  });
+
+  it('isDriverDocumentallyIrregular retorna true com uma pendência de cada tipo', () => {
+    const today = '2026-06-20';
+    expect(isDriverDocumentallyIrregular({ id: '1', expiration_date: '2026-06-10', gr_expiration_date: null, cnh_upload: 'cnh.pdf', gr_upload: 'gr.pdf' }, new Set(), today, 30)).toBe(true);
+    expect(isDriverDocumentallyIrregular({ id: '2', expiration_date: '2026-06-25', gr_expiration_date: null, cnh_upload: 'cnh.pdf', gr_upload: 'gr.pdf' }, new Set(), today, 30)).toBe(true);
+    expect(isDriverDocumentallyIrregular({ id: '3', expiration_date: '2026-12-31', gr_expiration_date: null, cnh_upload: '', gr_upload: 'gr.pdf' }, new Set(), today, 30)).toBe(true);
+    expect(isDriverDocumentallyIrregular({ id: '4', expiration_date: '2026-12-31', gr_expiration_date: '2026-06-10', cnh_upload: 'cnh.pdf', gr_upload: 'gr.pdf' }, new Set(), today, 30)).toBe(true);
+    expect(isDriverDocumentallyIrregular({ id: '5', expiration_date: '2026-12-31', gr_expiration_date: '2026-06-25', cnh_upload: 'cnh.pdf', gr_upload: 'gr.pdf' }, new Set(), today, 30)).toBe(true);
+    expect(isDriverDocumentallyIrregular({ id: '6', expiration_date: '2026-12-31', gr_expiration_date: null, cnh_upload: 'cnh.pdf', gr_upload: '' }, new Set(['6']), today, 30)).toBe(true);
+  });
+
+  it('countIrregularVehicles e countIrregularDrivers contam somente os irregulares', () => {
+    expect(countIrregularVehicles([
+      { id: 'v1', type: 'Truck', crlv_year: '2026', crlv_expiration_date: '2026-12-31', driver_id: null, crlv_upload: 'crlv.pdf', gr_upload: 'gr.pdf', has_insurance: true, has_maintenance_contract: true },
+      { id: 'v2', type: 'Truck', crlv_year: '2025', crlv_expiration_date: null, driver_id: null },
+    ], '2026', '2026-06-20', 30)).toBe(1);
+
+    expect(countIrregularDrivers([
+      { id: 'd1', expiration_date: '2026-12-31', gr_expiration_date: null, cnh_upload: 'cnh.pdf', gr_upload: 'gr.pdf' },
+      { id: 'd2', expiration_date: '2026-06-10', gr_expiration_date: null, cnh_upload: 'cnh.pdf', gr_upload: 'gr.pdf' },
+    ], new Set(['d1', 'd2']), '2026-06-20', 30)).toBe(1);
+  });
+
+  it('calculateDocumentaryComplianceRate aplica fórmula, zero-case e clamp', () => {
+    expect(calculateDocumentaryComplianceRate(10, 2)).toBe(80);
+    expect(calculateDocumentaryComplianceRate(0, 0)).toBe(100);
+    expect(calculateDocumentaryComplianceRate(10, -5)).toBe(100);
+    expect(calculateDocumentaryComplianceRate(10, 20)).toBe(0);
+  });
+
+  it('buildComplianceActionQueue omite count 0, ordena high antes de medium e retorna vazio quando não há itens', () => {
+    expect(buildComplianceActionQueue({
+      crlvExpired: [], cnhExpired: [], grVehicleExpired: [], grDriverExpired: [],
+      crlvExpiring: [], cnhExpiring: [], grVehicleExpiring: [], grDriverExpiring: [],
+      crlvMissing: [], cnhMissing: [], grVehicleMissing: [], grDriverMissing: [],
+      insuranceMissing: [], maintenanceContractMissing: [],
+    })).toEqual([]);
+
+    const queue = buildComplianceActionQueue({
+      crlvExpired: ['ABC1D23'],
+      cnhExpired: [],
+      grVehicleExpired: [],
+      grDriverExpired: [],
+      crlvExpiring: ['DEF4G56'],
+      cnhExpiring: [],
+      grVehicleExpiring: [],
+      grDriverExpiring: [],
+      crlvMissing: [],
+      cnhMissing: [],
+      grVehicleMissing: [],
+      grDriverMissing: [],
+      insuranceMissing: [],
+      maintenanceContractMissing: [],
+    });
+
+    expect(queue.map((item) => item.category)).toEqual(['crlv_expired', 'crlv_expiring']);
+    expect(queue[0].severity).toBe('high');
+    expect(queue[1].severity).toBe('medium');
+  });
+
+  it('buildComplianceActionQueue valida os 14 labels', () => {
+    const queue = buildComplianceActionQueue({
+      crlvExpired: ['1'],
+      cnhExpired: ['1'],
+      grVehicleExpired: ['1'],
+      grDriverExpired: ['1'],
+      crlvExpiring: ['1'],
+      cnhExpiring: ['1'],
+      grVehicleExpiring: ['1'],
+      grDriverExpiring: ['1'],
+      crlvMissing: ['1'],
+      cnhMissing: ['1'],
+      grVehicleMissing: ['1'],
+      grDriverMissing: ['1'],
+      insuranceMissing: ['1'],
+      maintenanceContractMissing: ['1'],
+    });
+
+    expect(queue.map((item) => item.label)).toEqual([
+      'Veículos com CRLV Vencido',
+      'Motoristas com CNH Vencida',
+      'GR de Veículo Vencida',
+      'GR de Motorista Vencida',
+      'Veículos sem CRLV Anexado',
+      'Motoristas sem CNH Anexada',
+      'Veículos sem GR',
+      'Motoristas sem GR',
+      'Veículo sem Apólice de Seguro',
+      'Veículo sem Contrato de Manutenção',
+      'CRLV a Vencer em 30 dias',
+      'CNH a Vencer em 30 dias',
+      'GR de Veículo a Vencer em 30 dias',
+      'GR de Motorista a Vencer em 30 dias',
+    ]);
+  });
+
+  it('getExpiredGrDriverNames e getVehiclesMissingMaintenanceContractPlates retornam apenas entradas válidas', () => {
+    expect(getExpiredGrDriverNames([
+      { name: 'Maria', gr_expiration_date: '2026-06-10' },
+      { name: 'João', gr_expiration_date: '2026-06-25' },
+    ], '2026-06-20')).toEqual(['Maria']);
+
+    expect(getVehiclesMissingMaintenanceContractPlates([
+      { license_plate: 'ABC1D23', has_maintenance_contract: false },
+      { license_plate: 'DEF4G56', has_maintenance_contract: null },
+      { license_plate: 'GHI7J89', has_maintenance_contract: true },
+    ])).toEqual(['ABC1D23', 'DEF4G56']);
   });
 });

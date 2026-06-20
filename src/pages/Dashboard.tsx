@@ -15,9 +15,11 @@ import RouteFallback from '../components/RouteFallback';
 import type { VehicleRow, DashboardFilters } from '../components/dashboard/OperationalPanel';
 import type { MaintenanceOrderDashboard } from '../types/maintenance';
 import {
+  buildComplianceActionQueue,
   calculateFleetAvailability,
   countVehiclesInMaintenance,
   calculateChecklistComplianceRate,
+  calculateDocumentaryComplianceRate,
   countOverdueMaintenanceOrders,
   countPendingApprovalOrders,
   calculateInsuranceCoverageRate,
@@ -25,6 +27,10 @@ import {
   buildOperationalActionQueue,
   calculatePreviousPeriodRange,
   mapVehicleIdsToPlates,
+  getDriversMissingCnhUploadNames,
+  getDriversWithVehicleMissingGrNames,
+  getExpiredGrDriverNames,
+  getExpiredGrVehiclePlates,
   countVehiclesWithoutDriver,
   getVehiclesWithoutDriverPlates,
   countOpenOrders,
@@ -35,13 +41,27 @@ import {
   getPendingBudgetVehicleIds,
   getTrailingMonthKeys,
   calculateMovingAverageProjection,
+  countIrregularDrivers,
+  countIrregularVehicles,
   computeOverdueChecklistVehicleIds,
+  getExpiredCnhNames,
+  getExpiredCrlvPlates,
+  getExpiringSoonCnhNames,
+  getExpiringSoonCrlvPlates,
+  getExpiringSoonGrDriverNames,
+  getExpiringSoonGrPlates,
+  getVehiclesMissingCrlvUploadPlates,
+  getVehiclesMissingGrPlates,
+  getVehiclesMissingInsurancePlates,
+  getVehiclesMissingMaintenanceContractPlates,
   resolveHorizonRange,
+  type ComplianceActionCategory,
+  type ComplianceActionItem,
   type OperationalActionItem,
   type OperationalActionCategory,
   type HorizonOption,
 } from '../lib/dashboardKpi';
-import { OPERATIONAL_QUEUE_ROUTES } from '../lib/actionQueueRoutes';
+import { COMPLIANCE_ACTION_ROUTES, OPERATIONAL_QUEUE_ROUTES } from '../lib/actionQueueRoutes';
 
 const EvolutionPanel = React.lazy(() => import('../components/dashboard/EvolutionPanel'));
 
@@ -55,6 +75,8 @@ const tabs: { id: TabType; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'custos', label: 'Custos', icon: DollarSign },
   { id: 'evolucao', label: 'Evolução', icon: LineChart },
 ];
+
+const EXPIRING_SOON_WINDOW_DAYS = 30;
 
 function getDefaultDateRange() {
   const now = new Date();
@@ -93,7 +115,7 @@ export default function Dashboard() {
     queryFn: async () => {
       let query = supabase
         .from('vehicles')
-        .select('id, type, crlv_year, crlv_expiration_date, driver_id, license_plate, gr_expiration_date, client_id, category, brand, model, acquisition, has_insurance, tracker, shippers(name), operational_units(name)');
+        .select('id, type, crlv_year, crlv_expiration_date, driver_id, license_plate, gr_expiration_date, client_id, category, brand, model, acquisition, crlv_upload, gr_upload, insurance_policy_upload, has_insurance, has_maintenance_contract, maintenance_contract_upload, tracker, shippers(name), operational_units(name)');
       if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
       }
@@ -112,7 +134,12 @@ export default function Dashboard() {
         brand: row.brand != null ? (row.brand as string) : null,
         model: row.model != null ? (row.model as string) : null,
         acquisition: row.acquisition != null ? (row.acquisition as string) : null,
+        crlv_upload: row.crlv_upload != null ? (row.crlv_upload as string) : null,
+        gr_upload: row.gr_upload != null ? (row.gr_upload as string) : null,
+        insurance_policy_upload: row.insurance_policy_upload != null ? (row.insurance_policy_upload as string) : null,
         has_insurance: row.has_insurance != null ? Boolean(row.has_insurance) : null,
+        has_maintenance_contract: row.has_maintenance_contract != null ? Boolean(row.has_maintenance_contract) : null,
+        maintenance_contract_upload: row.maintenance_contract_upload != null ? (row.maintenance_contract_upload as string) : null,
         tracker: row.tracker != null ? (row.tracker as string) : null,
         shipper_name:
           row.shippers && typeof row.shippers === 'object' && !Array.isArray(row.shippers)
@@ -123,6 +150,38 @@ export default function Dashboard() {
             ? (row.operational_units as Record<string, unknown>).name as string | null
             : null,
       })) as VehicleRow[];
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  const { data: drivers = [], isLoading: loadingDrivers } = useQuery<{
+    id: string;
+    name: string | null;
+    expiration_date: string | null;
+    gr_expiration_date: string | null;
+    cnh_upload: string | null;
+    gr_upload: string | null;
+  }[]>({
+    queryKey: ['dashboard-drivers', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from('drivers')
+        .select('id, name, expiration_date, gr_expiration_date, cnh_upload, gr_upload');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []).map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        name: row.name != null ? (row.name as string) : null,
+        expiration_date: row.expiration_date != null ? (row.expiration_date as string) : null,
+        gr_expiration_date: row.gr_expiration_date != null ? (row.gr_expiration_date as string) : null,
+        cnh_upload: row.cnh_upload != null ? (row.cnh_upload as string) : null,
+        gr_upload: row.gr_upload != null ? (row.gr_upload as string) : null,
+      }));
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -424,6 +483,153 @@ export default function Dashboard() {
     [vehicles, checklistRows, intervalsByClient]
   );
 
+  const currentYear = today.slice(0, 4);
+
+  const driverIdsWithVehicle = useMemo(
+    () => new Set(vehicles.filter((vehicle) => vehicle.driver_id).map((vehicle) => vehicle.driver_id as string)),
+    [vehicles]
+  );
+
+  const crlvExpired = useMemo(
+    () => getExpiredCrlvPlates(vehicles, currentYear, today),
+    [vehicles, currentYear, today]
+  );
+
+  const cnhExpired = useMemo(
+    () => getExpiredCnhNames(drivers, today),
+    [drivers, today]
+  );
+
+  const grVehicleExpired = useMemo(
+    () => getExpiredGrVehiclePlates(vehicles, today),
+    [vehicles, today]
+  );
+
+  const grDriverExpired = useMemo(
+    () => getExpiredGrDriverNames(drivers, today),
+    [drivers, today]
+  );
+
+  const crlvExpiring = useMemo(
+    () => getExpiringSoonCrlvPlates(vehicles, today, EXPIRING_SOON_WINDOW_DAYS),
+    [vehicles, today]
+  );
+
+  const cnhExpiring = useMemo(
+    () => getExpiringSoonCnhNames(drivers, today, EXPIRING_SOON_WINDOW_DAYS),
+    [drivers, today]
+  );
+
+  const grVehicleExpiring = useMemo(
+    () => getExpiringSoonGrPlates(vehicles, today, EXPIRING_SOON_WINDOW_DAYS),
+    [vehicles, today]
+  );
+
+  const grDriverExpiring = useMemo(
+    () => getExpiringSoonGrDriverNames(drivers, today, EXPIRING_SOON_WINDOW_DAYS),
+    [drivers, today]
+  );
+
+  const crlvMissing = useMemo(
+    () => getVehiclesMissingCrlvUploadPlates(vehicles),
+    [vehicles]
+  );
+
+  const cnhMissing = useMemo(
+    () => getDriversMissingCnhUploadNames(drivers),
+    [drivers]
+  );
+
+  const grVehicleMissing = useMemo(
+    () => getVehiclesMissingGrPlates(vehicles),
+    [vehicles]
+  );
+
+  const grDriverMissing = useMemo(
+    () => getDriversWithVehicleMissingGrNames(drivers, driverIdsWithVehicle),
+    [drivers, driverIdsWithVehicle]
+  );
+
+  const insuranceMissing = useMemo(
+    () => getVehiclesMissingInsurancePlates(vehicles),
+    [vehicles]
+  );
+
+  const maintenanceContractMissing = useMemo(
+    () => getVehiclesMissingMaintenanceContractPlates(vehicles),
+    [vehicles]
+  );
+
+  const complianceActionItems = useMemo<ComplianceActionItem[]>(
+    () => buildComplianceActionQueue({
+      crlvExpired,
+      cnhExpired,
+      grVehicleExpired,
+      grDriverExpired,
+      crlvExpiring,
+      cnhExpiring,
+      grVehicleExpiring,
+      grDriverExpiring,
+      crlvMissing,
+      cnhMissing,
+      grVehicleMissing,
+      grDriverMissing,
+      insuranceMissing,
+      maintenanceContractMissing,
+    }),
+    [
+      cnhExpired,
+      cnhExpiring,
+      cnhMissing,
+      crlvExpired,
+      crlvExpiring,
+      crlvMissing,
+      grDriverExpired,
+      grDriverExpiring,
+      grDriverMissing,
+      grVehicleExpired,
+      grVehicleExpiring,
+      grVehicleMissing,
+      insuranceMissing,
+      maintenanceContractMissing,
+    ]
+  );
+
+  const expiredDocumentsCount = useMemo(
+    () => crlvExpired.length + cnhExpired.length + grVehicleExpired.length + grDriverExpired.length,
+    [crlvExpired.length, cnhExpired.length, grVehicleExpired.length, grDriverExpired.length]
+  );
+
+  const expiringDocumentsCount = useMemo(
+    () => crlvExpiring.length + cnhExpiring.length + grVehicleExpiring.length + grDriverExpiring.length,
+    [crlvExpiring.length, cnhExpiring.length, grVehicleExpiring.length, grDriverExpiring.length]
+  );
+
+  const missingDocumentsCount = useMemo(
+    () => crlvMissing.length + cnhMissing.length + grVehicleMissing.length + grDriverMissing.length + insuranceMissing.length + maintenanceContractMissing.length,
+    [crlvMissing.length, cnhMissing.length, grVehicleMissing.length, grDriverMissing.length, insuranceMissing.length, maintenanceContractMissing.length]
+  );
+
+  const criticalItemsCount = useMemo(
+    () => expiredDocumentsCount + missingDocumentsCount,
+    [expiredDocumentsCount, missingDocumentsCount]
+  );
+
+  const irregularVehiclesCount = useMemo(
+    () => countIrregularVehicles(vehicles, currentYear, today, EXPIRING_SOON_WINDOW_DAYS),
+    [vehicles, currentYear, today]
+  );
+
+  const irregularDriversCount = useMemo(
+    () => countIrregularDrivers(drivers, driverIdsWithVehicle, today, EXPIRING_SOON_WINDOW_DAYS),
+    [drivers, driverIdsWithVehicle, today]
+  );
+
+  const documentaryComplianceRate = useMemo(
+    () => calculateDocumentaryComplianceRate(vehicles.length + drivers.length, irregularVehiclesCount + irregularDriversCount),
+    [vehicles.length, drivers.length, irregularVehiclesCount, irregularDriversCount]
+  );
+
   // ── Executive KPIs (Visão Geral) ─────────────────────────────────────────
 
   const vehiclesInMaintenance = useMemo(
@@ -581,10 +787,15 @@ export default function Dashboard() {
     navigate(OPERATIONAL_QUEUE_ROUTES[category]);
   };
 
+  const handleComplianceActionClick = (category: ComplianceActionCategory) => {
+    navigate(COMPLIANCE_ACTION_ROUTES[category]);
+  };
+
   // ── Loading state ─────────────────────────────────────────────────────────
 
   const isPanelLoading =
     loadingVehicles ||
+    loadingDrivers ||
     loadingMaintenance ||
     loadingCurrentMonthOrders ||
     loadingActiveMaintenance ||
@@ -661,7 +872,20 @@ export default function Dashboard() {
             isLoading={isPanelLoading}
           />
         )}
-        {activeTab === 'conformidade' && <ConformityPanel />}
+        {activeTab === 'conformidade' && (
+          <ConformityPanel
+            documentaryComplianceRate={documentaryComplianceRate}
+            expiredDocumentsCount={expiredDocumentsCount}
+            expiringDocumentsCount={expiringDocumentsCount}
+            missingDocumentsCount={missingDocumentsCount}
+            irregularVehiclesCount={irregularVehiclesCount}
+            irregularDriversCount={irregularDriversCount}
+            criticalItemsCount={criticalItemsCount}
+            actionItems={complianceActionItems}
+            onActionClick={handleComplianceActionClick}
+            isLoading={isPanelLoading}
+          />
+        )}
         {activeTab === 'custos' && (
           <div className="space-y-6">
             <PeriodRangeFilter

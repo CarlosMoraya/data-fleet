@@ -2,6 +2,49 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-06-20 (13:20)
+
+### Aba Conformidade como tela própria de regularidade documental
+
+**O que foi implementado:** a aba `Conformidade` do Dashboard deixou de ser empty-state e passou a renderizar a tela própria de regularidade documental de veículos e motoristas. O painel agora exibe 7 cards fixos, a `Fila de Ação Documental` com 14 categorias acionáveis por deep link e navegação aditiva para `Cadastros > Veículos` e `Cadastros > Motoristas`.
+
+**Arquivos criados:**
+- `e2e/completed/dashboard-conformidade.spec.ts`: valida navegação até a aba, presença dos 7 cards, estado vazio da fila e deep link quando houver item acionável.
+
+**Arquivos modificados:**
+- `src/components/dashboard/OperationalPanel.tsx`: `VehicleRow` ampliado com campos documentais opcionais compartilhados pelo Dashboard.
+- `src/pages/Dashboard.tsx`: queries `dashboard-vehicles` e `dashboard-drivers` expandidas; cálculos documentais adicionados em `useMemo`; `ConformityPanel` agora recebe dados prontos; navegação via `COMPLIANCE_ACTION_ROUTES`.
+- `src/lib/dashboardKpi.ts`: adicionadas funções puras de conformidade documental, `ComplianceActionCategory`, `ComplianceActionItem` e `buildComplianceActionQueue`.
+- `src/lib/dashboardKpi.test.ts`: cobertura unitária dos helpers documentais, predicados de irregularidade, taxa documental e fila documental.
+- `src/lib/actionQueueRoutes.ts`: adicionado `COMPLIANCE_ACTION_ROUTES`.
+- `src/lib/actionQueueRoutes.test.ts`: cobertura das 14 categorias e validação dos `issue` de veículo/motorista.
+- `src/lib/vehicleFilters.ts`: novos valores de `issue` para documentos/seguro/contrato, reaproveitando `isBlank`.
+- `src/lib/vehicleFilters.test.ts`: cobertura dos novos casos de pendência de veículo.
+- `src/lib/driverFilters.ts`: novos valores de `issue` para GR vencida, CNH ausente e GR ausente com restrição de vínculo a veículo.
+- `src/lib/driverFilters.test.ts`: cobertura dos novos casos de pendência de motorista.
+- `src/components/dashboard/ConformityPanel.tsx`: reescrito como componente apresentacional com 7 cards, loading e `Fila de Ação Documental`.
+- `src/components/dashboard/ConformityPanel.test.tsx`: suíte reescrita para refletir o novo painel.
+- `docs/MEMORY.md`: estado vigente do Dashboard e definições documentais atualizados.
+- `docs/MEMORY-HISTORY.md`: este arquivamento.
+
+**Decisões tomadas:**
+- `Conformidade Documental` usa base = `veículos.length + motoristas.length`; quando a base é 0, a taxa retorna `100`.
+- `Itens Críticos` = `Documentos Vencidos + Documentos Ausentes`; itens `a vencer em 30 dias` não são críticos.
+- `Sem GR/CRLV/CNH` usa upload nulo, indefinido, vazio ou em branco.
+- `Veículo sem Apólice de Seguro` usa `has_insurance !== true`; `Veículo sem Contrato de Manutenção` usa `has_maintenance_contract !== true`.
+- `Motoristas sem GR` contam apenas motoristas vinculados a pelo menos 1 veículo; GR vencida/a vencer continua considerando todos os motoristas.
+- Configuração per-cliente de campos opcionais (`VehicleFieldSettings`/`DriverFieldSettings`) permanece ignorada nesta v1 da Conformidade.
+
+**Validações executadas:**
+- `npm run lint` ✅
+- `npm run test:unit` ✅ (496 testes)
+- `npm run test:smoke` ✅ (6/6)
+- `npx playwright test e2e/completed/dashboard-conformidade.spec.ts --project=chromium` ✅ (2/2, incluindo setup)
+
+**Observações para sessões futuras:**
+- Se o produto quiser distinguir “tem seguro” de “tem documento do seguro anexado”, a próxima versão pode cruzar `has_insurance` com `insurance_policy_upload`.
+- O mesmo vale para contrato de manutenção: hoje a conformidade usa apenas a flag `has_maintenance_contract`.
+
 ## Sessão — 2026-06-20 (10:45)
 
 ### Reescrita da aba Operação do Dashboard

@@ -20,7 +20,12 @@ export interface VehicleRow {
   brand?: string | null;
   model?: string | null;
   acquisition?: string | null;
+  crlv_upload?: string | null;
+  gr_upload?: string | null;
+  insurance_policy_upload?: string | null;
   has_insurance?: boolean | null;
+  has_maintenance_contract?: boolean | null;
+  maintenance_contract_upload?: string | null;
   tracker?: string | null;
 }
 

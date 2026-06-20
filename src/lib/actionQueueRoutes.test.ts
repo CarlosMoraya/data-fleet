@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DRIVER_PENDENCY_VALUES } from './driverFilters';
 import { PENDENCY_VALUES } from './vehicleFilters';
 import {
+  COMPLIANCE_ACTION_ROUTES,
   GENERAL_ACTION_ROUTES,
   OPERATIONAL_ACTION_ROUTES,
   OPERATIONAL_QUEUE_ROUTES,
@@ -48,6 +49,40 @@ describe('actionQueueRoutes', () => {
         const issue = new URL(`https://betafleet.local${map[key]}`).searchParams.get('issue');
         expect(DRIVER_PENDENCY_VALUES).toContain(issue);
       }
+    }
+  });
+
+  it('COMPLIANCE_ACTION_ROUTES cobre todas as 14 categorias', () => {
+    expect(Object.keys(COMPLIANCE_ACTION_ROUTES)).toEqual([
+      'crlv_expired',
+      'cnh_expired',
+      'gr_vehicle_expired',
+      'gr_driver_expired',
+      'crlv_expiring',
+      'cnh_expiring',
+      'gr_vehicle_expiring',
+      'gr_driver_expiring',
+      'crlv_missing',
+      'cnh_missing',
+      'gr_vehicle_missing',
+      'gr_driver_missing',
+      'insurance_missing',
+      'maintenance_contract_missing',
+    ]);
+  });
+
+  it('rotas de motorista usam apenas valores válidos de issue de motorista e de veículo apenas valores válidos de veículo', () => {
+    const driverCategories = ['cnh_expired', 'cnh_expiring', 'gr_driver_expired', 'gr_driver_expiring', 'cnh_missing', 'gr_driver_missing'] as const;
+    const vehicleCategories = ['crlv_expired', 'gr_vehicle_expired', 'crlv_expiring', 'gr_vehicle_expiring', 'crlv_missing', 'gr_vehicle_missing', 'insurance_missing', 'maintenance_contract_missing'] as const;
+
+    for (const category of driverCategories) {
+      const issue = new URL(`https://betafleet.local${COMPLIANCE_ACTION_ROUTES[category]}`).searchParams.get('issue');
+      expect(DRIVER_PENDENCY_VALUES).toContain(issue);
+    }
+
+    for (const category of vehicleCategories) {
+      const issue = new URL(`https://betafleet.local${COMPLIANCE_ACTION_ROUTES[category]}`).searchParams.get('issue');
+      expect(PENDENCY_VALUES).toContain(issue);
     }
   });
 
