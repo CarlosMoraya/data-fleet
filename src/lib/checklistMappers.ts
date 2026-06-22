@@ -19,6 +19,7 @@ export interface ChecklistRow {
   notes: string | null;
   workshop_id: string | null;
   odometer_km: number | null;
+  odometer_photo_url: string | null;
   // join fields
   checklist_templates?: { name: string; context: string } | null;
   vehicles?: { license_plate: string } | null;
@@ -62,6 +63,7 @@ export function checklistFromRow(row: ChecklistRow): Checklist {
     workshopId: row.workshop_id ?? undefined,
     workshopName: row.workshops?.name ?? undefined,
     odometerKm: row.odometer_km ?? undefined,
+    odometerPhotoUrl: row.odometer_photo_url ?? undefined,
   };
 }
 
@@ -77,4 +79,3 @@ export function checklistResponseFromRow(row: ChecklistResponseRow): ChecklistRe
     respondedAt: row.responded_at,
   };
 }
-

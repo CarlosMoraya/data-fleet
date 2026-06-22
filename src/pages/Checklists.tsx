@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle, Disc } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle, Disc, Gauge } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
 import { templateFromRow, type ChecklistTemplateRow } from '../lib/checklistTemplateMappers';
 import { tireInspectionFromRow, type TireInspectionRow } from '../lib/tireInspectionMappers';
 import type { Checklist, ChecklistTemplate, TireInspection } from '../types';
+import { ODOMETER_UPDATE_CONTEXT } from '../types';
 import ChecklistDetailModal from '../components/ChecklistDetailModal';
 import TireInspectionDetailModal from '../components/TireInspectionDetailModal';
 import CreateActionPlanModal from '../components/CreateActionPlanModal';
@@ -44,6 +45,10 @@ export function getStoredChecklistTab(raw: string | null): 'checklists' | 'tireI
   return isValidChecklistTab(parsed) ? parsed : 'checklists';
 }
 
+export function isOdometerUpdateChecklist(checklist: Pick<Checklist, 'templateContext'>): boolean {
+  return checklist.templateContext === ODOMETER_UPDATE_CONTEXT;
+}
+
 export default function Checklists() {
   const { user, currentClient, clients } = useAuth();
   const navigate = useNavigate();
@@ -67,6 +72,9 @@ export default function Checklists() {
   );
   const [onlyWithIssues, setOnlyWithIssues] = useSessionUiState<boolean>(
     'checklists', 'filter', 'only-with-issues', false,
+  );
+  const [onlyOdometer, setOnlyOdometer] = useSessionUiState<boolean>(
+    'checklists', 'filter', 'only-odometer', false,
   );
   const [selectedVehicleId, setSelectedVehicleId] = useSessionUiState<string>(
     'checklists', 'selection', 'auditor-vehicle', '',
@@ -692,6 +700,16 @@ export default function Checklists() {
                     <span className="opacity-70">({issueChecklistIds.size})</span>
                   )}
                 </button>
+                <button
+                  onClick={() => setOnlyOdometer(v => !v)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    onlyOdometer ? 'bg-sky-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
+                  )}
+                >
+                  <Gauge className="h-3 w-3" />
+                  Hodômetro
+                </button>
               </div>
 
               {checklists.length === 0 ? (
@@ -714,6 +732,7 @@ export default function Checklists() {
                     <tbody className="divide-y divide-zinc-50">
                       {checklists
                         .filter(c => !onlyWithIssues || issueChecklistIds.has(c.id))
+                        .filter(c => !onlyOdometer || isOdometerUpdateChecklist(c))
                         .map(c => (
                         <tr key={c.id} className="hover:bg-zinc-50">
                           {blockWrite && (

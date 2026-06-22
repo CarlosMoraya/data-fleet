@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getStoredChecklistTab, isValidChecklistTab } from './Checklists';
+import { getStoredChecklistTab, isOdometerUpdateChecklist, isValidChecklistTab } from './Checklists';
 import { buildUiStateKey } from '../lib/uiStateStorage';
 
 describe('getStoredChecklistTab', () => {
@@ -47,5 +47,13 @@ describe('checklists tab scoped key', () => {
       name: 'active',
     });
     expect(key).toBe('bf:v1:ui:session:user-1:client-1:checklists:tab:active');
+  });
+});
+
+describe('isOdometerUpdateChecklist', () => {
+  it('seleciona apenas checklists de Atualizacao de Hodometro', () => {
+    expect(isOdometerUpdateChecklist({ templateContext: 'Atualização de Hodômetro' })).toBe(true);
+    expect(isOdometerUpdateChecklist({ templateContext: 'Rotina' })).toBe(false);
+    expect(isOdometerUpdateChecklist({ templateContext: undefined })).toBe(false);
   });
 });

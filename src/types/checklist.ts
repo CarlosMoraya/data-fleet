@@ -2,7 +2,8 @@
 
 export type VehicleCategory = 'Leve' | 'Médio' | 'Pesado' | 'Elétrico';
 export type TemplateCategory = VehicleCategory;
-export type ChecklistContext = 'Rotina' | 'Auditoria' | 'Reboque' | 'Entrada em Oficina' | 'Saída de Oficina' | 'Segurança';
+export type ChecklistContext = 'Rotina' | 'Auditoria' | 'Reboque' | 'Entrada em Oficina' | 'Saída de Oficina' | 'Segurança' | 'Atualização de Hodômetro';
+export const ODOMETER_UPDATE_CONTEXT: ChecklistContext = 'Atualização de Hodômetro';
 export const WORKSHOP_CONTEXTS: ChecklistContext[] = ['Entrada em Oficina', 'Saída de Oficina'];
 export type TemplateStatus = 'draft' | 'published' | 'deprecated';
 export type ChecklistStatus = 'in_progress' | 'completed';
@@ -76,6 +77,7 @@ export interface Checklist {
   workshopId?: string;
   workshopName?: string; // from join
   odometerKm?: number;
+  odometerPhotoUrl?: string;
 }
 
 export interface ChecklistResponse {
@@ -135,6 +137,8 @@ export interface ChecklistDayInterval {
   rotinaDayInterval: number | null;
   segurancaDayInterval: number | null;
   pneusDayInterval: number | null;
+  odometerUpdateDayInterval: number | null;
+  odometerKmTolerancePerDay: number | null;
   updatedAt?: string;
   updatedBy?: string;
 }

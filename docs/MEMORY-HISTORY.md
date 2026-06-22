@@ -2,6 +2,131 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-06-22
+
+### Novo contexto de checklist "Atualização de Hodômetro"
+
+**O que foi implementado:** contexto de checklist para coleta rápida de KM atual do veículo, sem itens obrigatórios no template, com validação anti-retrocesso reaproveitada, tolerância diária configurável por tenant e exigência de foto do hodômetro quando a leitura excede a tolerância. A leitura concluída continua alimentando o KM efetivo pela view `vehicle_odometer_effective_readings`, que agora também expõe origem (`source_context`) e evidência (`has_evidence`).
+
+**Arquivos criados:**
+- `supabase/migrations/20260622010000_add_odometer_update_context.sql`
+- `supabase/migrations/20260622010001_add_odometer_update_settings_and_photo.sql`
+- `supabase/migrations/20260622010002_odometer_effective_readings_origin.sql`
+- `src/lib/odometerToleranceValidation.ts`
+- `src/lib/odometerToleranceValidation.test.ts`
+- `src/lib/checklistTemplateRules.ts`
+- `src/lib/checklistTemplateRules.test.ts`
+
+**Arquivos modificados:**
+- `src/types.ts`
+- `src/types/index.ts`
+- `src/types/checklist.ts`
+- `src/types/odometerCorrection.ts`
+- `src/lib/checklistMappers.ts`
+- `src/lib/odometerCorrectionMappers.ts`
+- `src/lib/odometerCorrectionMappers.test.ts`
+- `src/components/ChecklistTemplateForm.tsx`
+- `src/pages/ChecklistFill.tsx`
+- `src/components/ChecklistDayIntervalSettings.tsx`
+- `src/pages/Checklists.tsx`
+- `src/pages/Checklists.activeTab.test.ts`
+- `src/components/ChecklistDetailModal.tsx`
+- `src/components/VehicleKmHistoryTab.tsx`
+- `docs/MEMORY.md`
+- `docs/MEMORY-HISTORY.md`
+
+**Decisões confirmadas:**
+- `Atualização de Hodômetro` é `ChecklistContext`, nunca `VehicleCategory`.
+- Templates desse contexto podem ter zero itens; os demais contextos continuam bloqueando criação sem item.
+- A tolerância usa dias reais desde a última leitura válida; `odometer_update_day_interval` fica informativo para alertas futuros.
+- Foto exigida por tolerância excedida usa `checklists.odometer_photo_url` e upload online, sem novo tipo de operação offline.
+- A RPC `dashboard_vehicle_km_in_period` não foi alterada.
+
+**Validações executadas:**
+- `npm run test:smoke` antes das alterações ✅ (6/6)
+- Constraint real confirmada no Dev: `checklist_templates_context_check` ✅
+- Migrations aplicadas no Supabase DEV vinculado (`20260622010000`, `20260622010001`, `20260622010002`) ✅
+- `INSERT` transacional com rollback de template `context = 'Atualização de Hodômetro'` aceito ✅
+- `SELECT source_context, has_evidence FROM public.vehicle_odometer_effective_readings LIMIT 1;` ✅
+- `npx tsc --noEmit` ✅
+- `npx vitest run` ✅ (556 testes)
+- `npm run test:smoke` ✅ (6/6)
+
+**Observações para sessões futuras:**
+- PROD não foi alterado nesta sessão; aplicar as 3 migrations em Prod apenas sob autorização explícita.
+- O roteiro manual completo com câmera/sessão permanece necessário para validar foto real no navegador.
+
+### Correção auditável mínima de KM/hodômetro
+
+**O que foi implementado:** fundação auditável para correção de leituras de KM sem sobrescrever o valor original em `checklists.odometer_km`. Correções passam a viver em tabela append-only, uma view resolve o KM efetivo, o dashboard e a validação de checklist passam a consumir esse KM efetivo, e o detalhe do veículo ganhou a aba **Histórico de KM** com sub-modal de correção.
+
+**Arquivos criados:**
+- `supabase/migrations/20260622000000_create_vehicle_odometer_corrections.sql`
+- `src/types/odometerCorrection.ts`
+- `src/lib/odometerCorrectionMappers.ts`
+- `src/lib/odometerCorrectionMappers.test.ts`
+- `src/lib/odometerCorrectionValidation.ts`
+- `src/lib/odometerCorrectionValidation.test.ts`
+- `src/services/odometerCorrectionService.ts`
+- `src/components/VehicleKmHistoryTab.tsx`
+- `e2e/completed/odometer-correction-flow.spec.ts`
+- `e2e/completed/odometer-correction-rls.spec.ts`
+
+**Arquivos modificados:**
+- `src/types/index.ts`
+- `src/lib/rolePermissions.ts`
+- `src/lib/rolePermissions.test.ts`
+- `src/components/VehicleDetailModal.tsx`
+- `src/pages/ChecklistFill.tsx`
+- `src/lib/checklistKmValidation.test.ts`
+- `docs/MEMORY.md`
+- `docs/MEMORY-HISTORY.md`
+
+**Decisões confirmadas:**
+- `checklists.odometer_km` continua imutável como valor original informado.
+- `vehicle_odometer_effective_readings` é a fonte única do KM efetivo para dashboard, checklist e histórico.
+- `dashboard_vehicle_km_in_period` mantém o contrato (`vehicle_id`, `km_driven`) e a regra `MAX−MIN`, agora sobre `effective_km`.
+- A permissão frontend `canCorrectOdometer` reaproveita o conjunto Manager+ (`Coordinator`, `Manager`, `Director`, `Admin Master`); a autoridade real fica na RLS de INSERT.
+- O MVP exibe apenas status `Válido` e `Corrigido`.
+
+**Validações executadas:**
+- Migration aplicada no Supabase DEV vinculado via `supabase db query --linked --file supabase/migrations/20260622000000_create_vehicle_odometer_corrections.sql` ✅
+- Consulta `SELECT checklist_id, original_km, effective_km, is_corrected FROM public.vehicle_odometer_effective_readings LIMIT 5;` ✅
+- `npm run lint` ✅
+- `npm run test:unit` ✅ (541 testes)
+- `npm run test:smoke` ✅ (6/6)
+- `npx playwright test e2e/completed/odometer-correction-flow.spec.ts e2e/completed/odometer-correction-rls.spec.ts --project=chromium` ✅ (4/4)
+
+**Observações para sessões futuras:**
+- PROD recebeu a migration e foi aprovado manualmente pelo usuário em 2026-06-22.
+- Exibir o nome do autor da correção, em vez do id, pode ser evolução futura com join em `profiles`.
+- A Fase 2 de validação preventiva no checklist continua fora de escopo.
+
+### Correção — tela branca em produção após deploy por chunk ausente
+
+**O que foi implementado:** correção cirúrgica do fluxo de recuperação quando um navegador com `index.html` antigo em cache tenta carregar chunks lazy já removidos do deploy novo. A Vercel deixou de reescrever `/assets/*` ausente para `index.html`, e a aplicação ganhou um Error Boundary específico para falhas de `import()` dinâmico.
+
+**Arquivos criados:**
+- `src/components/ChunkErrorBoundary.tsx`: Error Boundary para erro de chunk com reload único e fallback amigável.
+- `e2e/completed/regression-optim-chunk-recovery.spec.ts`: regressão E2E cobrindo recuperação com reload único e fallback sem loop.
+
+**Arquivos modificados:**
+- `vercel.json`: rewrite SPA alterado de `/(.*)` para `/((?!assets/).*)`, preservando SPA e deixando asset ausente retornar 404.
+- `src/App.tsx`: `ChunkErrorBoundary` adicionado acima do `<Suspense>` das rotas lazy.
+- `docs/MEMORY.md`: estado vigente atualizado com o bug corrigido e nota sobre o ref Supabase antigo.
+- `docs/MEMORY-HISTORY.md`: este arquivamento.
+
+**Decisões confirmadas:**
+- Não mexer em `vite.config.ts`/PWA nesta sessão; a correção ficou restrita ao rewrite do Vercel e à recuperação no React.
+- Code splitting por rota permanece ativo; o problema era ausência de rede de segurança para chunk ausente.
+
+**Validações executadas:**
+- `npm run lint` ✅
+- `npm run test:unit` ✅ (530 testes)
+- `npm run test:smoke` ✅ (6/6)
+- `npx playwright test e2e/completed/regression-optim-chunk-recovery.spec.ts --project=chromium` ✅ (3/3 incluindo setup)
+- Validação manual em produção aprovada pelo usuário após deploy/cenário real de cache.
+
 ## Sessão — 2026-06-20 (16:30)
 
 ### Aba Custos — filtros aprovados, Custo por KM e validação E2E

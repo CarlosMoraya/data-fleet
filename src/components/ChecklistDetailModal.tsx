@@ -112,6 +112,52 @@ export default function ChecklistDetailModal({ checklist, onClose }: Props) {
             )}
           </div>
 
+          {checklist.odometerKm != null && (
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+              <h3 className="text-sm font-semibold text-zinc-700 mb-3">Hodômetro</h3>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-zinc-400 uppercase tracking-wide">KM registrado</p>
+                  <p className="font-medium text-zinc-800">{checklist.odometerKm.toLocaleString('pt-BR')} km</p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-400 uppercase tracking-wide">Exigiu foto</p>
+                  <p className="font-medium text-zinc-800">{checklist.odometerPhotoUrl ? 'Sim' : 'Não'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-400 uppercase tracking-wide">Veículo</p>
+                  <p className="font-medium text-zinc-800">{checklist.vehicleLicensePlate ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-400 uppercase tracking-wide">Preenchido por</p>
+                  <p className="font-medium text-zinc-800">{checklist.filledByName ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-400 uppercase tracking-wide">Iniciado em</p>
+                  <p className="font-medium text-zinc-800">{formatDate(checklist.startedAt)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-400 uppercase tracking-wide">Concluído em</p>
+                  <p className="font-medium text-zinc-800">{formatDate(checklist.completedAt)}</p>
+                </div>
+                {checklist.odometerPhotoUrl && (
+                  <div className="col-span-2 mt-1 flex items-center gap-2">
+                    <img src={checklist.odometerPhotoUrl} alt="foto do hodômetro" className="h-20 w-20 rounded-lg object-cover" />
+                    <a
+                      href={checklist.odometerPhotoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-orange-500 hover:underline flex items-center gap-1"
+                    >
+                      <Camera className="h-3 w-3" />
+                      Visualizar foto
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Responses */}
           <div>
             <h3 className="text-sm font-semibold text-zinc-700 mb-3">Respostas</h3>

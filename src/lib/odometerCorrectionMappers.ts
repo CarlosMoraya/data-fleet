@@ -12,5 +12,7 @@ export function mapOdometerReadingRow(row: Record<string, unknown>): OdometerRea
     correctionReason: row.correction_reason ? String(row.correction_reason) : null,
     correctedBy: row.corrected_by ? String(row.corrected_by) : null,
     correctedAt: row.corrected_at ? String(row.corrected_at) : null,
+    sourceContext: row.source_context ? String(row.source_context) : null,
+    hasEvidence: Boolean(row.has_evidence),
   };
 }

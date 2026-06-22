@@ -33,7 +33,7 @@ export type {
   ActionPlan,
   ChecklistDayInterval,
 } from './types/checklist';
-export { WORKSHOP_CONTEXTS } from './types/checklist';
+export { ODOMETER_UPDATE_CONTEXT, WORKSHOP_CONTEXTS } from './types/checklist';
 export type {
   TireVisualClassification,
   TirePositionType,

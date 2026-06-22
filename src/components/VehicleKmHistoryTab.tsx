@@ -18,13 +18,16 @@ function formatKm(value: number): string {
   return value.toLocaleString('pt-BR');
 }
 
-function StatusBadge({ corrected }: { corrected: boolean }) {
+function StatusBadge({ corrected, hasEvidence }: { corrected: boolean; hasEvidence: boolean }) {
   const styles = corrected
     ? 'bg-amber-100 text-amber-700 border-amber-200'
-    : 'bg-emerald-100 text-emerald-700 border-emerald-200';
+    : hasEvidence
+      ? 'bg-sky-100 text-sky-700 border-sky-200'
+      : 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  const label = corrected ? 'Corrigido' : hasEvidence ? 'Válido com evidência' : 'Válido';
   return (
     <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${styles}`}>
-      {corrected ? 'Corrigido' : 'Válido'}
+      {label}
     </span>
   );
 }
@@ -57,10 +60,10 @@ function KmHistoryTable({
             {readings.map((reading) => (
               <tr key={reading.checklistId} className="text-zinc-700">
                 <td className="px-4 py-3 whitespace-nowrap">{formatDateTime(reading.readingAt)}</td>
-                <td className="px-4 py-3">Checklist</td>
+                <td className="px-4 py-3">{reading.sourceContext ?? 'Checklist'}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatKm(reading.originalKm)}</td>
                 <td className="px-4 py-3 whitespace-nowrap font-medium text-zinc-900">{formatKm(reading.effectiveKm)}</td>
-                <td className="px-4 py-3"><StatusBadge corrected={reading.isCorrected} /></td>
+                <td className="px-4 py-3"><StatusBadge corrected={reading.isCorrected} hasEvidence={reading.hasEvidence} /></td>
                 <td className="px-4 py-3">{reading.isCorrected ? reading.correctedBy ?? '—' : '—'}</td>
                 {canCorrect && (
                   <td className="px-4 py-3">

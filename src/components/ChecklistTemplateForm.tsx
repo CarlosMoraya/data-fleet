@@ -10,8 +10,9 @@ import {
   type SuggestionRow,
   type ChecklistItemRow,
 } from '../lib/checklistTemplateMappers';
-import type { ChecklistTemplate, ChecklistItem, ChecklistItemSuggestion, TemplateCategory, ChecklistContext } from '../types';
+import { ODOMETER_UPDATE_CONTEXT, type ChecklistTemplate, type ChecklistItem, type ChecklistItemSuggestion, type TemplateCategory, type ChecklistContext } from '../types';
 import { cn } from '../lib/utils';
+import { canSaveTemplateWithoutItems } from '../lib/checklistTemplateRules';
 
 interface Props {
   template?: ChecklistTemplate | null;
@@ -46,6 +47,7 @@ const CONTEXTS: { value: ChecklistContext; label: string; description: string }[
   { value: 'Entrada em Oficina', label: 'Entrada em Oficina', description: 'Registro ao enviar veículo para manutenção' },
   { value: 'Saída de Oficina', label: 'Saída de Oficina', description: 'Conferência ao receber veículo da manutenção' },
   { value: 'Segurança', label: 'Segurança', description: 'Itens críticos de segurança (pode bloquear veículo)' },
+  { value: 'Atualização de Hodômetro', label: 'Atualização de Hodômetro', description: 'Registro rápido apenas do KM atual do veículo.' },
 ];
 
 export default function ChecklistTemplateForm({ template, onClose, onSaved }: Props) {
@@ -67,6 +69,7 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
   const [error, setError] = useState('');
 
   const isSecurityContext = context === 'Segurança';
+  const isOdometerContext = context === ODOMETER_UPDATE_CONTEXT;
 
   const loadSuggestions = useCallback(async (cat: TemplateCategory) => {
     setLoadingSuggestions(true);
@@ -122,6 +125,7 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
 
   const buildItemsFromSuggestions = () => {
     if (isEdit) return;
+    if (isOdometerContext) return;
     if (items.length > 0) return;
     const built: DraftItem[] = suggestions.map((s, idx) => ({
       title: s.title,
@@ -182,7 +186,7 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
     const enabledItems = items.filter(it => it.enabled !== false);
     const hasEmptyTitles = enabledItems.some(it => !it.title.trim());
     if (hasEmptyTitles) { setError('Todos os itens devem ter um título.'); return; }
-    if (!isEdit && enabledItems.length === 0) { setError('Adicione pelo menos um item ao checklist.'); return; }
+    if (!isEdit && !canSaveTemplateWithoutItems(context) && enabledItems.length === 0) { setError('Adicione pelo menos um item ao checklist.'); return; }
 
     setSaving(true);
     try {
@@ -388,15 +392,22 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
                 </div>
               )}
 
-              {loadingSuggestions && (
+              {isOdometerContext && (
+                <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <span>Este contexto coleta apenas o KM atual do veículo. A foto do hodômetro é exigida somente quando a leitura excede a tolerância configurada. Não é necessário cadastrar perguntas.</span>
+                </div>
+              )}
+
+              {!isOdometerContext && loadingSuggestions && (
                 <div className="text-center py-8 text-zinc-400 text-sm">Carregando sugestões...</div>
               )}
 
-              {!loadingSuggestions && items.length === 0 && (
+              {!isOdometerContext && !loadingSuggestions && items.length === 0 && (
                 <div className="text-center py-8 text-zinc-400 text-sm">Nenhuma sugestão encontrada para esta categoria.</div>
               )}
 
-              {items.map((item, idx) => {
+              {!isOdometerContext && items.map((item, idx) => {
                 const isLocked = item.fromSuggestion && item.isMandatory;
                 return (
                   <div
@@ -521,14 +532,16 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
                 );
               })}
 
-              <button
-                type="button"
-                onClick={addItem}
-                className="w-full flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-zinc-300 py-3 text-sm text-zinc-500 hover:border-orange-400 hover:text-orange-500 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                Adicionar item
-              </button>
+              {!isOdometerContext && (
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-zinc-300 py-3 text-sm text-zinc-500 hover:border-orange-400 hover:text-orange-500 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  Adicionar item
+                </button>
+              )}
             </div>
           )}
         </div>

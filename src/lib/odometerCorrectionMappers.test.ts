@@ -14,6 +14,8 @@ describe('mapOdometerReadingRow', () => {
       correction_reason: 'Erro de digitação',
       corrected_by: 'user-1',
       corrected_at: '2026-06-22T11:00:00Z',
+      source_context: 'Atualização de Hodômetro',
+      has_evidence: true,
     })).toEqual({
       checklistId: 'checklist-1',
       vehicleId: 'vehicle-1',
@@ -25,6 +27,8 @@ describe('mapOdometerReadingRow', () => {
       correctionReason: 'Erro de digitação',
       correctedBy: 'user-1',
       correctedAt: '2026-06-22T11:00:00Z',
+      sourceContext: 'Atualização de Hodômetro',
+      hasEvidence: true,
     });
   });
 
@@ -48,6 +52,8 @@ describe('mapOdometerReadingRow', () => {
       correctionReason: null,
       correctedBy: null,
       correctedAt: null,
+      sourceContext: null,
+      hasEvidence: false,
     });
   });
 });

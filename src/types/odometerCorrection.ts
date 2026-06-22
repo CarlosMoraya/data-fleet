@@ -9,6 +9,8 @@ export interface OdometerReading {
   correctionReason: string | null;
   correctedBy: string | null;
   correctedAt: string | null;
+  sourceContext: string | null;
+  hasEvidence: boolean;
 }
 
 export interface OdometerCorrectionInput {

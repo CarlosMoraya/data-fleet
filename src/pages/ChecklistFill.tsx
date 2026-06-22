@@ -13,11 +13,12 @@ import OfflineBanner from '../components/OfflineBanner';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePendingSyncCount } from '../hooks/usePendingSyncCount';
 import type { Checklist, ChecklistItem, ChecklistContext, ResponseStatus } from '../types';
-import { WORKSHOP_CONTEXTS } from '../types';
+import { ODOMETER_UPDATE_CONTEXT, WORKSHOP_CONTEXTS } from '../types';
 import { cn } from '../lib/utils';
 import { applyOfflineKm, applyOfflineWorkshop, upsertResponse } from '../lib/offlineCacheUpdates';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { validateChecklistOdometerKm } from '../lib/checklistKmValidation';
+import { evaluateOdometerTolerance } from '../lib/odometerToleranceValidation';
 
 interface ItemState {
   item: ChecklistItem;
@@ -51,6 +52,13 @@ export default function ChecklistFill() {
   const [kmInput, setKmInput] = useState('');
   const [kmConfirmed, setKmConfirmed] = useState(false);
   const [kmError, setKmError] = useState<string | null>(null);
+  const [odometerPhotoUrl, setOdometerPhotoUrl] = useState('');
+  const [odometerCameraOpen, setOdometerCameraOpen] = useState(false);
+  const [toleranceState, setToleranceState] = useState<{
+    requiresPhoto: boolean;
+    expectedMaxKm?: number;
+    exceededBy?: number;
+  }>({ requiresPhoto: false });
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -103,12 +111,13 @@ export default function ChecklistFill() {
   });
 
   const templateContext = checklist?.templateContext as ChecklistContext | null;
+  const isOdometerContext = templateContext === ODOMETER_UPDATE_CONTEXT;
   const needsWorkshop = templateContext !== null && WORKSHOP_CONTEXTS.includes(templateContext as typeof WORKSHOP_CONTEXTS[number]);
   // Use workshop from checklist record or selected via local UI
   const effectiveWorkshopId = checklist?.workshopId || selectedWorkshopId;
   const workshopSaved = !!checklist?.workshopId;
   const workshopReady = !needsWorkshop || workshopSaved;
-  const canShowItems = workshopReady && kmConfirmed;
+  const canShowItems = workshopReady && kmConfirmed && !isOdometerContext;
 
   // KM do cadastro do veículo (fallback quando não há checklist anterior)
   const { data: vehicleInitialKm = null } = useQuery({
@@ -144,6 +153,39 @@ export default function ChecklistFill() {
     networkMode: 'offlineFirst',
   });
 
+  const { data: lastReadingAt = null } = useQuery({
+    queryKey: ['lastOdometerReadingAt', checklist?.vehicleId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('vehicle_odometer_effective_readings')
+        .select('reading_at')
+        .eq('vehicle_id', checklist!.vehicleId!)
+        .order('reading_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return (data as { reading_at: string | null } | null)?.reading_at ?? null;
+    },
+    enabled: isOdometerContext && !!checklist?.vehicleId,
+    gcTime: Infinity,
+    networkMode: 'offlineFirst',
+  });
+
+  const { data: odometerIntervalSettings = null } = useQuery({
+    queryKey: ['checklistDayIntervals', currentClient?.id, 'odometer'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('checklist_day_intervals')
+        .select('odometer_km_tolerance_per_day, odometer_update_day_interval')
+        .eq('client_id', currentClient!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { odometer_km_tolerance_per_day: number | null; odometer_update_day_interval: number | null } | null;
+    },
+    enabled: isOdometerContext && !!currentClient?.id,
+    gcTime: Infinity,
+    networkMode: 'offlineFirst',
+  });
+
   const { data: workshops = [] } = useQuery({
     queryKey: ['workshops', currentClient?.id],
     queryFn: async () => {
@@ -168,6 +210,12 @@ export default function ChecklistFill() {
       setKmConfirmed(true);
     }
   }, [checklist?.odometerKm]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  React.useEffect(() => {
+    if (checklist?.odometerPhotoUrl) {
+      setOdometerPhotoUrl(checklist.odometerPhotoUrl);
+    }
+  }, [checklist?.odometerPhotoUrl]);
 
   // Referência para exibir ao usuário: último checklist > initial_km do veículo
   const referenceKm = lastOdometerKm ?? vehicleInitialKm ?? null;
@@ -251,6 +299,30 @@ export default function ChecklistFill() {
 
   const handleConfirmKm = () => {
     setKmError(null);
+    if (isOdometerContext) {
+      const validation = evaluateOdometerTolerance({
+        rawValue: kmInput,
+        lastValidKm: lastOdometerKm,
+        lastReadingAt,
+        initialKm: vehicleInitialKm,
+        tolerancePerDay: odometerIntervalSettings?.odometer_km_tolerance_per_day ?? null,
+        dayInterval: odometerIntervalSettings?.odometer_update_day_interval ?? null,
+      });
+      if (validation.ok === false) {
+        setKmError(validation.message);
+        return;
+      }
+      setToleranceState(validation.requiresPhoto
+        ? {
+            requiresPhoto: true,
+            expectedMaxKm: validation.expectedMaxKm,
+            exceededBy: validation.exceededBy,
+          }
+        : { requiresPhoto: false });
+      confirmKmMutation.mutate(validation.value, { onSuccess: () => setKmConfirmed(true) });
+      return;
+    }
+
     const validation = validateChecklistOdometerKm({ rawValue: kmInput, referenceKm });
     if (!validation.ok) {
       setKmError(validation.message);
@@ -410,6 +482,31 @@ export default function ChecklistFill() {
     }
   };
 
+  const handleOdometerPhotoCapture = async (file: File) => {
+    setOdometerCameraOpen(false);
+    setKmError(null);
+
+    if (!navigator.onLine) {
+      setKmError('Você precisa estar online para enviar a foto do hodômetro.');
+      return;
+    }
+
+    try {
+      const url = await uploadChecklistPhoto(currentClient!.id, checklistId!, 'odometer', file);
+      const { error: updateError } = await supabase
+        .from('checklists')
+        .update({ odometer_photo_url: url })
+        .eq('id', checklistId);
+      if (updateError) throw updateError;
+
+      setOdometerPhotoUrl(url);
+      queryClient.setQueryData(['checklist', checklistId], (old: Checklist | undefined) => old ? { ...old, odometerPhotoUrl: url } : old);
+    } catch (err) {
+      console.error('Odometer photo upload error:', err);
+      setKmError('Não foi possível enviar a foto. Tente novamente.');
+    }
+  };
+
   const handleObservationBlur = (idx: number) => {
     const s = itemStates[idx];
     if (s.status) {
@@ -423,6 +520,8 @@ export default function ChecklistFill() {
   };
 
   const mandatoryAnswered = itemStates.filter(s => s.item.isMandatory).every(s => s.status !== null);
+  const odometerPhotoRequired = isOdometerContext && toleranceState.requiresPhoto;
+  const odometerPhotoGateBlocked = odometerPhotoRequired && !odometerPhotoUrl;
   const totalAnswered = itemStates.filter(s => s.status !== null).length;
   const progress = itemStates.length > 0 ? Math.round((totalAnswered / itemStates.length) * 100) : 0;
 
@@ -558,6 +657,35 @@ export default function ChecklistFill() {
                   <p className="text-xs text-zinc-500 text-center">Informe o hodômetro para liberar os itens do checklist</p>
                 </>
               )}
+              {isOdometerContext && kmConfirmed && toleranceState.requiresPhoto && (
+                <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 space-y-3">
+                  <p className="text-xs text-sky-800">
+                    O KM informado excedeu a tolerância esperada (máximo {toleranceState.expectedMaxKm?.toLocaleString('pt-BR')} km). Para concluir, envie uma foto do hodômetro como evidência.
+                  </p>
+                  {kmError && <p className="text-xs text-red-600">{kmError}</p>}
+                  {odometerPhotoUrl ? (
+                    <div className="flex items-center gap-2">
+                      <img src={odometerPhotoUrl} alt="foto do hodômetro" className="h-16 w-16 rounded-lg object-cover" />
+                      <button onClick={() => setOdometerCameraOpen(true)} className="text-xs text-orange-500 hover:underline">Refazer foto</button>
+                      <span className="text-xs text-green-600 font-medium">✓ Foto registrada</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (!navigator.onLine) {
+                          setKmError('Você precisa estar online para enviar a foto do hodômetro.');
+                          return;
+                        }
+                        setOdometerCameraOpen(true);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl border border-sky-300 text-sm font-medium text-sky-700 bg-white hover:bg-sky-100 transition-colors"
+                    >
+                      <Camera className="h-4 w-4" />
+                      Tirar foto do hodômetro
+                    </button>
+                  )}
+                </div>
+              )}
               {kmConfirmed && (
                 <button onClick={() => setKmConfirmed(false)} className="text-xs text-orange-500 hover:underline">
                   Alterar
@@ -685,9 +813,12 @@ export default function ChecklistFill() {
           {workshopReady && kmConfirmed && !mandatoryAnswered && (
             <p className="text-xs text-amber-600 text-center">Responda todos os itens obrigatórios para finalizar</p>
           )}
+          {odometerPhotoGateBlocked && (
+            <p className="text-xs text-amber-600 text-center">Envie a foto do hodômetro para concluir.</p>
+          )}
           <button
             onClick={() => finishChecklistMutation.mutate()}
-            disabled={!mandatoryAnswered || finishChecklistMutation.isPending || !workshopReady || !kmConfirmed}
+            disabled={!mandatoryAnswered || finishChecklistMutation.isPending || !workshopReady || !kmConfirmed || odometerPhotoGateBlocked}
             className="w-full py-3 rounded-xl bg-orange-500 text-white font-semibold text-sm disabled:opacity-40 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
           >
             {finishChecklistMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -700,6 +831,12 @@ export default function ChecklistFill() {
         <CameraCapture
           onClose={() => setCameraItemIdx(null)}
           onCapture={(file, lat, lng) => handlePhotoCapture(cameraItemIdx, file, lat, lng)}
+        />
+      )}
+      {odometerCameraOpen && (
+        <CameraCapture
+          onClose={() => setOdometerCameraOpen(false)}
+          onCapture={(file) => handleOdometerPhotoCapture(file)}
         />
       )}
     </div>
