@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { canAccessRoute } from './rolePermissions';
+import { canAccessRoute, canCorrectOdometer } from './rolePermissions';
+import type { Role } from '../types';
 
 describe('canAccessRoute', () => {
   it('allows Operations Manager to access the password page', () => {
@@ -12,5 +13,30 @@ describe('canAccessRoute', () => {
 
   it('allows Driver to access the password page', () => {
     expect(canAccessRoute('Driver', '/conta/senha')).toBe(true);
+  });
+});
+
+describe('canCorrectOdometer', () => {
+  it('permite Coordinator, Manager, Director e Admin Master', () => {
+    const allowed: Role[] = ['Coordinator', 'Manager', 'Director', 'Admin Master'];
+    for (const role of allowed) {
+      expect(canCorrectOdometer(role)).toBe(true);
+    }
+  });
+
+  it('bloqueia papeis abaixo de Coordinator e undefined', () => {
+    const denied: Array<Role | undefined> = [
+      'Driver',
+      'Yard Auditor',
+      'Workshop',
+      'Fleet Assistant',
+      'Fleet Analyst',
+      'Supervisor',
+      'Operations Manager',
+      undefined,
+    ];
+    for (const role of denied) {
+      expect(canCorrectOdometer(role)).toBe(false);
+    }
   });
 });

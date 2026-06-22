@@ -17,6 +17,7 @@ import { WORKSHOP_CONTEXTS } from '../types';
 import { cn } from '../lib/utils';
 import { applyOfflineKm, applyOfflineWorkshop, upsertResponse } from '../lib/offlineCacheUpdates';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { validateChecklistOdometerKm } from '../lib/checklistKmValidation';
 
 interface ItemState {
   item: ChecklistItem;
@@ -125,20 +126,18 @@ export default function ChecklistFill() {
     networkMode: 'offlineFirst',
   });
 
-  // Último KM registrado em qualquer checklist concluído deste veículo
+  // Maior KM efetivo registrado em qualquer checklist concluído deste veículo
   const { data: lastOdometerKm = null } = useQuery({
     queryKey: ['lastOdometerKm', checklist?.vehicleId],
     queryFn: async () => {
       const { data } = await supabase
-        .from('checklists')
-        .select('odometer_km')
+        .from('vehicle_odometer_effective_readings')
+        .select('effective_km')
         .eq('vehicle_id', checklist!.vehicleId!)
-        .eq('status', 'completed')
-        .not('odometer_km', 'is', null)
-        .order('completed_at', { ascending: false })
+        .order('effective_km', { ascending: false })
         .limit(1)
         .maybeSingle();
-      return (data as { odometer_km: number } | null)?.odometer_km ?? null;
+      return (data as { effective_km: number } | null)?.effective_km ?? null;
     },
     enabled: !!checklist?.vehicleId,
     gcTime: Infinity,
@@ -252,18 +251,12 @@ export default function ChecklistFill() {
 
   const handleConfirmKm = () => {
     setKmError(null);
-    const parsed = parseInt(kmInput, 10);
-    if (!kmInput.trim() || isNaN(parsed)) {
-      setKmError('Informe o Km atual do veículo.');
+    const validation = validateChecklistOdometerKm({ rawValue: kmInput, referenceKm });
+    if (!validation.ok) {
+      setKmError(validation.message);
       return;
     }
-    if (referenceKm !== null && parsed < referenceKm) {
-      setKmError(
-        `O Km informado (${parsed.toLocaleString('pt-BR')}) é menor que o último registrado (${referenceKm.toLocaleString('pt-BR')} km).`
-      );
-      return;
-    }
-    confirmKmMutation.mutate(parsed, { onSuccess: () => setKmConfirmed(true) });
+    confirmKmMutation.mutate(validation.value, { onSuccess: () => setKmConfirmed(true) });
   };
 
   const confirmWorkshopMutation = useMutation({

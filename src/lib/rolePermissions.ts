@@ -80,6 +80,8 @@ export const ROLES_CAN_APPROVE_BUDGET: Role[] = [
   'Admin Master',
 ];
 
+export const ROLES_CAN_CORRECT_ODOMETER: Role[] = ['Coordinator', 'Manager', 'Director', 'Admin Master'];
+
 export const TENANT_USER_ROLE_OPTIONS: Role[] = [
   'Driver',
   'Yard Auditor',
@@ -125,6 +127,10 @@ export function isOperationsManager(role: Role | null | undefined): role is 'Ope
 
 export function canManageOperationsManagerScope(role: Role | null | undefined): boolean {
   return role === 'Coordinator' || role === 'Manager' || role === 'Director' || role === 'Admin Master';
+}
+
+export function canCorrectOdometer(role: Role | undefined | null): boolean {
+  return ROLES_CAN_CORRECT_ODOMETER.includes(role as Role);
 }
 
 export function canAccessOperationsReadonlyModules(role: Role | null | undefined): boolean {

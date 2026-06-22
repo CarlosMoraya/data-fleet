@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, ExternalLink, Truck } from 'lucide-react';
 import { Vehicle } from '../types';
+import VehicleKmHistoryTab from './VehicleKmHistoryTab';
 
 interface Props {
   vehicle: Vehicle;
@@ -59,6 +60,8 @@ function formatDate(dateStr?: string | null): string | undefined {
 }
 
 export default function VehicleDetailModal({ vehicle, onClose }: Props) {
+  const [activeTab, setActiveTab] = useState<'general' | 'kmHistory'>('general');
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto"
@@ -86,23 +89,53 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
 
         {/* Body */}
         <div className="overflow-y-auto px-6 py-6 space-y-6">
-
-          {/* Identificação */}
-          <div className="space-y-3">
-            <SectionTitle title="Identificação" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
-              <DetailField label="Placa" value={vehicle.licensePlate} />
-              <DetailField label="Marca" value={vehicle.brand} />
-              <DetailField label="Modelo" value={vehicle.model} />
-              <DetailField label="Ano" value={vehicle.year} />
-              <DetailField label="Chassi" value={vehicle.chassi} />
-              <DetailField label="RENAVAM" value={vehicle.renavam} />
-              <DetailField label="DETRAN UF" value={vehicle.detranUF} />
-              <DetailField label="Tag" value={vehicle.tag} />
-              <DetailField label="Tipo" value={vehicle.type} />
-              <DetailField label="Categoria" value={vehicle.category} />
-            </div>
+          <div className="flex gap-2 border-b border-zinc-100" role="tablist" aria-label="Detalhes do veículo">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'general'}
+              onClick={() => setActiveTab('general')}
+              className={`rounded-t-xl px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'general'
+                  ? 'border-b-2 border-orange-500 text-orange-600'
+                  : 'text-zinc-500 hover:text-zinc-800'
+              }`}
+            >
+              Dados gerais
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'kmHistory'}
+              onClick={() => setActiveTab('kmHistory')}
+              className={`rounded-t-xl px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'kmHistory'
+                  ? 'border-b-2 border-orange-500 text-orange-600'
+                  : 'text-zinc-500 hover:text-zinc-800'
+              }`}
+            >
+              Histórico de KM
+            </button>
           </div>
+
+          {activeTab === 'general' ? (
+            <>
+              {/* Identificação */}
+              <div className="space-y-3">
+                <SectionTitle title="Identificação" />
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
+                  <DetailField label="Placa" value={vehicle.licensePlate} />
+                  <DetailField label="Marca" value={vehicle.brand} />
+                  <DetailField label="Modelo" value={vehicle.model} />
+                  <DetailField label="Ano" value={vehicle.year} />
+                  <DetailField label="Chassi" value={vehicle.chassi} />
+                  <DetailField label="RENAVAM" value={vehicle.renavam} />
+                  <DetailField label="DETRAN UF" value={vehicle.detranUF} />
+                  <DetailField label="Tag" value={vehicle.tag} />
+                  <DetailField label="Tipo" value={vehicle.type} />
+                  <DetailField label="Categoria" value={vehicle.category} />
+                </div>
+              </div>
 
           {/* Propriedade */}
           <div className="space-y-3">
@@ -194,15 +227,18 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
             </div>
           </div>
 
-          {/* Seguro e Manutenção */}
-          <div className="space-y-3">
-            <SectionTitle title="Seguro e Manutenção" />
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-              <BoolField label="Possui Seguro" value={vehicle.hasInsurance} />
-              <BoolField label="Possui Contrato de Manutenção" value={vehicle.hasMaintenanceContract} />
-            </div>
-          </div>
-
+              {/* Seguro e Manutenção */}
+              <div className="space-y-3">
+                <SectionTitle title="Seguro e Manutenção" />
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                  <BoolField label="Possui Seguro" value={vehicle.hasInsurance} />
+                  <BoolField label="Possui Contrato de Manutenção" value={vehicle.hasMaintenanceContract} />
+                </div>
+              </div>
+            </>
+          ) : (
+            <VehicleKmHistoryTab vehicleId={vehicle.id} />
+          )}
         </div>
 
         {/* Footer */}
