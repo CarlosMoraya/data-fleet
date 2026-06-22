@@ -93,7 +93,7 @@ export const TENANT_USER_ROLE_OPTIONS: Role[] = [
   'Admin Master',
 ];
 
-const OPERATIONS_MANAGER_ALLOWED_ROUTES = ['/agendamentos', '/manutencao'] as const;
+const OPERATIONS_MANAGER_ALLOWED_ROUTES = ['/agendamentos', '/manutencao', '/conta/senha'] as const;
 
 export function hasRoleAccess(role: Role | undefined): boolean {
   return ROLES_WITH_ACCESS.includes(role as Role);

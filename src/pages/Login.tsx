@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff } from 'lucide-react';
 
@@ -13,6 +13,8 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const resetSuccess = searchParams.get('reset') === 'success';
 
   const showVideo = !videoFailed;
   const showImage = videoFailed && !imageFailed;
@@ -80,6 +82,12 @@ export default function Login() {
 
         <div className="bg-white/95 backdrop-blur-sm py-8 px-4 shadow-xl rounded-2xl sm:px-10 border border-white/20">
           <form className="space-y-6" onSubmit={handleSubmit}>
+            {resetSuccess && (
+              <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                Senha redefinida com sucesso. Faça login com a nova senha.
+              </p>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-zinc-700">Email</label>
               <div className="mt-1">
@@ -114,6 +122,15 @@ export default function Login() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Link
+                to="/recuperar-senha"
+                className="text-sm font-medium text-orange-600 hover:text-orange-700"
+              >
+                Esqueci minha senha
+              </Link>
             </div>
 
             {error && (

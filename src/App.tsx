@@ -36,6 +36,9 @@ const BudgetApprovals = lazy(() => import('./pages/BudgetApprovals'));
 const Tires = lazy(() => import('./pages/Tires'));
 const WorkshopJoin = lazy(() => import('./pages/WorkshopJoin'));
 const TireInspectionFill = lazy(() => import('./pages/TireInspectionFill'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -71,6 +74,8 @@ export default function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/workshop/join" element={<WorkshopJoin />} />
+              <Route path="/recuperar-senha" element={<ForgotPassword />} />
+              <Route path="/redefinir-senha" element={<ResetPassword />} />
               <Route path="/" element={<Layout />}>
                 <Route index element={<HomeRedirect />} />
                 <Route path="cadastros" element={<Cadastros />}>
@@ -95,6 +100,7 @@ export default function App() {
                 <Route path="agendamentos" element={<WorkshopSchedules />} />
                 <Route path="manutencao" element={<Maintenance />} />
                 <Route path="aprovacao-orcamentos" element={<BudgetApprovals />} />
+                <Route path="conta/senha" element={<ChangePassword />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="admin/clients" element={<AdminClients />} />
                 <Route path="admin/users" element={<AdminUsers />} />

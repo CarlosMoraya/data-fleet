@@ -14,6 +14,7 @@ import {
   Wrench,
   CalendarClock,
   BadgeCheck,
+  KeyRound,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import type { Role } from '../types';
@@ -153,6 +154,21 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               {getRoleLabel(user.role)}
             </p>
           )}
+          <NavLink
+            to="/conta/senha"
+            onClick={onClose}
+            className={({ isActive }) =>
+              cn(
+                isActive
+                  ? 'bg-blue-700 text-white font-medium'
+                  : 'text-blue-200 hover:bg-blue-800 hover:text-white',
+                'group flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors'
+              )
+            }
+          >
+            <KeyRound className="mr-3 h-5 w-5 flex-shrink-0" aria-hidden="true" />
+            Alterar senha
+          </NavLink>
           <button
             onClick={handleLogout}
             className="group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium text-blue-200 hover:bg-blue-800 hover:text-white transition-colors"

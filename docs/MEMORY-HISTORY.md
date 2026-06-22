@@ -1136,6 +1136,16 @@ Pendente (próximas fases): Fase 2 — tempos médios em manutenção/permanênc
 ## 📜 Histórico de Sessões e Mudanças
 
 ### Junho 2026
+- **Self-service de senha via Supabase Auth (21/06/2026)**:
+  - Motivação: permitir recuperação por e-mail ("Esqueci minha senha") e alteração de senha pelo próprio usuário logado para todos os papéis, sem administrador e sem lógica própria de tokens.
+  - Mudança: adicionadas rotas públicas `/recuperar-senha` e `/redefinir-senha`; adicionada rota protegida `/conta/senha`; Login ganhou link "Esqueci minha senha" e banner pós-reset.
+  - Auth: `AuthContext` passou a expor `requestPasswordReset`, `updatePassword` e `reauthenticate`, usando apenas Supabase Auth (`resetPasswordForEmail`, `updateUser`, `signInWithPassword`).
+  - Segurança: resposta de recuperação é enumeration-safe; troca logada exige senha atual; `/redefinir-senha` faz `logout()` após sucesso; nenhum dado sensível é persistido em storage.
+  - UI: novo `PasswordField` reutilizável com toggle de visibilidade; entrada "Alterar senha" adicionada no rodapé da Sidebar, acima do Logout, visível para todos os papéis.
+  - Permissões: `/conta/senha` incluída em `OPERATIONS_MANAGER_ALLOWED_ROUTES` para evitar redirect de Operations Manager.
+  - Testes: `passwordValidation.test.ts`, `rolePermissions.test.ts` e `e2e/completed/password-self-service.spec.ts`.
+  - Validações: `npm run lint` ✅; `npm run test:unit` ✅ (530 testes); `npx playwright test e2e/completed/password-self-service.spec.ts --project=chromium` ✅ (6 testes). Validação manual real documentada em `TESTES_HUMANOS.md`; depende da configuração Supabase de Redirect URLs, template de e-mail, senha mínima e SMTP.
+
 - **Dashboard Executivo — filtro de período restrito à aba Custos (19/06/2026)**:
   - Motivação: remover a ambiguidade do filtro de período global, que afetava somente os custos e dois indicadores fora da aba `Custos`.
   - Mudança: novo componente apresentacional `PeriodRangeFilter`; o filtro de datas foi removido do topo do Dashboard e renderizado apenas na aba `Custos`.

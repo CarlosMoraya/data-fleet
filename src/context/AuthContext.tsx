@@ -11,6 +11,9 @@ interface AuthContextType {
   clients: Client[];
   loading: boolean;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
+  requestPasswordReset: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
+  reauthenticate: (password: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
   switchClient: (clientId: string) => void;
   canSwitchClient: boolean;
@@ -252,6 +255,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
+  const requestPasswordReset = async (email: string): Promise<{ error: string | null }> => {
+    const redirectTo = `${window.location.origin}/redefinir-senha`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) {
+      console.error('requestPasswordReset error:', error.message);
+    }
+    return { error: null };
+  };
+
+  const updatePassword = async (newPassword: string): Promise<{ error: string | null }> => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    return { error: error ? error.message : null };
+  };
+
+  const reauthenticate = async (password: string): Promise<{ error: string | null }> => {
+    if (!user?.email) return { error: 'Sessão inválida. Faça login novamente.' };
+    const { error } = await supabase.auth.signInWithPassword({ email: user.email, password });
+    return { error: error ? 'Senha atual incorreta.' : null };
+  };
+
   const logout = async () => {
     await supabase.auth.signOut();
     queryClient.clear();
@@ -311,6 +334,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clients: allClients,
         loading,
         login,
+        requestPasswordReset,
+        updatePassword,
+        reauthenticate,
         logout,
         switchClient,
         canSwitchClient,
