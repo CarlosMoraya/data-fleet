@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import Layout from './components/Layout';
 import RouteFallback from './components/RouteFallback';
+import ChunkErrorBoundary from './components/ChunkErrorBoundary';
 import Login from './pages/Login';
 import { getDefaultRouteForRole } from './lib/rolePermissions';
 import { shouldPersistQuery } from './lib/cachePolicy';
@@ -70,13 +71,14 @@ export default function App() {
       <OfflineSyncBoot />
       <AuthProvider>
         <Router>
-          <Suspense fallback={<RouteFallback />}>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/workshop/join" element={<WorkshopJoin />} />
-              <Route path="/recuperar-senha" element={<ForgotPassword />} />
-              <Route path="/redefinir-senha" element={<ResetPassword />} />
-              <Route path="/" element={<Layout />}>
+          <ChunkErrorBoundary>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/workshop/join" element={<WorkshopJoin />} />
+                <Route path="/recuperar-senha" element={<ForgotPassword />} />
+                <Route path="/redefinir-senha" element={<ResetPassword />} />
+                <Route path="/" element={<Layout />}>
                 <Route index element={<HomeRedirect />} />
                 <Route path="cadastros" element={<Cadastros />}>
                   <Route index element={<Navigate to="veiculos" replace />} />
@@ -104,10 +106,11 @@ export default function App() {
                 <Route path="settings" element={<Settings />} />
                 <Route path="admin/clients" element={<AdminClients />} />
                 <Route path="admin/users" element={<AdminUsers />} />
-              </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
+                </Route>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </ChunkErrorBoundary>
         </Router>
       </AuthProvider>
     </PersistQueryClientProvider>
