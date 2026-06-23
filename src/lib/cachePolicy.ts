@@ -30,7 +30,6 @@ export const PERSIST_ALLOWLIST: Record<string, number> = {
   tires: CACHE_TTL.operational,
   workshops: CACHE_TTL.operational,
   workshopPartnerships: CACHE_TTL.operational,
-  workshopPartnerIds: CACHE_TTL.operational,
   workshopInvitations: CACHE_TTL.operational,
   actionPlans: CACHE_TTL.operational,
   checklists: CACHE_TTL.operational,

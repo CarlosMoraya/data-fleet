@@ -52,6 +52,11 @@ describe('shouldPersistQuery', () => {
     expect(shouldPersistQuery(['vehicles', 'c1'], 0, now)).toBe(false);
   });
 
+  it('does not persist Set-returning queries (workshopPartnerIds) to avoid storage corruption', () => {
+    const now = Date.now();
+    expect(shouldPersistQuery(['workshopPartnerIds', 'c1'], now, now)).toBe(false);
+  });
+
   it('persists aggregated dashboard RPC queries inside dashboard TTL', () => {
     expect(shouldPersistQuery(['dashboard-last-checklists', 'c1'], now, now)).toBe(true);
     expect(shouldPersistQuery(['dashboard-vehicle-km', 'c1', '2026-06-01', '2026-06-30'], now, now)).toBe(true);
