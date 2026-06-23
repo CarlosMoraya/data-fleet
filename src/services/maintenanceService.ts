@@ -57,6 +57,7 @@ export async function saveMaintenanceOrder(
     notes: data.notes ?? null,
     workshop_os_number: data.workshopOs ?? null,
     current_km: data.currentKm ?? null,
+    warranty_revision_event_id: data.warrantyRevisionEventId ?? null,
   };
 
   let orderId: string;

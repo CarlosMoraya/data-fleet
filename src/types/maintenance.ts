@@ -32,6 +32,7 @@ export interface MaintenanceOrder {
   cancelledById?: string;
   clientName?: string; // Populado quando Workshop vê múltiplas transportadoras
   clientId?: string;   // client_id da OS; necessário para Workshop no modo "Todos os Clientes"
+  warrantyRevisionEventId?: string; // Vínculo opcional a um evento de revisão em garantia
 }
 
 export interface BudgetItem {
@@ -72,6 +73,7 @@ export interface MaintenanceOrderRow {
   budget_reviewed_at: string | null;
   cancelled_at: string | null;
   cancelled_by_id: string | null;
+  warranty_revision_event_id: string | null;
   created_at: string;
   updated_at: string;
 

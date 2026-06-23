@@ -15,6 +15,7 @@ import {
   CalendarClock,
   BadgeCheck,
   KeyRound,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import type { Role } from '../types';
@@ -35,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'Agendamentos', to: '/agendamentos', icon: CalendarClock, roles: ['Driver', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Manutenção', to: '/manutencao', icon: Wrench, roles: ['Workshop', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Aprovação de Orçamentos', to: '/aprovacao-orcamentos', icon: BadgeCheck, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
+  { name: 'Revisões de Garantia', to: '/revisoes-garantia', icon: ShieldCheck, roles: ['Fleet Analyst', 'Supervisor', 'Coordinator', 'Manager', 'Director', 'Admin Master'] },
   { name: 'Templates', to: '/checklist-templates', icon: FileStack, roles: ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Configurações', to: '/settings', icon: Settings, roles: ['Coordinator', 'Manager', 'Director', 'Admin Master'] },
 ];

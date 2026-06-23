@@ -9,11 +9,9 @@ interface ChecklistOdometerSource {
 }
 
 export async function listVehicleOdometerHistory(vehicleId: string): Promise<OdometerReading[]> {
-  const { data, error } = await supabase
-    .from('vehicle_odometer_effective_readings')
-    .select('*')
-    .eq('vehicle_id', vehicleId)
-    .order('reading_at', { ascending: false });
+  const { data, error } = await supabase.rpc('get_vehicle_odometer_readings', {
+    p_vehicle_id: vehicleId,
+  });
 
   if (error) throw error;
   return (data ?? []).map((row) => mapOdometerReadingRow(row as Record<string, unknown>));

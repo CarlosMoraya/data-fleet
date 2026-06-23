@@ -106,6 +106,9 @@ function CorrectKmModal({
     mutationFn: createOdometerCorrection,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vehicle-odometer-history', vehicleId] });
+      queryClient.invalidateQueries({ queryKey: ['lastOdometerKm', vehicleId] });
+      queryClient.invalidateQueries({ queryKey: ['lastOdometerReadingAt', vehicleId] });
+      queryClient.invalidateQueries({ queryKey: ['warrantyOverview'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-vehicle-km'] });
       onClose();
     },

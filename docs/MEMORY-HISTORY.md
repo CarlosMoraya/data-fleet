@@ -1269,7 +1269,7 @@ Pendente (próximas fases): Fase 2 — tempos médios em manutenção/permanênc
   - UI: novo `PasswordField` reutilizável com toggle de visibilidade; entrada "Alterar senha" adicionada no rodapé da Sidebar, acima do Logout, visível para todos os papéis.
   - Permissões: `/conta/senha` incluída em `OPERATIONS_MANAGER_ALLOWED_ROUTES` para evitar redirect de Operations Manager.
   - Testes: `passwordValidation.test.ts`, `rolePermissions.test.ts` e `e2e/completed/password-self-service.spec.ts`.
-  - Validações: `npm run lint` ✅; `npm run test:unit` ✅ (530 testes); `npx playwright test e2e/completed/password-self-service.spec.ts --project=chromium` ✅ (6 testes). Validação manual real documentada em `TESTES_HUMANOS.md`; depende da configuração Supabase de Redirect URLs, template de e-mail, senha mínima e SMTP.
+  - Validações: `npm run lint` ✅; `npm run test:unit` ✅ (530 testes); `npx playwright test e2e/completed/password-self-service.spec.ts --project=chromium` ✅ (6 testes). Validação manual real concluída em DEV e PROD. Pendência remanescente movida para backlog operacional: SMTP customizado + templates Auth em PT-BR, no nível do projeto BetaFleet/Supabase, não por cliente.
 
 - **Dashboard Executivo — filtro de período restrito à aba Custos (19/06/2026)**:
   - Motivação: remover a ambiguidade do filtro de período global, que afetava somente os custos e dois indicadores fora da aba `Custos`.
@@ -1426,3 +1426,26 @@ Em vez de usar ORMs complexos no frontend, utilizamos funções de mapeamento pu
 - **Correção:** nos 6 pontos do bloco C, trocar `tireRows.first().click()` / `completedRows.first().click()` por `.locator('button[title="Visualizar"]').click()`. Nenhuma mudança em produção.
 - **Arquivo modificado:** `e2e/completed/tire-inspection-assistant.spec.ts`.
 - **Testes:** C.1–C.6 corrigidos passam a ser cobertura de regressão real; nenhum teste novo necessário.
+
+### 22/06/2026 — Módulo Revisões de Garantia (resolvedor único de próxima revisão)
+- **Escopo:** novo módulo `/revisoes-garantia` — programação de revisões em garantia (plano + etapas + agenda materializada) com resolvedor único de "próxima revisão" que dá precedência ao plano de garantia ativo sobre a regra preventiva por `vehicle_km_intervals`.
+- **Tipos de mudança:** Tipo 4 — estrutural/arquitetural (novas tabelas + RLS multi-tenant, vínculo em OS, escrita em dado de produção do veículo).
+- **Decisões intencionais (não "corrigir"):**
+  - Resolvedor único (`resolveNextRevision`) em vez de regras paralelas; cards preventivos futuros do Dashboard devem consumi-lo.
+  - Trigger no banco (`fn_complete_warranty_revision_on_os`, `SECURITY DEFINER`) conclui a revisão ao concluir a OS — independente do caminho de UI.
+  - RLS com subqueries inline em `profiles` (sem helpers) para portabilidade dev/prod.
+  - Escrita = Coordinator/Manager/Director/Admin Master (mesma régua de Configurações e correção de KM).
+  - `vehicle_warranty_revision_events` materializa a agenda (1 linha por etapa por veículo) — permite ajuste por veículo, `presumed_completed` (com confirmação explícita) e importação com comprovante.
+  - `warranty` só transita `false → true`; espelho de `first_revision_max_km` é não-destrutivo.
+- **Arquivos criados:** `supabase/migrations/20260622000000_create_warranty_revisions.sql`; `src/types/warrantyRevision.ts`; `src/lib/warrantyRevisionMappers.ts`, `warrantyRevisionResolver.ts`(+test), `warrantyRevisionEligibility.ts`(+test), `warrantyAssignmentPayload.ts`(+test), `warrantyRevisionStatusBadge.ts`; `src/services/warrantyRevisionService.ts`; `src/pages/WarrantyRevisions.tsx`; `src/components/warranty/WarrantyPlanByPlateModal.tsx`, `WarrantyPlanByModelModal.tsx`, `WarrantyImportHistoryModal.tsx`; E2E `e2e/completed/warranty-revision-by-plate.spec.ts`, `-by-model.spec.ts`, `-os-link.spec.ts`, `-first-km-mirror.spec.ts`.
+- **Arquivos modificados:** `src/types/index.ts` (barrel), `src/types/maintenance.ts` (+`warrantyRevisionEventId`/row), `src/lib/maintenanceMappers.ts` (mapeia o vínculo), `src/components/MaintenanceForm.tsx` (seletor opcional de vínculo), **`src/services/maintenanceService.ts`** (persiste `warranty_revision_event_id` no insert/update da OS — necessário para o trigger e exigido pela Etapa 9), `src/components/VehicleForm.tsx` (CTA "Criar programação de revisão"), `src/App.tsx` (rota lazy), `src/components/Sidebar.tsx` (item de nav `ShieldCheck`), `src/lib/cachePolicy.ts` (allowlist `warrantyOverview`/`warrantyVehicleCurrentKm`), `docs/SPEC.md` (seção módulo), `docs/MEMORY.md`.
+- **Desvio do guardrail registrado:** `src/services/maintenanceService.ts` não constava na lista da Etapa 9, mas a exigência "Persistir `warrantyRevisionEventId` no insert/update da OS" só é satisfeita adicionando o campo em `commonFields`. Alteração mínima e estritamente dentro do efeito exigido.
+- **Pendência externa:** a **migration precisa ser aplicada manualmente no SQL Editor do Dev e, depois, do Prod** (o agente não tem acesso DDL por工具); os E2E do módulo só passam após a migration no Dev. `IMPLEMENTATION.md` não entra no commit por padrão (artefato de sessão).
+- **Verificação local nesta sessão:** `npx tsc --noEmit` 0 erros; `npx vitest run` 587/587 (556 prévios + 31 novos); `npm run test:smoke` 6/6; `npm run build` OK. E2E do módulo não executados (dependem da migration).
+
+### 22/06/2026 — Bugfix: hodômetro do motorista mostrava KM de fábrica (24.500) em vez do KM real (25.821)
+- **Contexto:** ao abrir checklist de "Atualização de Hodômetro" no celular (usuário motorista), o sistema exibia "Último Km registrado: 24.500 km" (valor de `vehicles.initial_km`) em vez de 25.821 km (último checklist concluído + correção).
+- **Causa raiz (Tipo A):** a view `vehicle_odometer_effective_readings` herda RLS da tabela `checklists`. A policy `checklists_select_own_driver` restringe motoristas a ver apenas checklists que eles mesmos preencheram. Se o último checklist com hodômetro foi preenchido por outro motorista ou gestor, o motorista atual não o via → a view retornava vazio → `lastOdometerKm = null` → fallback para `vehicleInitialKm = 24.500`.
+- **Correção:** criadas duas RPCs `SECURITY DEFINER` (`get_vehicle_max_effective_km`, `get_vehicle_last_odometer_reading_at`) que consultam as tabelas subjacentes ignorando RLS de linha, retornando o KM máximo efetivo e a data da última leitura de QUALQUER usuário do mesmo tenant. `ChecklistFill.tsx` passou a consumir as RPCs em vez da view diretamente. Cache invalidation no `VehicleKmHistoryTab` também ajustada para invalidar as novas query keys.
+- **Arquivos modificados:** `src/pages/ChecklistFill.tsx`, `src/components/VehicleKmHistoryTab.tsx`; migrations `20260622000001_add_vehicle_max_km_rpc.sql` aplicada no Dev.
+- **Observação:** o fix de cache invalidation aplicado anteriormente na mesma sessão (`VehicleKmHistoryTab.tsx`) resolveu o problema de cache stale após correções manuais de KM, mas não resolveu a raiz do RLS — ambos os fixes são complementares.

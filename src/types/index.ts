@@ -58,3 +58,18 @@ export type {
   TireInspection,
   TireInspectionResponse,
 } from './tireInspection';
+export type {
+  WarrantyRevisionEventStatus,
+  WarrantyRevisionStatus,
+  WarrantyRegime,
+  AssignmentFinishReason,
+  AssignmentStatus,
+  WarrantyRevisionPlan,
+  WarrantyRevisionPlanRow,
+  WarrantyRevisionPlanItem,
+  WarrantyRevisionPlanItemRow,
+  VehicleWarrantyAssignment,
+  VehicleWarrantyAssignmentRow,
+  WarrantyRevisionEvent,
+  WarrantyRevisionEventRow,
+} from './warrantyRevision';

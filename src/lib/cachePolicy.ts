@@ -12,6 +12,7 @@ export const PERSIST_ALLOWLIST: Record<string, number> = {
   driverSettings: CACHE_TTL.reference,
   checklistDayIntervals: CACHE_TTL.reference,
   vehicleKmIntervals: CACHE_TTL.reference,
+  warrantyVehicleCurrentKm: CACHE_TTL.reference,
   vehiclesForKmIntervals: CACHE_TTL.reference,
   pneusDayInterval: CACHE_TTL.reference,
   'dashboard-intervals': CACHE_TTL.reference,
@@ -23,6 +24,7 @@ export const PERSIST_ALLOWLIST: Record<string, number> = {
 
   vehicles: CACHE_TTL.operational,
   vehiclesSimple: CACHE_TTL.operational,
+  warrantyOverview: CACHE_TTL.operational,
   shippers: CACHE_TTL.operational,
   operationalUnits: CACHE_TTL.operational,
   tires: CACHE_TTL.operational,

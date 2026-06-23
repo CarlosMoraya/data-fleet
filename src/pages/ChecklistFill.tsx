@@ -136,17 +136,16 @@ export default function ChecklistFill() {
   });
 
   // Maior KM efetivo registrado em qualquer checklist concluído deste veículo
+  // Usa RPC SECURITY DEFINER para bypassar RLS — motoristas precisam validar
+  // contra o último registro de QUALQUER usuário, não apenas os próprios.
   const { data: lastOdometerKm = null } = useQuery({
     queryKey: ['lastOdometerKm', checklist?.vehicleId],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('vehicle_odometer_effective_readings')
-        .select('effective_km')
-        .eq('vehicle_id', checklist!.vehicleId!)
-        .order('effective_km', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return (data as { effective_km: number } | null)?.effective_km ?? null;
+      const { data, error } = await supabase.rpc('get_vehicle_max_effective_km', {
+        p_vehicle_id: checklist!.vehicleId!,
+      });
+      if (error) throw error;
+      return (data as number | null) ?? null;
     },
     enabled: !!checklist?.vehicleId,
     gcTime: Infinity,
@@ -156,14 +155,11 @@ export default function ChecklistFill() {
   const { data: lastReadingAt = null } = useQuery({
     queryKey: ['lastOdometerReadingAt', checklist?.vehicleId],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('vehicle_odometer_effective_readings')
-        .select('reading_at')
-        .eq('vehicle_id', checklist!.vehicleId!)
-        .order('reading_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return (data as { reading_at: string | null } | null)?.reading_at ?? null;
+      const { data, error } = await supabase.rpc('get_vehicle_last_odometer_reading_at', {
+        p_vehicle_id: checklist!.vehicleId!,
+      });
+      if (error) throw error;
+      return (data as string | null) ?? null;
     },
     enabled: isOdometerContext && !!checklist?.vehicleId,
     gcTime: Infinity,

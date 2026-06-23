@@ -23,6 +23,9 @@ import {
 } from '../lib/offline/vehicleDraftFiles';
 import { useAuth } from '../context/AuthContext';
 import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
+import { supabase } from '../lib/supabase';
+import WarrantyPlanByPlateModal from './warranty/WarrantyPlanByPlateModal';
+import { CalendarClock } from 'lucide-react';
 
 interface VehicleFormFiles {
   crlv: File | null;
@@ -93,6 +96,20 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
 };
 
 export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, availableShippers, availableOperationalUnits, restoreFiles, onClose, onSave }: VehicleFormProps) {
+  const [hasActiveWarrantyPlan, setHasActiveWarrantyPlan] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!vehicle?.id) { setHasActiveWarrantyPlan(false); return; }
+    let active = true;
+    supabase
+      .from('vehicle_warranty_revision_assignments')
+      .select('id', { count: 'exact', head: true })
+      .eq('vehicle_id', vehicle.id)
+      .eq('status', 'active')
+      .then(({ count }) => { if (active) setHasActiveWarrantyPlan((count ?? 0) > 0); });
+    return () => { active = false; };
+  }, [vehicle?.id]);
   const { user, currentClient } = useAuth();
 
   const draftKey = user?.id
@@ -773,6 +790,16 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                 <div>
                   <Label name="firstRevisionMaxKm">Km Máximo da 1ª Revisão</Label>
                   <input type="text" name="firstRevisionMaxKm" required={req('firstRevisionMaxKm')} inputMode="numeric" value={formData.firstRevisionMaxKm ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 10000" />
+                  {vehicle?.id && formData.firstRevisionMaxKm && !hasActiveWarrantyPlan && (
+                    <button
+                      type="button"
+                      onClick={() => setScheduleModalOpen(true)}
+                      className="mt-2 inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                    >
+                      <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
+                      Criar programação de revisão
+                    </button>
+                  )}
                 </div>
                 <div>
                   <Label name="firstRevisionDeadline">Data Limite da 1ª Revisão</Label>
@@ -917,6 +944,14 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
           </button>
         </div>
       </div>
+
+      {scheduleModalOpen && vehicle?.id && (
+        <WarrantyPlanByPlateModal
+          prefillVehicleId={vehicle.id}
+          onClose={() => setScheduleModalOpen(false)}
+          onSaved={() => setScheduleModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

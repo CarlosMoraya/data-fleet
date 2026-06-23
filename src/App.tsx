@@ -40,6 +40,7 @@ const TireInspectionFill = lazy(() => import('./pages/TireInspectionFill'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const ChangePassword = lazy(() => import('./pages/ChangePassword'));
+const WarrantyRevisions = lazy(() => import('./pages/WarrantyRevisions'));
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -103,6 +104,7 @@ export default function App() {
                 <Route path="manutencao" element={<Maintenance />} />
                 <Route path="aprovacao-orcamentos" element={<BudgetApprovals />} />
                 <Route path="conta/senha" element={<ChangePassword />} />
+                <Route path="revisoes-garantia" element={<WarrantyRevisions />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="admin/clients" element={<AdminClients />} />
                 <Route path="admin/users" element={<AdminUsers />} />

@@ -10,6 +10,7 @@ import { validateFile } from '../lib/storageHelpers';
 import { extractBudgetData } from '../lib/budgetOcr';
 import { isKnownBudgetSystem } from '../lib/budgetSystems';
 import BudgetItemsTable from './BudgetItemsTable';
+import { listPendingEventsForVehicle } from '../services/warrantyRevisionService';
 
 const inputClass =
   'mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 text-sm shadow-sm ' +
@@ -36,6 +37,7 @@ interface MaintenanceFormProps {
 
 interface VehicleOption { id: string; licensePlate: string; }
 interface WorkshopOption { id: string; name: string; }
+interface WarrantyEventOption { id: string; sequence: number; label: string; targetKm: number; }
 
 export default function MaintenanceForm({ order, prefill, mode = 'default', onClose, onSave }: MaintenanceFormProps) {
   const { user, currentClient } = useAuth();
@@ -67,6 +69,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
   const [vehicles, setVehicles] = useState<VehicleOption[]>([]);
   const [workshops, setWorkshops] = useState<WorkshopOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
+  const [warrantyEvents, setWarrantyEvents] = useState<WarrantyEventOption[]>([]);
 
   // Budget states
   const [budgetFile, setBudgetFile] = useState<File | null>(null);
@@ -146,6 +149,24 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
       return next;
     });
   };
+
+  // Carrega eventos pendentes de revisão em garantia do veículo selecionado
+  useEffect(() => {
+    if (isWorkshopMode || !formData.vehicleId) { setWarrantyEvents([]); return; }
+    let active = true;
+    listPendingEventsForVehicle(formData.vehicleId)
+      .then((events) => {
+        if (!active) return;
+        setWarrantyEvents(events);
+        // Limpa vínculo se o evento selecionado não pertence mais a este veículo
+        const current = formData.warrantyRevisionEventId;
+        if (current && !events.some((e) => e.id === current)) {
+          setFormData((prev) => ({ ...prev, warrantyRevisionEventId: undefined }));
+        }
+      })
+      .catch(() => { if (active) setWarrantyEvents([]); });
+    return () => { active = false; };
+  }, [formData.vehicleId, isWorkshopMode]);
 
   const handleBudgetUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -479,6 +500,27 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
                       />
                     </div>
                   </div>
+
+                  {/* Vínculo: Revisão em garantia (opcional) */}
+                  {warrantyEvents.length > 0 && (
+                    <div>
+                      <Label htmlFor="warrantyRevisionEventId">Vínculo: Revisão em garantia (opcional)</Label>
+                      <select
+                        id="warrantyRevisionEventId"
+                        name="warrantyRevisionEventId"
+                        value={formData.warrantyRevisionEventId ?? ''}
+                        onChange={handleChange}
+                        className={inputClass}
+                      >
+                        <option value="">Sem vínculo</option>
+                        {warrantyEvents.map((ev) => (
+                          <option key={ev.id} value={ev.id}>
+                            {ev.label} — {ev.targetKm.toLocaleString('pt-BR')} km
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {/* OS Interna (read-only) e OS da Oficina */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
