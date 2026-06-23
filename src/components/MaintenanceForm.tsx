@@ -11,6 +11,7 @@ import { extractBudgetData } from '../lib/budgetOcr';
 import { isKnownBudgetSystem } from '../lib/budgetSystems';
 import BudgetItemsTable from './BudgetItemsTable';
 import { listPendingEventsForVehicle } from '../services/warrantyRevisionService';
+import { validateMaintenanceCurrentKm } from '../lib/maintenanceKmValidation';
 
 const inputClass =
   'mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 text-sm shadow-sm ' +
@@ -35,7 +36,7 @@ interface MaintenanceFormProps {
   onSave: (order: Partial<MaintenanceOrder>, budgetItems: BudgetItem[], budgetFile: File | null) => Promise<void>;
 }
 
-interface VehicleOption { id: string; licensePlate: string; }
+interface VehicleOption { id: string; licensePlate: string; initialKm: number | null; }
 interface WorkshopOption { id: string; name: string; }
 interface WarrantyEventOption { id: string; sequence: number; label: string; targetKm: number; }
 
@@ -70,6 +71,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
   const [workshops, setWorkshops] = useState<WorkshopOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [warrantyEvents, setWarrantyEvents] = useState<WarrantyEventOption[]>([]);
+  const [referenceKm, setReferenceKm] = useState<number | null>(null);
 
   // Budget states
   const [budgetFile, setBudgetFile] = useState<File | null>(null);
@@ -121,7 +123,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
     const [{ data: vehiclesData }, { data: workshopsData }] = await Promise.all([
       supabase
         .from('vehicles')
-        .select('id, license_plate')
+        .select('id, license_plate, initial_km')
         .eq('client_id', currentClient.id)
         .order('license_plate'),
       supabase
@@ -131,7 +133,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
         .eq('active', true)
         .order('name'),
     ]);
-    setVehicles((vehiclesData ?? []).map((v: { id: string; license_plate: string }) => ({ id: v.id, licensePlate: v.license_plate })));
+    setVehicles((vehiclesData ?? []).map((v: { id: string; license_plate: string; initial_km: number | null }) => ({ id: v.id, licensePlate: v.license_plate, initialKm: v.initial_km ?? null })));
     setWorkshops((workshopsData ?? []) as WorkshopOption[]);
     setLoadingOptions(false);
   }, [currentClient?.id, isWorkshopMode]);
@@ -167,6 +169,22 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
       .catch(() => { if (active) setWarrantyEvents([]); });
     return () => { active = false; };
   }, [formData.vehicleId, isWorkshopMode]);
+
+  // Resolve o KM de referencia (piso) do veiculo selecionado no modo padrao
+  useEffect(() => {
+    if (isWorkshopMode || !formData.vehicleId) { setReferenceKm(null); return; }
+    let active = true;
+    const fallbackInitialKm = vehicles.find((v) => v.id === formData.vehicleId)?.initialKm ?? null;
+    supabase
+      .rpc('get_vehicle_max_effective_km', { p_vehicle_id: formData.vehicleId })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) { setReferenceKm(fallbackInitialKm); return; }
+        const maxKm = (data as number | null) ?? null;
+        setReferenceKm(maxKm ?? fallbackInitialKm);
+      });
+    return () => { active = false; };
+  }, [formData.vehicleId, isWorkshopMode, vehicles]);
 
   const handleBudgetUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -230,6 +248,16 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
     } else if (!formData.vehicleId || !formData.workshopId || !formData.entryDate || !formData.type || !formData.status) {
       setError('Preencha os campos obrigatórios.');
       return;
+    }
+    if (!isWorkshopMode) {
+      const kmValidation = validateMaintenanceCurrentKm({
+        currentKm: formData.currentKm,
+        referenceKm,
+      });
+      if (!kmValidation.ok) {
+        setError(kmValidation.message);
+        return;
+      }
     }
     setSaving(true);
     setError(null);
@@ -498,6 +526,11 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
                         onChange={handleChange}
                         className={inputClass}
                       />
+                      {referenceKm !== null && (
+                        <p className="mt-1 text-xs text-zinc-500">
+                          Último Km registrado: {referenceKm.toLocaleString('pt-BR')} km
+                        </p>
+                      )}
                     </div>
                   </div>
 

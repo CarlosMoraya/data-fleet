@@ -2,6 +2,41 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-06-22 (Manutenção: paridade de piso de KM com o checklist)
+
+### Travamento de KM mínimo no campo "Km Atual do Veículo" da Manutenção
+
+**O que foi implementado:** o campo "Km Atual do Veículo" da tela de Manutenção no modo padrão ("Nova Manutenção"/"Editar OS") passou a aplicar a mesma regra de piso de KM já usada nos checklists. Se o usuário informar um valor menor que o último KM efetivo registrado para o veículo, o envio é bloqueado com a mesma mensagem do checklist. O campo permanece **opcional** (vazio = válido). Um hint "Último Km registrado: X km" passa a ser exibido sob o campo, igual ao checklist. Em erro de RPC, cai no fallback `vehicles.initial_km`; ausência de referência (`null`) desativa o piso (`ok: true`). O modo **Workshop** permanece **intacto** (fora do escopo). A OS não retroalimenta a fonte de KM efetivo — a validação apenas lê o piso.
+
+**Arquitetura (padrões aplicados):** Pure function + Adapter (reuso da `validateChecklistOdometerKm`) e Single Source of Truth (`get_vehicle_max_effective_km` + fallback `initial_km`).
+
+**Arquivos criados:**
+- `src/lib/maintenanceKmValidation.ts` — wrapper `validateMaintenanceCurrentKm` (campo opcional → delega ao validador do checklist).
+- `src/lib/maintenanceKmValidation.test.ts` — 7 casos (vazio, nulo, igual, maior, menor, sem referência, referência zero).
+
+**Arquivos modificados:**
+- `src/components/MaintenanceForm.tsx` — import do wrapper; `VehicleOption` estendido com `initialKm`; `fetchOptions` faz `select` de `initial_km`; novo estado `referenceKm`; novo `useEffect` resolve o piso via RPC com fallback; hint sob o campo no modo padrão; validação no `handleSubmit` somente no ramo padrão.
+- `docs/MEMORY.md` — linha de paridade e observação do `cachePolicy`.
+- `docs/MEMORY-HISTORY.md` — este registro.
+
+**Desvio técnico registrado (com aprovação do usuário):** o `IMPLEMENTATION.md` especificava a função `validateMaintenanceCurrentKm` com anotação de retorno explícita `{ ok: true } | { ok: false; message: string }`. O `tsconfig.json` do projeto não habilita `strict`/`strictNullChecks`, e nesse modo o TypeScript NÃO afunila (narrowing) uma union discriminada por boolean com anotação explícita (erros TS2339 em `MaintenanceForm.tsx` e no teste). Solução adotada (Opção A, aprovada pelo usuário): remover a anotação de retorno explícita e adicionar `as const` aos literais — exatamente o padrão já usado por `checklistKmValidation.ts` (o validador reusado). O tipo público exportado permanece estruturalmente `{ ok: true } | { ok: false; message: string }` e o call-site documentado `if (!kmValidation.ok) { setError(kmValidation.message) }` compila verbatim. Nenhuma outra decisão fora do spec.
+
+**Verificação:**
+- Smoke baseline (Etapa 1): 6/6 passando antes de qualquer alteração.
+- `npx tsc --noEmit`: limpo.
+- `npx vitest run` (meus arquivos + `cachePolicy.test.ts` revertido ao HEAD): 593/593 (586 base + 7 novos). Meus 7 testes: 7/7.
+- Smoke final (Etapa 5): 6/6 passando.
+- Validação manual no browser (Etapa 5 passo 2): pendente de execução pelo usuário.
+
+**Observação não-bloqueante (registrada, não corrigida):** foi descoberta uma inconsistência pré-existente (uncommitted, anterior a esta sessão) em `src/lib/cachePolicy.test.ts`: o teste `rejects field settings queries` espera que `vehicleFieldSettings`/`vehicleSettings`/`driverFieldSettings`/`driverSettings` retornem `false`, mas `cachePolicy.ts` (não modificado) ainda as mantém na `PERSIST_ALLOWLIST` → retornam `true` → 1 falha deterministic-amente. Isto É alinhado à decisão vigente "Settings fora do cache persistido", sugerindo correção futura = remover as 4 chaves da allowlist. Não corrigido por estar fora do escopo do `IMPLEMENTATION.md` (guardrail: registrar e continuar). Detalhes em `docs/MEMORY.md`.
+
+**Decisões confirmadas:**
+- Wrapper trata ausência de valor como `ok: true` (campo opcional) — divergência intencional em relação ao checklist onde o campo é obrigatório.
+- Escopo restrito ao modo padrão; Workshop deixado de fora conscientemente (RLS/papel distinto).
+- `current_km` da OS continua sem alimentar a fonte de KM efetivo; a validação só lê o piso.
+
+---
+
 ## Sessão — 2026-06-22
 
 ### Novo contexto de checklist "Atualização de Hodômetro"
