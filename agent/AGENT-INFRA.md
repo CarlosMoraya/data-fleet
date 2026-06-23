@@ -38,8 +38,16 @@ Os testes são executados simulando diferentes personas:
 - **Rewrites**: O arquivo `vercel.json` garante que as rotas SPA funcionem corretamente (evitando erros 404 ao atualizar a página).
 
 ### Backend (Supabase)
-- **Database/Auth**: Alterações feitas via migrations manuais no Dashboard.
+- **Database/Auth**: Alterações via migrations manuais no SQL Editor ou pelo CLI (`supabase db query`).
 - **Edge Functions**: Deploy via Dashboard (não utiliza CLI).
+
+### Banco de Dados — Dev vs Prod (regra crítica)
+- Existem **dois** bancos Supabase separados:
+  - **Dev**: `vvbnbzzhpiksacqudmfu` — referenciado em `.env.local`. Toda migration **DEVE** ser aplicada aqui primeiro e validada.
+  - **Prod**: `oajfjdadcicgoxrfrnny` — referenciado em `.env.production`. Aplicar migration aqui é **PROIBIDO** exceto com **autorização expressa do usuário**.
+- **Regra de ouro**: o agente NUNCA aplica migration em produção por iniciativa própria. Sempre aplicar em Dev primeiro, testar, e somente promover a Prod quando o usuário disser explicitamente "pode aplicar em produção" (ou equivalente).
+- **CLI**: ao usar `supabase link --project-ref <ref>`, sempre desvincular (`supabase unlink`) ao terminar, para evitar que o CLI permaneça apontado para produção.
+- **MEMORY.md**: a referência ao ref de produção como "legado" é intencional — funciona como barreira de segurança para que agentes não apliquem migrations em prod sem autorização.
 
 ---
 

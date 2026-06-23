@@ -13,3 +13,18 @@ test-results/
 .vercel
 docs/reports/perf/.last-bundle.json
 docs/reports/perf/.last-routes.json
+
+# Session artifacts
+# Memory lives in docs/ (versionable). Everything under session/ is transient
+# (implementation plans, reports, scratch, test checklists) — readable by
+# agents when explicitly referenced, but not committed by default.
+session/
+
+# Transient implementation plans — readable by agents when explicitly cited,
+# but never committed unless the user explicitly asks to version the plan.
+# Canonical location: session/implementation/ ; root-level copies are tolerated.
+IMPLEMENTATION.md
+IMPLEMENTATION_FIXBUG.md
+
+# Supabase CLI temp cache
+supabase/.temp/

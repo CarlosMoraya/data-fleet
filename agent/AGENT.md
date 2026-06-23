@@ -43,8 +43,11 @@ Qualquer nova funcionalidade **DEVE** seguir estas fases sequenciais:
 
 ### 4. Política de Artefatos Mutáveis
 - **Persistentes e versionáveis**: `docs/MEMORY.md` e `docs/MEMORY-HISTORY.md` representam a memória operacional compartilhada do projeto. Sempre que mudarem o estado vigente ou registrarem histórico relevante, devem ser considerados artefatos de commit.
-- **Transitórios e não versionáveis por padrão**: `IMPLEMENTATION.md` e `IMPLEMENTATION_FIXBUG.md` são artefatos de sessão. Servem como instrução de execução da tarefa corrente e podem ser sobrescritos na sessão seguinte.
-- **Exceção**: `IMPLEMENTATION.md` e `IMPLEMENTATION_FIXBUG.md` só devem entrar em commit quando o usuário pedir explicitamente para versionar o plano daquela sessão.
+- **Transitórios e não versionáveis por padrão**:
+  - `IMPLEMENTATION.md` e `IMPLEMENTATION_FIXBUG.md` (raiz) e `session/implementation/IMPLEMENTATION*.md` são artefatos de sessão. Servem como instrução de execução da tarefa corrente e podem ser sobrescritos na sessão seguinte.
+  - Toda a pasta `session/` (implementação, `reports/`, `scratch/`, `test-checklists/`) também é transitória e está no `.gitignore`.
+- **Acessibilidade aos agentes**: o fato de um arquivo estar no `.gitignore` **não** impede os agentes de lê-lo quando citado explicitamente pelo usuário. Transitórios são arquivos legíveis e editáveis durante a sessão; apenas não entram em commits por padrão.
+- **Commit de transitórios**: `IMPLEMENTATION*.md` (raiz ou `session/implementation/`) só devem entrar em commit quando o usuário pedir explicitamente para versionar o plano daquela sessão. Caso contrário, afastá-los de `git add` (evitar `git add .`).
 
 ---
 
