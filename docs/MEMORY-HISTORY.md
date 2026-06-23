@@ -1484,3 +1484,31 @@ Em vez de usar ORMs complexos no frontend, utilizamos funções de mapeamento pu
 - **Correção:** criadas duas RPCs `SECURITY DEFINER` (`get_vehicle_max_effective_km`, `get_vehicle_last_odometer_reading_at`) que consultam as tabelas subjacentes ignorando RLS de linha, retornando o KM máximo efetivo e a data da última leitura de QUALQUER usuário do mesmo tenant. `ChecklistFill.tsx` passou a consumir as RPCs em vez da view diretamente. Cache invalidation no `VehicleKmHistoryTab` também ajustada para invalidar as novas query keys.
 - **Arquivos modificados:** `src/pages/ChecklistFill.tsx`, `src/components/VehicleKmHistoryTab.tsx`; migrations `20260622000001_add_vehicle_max_km_rpc.sql` aplicada no Dev.
 - **Observação:** o fix de cache invalidation aplicado anteriormente na mesma sessão (`VehicleKmHistoryTab.tsx`) resolveu o problema de cache stale após correções manuais de KM, mas não resolveu a raiz do RLS — ambos os fixes são complementares.
+
+### 23/06/2026 — Km Inicial como fallback de KM efetivo na fonte única (Dev aplicado, Prod pendente)
+- **Contexto:** veículos recém-cadastrados sem checklist concluído (ex.: placa SDQ2C14, Km Inicial 35000) exibiam "KM ATUAL = —" em `/revisoes-garantia` e não tinham regras de revisão calculadas. O `vehicles.initial_km` não era considerado na fonte única de KM efetivo.
+- **Decisão:** correção na **fonte única** (banco), não em TypeScript — Opção A escolhida pelo usuário, para cumprir "em todas as regras de negócio" e eliminar a duplicação do fallback (hoje em `ChecklistFill.tsx` e `MaintenanceForm.tsx`). Os fallbacks TS foram **mantidos** como defesa redundante (remoção fora do escopo).
+- **Padrões aplicados:** Single Source of Truth + Null Object / Coalescing fallback + migration backwards-compatible (`CREATE OR REPLACE`, mesma assinatura/contrato, sem downtime, sem mudança de dados).
+- **Correção aplicada:** migration `supabase/migrations/20260623010000_km_effective_initial_km_fallback.sql` com `CREATE OR REPLACE` de duas funções `SECURITY DEFINER`:
+  - `get_vehicle_max_effective_km(UUID)`: agora `COALESCE(<MAX de leituras de checklist>, (SELECT initial_km FROM vehicles WHERE id = p_vehicle_id))`.
+  - `get_vehicle_odometer_readings_batch(UUID[])`: agora faz `FROM vehicles` (uma linha por veículo solicitado) com `effective_km = COALESCE(<MAX de leituras>, v.initial_km)`.
+  - `GRANT EXECUTE TO authenticated` e `NOTIFY pgrst, 'reload schema'` preservados. `SECURITY DEFINER` preservado.
+- **Fora do escopo (decisões intencionais):** `get_vehicle_odometer_readings` (histórico) e `get_vehicle_odometer_summary` não receberam fallback (histórico não ganha linha fantasma; summary sem consumidor). `dashboard_vehicle_km_in_period` fora do escopo (delta de período, não KM atual). Falha pré-existente de `cachePolicy.test.ts` não corrigida (débito separado).
+- **Arquivos criados:** `supabase/migrations/20260623010000_km_effective_initial_km_fallback.sql`; `e2e/completed/warranty-revision-initial-km-fallback.spec.ts` (reaproveita helpers `adminClient`/`getManager`/`login` de `warranty-revision-by-plate.spec.ts`).
+- **Arquivos modificados:** `docs/MEMORY.md`, `docs/MEMORY-HISTORY.md`. **Nenhum arquivo em `src/` alterado.**
+- **Verificação no Dev (após aplicação manual no SQL Editor):**
+  - `get_vehicle_max_effective_km('046f0d06…')` (SDQ2C14, sem checklist, initial_km 35000) → **35000** (antes `null`).
+  - `get_vehicle_odometer_readings_batch(ARRAY['046f0d06…'])` → `[{vehicle_id, effective_km: 35000}]`.
+  - Veículo com checklist (`a58fbd22…`, initial_km 24500) → **27000** (MAX das leituras, sem regressão).
+  - `npm run lint` (tsc --noEmit): 0 erros.
+  - `npm run test:unit`: 596 passam / 1 falha pré-existente de `cachePolicy.test.ts` (não-regressão, documentada).
+  - Novo spec `warranty-revision-initial-km-fallback.spec.ts`: 2/2 passando.
+- **Falhas pré-existentes encontradas (não-regressão comprovada):** `warranty-revision-by-plate`, `warranty-revision-by-model`, `warranty-revision-first-km-mirror` falham na criação do assignment (fluxo de salvamento não persiste); `warranty-revision-os-link` falha em `toBeVisible` aplicado a `<option>` (sempre "hidden" no Playwright). Comprovado que a migration não causou: veículos desses specs **não têm `initial_km`** → `effective_km=NULL` (idêntico ao antes) e o fluxo de salvamento **não chama** a `batchRPC`. A sessão de planejamento não rodou esses E2E (só lint+unit) — "E2E existentes passando" era premissa, não baseline. Registrado em `docs/MEMORY.md` (Observações) para sessão dedicada; não corrigidos (guardrail).
+- **Restrição de produção:** migration **não aplicada no Prod** (`oajfjdadcicgoxrfrnny`). Promoção gated — só com autorização expressa do usuário. Antes de promover, rodar `npm run test:smoke` (não executado no planejamento nem nesta sessão).
+- **Pendência externa:** a migration foi aplicada no Dev pelo usuário via SQL Editor (o agente não tem acesso DDL; `SUPABASE_SERVICE_ROLE_KEY` só autoriza REST/PostgREST, não DDL).
+- **`IMPLEMENTATION.md` não entra no commit por padrão** (artefato de sessão transitório).
+- **Sugestão de commit:**
+  ```
+  git add docs/MEMORY.md docs/MEMORY-HISTORY.md supabase/migrations/20260623010000_km_effective_initial_km_fallback.sql e2e/completed/warranty-revision-initial-km-fallback.spec.ts
+  git commit -m "feat: usa Km Inicial como KM atual na fonte única quando veículo não tem checklist"
+  ```
