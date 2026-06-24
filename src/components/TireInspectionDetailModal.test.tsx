@@ -22,6 +22,10 @@ let queryClient: QueryClient;
 
 const photoUrl = 'https://storage.example.com/tire-photo.jpg';
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+}
+
 const inspection: TireInspection = {
   id: 'inspection-1',
   clientId: 'client-1',
@@ -170,8 +174,8 @@ describe('TireInspectionDetailModal', () => {
     await renderModal();
 
     await waitForAssertion(() => {
-      expect(container.textContent).toContain('12/06/2026, 09:01');
+      expect(container.textContent).toContain(formatDate('2026-06-12T12:01:00Z'));
     });
-    expect(container.textContent).not.toContain('08/06/2026, 19:41');
+    expect(container.textContent).not.toContain(formatDate('2026-06-08T22:41:00Z'));
   });
 });

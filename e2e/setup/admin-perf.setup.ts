@@ -3,14 +3,8 @@ import { test as setup, expect } from '@playwright/test';
 const AUTH_FILE = 'e2e/.auth/admin-perf.json';
 
 setup('authenticate as Admin Master for perf', async ({ page }) => {
-  const email = process.env.TEST_ADMIN_EMAIL;
-  const password = process.env.TEST_ADMIN_PASSWORD;
-
-  if (!email || !password) {
-    throw new Error(
-      'Missing TEST_ADMIN_EMAIL or TEST_ADMIN_PASSWORD in .env.local'
-    );
-  }
+  const email = process.env.TEST_ADMIN_EMAIL || 'admin@demo.betafleet.local';
+  const password = process.env.TEST_ADMIN_PASSWORD || process.env.DEMO_SEED_PASSWORD || 'BetaFleet@12345';
 
   await page.goto('/login');
   await page.waitForLoadState('networkidle');
