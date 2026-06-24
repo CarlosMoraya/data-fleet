@@ -32,6 +32,8 @@ export interface MaintenanceOrder {
   cancelledById?: string;
   clientName?: string; // Populado quando Workshop vê múltiplas transportadoras
   clientId?: string;   // client_id da OS; necessário para Workshop no modo "Todos os Clientes"
+  shipperName?: string;
+  operationalUnitName?: string;
   warrantyRevisionEventId?: string; // Vínculo opcional a um evento de revisão em garantia
 }
 
@@ -78,7 +80,7 @@ export interface MaintenanceOrderRow {
   updated_at: string;
 
   // Joins
-  vehicles?: { license_plate: string };
+  vehicles?: { license_plate: string; shippers?: { name: string } | null; operational_units?: { name: string } | null };
   workshops?: { name: string };
   profiles?: { name: string };
   budget_reviewer?: { name: string };

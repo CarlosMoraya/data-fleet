@@ -20,6 +20,8 @@ import { requiresClientSelection } from '../lib/clientScope';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useSessionUiState, usePersistentFilterState, usePersistentTabState } from '../hooks/usePersistentUiState';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
+import MultiSelectDropdown from '../components/MultiSelectDropdown';
+import { buildMaintenanceFilterOptions, applyMaintenanceListFilters } from '../lib/maintenanceFilters';
 
 // Re-export para compatibilidade com componentes que importam daqui
 export type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus };
@@ -121,6 +123,8 @@ export default function Maintenance() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = usePersistentTabState('maintenance', 'status', 'all');
   const [search, setSearch] = usePersistentFilterState<string>('maintenance', 'search', '');
+  const [shipperFilter, setShipperFilter] = usePersistentFilterState<string[]>('maintenance', 'shippers', []);
+  const [unitFilter, setUnitFilter] = usePersistentFilterState<string[]>('maintenance', 'units', []);
   const [searchParams, setSearchParams] = useSearchParams();
   React.useEffect(() => {
     const placa = searchParams.get('placa');
@@ -184,7 +188,7 @@ export default function Maintenance() {
         .from('maintenance_orders')
         .select(`
           *,
-          vehicles (license_plate),
+          vehicles (license_plate, shippers (name), operational_units (name)),
           workshops (name),
           profiles!created_by_id (name),
           budget_reviewer:profiles!budget_reviewed_by (name),
@@ -270,6 +274,8 @@ export default function Maintenance() {
     },
   });
 
+  const filterOptions = React.useMemo(() => buildMaintenanceFilterOptions(orders), [orders]);
+
   const counts = React.useMemo(() => {
     return {
       all: orders.length,
@@ -285,12 +291,13 @@ export default function Maintenance() {
   }, [orders]);
 
   const filtered = React.useMemo(() => {
-    return orders.filter(o => {
+    const byTabAndSearch = orders.filter(o => {
       const matchTab = activeTab === 'all' || o.status === activeTab;
       const matchSearch = !search || o.licensePlate.toLowerCase().includes(search.toLowerCase()) || o.os.toLowerCase().includes(search.toLowerCase());
       return matchTab && matchSearch;
     });
-  }, [orders, activeTab, search]);
+    return applyMaintenanceListFilters(byTabAndSearch, { shippers: shipperFilter, operationalUnits: unitFilter });
+  }, [orders, activeTab, search, shipperFilter, unitFilter]);
 
   const clientNameMap = React.useMemo(() => {
     const map = new Map<string, string>();
@@ -408,6 +415,10 @@ export default function Maintenance() {
             </button>
           ))}
         </div>
+
+        {/* Multi-select filters */}
+        <MultiSelectDropdown label="Unidade Operacional" options={filterOptions.operationalUnits} selected={unitFilter} onChange={setUnitFilter} />
+        <MultiSelectDropdown label="Embarcador" options={filterOptions.shippers} selected={shipperFilter} onChange={setShipperFilter} />
 
         {/* Search */}
         <div className="relative sm:ml-auto w-full sm:w-64 flex items-center">

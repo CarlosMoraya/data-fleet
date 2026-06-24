@@ -55,6 +55,8 @@ export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
     cancelledById: row.cancelled_by_id || undefined,
     clientName: row.clients?.name || undefined,
     clientId: row.client_id,
+    shipperName: row.vehicles?.shippers?.name || undefined,
+    operationalUnitName: row.vehicles?.operational_units?.name || undefined,
     warrantyRevisionEventId: row.warranty_revision_event_id || undefined,
   };
 }

@@ -2,6 +2,40 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-06-24 (Manutenção: filtros de Unidade Operacional e Embarcador)
+
+### Filtros de Unidade Operacional e Embarcador na tela de Manutenção
+
+**O que foi implementado:** dois dropdowns de multi-seleção na faixa de filtros da tela `/manutencao`, filtrando ordens de serviço pelo embarcador e pela unidade operacional do veículo da OS. A filtragem é client-side, sobre dados já carregados e escopados por tenant.
+
+**Arquitetura (padrões aplicados):** Pure function module (`maintenanceFilters.ts` espelhando `vehicleFilters.ts`), controlled component + click-outside dismiss (`MultiSelectDropdown`), estado de filtro persistido via `usePersistentFilterState` (sessionStorage).
+
+**Arquivos criados:**
+- `src/lib/maintenanceFilters.ts` — `buildMaintenanceFilterOptions` (deriva opções distintas ordenadas em pt-BR) + `applyMaintenanceListFilters` (filtra por multi-seleção: OU dentro do campo, E entre campos).
+- `src/lib/maintenanceFilters.test.ts` — 8 testes (opções distintas, valores vazios ignorados, filtro por shipper, interseção shipper+unit, multi-seleção OR, filtros vazios, undefined não passa).
+- `src/components/MultiSelectDropdown.tsx` — dropdown genérico controlado: botão com label+contagem, painel com checkboxes, "Limpar", fecha com click-outside/Escape, acessibilidade mínima (`aria-haspopup`, `aria-expanded`, `role="option"`).
+
+**Arquivos modificados:**
+- `src/types/maintenance.ts` — adicionados `shipperName?` e `operationalUnitName?` em `MaintenanceOrder`; embed `vehicles` em `MaintenanceOrderRow` estendido com `shippers(name)` e `operational_units(name)`.
+- `src/lib/maintenanceMappers.ts` — `maintenanceFromRow` popula `shipperName` e `operationalUnitName` via optional chaining.
+- `src/lib/maintenanceMappers.test.ts` — 3 novos testes (cenário feliz, null embeds, vehicles ausente).
+- `src/pages/Maintenance.tsx` — query `.select()` estendida; novos estados `shipperFilter`/`unitFilter` via `usePersistentFilterState`; `filterOptions` derivado via `useMemo`; `filtered` encadeia `applyMaintenanceListFilters`; dois `MultiSelectDropdown` renderizados na faixa de filtros.
+
+**Decisões confirmadas:**
+- Opções derivadas das ordens carregadas (não de lista completa de embarcadores/unidades) — aprovado pelo usuário.
+- Persistência via sessionStorage (`usePersistentFilterState`), não deep link de URL (multi-seleção incompatível com convenção de valor único).
+- Não reusar `dashboardKpi.ts` — evita acoplamento Manutenção↔Dashboard.
+- Sem novas dependências — dropdown construído com Tailwind v4 + lucide.
+
+**Validações executadas:**
+- `npx vitest run src/lib/maintenanceMappers.test.ts` ✅ (8/8, +3 novos)
+- `npx vitest run src/lib/maintenanceFilters.test.ts` ✅ (8/8)
+- `npm run test:unit` ✅ (608/608, +11 novos sem regressão)
+- `npx tsc --noEmit` ✅ (0 erros)
+- `npm run test:smoke` ✅ (6/6)
+
+---
+
 ## Sessão — 2026-06-22 (Manutenção: paridade de piso de KM com o checklist)
 
 ### Travamento de KM mínimo no campo "Km Atual do Veículo" da Manutenção
