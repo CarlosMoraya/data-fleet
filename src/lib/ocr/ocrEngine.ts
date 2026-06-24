@@ -1,7 +1,9 @@
-import type { OcrProvider } from './types';
-import { GeminiProvider } from './geminiProvider';
 import { calculateFileHash } from '../hashUtils';
+
 import { getOcrCache, saveOcrCache } from './cacheService';
+import { GeminiProvider } from './geminiProvider';
+
+import type { OcrProvider } from './types';
 
 // Atualmente usamos apenas o Gemini, mas fácil de trocar aqui:
 const currentProvider: OcrProvider = new GeminiProvider();

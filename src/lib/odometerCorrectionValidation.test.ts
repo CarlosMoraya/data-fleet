@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { validateOdometerCorrection } from './odometerCorrectionValidation';
 
 describe('validateOdometerCorrection', () => {

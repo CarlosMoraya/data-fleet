@@ -1,23 +1,20 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Edit2, Trash2, Truck, User, Eye } from 'lucide-react';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '../context/AuthContext';
-import { Vehicle, VehicleFieldSettings } from '../types';
-import { Plus, Search, Edit2, Trash2, Truck, User, Eye } from 'lucide-react';
-import VehicleForm from '../components/VehicleForm';
-import VehicleDetailModal from '../components/VehicleDetailModal';
-import { supabase } from '../lib/supabase';
-import { vehicleFromRow, VehicleRow } from '../lib/vehicleMappers';
-import { fieldSettingsFromRow, defaultFieldSettings, VehicleFieldSettingsRow } from '../lib/fieldSettingsMappers';
-import { saveVehicle, deleteVehicle } from '../services/vehicleService';
-import type { VehicleFiles } from '../services/vehicleService';
-import { requiresClientSelection } from '../lib/clientScope';
+
 import SelectClientNotice from '../components/SelectClientNotice';
 import VehicleActiveFilterBanner from '../components/VehicleActiveFilterBanner';
-import { clearVehicleDraftFiles } from '../lib/offline/vehicleDraftFiles';
+import VehicleDetailModal from '../components/VehicleDetailModal';
+import VehicleForm from '../components/VehicleForm';
+import { useAuth } from '../context/AuthContext';
 import { useSessionUiState } from '../hooks/usePersistentUiState';
-import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
+import { requiresClientSelection } from '../lib/clientScope';
 import { computeOverdueChecklistVehicleIds } from '../lib/dashboardKpi';
+import { fieldSettingsFromRow, defaultFieldSettings, VehicleFieldSettingsRow } from '../lib/fieldSettingsMappers';
+import { clearVehicleDraftFiles } from '../lib/offline/vehicleDraftFiles';
+import { supabase } from '../lib/supabase';
+import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import {
   PENDENCY_LABELS,
   PENDENCY_VALUES,
@@ -30,6 +27,11 @@ import {
   type VehiclePendency,
   type VehicleStructuredFilters,
 } from '../lib/vehicleFilters';
+import { vehicleFromRow, VehicleRow } from '../lib/vehicleMappers';
+import { saveVehicle, deleteVehicle } from '../services/vehicleService';
+import { Vehicle, VehicleFieldSettings } from '../types';
+
+import type { VehicleFiles } from '../services/vehicleService';
 
 interface AvailableDriver {
   id: string;
@@ -130,12 +132,12 @@ export default function Vehicles() {
       ]);
 
       return {
-        shippers: (shippersData ?? []) as AvailableShipper[],
+        shippers: (shippersData ?? []),
         units: (unitsData ?? []).map((u: any) => ({
           id: u.id,
           name: u.name,
           shipperId: u.shipper_id,
-        })) as AvailableOperationalUnit[]
+        }))
       };
     },
     enabled: !!currentClient?.id,
@@ -163,7 +165,7 @@ export default function Vehicles() {
           .filter((id: string) => id !== editingVehicle?.driverId)
       );
 
-      return (allDrivers ?? []).filter((d: any) => !usedIds.has(d.id)) as AvailableDriver[];
+      return (allDrivers ?? []).filter((d: any) => !usedIds.has(d.id));
     },
     enabled: isFormOpen && !!currentClient?.id,
   });
@@ -232,7 +234,7 @@ export default function Vehicles() {
       }
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as { client_id: string; rotina_day_interval: number | null; seguranca_day_interval: number | null }[];
+      return (data ?? []);
     },
     enabled: !!user && filters.pendency === 'checklist_overdue',
     staleTime: 5 * 60 * 1000,
@@ -351,12 +353,12 @@ export default function Vehicles() {
   }, [clients]);
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex h-full flex-col gap-6">
       {blockWrite && <SelectClientNotice />}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Veículos</h1>
-          <p className="text-sm text-zinc-500 mt-1">Gerencie a frota de veículos do cliente.</p>
+          <p className="mt-1 text-sm text-zinc-500">Gerencie a frota de veículos do cliente.</p>
         </div>
 
         {canCreate && (
@@ -368,15 +370,15 @@ export default function Vehicles() {
               setEditingVehicle(null);
               setIsFormOpen(true);
             }}
-            className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
+            className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none"
           >
-            <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+            <Plus className="mr-2 -ml-1 h-5 w-5" aria-hidden="true" />
             Adicionar Veículo
           </button>
         )}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <Search className="h-5 w-5 text-zinc-400" aria-hidden="true" />
@@ -385,7 +387,7 @@ export default function Vehicles() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="block w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
+            className="block w-full rounded-xl border border-zinc-200 bg-white py-2.5 pr-3 pl-10 text-sm placeholder-zinc-500 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             placeholder="Buscar por placa, modelo ou chassi..."
           />
         </div>
@@ -393,7 +395,7 @@ export default function Vehicles() {
           aria-label="Embarcador"
           value={filters.shipperId ?? ''}
           onChange={(e) => updateFilter({ shipperId: e.target.value || null })}
-          className="rounded-xl border border-zinc-200 bg-white py-2.5 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
         >
           <option value="">Todos os embarcadores</option>
           {shipperOptions.map((shipper) => (
@@ -404,7 +406,7 @@ export default function Vehicles() {
           aria-label="Unidade Operacional"
           value={filters.operationalUnitId ?? ''}
           onChange={(e) => updateFilter({ operationalUnitId: e.target.value || null })}
-          className="rounded-xl border border-zinc-200 bg-white py-2.5 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
         >
           <option value="">Todas as unidades</option>
           {unitOptions.map((unit) => (
@@ -415,7 +417,7 @@ export default function Vehicles() {
           aria-label="Pendência"
           value={filters.pendency ?? ''}
           onChange={(e) => updateFilter({ pendency: (e.target.value || null) as VehiclePendency | null })}
-          className="rounded-xl border border-zinc-200 bg-white py-2.5 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
         >
           <option value="">Todas as pendências</option>
           {PENDENCY_VALUES.map((pendency) => (
@@ -427,7 +429,7 @@ export default function Vehicles() {
             type="button"
             aria-label="Limpar filtros"
             onClick={clearAllFilters}
-            className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
           >
             Limpar filtros
           </button>
@@ -445,7 +447,7 @@ export default function Vehicles() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm flex-1 min-h-0 flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         {loadingVehicles ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-orange-500" />
@@ -453,35 +455,35 @@ export default function Vehicles() {
         ) : (
           <div className="flex-1 overflow-auto">
             <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50 sticky top-0 z-10">
+              <thead className="sticky top-0 z-10 bg-zinc-50">
                 <tr>
                   {blockWrite && (
-                    <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Cliente</th>
+                    <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Cliente</th>
                   )}
-                  <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider sm:pl-6">Veículo</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Tipo / Energia</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Proprietário</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Motorista</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Embarcador / Unid. Op.</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Finalidade</th>
-                  <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                  <th scope="col" className="py-3.5 pr-3 pl-4 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase sm:pl-6">Veículo</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Tipo / Energia</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Proprietário</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Motorista</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Embarcador / Unid. Op.</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Finalidade</th>
+                  <th scope="col" className="relative py-3.5 pr-4 pl-3 sm:pr-6">
                     <span className="sr-only">Ações</span>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 bg-white">
                 {filteredVehicles.map((vehicle) => (
-                  <tr key={vehicle.id} className="hover:bg-zinc-50 transition-colors">
+                  <tr key={vehicle.id} className="transition-colors hover:bg-zinc-50">
                     {blockWrite && (
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-600">
+                      <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-600">
                         <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
                           {vehicle.clientId ? (clientNameMap.get(vehicle.clientId) ?? '—') : '—'}
                         </span>
                       </td>
                     )}
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
+                    <td className="py-4 pr-3 pl-4 whitespace-nowrap sm:pl-6">
                       <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-zinc-100 flex items-center justify-center border border-zinc-200">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100">
                           <Truck className="h-5 w-5 text-zinc-500" />
                         </div>
                         <div className="ml-4">
@@ -490,23 +492,23 @@ export default function Vehicles() {
                         </div>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
                       <div className="text-zinc-900">{vehicle.type}</div>
                       <div>{vehicle.energySource}</div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
                       <div className="text-zinc-900">{vehicle.owner}</div>
                       <div>{vehicle.acquisition}</div>
                     </td>
-                    <td className="px-3 py-4 text-sm text-zinc-500 max-w-[140px]">
+                    <td className="max-w-[140px] px-3 py-4 text-sm text-zinc-500">
                       {vehicle.driverName ? (() => {
                         const parts = vehicle.driverName.split(' ');
                         const firstLine = parts.slice(0, 2).join(' ');
                         const secondLine = parts.slice(2).join(' ');
                         return (
                           <div className="flex items-start gap-1.5">
-                            <User className="h-3.5 w-3.5 text-orange-500 flex-shrink-0 mt-0.5" />
-                            <span className="text-zinc-900 leading-snug">
+                            <User className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-orange-500" />
+                            <span className="leading-snug text-zinc-900">
                               {firstLine}
                               {secondLine && <><br />{secondLine}</>}
                             </span>
@@ -516,7 +518,7 @@ export default function Vehicles() {
                         <span className="text-zinc-400 italic">Sem motorista</span>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
                       {vehicle.shipperName ? (
                         <div className="text-zinc-900">{vehicle.shipperName}</div>
                       ) : (
@@ -526,19 +528,19 @@ export default function Vehicles() {
                         <div className="text-zinc-500">{vehicle.operationalUnitName}</div>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
                       {vehicle.vehicleUsage ? (
                         <span className="text-zinc-900">{vehicle.vehicleUsage}</span>
                       ) : (
                         <span className="text-zinc-400 italic">—</span>
                       )}
                     </td>
-                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                    <td className="relative py-4 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-6">
                       <div className="flex items-center justify-end gap-3">
                         <button
                           onClick={() => setViewingVehicle(vehicle)}
                           title="Visualizar"
-                          className="text-zinc-400 hover:text-zinc-700 transition-colors"
+                          className="text-zinc-400 transition-colors hover:text-zinc-700"
                         >
                           <Eye className="h-5 w-5" />
                           <span className="sr-only">Visualizar</span>
@@ -551,7 +553,7 @@ export default function Vehicles() {
                               setIsFormOpen(true);
                               setEditingVehicle(vehicle);
                             }}
-                            className="text-zinc-400 hover:text-zinc-900 transition-colors"
+                            className="text-zinc-400 transition-colors hover:text-zinc-900"
                           >
                             <Edit2 className="h-5 w-5" />
                             <span className="sr-only">Edit</span>
@@ -560,7 +562,7 @@ export default function Vehicles() {
                         {canDelete && (
                           <button
                             onClick={() => handleDelete(vehicle)}
-                            className="text-zinc-400 hover:text-red-600 transition-colors"
+                            className="text-zinc-400 transition-colors hover:text-red-600"
                           >
                             <Trash2 className="h-5 w-5" />
                             <span className="sr-only">Delete</span>

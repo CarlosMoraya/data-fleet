@@ -5,13 +5,16 @@
  * Verifies that the editable table renders Sistema as a select dropdown
  * and the readOnly table renders system as plain text.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import React from 'react';
-import { createRoot } from 'react-dom/client';
 import { act } from 'react';
-import BudgetItemsTable from './BudgetItemsTable';
-import type { BudgetItem } from '../lib/maintenanceMappers';
+import { createRoot } from 'react-dom/client';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
 import { BUDGET_SYSTEM_OPTIONS } from '../lib/budgetSystems';
+
+import BudgetItemsTable from './BudgetItemsTable';
+
+import type { BudgetItem } from '../lib/maintenanceMappers';
 
 let container: HTMLDivElement;
 
@@ -60,13 +63,13 @@ describe('BudgetItemsTable', () => {
     expect(systemInputs.length).toBe(0);
 
     // The first select should have the correct value
-    expect((selects[0] as HTMLSelectElement).value).toBe('Sistema de Freio');
+    expect((selects[0]).value).toBe('Sistema de Freio');
 
     // Options should include all BUDGET_SYSTEM_OPTIONS plus the placeholder
     const options = selects[0].querySelectorAll('option');
     expect(options.length).toBe(BUDGET_SYSTEM_OPTIONS.length + 1); // +1 for "Selecione..."
-    expect((options[0] as HTMLOptionElement).value).toBe('');
-    expect((options[0] as HTMLOptionElement).textContent).toBe('Selecione...');
+    expect((options[0]).value).toBe('');
+    expect((options[0]).textContent).toBe('Selecione...');
   });
 
   it('system select calls onChange with selected official value', () => {
@@ -81,7 +84,7 @@ describe('BudgetItemsTable', () => {
     act(() => {
       const event = new Event('change', { bubbles: true });
       Object.defineProperty(event, 'target', { value: selects[0], writable: false });
-      (selects[0] as HTMLSelectElement).value = 'Motor';
+      (selects[0]).value = 'Motor';
       selects[0].dispatchEvent(event);
     });
 

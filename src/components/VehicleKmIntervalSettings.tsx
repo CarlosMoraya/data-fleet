@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Gauge, Loader2, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 
@@ -63,7 +64,7 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
         .eq('client_id', clientId)
         .order('license_plate');
       if (error) throw error;
-      return data as VehicleRow[];
+      return data;
     },
     enabled: !!clientId,
   });
@@ -76,7 +77,7 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
         .select('id, vehicle_id, km_interval')
         .eq('client_id', clientId);
       if (error) throw error;
-      return data as IntervalRow[];
+      return data;
     },
     enabled: !!clientId,
   });
@@ -184,9 +185,9 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden animate-in fade-in duration-300">
+    <div className="animate-in fade-in overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm duration-300">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col justify-between gap-3 border-b border-zinc-200 px-6 py-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           <Gauge className="h-5 w-5 text-zinc-400" />
           <div>
@@ -195,20 +196,20 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
           </div>
         </div>
         {dirtyCount > 0 && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700 shrink-0">
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700">
             {dirtyCount} {dirtyCount === 1 ? 'alteração pendente' : 'alterações pendentes'}
           </span>
         )}
       </div>
 
       {/* Filters */}
-      <div className="px-6 py-3 border-b border-zinc-100 bg-zinc-50 flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3 border-b border-zinc-100 bg-zinc-50 px-6 py-3">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-zinc-500 font-medium">Marca</label>
+          <label className="text-xs font-medium text-zinc-500">Marca</label>
           <select
             value={filterBrand}
             onChange={e => setFilterBrand(e.target.value)}
-            className="h-8 rounded-lg border border-zinc-200 bg-white px-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="h-8 rounded-lg border border-zinc-200 bg-white px-2 text-sm text-zinc-800 focus:ring-2 focus:ring-orange-500 focus:outline-none"
           >
             <option value="">Todas</option>
             {availableBrands.map(b => (
@@ -218,22 +219,22 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-zinc-500 font-medium">Modelo</label>
+          <label className="text-xs font-medium text-zinc-500">Modelo</label>
           <input
             type="text"
             value={filterModel}
             onChange={e => setFilterModel(e.target.value)}
             placeholder="Buscar modelo..."
-            className="h-8 rounded-lg border border-zinc-200 bg-white px-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="h-8 rounded-lg border border-zinc-200 bg-white px-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500 focus:outline-none"
           />
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-zinc-500 font-medium">Categoria</label>
+          <label className="text-xs font-medium text-zinc-500">Categoria</label>
           <select
             value={filterCategory}
             onChange={e => setFilterCategory(e.target.value)}
-            className="h-8 rounded-lg border border-zinc-200 bg-white px-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="h-8 rounded-lg border border-zinc-200 bg-white px-2 text-sm text-zinc-800 focus:ring-2 focus:ring-orange-500 focus:outline-none"
           >
             <option value="">Todas</option>
             <option value="Leve">Leve</option>
@@ -245,7 +246,7 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
         {hasFilters && (
           <button
             onClick={handleClearFilters}
-            className="flex items-center gap-1 h-8 px-2.5 rounded-lg border border-zinc-200 bg-white text-xs text-zinc-600 hover:bg-zinc-100 transition-colors cursor-pointer"
+            className="flex h-8 cursor-pointer items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 text-xs text-zinc-600 transition-colors hover:bg-zinc-100"
           >
             <X className="h-3 w-3" />
             Limpar
@@ -254,7 +255,7 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
       </div>
 
       {/* Bulk apply */}
-      <div className="px-6 py-3 border-b border-zinc-100 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 border-b border-zinc-100 px-6 py-3">
         <span className="text-sm text-zinc-600">
           Aplicar em todos os <span className="font-medium text-zinc-800">{filteredVehicles.length}</span> veículos{hasFilters ? ' filtrados' : ''}:
         </span>
@@ -265,13 +266,13 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
             value={bulkKm}
             onChange={e => setBulkKm(e.target.value)}
             placeholder="Ex: 10000"
-            className="h-8 w-32 rounded-lg border border-zinc-200 px-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="h-8 w-32 rounded-lg border border-zinc-200 px-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500 focus:outline-none"
           />
           <span className="text-sm text-zinc-500">km</span>
           <button
             onClick={handleBulkApply}
             disabled={!bulkKm || parseInt(bulkKm, 10) <= 0}
-            className="h-8 px-3 rounded-lg bg-orange-50 border border-orange-200 text-xs font-medium text-orange-700 hover:bg-orange-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            className="h-8 cursor-pointer rounded-lg border border-orange-200 bg-orange-50 px-3 text-xs font-medium text-orange-700 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Aplicar
           </button>
@@ -295,11 +296,11 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-zinc-100 bg-zinc-50">
-              <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Placa</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Marca</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Modelo</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Categoria</th>
-              <th className="px-6 py-3 text-right text-xs font-semibold text-zinc-500 uppercase tracking-wider">Km entre Revisões</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Placa</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Marca</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Modelo</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Categoria</th>
+              <th className="px-6 py-3 text-right text-xs font-semibold tracking-wider text-zinc-500 uppercase">Km entre Revisões</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100">
@@ -319,7 +320,7 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
                   : (v.kmInterval !== null ? String(v.kmInterval) : '');
 
                 return (
-                  <tr key={v.id} className={cn('hover:bg-zinc-50 transition-colors', isDirty && 'bg-orange-50/30')}>
+                  <tr key={v.id} className={cn('transition-colors hover:bg-zinc-50', isDirty && 'bg-orange-50/30')}>
                     <td className="px-6 py-3 font-mono text-xs font-medium text-zinc-800">{v.license_plate}</td>
                     <td className="px-4 py-3 text-zinc-700">{v.brand}</td>
                     <td className="px-4 py-3 text-zinc-700">{v.model}</td>
@@ -341,11 +342,11 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
                           onChange={e => handleKmChange(v.id, e.target.value)}
                           placeholder="—"
                           className={cn(
-                            'w-28 h-8 rounded-lg border px-2 text-sm text-right text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors',
+                            'h-8 w-28 rounded-lg border px-2 text-right text-sm text-zinc-800 transition-colors placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500 focus:outline-none',
                             isDirty ? 'border-orange-300 bg-orange-50' : 'border-zinc-200 bg-white'
                           )}
                         />
-                        <span className="text-xs text-zinc-400 w-4">km</span>
+                        <span className="w-4 text-xs text-zinc-400">km</span>
                       </div>
                     </td>
                   </tr>
@@ -358,7 +359,7 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="px-6 py-3 border-t border-zinc-100 flex items-center justify-between">
+        <div className="flex items-center justify-between border-t border-zinc-100 px-6 py-3">
           <span className="text-xs text-zinc-500">
             Página {safePage} de {totalPages} — {filteredVehicles.length} veículos
           </span>
@@ -366,7 +367,7 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={safePage === 1}
-              className="flex items-center gap-1 h-8 px-2.5 rounded-lg border border-zinc-200 text-xs text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              className="flex h-8 cursor-pointer items-center gap-1 rounded-lg border border-zinc-200 px-2.5 text-xs text-zinc-600 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
               Anterior
@@ -374,7 +375,7 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={safePage === totalPages}
-              className="flex items-center gap-1 h-8 px-2.5 rounded-lg border border-zinc-200 text-xs text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              className="flex h-8 cursor-pointer items-center gap-1 rounded-lg border border-zinc-200 px-2.5 text-xs text-zinc-600 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Próxima
               <ChevronRight className="h-3.5 w-3.5" />
@@ -384,11 +385,11 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
       )}
 
       {/* Footer */}
-      <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 flex items-center justify-end">
+      <div className="flex items-center justify-end border-t border-zinc-200 bg-zinc-50 px-6 py-4">
         <button
           onClick={() => saveMutation.mutate()}
           disabled={dirtyCount === 0 || saveMutation.isPending}
-          className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
+          className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
         >
           {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
           {saveMutation.isPending

@@ -1,8 +1,9 @@
 /// <reference types="node" />
-import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it } from 'vitest';
 
 // ── RPC contract: every supabase.rpc('<name>') called in src/** must have a
 // matching `CREATE [OR REPLACE] FUNCTION <name>` in supabase/migrations/**.

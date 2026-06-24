@@ -1,5 +1,6 @@
-import { supabase } from '../lib/supabase';
 import { mapOdometerReadingRow } from '../lib/odometerCorrectionMappers';
+import { supabase } from '../lib/supabase';
+
 import type { OdometerCorrectionInput, OdometerReading } from '../types/odometerCorrection';
 
 interface ChecklistOdometerSource {
@@ -28,7 +29,7 @@ export async function createOdometerCorrection(
 
   if (checklistError) throw checklistError;
 
-  const source = checklist as ChecklistOdometerSource;
+  const source = checklist;
   const { error } = await supabase.from('vehicle_odometer_corrections').insert({
     client_id: source.client_id,
     vehicle_id: source.vehicle_id,

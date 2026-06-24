@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Driver } from '../types';
+
 import {
   DRIVER_PENDENCY_VALUES,
   EMPTY_DRIVER_FILTERS,
@@ -15,6 +15,8 @@ import {
   serializeDriverFiltersToParams,
   type DriverFilterContext,
 } from './driverFilters';
+
+import type { Driver } from '../types';
 
 const ctx: DriverFilterContext = {
   todayIso: '2026-06-19',

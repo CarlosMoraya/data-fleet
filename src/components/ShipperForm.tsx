@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
 import { X, Package } from 'lucide-react';
-import { Shipper } from '../types';
-import { shipperToRow } from '../lib/shipperMappers';
+import React, { useState, useEffect } from 'react';
+
 import { filterText, filterCNPJ, filterPhone } from '../lib/inputHelpers';
+import { shipperToRow } from '../lib/shipperMappers';
+import { Shipper } from '../types';
 
 // ─── Estilos ─────────────────────────────────────────────────────────────────
 
@@ -105,9 +106,9 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className="relative flex w-full max-w-xl flex-col rounded-2xl bg-white shadow-xl max-h-[90vh]">
+      <div className="relative flex max-h-[90vh] w-full max-w-xl flex-col rounded-2xl bg-white shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-zinc-200 px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100">
               <Package className="h-4 w-4 text-blue-600" />
@@ -116,21 +117,21 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
               {shipper ? 'Editar Embarcador' : 'Novo Embarcador'}
             </h2>
           </div>
-          <button onClick={handleClose} className="rounded-lg p-1 hover:bg-zinc-100 transition-colors">
+          <button onClick={handleClose} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto flex-1">
+        <div className="flex-1 overflow-y-auto">
           <form id="shipper-form" onSubmit={handleSubmit} className="space-y-8 p-6">
 
             {/* Seção 1: Dados do Embarcador */}
             <div>
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-500">
+              <h3 className="mb-4 text-sm font-semibold tracking-wider text-zinc-500 uppercase">
                 Dados do Embarcador
               </h3>
-              <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <Label htmlFor="name" required>Nome do Embarcador</Label>
                   <input
@@ -188,7 +189,7 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
 
             {/* Seção 2: Observações & Status */}
             <div>
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-500">
+              <h3 className="mb-4 text-sm font-semibold tracking-wider text-zinc-500 uppercase">
                 Observações & Status
               </h3>
               <div className="space-y-4">
@@ -213,10 +214,10 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
                     className="h-4 w-4 rounded border-zinc-300 text-blue-500 focus:ring-blue-500"
                   />
                   <div>
-                    <label htmlFor="active" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                    <label htmlFor="active" className="block cursor-pointer text-sm font-medium text-zinc-700">
                       Embarcador ativo
                     </label>
-                    <p className="text-xs text-zinc-500 mt-0.5">
+                    <p className="mt-0.5 text-xs text-zinc-500">
                       Embarcadores inativos não aparecem para seleção em veículos.
                     </p>
                   </div>
@@ -238,7 +239,7 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
             >
               Cancelar
             </button>
@@ -246,7 +247,7 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
               type="submit"
               form="shipper-form"
               disabled={saving}
-              className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 transition-colors disabled:opacity-60"
+              className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-600 disabled:opacity-60"
             >
               {saving ? 'Salvando...' : shipper ? 'Salvar Alterações' : 'Cadastrar Embarcador'}
             </button>

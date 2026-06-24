@@ -1,4 +1,5 @@
 import { Workshop } from '../types';
+
 import { capitalizeWords, normalizeUpper, normalizeTrim } from './inputHelpers';
 
 // ─── Tipo espelho do banco (snake_case) ─────────────────────────────────────

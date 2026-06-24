@@ -1,6 +1,7 @@
-import React from 'react';
-import { useAuth } from '../context/AuthContext';
 import { ChevronDown, User as UserIcon, Menu } from 'lucide-react';
+import React from 'react';
+
+import { useAuth } from '../context/AuthContext';
 import { getRoleLabel } from '../lib/rolePermissions';
 
 interface TopbarProps {
@@ -41,7 +42,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
             {currentClient ? (
               <ClientLogo name={currentClient.name} logoUrl={currentClient.logoUrl} />
             ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 border border-zinc-200">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100">
                 <Menu className="h-4 w-4 text-zinc-400" />
               </div>
             )}
@@ -49,7 +50,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
               <select
                 value={currentClient?.id ?? ''}
                 onChange={(e) => switchClient(e.target.value)}
-                className="appearance-none bg-transparent py-1.5 pl-3 pr-8 text-sm font-medium text-zinc-900 focus:outline-none focus:ring-0 border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
+                className="cursor-pointer appearance-none rounded-lg border border-zinc-200 bg-transparent py-1.5 pr-8 pl-3 text-sm font-medium text-zinc-900 hover:bg-zinc-50 focus:ring-0 focus:outline-none"
               >
                 {(user?.role === 'Admin Master' || (user?.role === 'Workshop' && workshopPartnerships.length > 1)) && (
                   <option value="">Todos os Clientes</option>
@@ -60,7 +61,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+              <ChevronDown className="pointer-events-none absolute top-1/2 right-2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
             </div>
           </div>
         ) : (
@@ -77,7 +78,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
             <span className="text-sm font-medium text-zinc-900">{user?.name}</span>
             <span className="text-xs text-zinc-500">{getRoleLabel(user?.role)}</span>
           </div>
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 border border-zinc-200">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-zinc-100">
             <UserIcon className="h-5 w-5 text-zinc-600" />
           </div>
         </div>

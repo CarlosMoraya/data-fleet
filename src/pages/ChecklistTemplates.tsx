@@ -1,14 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit2, CheckCircle, XCircle, RefreshCw, Trash2, FileStack } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import React, { useState, useMemo } from 'react';
+
+import ChecklistTemplateForm from '../components/ChecklistTemplateForm';
+import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { templateFromRow, type ChecklistTemplateRow } from '../lib/checklistTemplateMappers';
-import type { ChecklistTemplate, TemplateCategory, TemplateStatus, ChecklistContext } from '../types';
-import ChecklistTemplateForm from '../components/ChecklistTemplateForm';
-import { cn } from '../lib/utils';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
-import SelectClientNotice from '../components/SelectClientNotice';
+import { supabase } from '../lib/supabase';
+import { cn } from '../lib/utils';
+
+import type { ChecklistTemplate, TemplateCategory, TemplateStatus, ChecklistContext } from '../types';
+
 
 const STATUS_LABEL: Record<TemplateStatus, string> = {
   draft: 'Rascunho',
@@ -189,22 +192,22 @@ export default function ChecklistTemplates() {
   }, [clients]);
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex h-full flex-col gap-6">
       {blockWrite && <SelectClientNotice />}
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-zinc-900">
             <FileStack className="h-6 w-6 text-orange-500" />
             Templates de Checklist
           </h1>
-          <p className="text-sm text-zinc-500 mt-1">Gerencie os modelos de inspeção da frota</p>
+          <p className="mt-1 text-sm text-zinc-500">Gerencie os modelos de inspeção da frota</p>
         </div>
         {canCreate && (
           <button
             onClick={() => { setEditingTemplate(null); setShowForm(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600"
+            className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
           >
             <Plus className="h-4 w-4" />
             Novo Template
@@ -214,13 +217,13 @@ export default function ChecklistTemplates() {
 
       {/* Filters */}
       <div className="space-y-2">
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex flex-wrap gap-2">
           {(['Todos', 'Leve', 'Médio', 'Pesado', 'Elétrico'] as const).map(cat => (
             <button
               key={cat}
               onClick={() => setFilterCategory(cat)}
               className={cn(
-                'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+                'rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
                 filterCategory === cat ? 'bg-orange-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
               )}
             >
@@ -228,13 +231,13 @@ export default function ChecklistTemplates() {
             </button>
           ))}
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex flex-wrap gap-2">
           {(['Todos', 'Rotina', 'Auditoria', 'Reboque', 'Entrada em Oficina', 'Saída de Oficina', 'Segurança'] as const).map(ctx => (
             <button
               key={ctx}
               onClick={() => setFilterContext(ctx)}
               className={cn(
-                'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
                 filterContext === ctx ? 'bg-zinc-700 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
               )}
             >
@@ -251,12 +254,12 @@ export default function ChecklistTemplates() {
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden flex-1 min-h-0 flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
         {loadingTemplates ? (
-          <div className="text-center py-16 text-zinc-400 text-sm">Carregando templates...</div>
+          <div className="py-16 text-center text-sm text-zinc-400">Carregando templates...</div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-16 text-zinc-400">
-            <FileStack className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <div className="py-16 text-center text-zinc-400">
+            <FileStack className="mx-auto mb-3 h-12 w-12 opacity-30" />
             <p className="text-sm">Nenhum template encontrado.</p>
             {canCreate && (
               <button
@@ -273,7 +276,7 @@ export default function ChecklistTemplates() {
               <thead className="sticky top-0 z-10">
                 <tr className="bg-zinc-50">
                   {[...(blockWrite ? ['Cliente'] : []), 'Nome', 'Contexto', 'Categoria', 'Status', 'Versão', 'Ações'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">
                       {h}
                     </th>
                   ))}
@@ -281,7 +284,7 @@ export default function ChecklistTemplates() {
               </thead>
               <tbody className="divide-y divide-zinc-50">
                 {filtered.map(t => (
-                  <tr key={t.id} className="hover:bg-zinc-50 transition-colors">
+                  <tr key={t.id} className="transition-colors hover:bg-zinc-50">
                     {blockWrite && (
                       <td className="px-4 py-3 text-sm text-zinc-600">
                         <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
@@ -292,7 +295,7 @@ export default function ChecklistTemplates() {
                     <td className="px-4 py-3">
                       <div>
                         <p className="text-sm font-medium text-zinc-900">{t.name}</p>
-                        {t.description && <p className="text-xs text-zinc-400 truncate max-w-xs">{t.description}</p>}
+                        {t.description && <p className="max-w-xs truncate text-xs text-zinc-400">{t.description}</p>}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -302,7 +305,7 @@ export default function ChecklistTemplates() {
                       <span className="text-sm text-zinc-700">{CATEGORY_LABEL[t.vehicleCategory] ?? t.vehicleCategory}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', STATUS_COLOR[t.status])}>
+                      <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', STATUS_COLOR[t.status])}>
                         {STATUS_LABEL[t.status]}
                       </span>
                     </td>
@@ -314,7 +317,7 @@ export default function ChecklistTemplates() {
                           <button
                             title="Editar"
                             onClick={() => { setEditingTemplate(t); setShowForm(true); }}
-                            className="p-1.5 rounded hover:bg-zinc-100 text-zinc-500"
+                            className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100"
                           >
                             <Edit2 className="h-4 w-4" />
                           </button>
@@ -325,7 +328,7 @@ export default function ChecklistTemplates() {
                           <button
                             title="Publicar"
                             onClick={() => setConfirmAction({ type: 'publish', template: t })}
-                            className="p-1.5 rounded hover:bg-green-50 text-green-600"
+                            className="rounded p-1.5 text-green-600 hover:bg-green-50"
                           >
                             <CheckCircle className="h-4 w-4" />
                           </button>
@@ -336,7 +339,7 @@ export default function ChecklistTemplates() {
                           <button
                             title="Nova versão"
                             onClick={() => setConfirmAction({ type: 'new-version', template: t })}
-                            className="p-1.5 rounded hover:bg-blue-50 text-blue-600"
+                            className="rounded p-1.5 text-blue-600 hover:bg-blue-50"
                           >
                             <RefreshCw className="h-4 w-4" />
                           </button>
@@ -347,7 +350,7 @@ export default function ChecklistTemplates() {
                           <button
                             title="Descontinuar"
                             onClick={() => setConfirmAction({ type: 'deprecate', template: t })}
-                            className="p-1.5 rounded hover:bg-zinc-100 text-zinc-500"
+                            className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100"
                           >
                             <XCircle className="h-4 w-4" />
                           </button>
@@ -358,7 +361,7 @@ export default function ChecklistTemplates() {
                           <button
                             title="Excluir"
                             onClick={() => setConfirmAction({ type: 'delete', template: t })}
-                            className="p-1.5 rounded hover:bg-red-50 text-red-500"
+                            className="rounded p-1.5 text-red-500 hover:bg-red-50"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -396,14 +399,14 @@ export default function ChecklistTemplates() {
       {/* Confirm Dialog */}
       {confirmAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+          <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-zinc-900">{CONFIRM_TEXTS[confirmAction.type].title}</h3>
             <p className="text-sm text-zinc-600">{CONFIRM_TEXTS[confirmAction.type].body}</p>
             <p className="text-sm font-medium text-zinc-900">Template: <span className="text-orange-600">{confirmAction.template.name}</span></p>
             {actionError && (
-              <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{actionError}</p>
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{actionError}</p>
             )}
-            <div className="flex gap-3 justify-end">
+            <div className="flex justify-end gap-3">
               <button
                 onClick={() => { setConfirmAction(null); setActionError(null); }}
                 className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900"
@@ -415,7 +418,7 @@ export default function ChecklistTemplates() {
                 <button
                   onClick={executeConfirm}
                   disabled={templateActionMutation.isPending}
-                  className={cn('px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50', CONFIRM_TEXTS[confirmAction.type].color)}
+                  className={cn('rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50', CONFIRM_TEXTS[confirmAction.type].color)}
                 >
                   {templateActionMutation.isPending ? 'Aguarde...' : CONFIRM_TEXTS[confirmAction.type].confirm}
                 </button>

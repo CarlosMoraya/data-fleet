@@ -1,3 +1,5 @@
+import { normalizeTrim } from './inputHelpers';
+
 import type {
   ChecklistItemSuggestion,
   ChecklistTemplate,
@@ -7,7 +9,6 @@ import type {
   ChecklistContext,
   TemplateStatus,
 } from '../types';
-import { normalizeTrim } from './inputHelpers';
 
 // ─── Row types (snake_case from Supabase) ─────────────────────────────────────
 

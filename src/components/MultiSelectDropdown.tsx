@@ -1,5 +1,6 @@
-import React from 'react';
 import { ChevronDown, Check } from 'lucide-react';
+import React from 'react';
+
 import { cn } from '../lib/utils';
 
 export interface MultiSelectDropdownProps {
@@ -22,7 +23,7 @@ export default function MultiSelectDropdown({
 
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (ref.current && !ref.current.contains(e.target)) {
         setIsOpen(false);
       }
     };
@@ -58,8 +59,8 @@ export default function MultiSelectDropdown({
         aria-expanded={isOpen}
         className={cn(
           'inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium',
-          'bg-white text-zinc-700 hover:bg-zinc-50 transition-colors',
-          'focus:outline-none focus:ring-2 focus:ring-orange-400',
+          'bg-white text-zinc-700 transition-colors hover:bg-zinc-50',
+          'focus:ring-2 focus:ring-orange-400 focus:outline-none',
         )}
       >
         {buttonLabel}
@@ -84,7 +85,7 @@ export default function MultiSelectDropdown({
                     aria-selected={isSelected}
                     onClick={() => toggleOption(option)}
                     className={cn(
-                      'flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors',
+                      'flex cursor-pointer items-center gap-2 px-3 py-2 text-sm transition-colors',
                       isSelected ? 'bg-orange-50 text-orange-700' : 'text-zinc-700 hover:bg-zinc-50',
                     )}
                   >
@@ -109,7 +110,7 @@ export default function MultiSelectDropdown({
               <button
                 type="button"
                 onClick={() => onChange([])}
-                className="text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors"
+                className="text-xs font-medium text-orange-600 transition-colors hover:text-orange-700"
               >
                 Limpar
               </button>

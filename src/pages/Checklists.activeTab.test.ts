@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { getStoredChecklistTab, isOdometerUpdateChecklist, isValidChecklistTab } from './Checklists';
+
 import { buildUiStateKey } from '../lib/uiStateStorage';
+
+import { getStoredChecklistTab, isOdometerUpdateChecklist, isValidChecklistTab } from './Checklists';
 
 describe('getStoredChecklistTab', () => {
   it('falls back to checklists when storage is empty', () => {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+
 import { useAuth } from '../context/AuthContext';
 
 const DEFAULT_TIMEOUT = 60 * 60 * 1000; // 60 minutos

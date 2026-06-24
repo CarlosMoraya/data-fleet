@@ -1,6 +1,7 @@
-import type { MaintenanceOrderDashboard } from '../types/maintenance';
-import type { VehicleRow } from '../components/dashboard/OperationalPanel';
 import { normalizeBudgetSystem } from './budgetSystems';
+
+import type { VehicleRow } from '../components/dashboard/OperationalPanel';
+import type { MaintenanceOrderDashboard } from '../types/maintenance';
 
 export interface CostDashboardFilters {
   category: string | null;
@@ -441,7 +442,7 @@ export function countVehiclesWithoutDriver(vehicles: Pick<VehicleRow, 'driver_id
 export function getVehiclesWithoutDriverPlates(vehicles: Pick<VehicleRow, 'driver_id' | 'license_plate'>[]): string[] {
   return vehicles
     .filter((vehicle) => vehicle.driver_id == null && vehicle.license_plate)
-    .map((vehicle) => vehicle.license_plate as string);
+    .map((vehicle) => vehicle.license_plate);
 }
 
 export function countOpenOrders(orders: Pick<MaintenanceOrderDashboard, 'status'>[]): number {
@@ -602,7 +603,7 @@ export function calculateAverageMaintenanceDays(
 ): number | null {
   const days = orders
     .filter((o) => o.status === 'Concluído' && o.entry_date != null && o.actual_exit_date != null)
-    .map((o) => Math.floor((new Date(o.actual_exit_date as string).getTime() - new Date(o.entry_date as string).getTime()) / 86400000))
+    .map((o) => Math.floor((new Date(o.actual_exit_date).getTime() - new Date(o.entry_date).getTime()) / 86400000))
     .filter((value) => value >= 0);
 
   if (days.length === 0) return null;
@@ -616,7 +617,7 @@ export function calculateAverageOpenOrderAgeDays(
   const today = new Date(todayIso).getTime();
   const days = orders
     .filter((o) => o.status !== 'Concluído' && o.status !== 'Cancelado' && o.entry_date != null)
-    .map((o) => Math.floor((today - new Date(o.entry_date as string).getTime()) / 86400000))
+    .map((o) => Math.floor((today - new Date(o.entry_date).getTime()) / 86400000))
     .filter((value) => value >= 0);
 
   if (days.length === 0) return null;
@@ -693,7 +694,7 @@ export function getExpiredCrlvPlates(
 ): string[] {
   return vehicles
     .filter((vehicle) => isCrlvExpired(vehicle, currentYear, todayIso) && vehicle.license_plate)
-    .map((vehicle) => vehicle.license_plate as string);
+    .map((vehicle) => vehicle.license_plate);
 }
 
 export function getExpiringSoonCrlvPlates(
@@ -706,7 +707,7 @@ export function getExpiringSoonCrlvPlates(
       const date = v.crlv_expiration_date;
       return date != null && date >= todayIso && Math.floor((new Date(date).getTime() - new Date(todayIso).getTime()) / 86400000) <= windowDays && v.license_plate;
     })
-    .map((v) => v.license_plate as string);
+    .map((v) => v.license_plate);
 }
 
 export function getExpiredCnhNames(
@@ -715,7 +716,7 @@ export function getExpiredCnhNames(
 ): string[] {
   return drivers
     .filter((driver) => driver.expiration_date != null && driver.expiration_date < todayIso && driver.name)
-    .map((driver) => driver.name as string);
+    .map((driver) => driver.name);
 }
 
 export function getExpiringSoonCnhNames(
@@ -725,7 +726,7 @@ export function getExpiringSoonCnhNames(
 ): string[] {
   return drivers
     .filter((driver) => isWithinExpiryWindow(driver.expiration_date, todayIso, windowDays) && driver.name)
-    .map((driver) => driver.name as string);
+    .map((driver) => driver.name);
 }
 
 export function getExpiringSoonGrPlates(
@@ -735,7 +736,7 @@ export function getExpiringSoonGrPlates(
 ): string[] {
   return vehicles
     .filter((vehicle) => isWithinExpiryWindow(vehicle.gr_expiration_date ?? null, todayIso, windowDays) && vehicle.license_plate)
-    .map((vehicle) => vehicle.license_plate as string);
+    .map((vehicle) => vehicle.license_plate);
 }
 
 export function getExpiringSoonGrDriverNames(
@@ -745,7 +746,7 @@ export function getExpiringSoonGrDriverNames(
 ): string[] {
   return drivers
     .filter((driver) => isWithinExpiryWindow(driver.gr_expiration_date, todayIso, windowDays) && driver.name)
-    .map((driver) => driver.name as string);
+    .map((driver) => driver.name);
 }
 
 // ─── Visão Geral — Cobertura e Mapa da Frota ───────────────────────────────
@@ -960,7 +961,7 @@ export function buildMonthlyAverageCompletionDays(
       if (days >= 0) {
         const key = order.actual_exit_date.substring(0, 7);
         if (!daysByKey.has(key)) daysByKey.set(key, []);
-        daysByKey.get(key)!.push(days);
+        daysByKey.get(key).push(days);
       }
     }
   }
@@ -986,7 +987,7 @@ export function buildMonthlyMaintenanceTypeCounts(
       if (!countsByKey.has(key)) {
         countsByKey.set(key, { Corretiva: 0, Preventiva: 0, Preditiva: 0 });
       }
-      const entry = countsByKey.get(key)!;
+      const entry = countsByKey.get(key);
       if (order.type === 'Corretiva') entry.Corretiva += 1;
       else if (order.type === 'Preventiva') entry.Preventiva += 1;
       else if (order.type === 'Preditiva') entry.Preditiva += 1;
@@ -1011,7 +1012,7 @@ export function getExpiredGrVehiclePlates(
 ): string[] {
   return vehicles
     .filter((vehicle) => vehicle.gr_expiration_date != null && vehicle.gr_expiration_date < todayIso && vehicle.license_plate)
-    .map((vehicle) => vehicle.license_plate as string);
+    .map((vehicle) => vehicle.license_plate);
 }
 
 export function getExpiredGrDriverNames(
@@ -1020,7 +1021,7 @@ export function getExpiredGrDriverNames(
 ): string[] {
   return drivers
     .filter((driver) => driver.gr_expiration_date != null && driver.gr_expiration_date < todayIso && driver.name)
-    .map((driver) => driver.name as string);
+    .map((driver) => driver.name);
 }
 
 export function getVehiclesMissingCrlvUploadPlates(
@@ -1028,7 +1029,7 @@ export function getVehiclesMissingCrlvUploadPlates(
 ): string[] {
   return vehicles
     .filter((vehicle) => isBlank(vehicle.crlv_upload) && vehicle.license_plate)
-    .map((vehicle) => vehicle.license_plate as string);
+    .map((vehicle) => vehicle.license_plate);
 }
 
 export function getVehiclesMissingGrPlates(
@@ -1036,7 +1037,7 @@ export function getVehiclesMissingGrPlates(
 ): string[] {
   return vehicles
     .filter((vehicle) => isBlank(vehicle.gr_upload) && vehicle.license_plate)
-    .map((vehicle) => vehicle.license_plate as string);
+    .map((vehicle) => vehicle.license_plate);
 }
 
 export function getVehiclesMissingInsurancePlates(
@@ -1044,7 +1045,7 @@ export function getVehiclesMissingInsurancePlates(
 ): string[] {
   return vehicles
     .filter((vehicle) => vehicle.has_insurance !== true && vehicle.license_plate)
-    .map((vehicle) => vehicle.license_plate as string);
+    .map((vehicle) => vehicle.license_plate);
 }
 
 export function getVehiclesMissingMaintenanceContractPlates(
@@ -1052,7 +1053,7 @@ export function getVehiclesMissingMaintenanceContractPlates(
 ): string[] {
   return vehicles
     .filter((vehicle) => vehicle.has_maintenance_contract !== true && vehicle.license_plate)
-    .map((vehicle) => vehicle.license_plate as string);
+    .map((vehicle) => vehicle.license_plate);
 }
 
 export function getDriversMissingCnhUploadNames(
@@ -1060,7 +1061,7 @@ export function getDriversMissingCnhUploadNames(
 ): string[] {
   return drivers
     .filter((driver) => isBlank(driver.cnh_upload) && driver.name)
-    .map((driver) => driver.name as string);
+    .map((driver) => driver.name);
 }
 
 export function getDriversWithVehicleMissingGrNames(
@@ -1069,7 +1070,7 @@ export function getDriversWithVehicleMissingGrNames(
 ): string[] {
   return drivers
     .filter((driver) => driverIdsWithVehicle.has(driver.id) && isBlank(driver.gr_upload) && driver.name)
-    .map((driver) => driver.name as string);
+    .map((driver) => driver.name);
 }
 
 export function isVehicleDocumentallyIrregular(

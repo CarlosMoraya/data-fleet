@@ -29,6 +29,7 @@ import {
   saveInspectionResponse,
   completeTireInspection,
 } from './tireInspectionService';
+
 import type { AxleConfigEntry } from '../types/tire';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────

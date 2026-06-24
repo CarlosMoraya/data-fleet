@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Driver, DriverFieldSettings } from '../types';
 import { X, FileText, ExternalLink, Loader2, UserPlus, Eye, EyeOff } from 'lucide-react';
-import { validateFile } from '../lib/storageHelpers';
+import React, { useState, useEffect } from 'react';
+
+import { useAuth } from '../context/AuthContext';
+import { extractCnhData, ExtractionStatus, ExtractionResult } from '../lib/documentOcr';
 import { isDriverFieldRequired } from '../lib/driverFieldSettingsMappers';
-import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
 import {
   filterDigitsOnly,
   filterText,
@@ -12,9 +12,10 @@ import {
   filterCNHCategory,
   filterPhone,
 } from '../lib/inputHelpers';
-import { extractCnhData, ExtractionStatus, ExtractionResult } from '../lib/documentOcr';
-import { useAuth } from '../context/AuthContext';
+import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
+import { validateFile } from '../lib/storageHelpers';
 import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
+import { Driver, DriverFieldSettings } from '../types';
 
 interface DriverFormFiles {
   cnh: File | null;
@@ -247,7 +248,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
   // Label com asterisco vermelho para campos obrigatórios
   const Label = ({ name, children }: { name: string; children: React.ReactNode }) => (
     <label className="block text-sm font-medium text-zinc-700">
-      {children}{req(name) && <span className="text-red-500 ml-0.5">*</span>}
+      {children}{req(name) && <span className="ml-0.5 text-red-500">*</span>}
     </label>
   );
 
@@ -255,15 +256,15 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
     <>
       {url && !selectedFile && (
         <div className="mt-2 mb-2 flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-          <FileText className="h-4 w-4 text-zinc-400 flex-shrink-0" />
+          <FileText className="h-4 w-4 flex-shrink-0 text-zinc-400" />
           <span className="flex-1 truncate">{label}</span>
-          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700">
             Visualizar <ExternalLink className="h-3 w-3" />
           </a>
         </div>
       )}
       {selectedFile && (
-        <p className="mt-1 text-xs text-emerald-600 font-medium">
+        <p className="mt-1 text-xs font-medium text-emerald-600">
           ✓ {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
           {selectedFile.type.startsWith('image/') ? ' — será comprimida antes do upload' : ''}
         </p>
@@ -272,13 +273,13 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-full flex flex-col my-8">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:p-6">
+      <div className="my-8 flex max-h-full w-full max-w-3xl flex-col rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
           <h2 className="text-xl font-semibold text-zinc-900">
             {driver ? 'Editar Motorista' : 'Cadastrar Motorista'}
           </h2>
-          <button onClick={handleClose} className="text-zinc-400 hover:text-zinc-500 transition-colors">
+          <button onClick={handleClose} className="text-zinc-400 transition-colors hover:text-zinc-500">
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -294,15 +295,15 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
             {/* Acesso ao Sistema — apenas na criação */}
             {isCreating && (
               <div>
-                <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4 flex items-center gap-2">
+                <h3 className="mb-4 flex items-center gap-2 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">
                   <UserPlus className="h-5 w-5 text-orange-500" />
                   Acesso ao Sistema
                 </h3>
                 <p className="mb-4 text-sm text-zinc-500">O motorista receberá um login para acessar os checklists.</p>
-                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <label className="block text-sm font-medium text-zinc-700">
-                      E-mail<span className="text-red-500 ml-0.5">*</span>
+                      E-mail<span className="ml-0.5 text-red-500">*</span>
                     </label>
                     <input
                       type="email"
@@ -315,7 +316,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-700">
-                      Senha temporária<span className="text-red-500 ml-0.5">*</span>
+                      Senha temporária<span className="ml-0.5 text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <input
@@ -331,7 +332,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                       <button
                         type="button"
                         onClick={() => setShowPassword(prev => !prev)}
-                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-zinc-600 transition-colors"
+                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 transition-colors hover:text-zinc-600"
                         aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -345,11 +346,11 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
 
             {/* Dados Pessoais */}
             <div>
-              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Dados Pessoais</h3>
-              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+              <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Dados Pessoais</h3>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-zinc-700">
-                    Nome<span className="text-red-500 ml-0.5">*</span>
+                    Nome<span className="ml-0.5 text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -363,7 +364,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">
-                    CPF<span className="text-red-500 ml-0.5">*</span>
+                    CPF<span className="ml-0.5 text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -395,8 +396,8 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
 
             {/* CNH */}
             <div>
-              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">CNH</h3>
-              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+              <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">CNH</h3>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                 <div>
                   <Label name="issueDate">Data de Emissão</Label>
                   <input
@@ -473,7 +474,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                   </p>
                   {cnhExtractionStatus === 'extracting' && (
                     <div className="mt-2 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
-                      <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                      <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin" />
                       Extraindo dados do documento…
                     </div>
                   )}
@@ -488,7 +489,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                       {cnhExtractionResult.fieldCount}/{cnhExtractionResult.totalFields} campos extraídos via{' '}
                       {cnhExtractionResult.method === 'regex' ? 'leitura direta' : 'IA'}.
                       {cnhExtractionResult.warnings.length > 0 && (
-                        <span className="block mt-0.5 text-xs">
+                        <span className="mt-0.5 block text-xs">
                           Não encontrados: {cnhExtractionResult.warnings.join(', ')}
                         </span>
                       )}
@@ -505,8 +506,8 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
 
             {/* GR do Motorista */}
             <div>
-              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">GR do Motorista</h3>
-              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+              <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">GR do Motorista</h3>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <Label name="grUpload">GR — Gerenciamento de Risco</Label>
                   <FilePreview url={formData.grUpload} selectedFile={selectedGRFile} label="Documento atual" />
@@ -537,11 +538,11 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
 
             {/* Certificados */}
             <div>
-              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Certificados</h3>
+              <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Certificados</h3>
               <div className="space-y-6">
                 {/* Certificado 1 */}
-                <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2 border border-zinc-100 rounded-xl p-4 bg-zinc-50/50">
-                  <h4 className="sm:col-span-2 text-sm font-semibold text-zinc-600">Certificado 1</h4>
+                <div className="grid grid-cols-1 gap-x-4 gap-y-4 rounded-xl border border-zinc-100 bg-zinc-50/50 p-4 sm:grid-cols-2">
+                  <h4 className="text-sm font-semibold text-zinc-600 sm:col-span-2">Certificado 1</h4>
                   <div>
                     <Label name="courseName1">Nome do Curso</Label>
                     <input
@@ -567,8 +568,8 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                 </div>
 
                 {/* Certificado 2 */}
-                <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2 border border-zinc-100 rounded-xl p-4 bg-zinc-50/50">
-                  <h4 className="sm:col-span-2 text-sm font-semibold text-zinc-600">Certificado 2</h4>
+                <div className="grid grid-cols-1 gap-x-4 gap-y-4 rounded-xl border border-zinc-100 bg-zinc-50/50 p-4 sm:grid-cols-2">
+                  <h4 className="text-sm font-semibold text-zinc-600 sm:col-span-2">Certificado 2</h4>
                   <div>
                     <Label name="courseName2">Nome do Curso</Label>
                     <input
@@ -594,8 +595,8 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                 </div>
 
                 {/* Certificado 3 */}
-                <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2 border border-zinc-100 rounded-xl p-4 bg-zinc-50/50">
-                  <h4 className="sm:col-span-2 text-sm font-semibold text-zinc-600">Certificado 3</h4>
+                <div className="grid grid-cols-1 gap-x-4 gap-y-4 rounded-xl border border-zinc-100 bg-zinc-50/50 p-4 sm:grid-cols-2">
+                  <h4 className="text-sm font-semibold text-zinc-600 sm:col-span-2">Certificado 3</h4>
                   <div>
                     <Label name="courseName3">Nome do Curso</Label>
                     <input
@@ -624,11 +625,11 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
           </form>
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-zinc-200 bg-zinc-50 rounded-b-2xl">
-          <button type="button" onClick={handleClose} disabled={saving} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 transition-colors disabled:opacity-50">
+        <div className="flex items-center justify-end gap-3 rounded-b-2xl border-t border-zinc-200 bg-zinc-50 px-6 py-4">
+          <button type="button" onClick={handleClose} disabled={saving} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50">
             Cancelar
           </button>
-          <button type="submit" form="driver-form" disabled={saving} className="inline-flex justify-center items-center gap-2 rounded-xl border border-transparent bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50">
+          <button type="submit" form="driver-form" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl border border-transparent bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50">
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             {saving ? 'Salvando...' : 'Salvar Motorista'}
           </button>

@@ -1,4 +1,5 @@
 import React from 'react';
+
 import type { HorizonOption } from '../../lib/dashboardKpi';
 
 interface HorizonSelectorProps {
@@ -26,8 +27,8 @@ export default function HorizonSelector({ value, onChange }: HorizonSelectorProp
             onClick={() => onChange(opt.id)}
             className={`border-b-2 px-4 py-2 text-sm transition-colors ${
               isActive
-                ? 'border-orange-500 text-orange-600 font-medium'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
+                ? 'border-orange-500 font-medium text-orange-600'
+                : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
             }`}
           >
             {opt.label}

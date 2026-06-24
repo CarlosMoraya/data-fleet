@@ -55,7 +55,7 @@ export function isKnownBudgetSystem(system: string | null | undefined): boolean 
  * Known values are kept as-is; empty / null / unknown values become `Outros`.
  */
 export function normalizeBudgetSystem(system: string | null | undefined): string {
-  if (isKnownBudgetSystem(system)) return system!;
+  if (isKnownBudgetSystem(system)) return system;
   return OTHER_BUDGET_SYSTEM;
 }
 

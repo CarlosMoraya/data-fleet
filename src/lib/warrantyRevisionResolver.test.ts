@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+
 import { resolveNextRevision, classifyStatus } from './warrantyRevisionResolver';
+
 import type { WarrantyRevisionEvent } from '../types/warrantyRevision';
 
 function makeEvent(over: Partial<WarrantyRevisionEvent>): WarrantyRevisionEvent {

@@ -1,5 +1,6 @@
-import React from 'react';
 import { LucideIcon } from 'lucide-react';
+import React from 'react';
+
 import { cn } from '../../lib/utils';
 
 interface DashboardKpiCardProps {
@@ -33,7 +34,7 @@ export default function DashboardKpiCard({
       ? 'border-red-200 bg-red-50'
       : 'border-zinc-200',
     onClick &&
-      'w-full cursor-pointer text-left transition-colors hover:border-zinc-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-orange-400'
+      'w-full cursor-pointer text-left transition-colors hover:border-zinc-300 hover:shadow-md focus:ring-2 focus:ring-orange-400 focus:outline-none'
   );
 
   const content = (
@@ -53,7 +54,7 @@ export default function DashboardKpiCard({
         />
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-medium text-zinc-500 line-clamp-2">{label}</p>
+        <p className="line-clamp-2 text-sm font-medium text-zinc-500">{label}</p>
         <p
           className={cn(
             isMuted ? 'text-xl font-semibold' : 'text-2xl font-semibold',

@@ -1,11 +1,13 @@
 import { supabase } from '../lib/supabase';
+import { buildAssignmentPayload } from '../lib/warrantyAssignmentPayload';
+import { eventFromRow, planItemFromRow } from '../lib/warrantyRevisionMappers';
+
 import type {
   WarrantyRevisionPlanItem,
   WarrantyRevisionEvent,
   AssignmentFinishReason,
 } from '../types/warrantyRevision';
-import { eventFromRow, planItemFromRow } from '../lib/warrantyRevisionMappers';
-import { buildAssignmentPayload } from '../lib/warrantyAssignmentPayload';
+
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -172,7 +174,7 @@ export async function listWarrantyOverview(clientId: string): Promise<WarrantyOv
       .eq('status', 'active')
       .then(({ data, error }) => {
         if (error) throw error;
-        return (data ?? []) as Array<{ id: string; vehicle_id: string; plan_id: string }>;
+        return (data ?? []);
       }),
     supabase
       .from('vehicle_km_intervals')
@@ -180,7 +182,7 @@ export async function listWarrantyOverview(clientId: string): Promise<WarrantyOv
       .eq('client_id', clientId)
       .then(({ data, error }) => {
         if (error) throw error;
-        return (data ?? []) as Array<{ vehicle_id: string; km_interval: number | null }>;
+        return (data ?? []);
       }),
   ]);
 

@@ -1,8 +1,11 @@
-import React from 'react';
 import { Trash2, Plus, Loader2 } from 'lucide-react';
-import type { BudgetItem } from '../lib/maintenanceMappers';
-import { calcBudgetSubtotal } from '../lib/maintenanceMappers';
+import React from 'react';
+
 import { BUDGET_SYSTEM_OPTIONS } from '../lib/budgetSystems';
+import { calcBudgetSubtotal } from '../lib/maintenanceMappers';
+
+import type { BudgetItem } from '../lib/maintenanceMappers';
+
 
 interface BudgetItemsTableProps {
   items: BudgetItem[];
@@ -69,32 +72,32 @@ export default function BudgetItemsTable({
 
   if (readOnly) {
     return (
-      <div className="border border-zinc-200 rounded-xl overflow-hidden text-sm">
+      <div className="overflow-hidden rounded-xl border border-zinc-200 text-sm">
         <table className="min-w-full">
           <thead>
-            <tr className="bg-zinc-50 border-b border-zinc-200">
+            <tr className="border-b border-zinc-200 bg-zinc-50">
               <th className="px-3 py-2 text-left text-xs font-semibold text-zinc-500 uppercase">Item</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-zinc-500 uppercase w-40">Sistema</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-zinc-500 uppercase w-16">Qtd</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-zinc-500 uppercase w-28">Valor (R$)</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-zinc-500 uppercase w-28">Total (R$)</th>
+              <th className="w-40 px-3 py-2 text-left text-xs font-semibold text-zinc-500 uppercase">Sistema</th>
+              <th className="w-16 px-3 py-2 text-right text-xs font-semibold text-zinc-500 uppercase">Qtd</th>
+              <th className="w-28 px-3 py-2 text-right text-xs font-semibold text-zinc-500 uppercase">Valor (R$)</th>
+              <th className="w-28 px-3 py-2 text-right text-xs font-semibold text-zinc-500 uppercase">Total (R$)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100">
             {displayItems.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-4 text-center text-zinc-400 text-xs">Nenhum item cadastrado</td>
+                <td colSpan={5} className="px-3 py-4 text-center text-xs text-zinc-400">Nenhum item cadastrado</td>
               </tr>
             ) : (
               displayItems.map((item, i) => (
                 <tr key={i} className="bg-white">
                   <td className="px-3 py-2 text-zinc-800">{item.itemName || '—'}</td>
-                  <td className="px-3 py-2 text-zinc-500 w-40">{item.system || '—'}</td>
-                  <td className="px-3 py-2 text-right text-zinc-700 w-16">{item.quantity}</td>
-                  <td className="px-3 py-2 text-right text-zinc-700 w-28">
+                  <td className="w-40 px-3 py-2 text-zinc-500">{item.system || '—'}</td>
+                  <td className="w-16 px-3 py-2 text-right text-zinc-700">{item.quantity}</td>
+                  <td className="w-28 px-3 py-2 text-right text-zinc-700">
                     {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </td>
-                  <td className="px-3 py-2 text-right font-semibold text-zinc-800 w-28">
+                  <td className="w-28 px-3 py-2 text-right font-semibold text-zinc-800">
                     {(item.quantity * item.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
@@ -102,7 +105,7 @@ export default function BudgetItemsTable({
             )}
           </tbody>
         </table>
-        <div className="bg-zinc-50 border-t border-zinc-200 px-3 py-2 text-right text-sm font-semibold text-zinc-700">
+        <div className="border-t border-zinc-200 bg-zinc-50 px-3 py-2 text-right text-sm font-semibold text-zinc-700">
           Subtotal: R${' '}
           <span className="text-orange-600">
             {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -113,9 +116,9 @@ export default function BudgetItemsTable({
   }
 
   return (
-    <div className="relative border border-zinc-200 rounded-xl overflow-hidden text-sm">
+    <div className="relative overflow-hidden rounded-xl border border-zinc-200 text-sm">
       {extracting && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-xl">
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-2">
             <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
             <span className="text-xs text-zinc-500">Extraindo dados do PDF...</span>
@@ -125,13 +128,13 @@ export default function BudgetItemsTable({
 
       <table className="min-w-full">
         <thead>
-          <tr className="bg-zinc-50 border-b border-zinc-200">
+          <tr className="border-b border-zinc-200 bg-zinc-50">
             <th className="px-2 py-2 text-left text-xs font-semibold text-zinc-500 uppercase">Item</th>
-            <th className="px-2 py-2 text-left text-xs font-semibold text-zinc-500 uppercase w-40">Sistema</th>
-            <th className="px-2 py-2 text-left text-xs font-semibold text-zinc-500 uppercase w-16">Qtd</th>
-            <th className="px-2 py-2 text-left text-xs font-semibold text-zinc-500 uppercase w-24">Valor (R$)</th>
-            <th className="px-2 py-2 text-right text-xs font-semibold text-zinc-500 uppercase w-28">Total (R$)</th>
-            <th className="px-2 py-2 w-8" />
+            <th className="w-40 px-2 py-2 text-left text-xs font-semibold text-zinc-500 uppercase">Sistema</th>
+            <th className="w-16 px-2 py-2 text-left text-xs font-semibold text-zinc-500 uppercase">Qtd</th>
+            <th className="w-24 px-2 py-2 text-left text-xs font-semibold text-zinc-500 uppercase">Valor (R$)</th>
+            <th className="w-28 px-2 py-2 text-right text-xs font-semibold text-zinc-500 uppercase">Total (R$)</th>
+            <th className="w-8 px-2 py-2" />
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-100 bg-white">
@@ -146,7 +149,7 @@ export default function BudgetItemsTable({
                   className={cellInput}
                 />
               </td>
-              <td className="px-2 py-1.5 w-40">
+              <td className="w-40 px-2 py-1.5">
                 <select
                   value={item.system || ''}
                   onChange={e => handleChange(idx, 'system', e.target.value)}
@@ -158,7 +161,7 @@ export default function BudgetItemsTable({
                   ))}
                 </select>
               </td>
-              <td className="px-2 py-1.5 w-16">
+              <td className="w-16 px-2 py-1.5">
                 <input
                   type="number"
                   min="0"
@@ -169,7 +172,7 @@ export default function BudgetItemsTable({
                   className={cellInput}
                 />
               </td>
-              <td className="px-2 py-1.5 w-24">
+              <td className="w-24 px-2 py-1.5">
                 <input
                   type="number"
                   min="0"
@@ -180,14 +183,14 @@ export default function BudgetItemsTable({
                   className={cellInput}
                 />
               </td>
-              <td className="px-2 py-1.5 w-28 text-right font-semibold text-zinc-800">
+              <td className="w-28 px-2 py-1.5 text-right font-semibold text-zinc-800">
                 {(item.quantity * item.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </td>
-              <td className="px-2 py-1.5 w-8 text-center">
+              <td className="w-8 px-2 py-1.5 text-center">
                 <button
                   type="button"
                   onClick={() => handleDelete(idx)}
-                  className="p-1 rounded text-zinc-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  className="rounded p-1 text-zinc-300 transition-colors hover:bg-red-50 hover:text-red-500"
                   title="Remover linha"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -198,11 +201,11 @@ export default function BudgetItemsTable({
         </tbody>
       </table>
 
-      <div className="bg-zinc-50 border-t border-zinc-200 px-3 py-2 flex items-center justify-between">
+      <div className="flex items-center justify-between border-t border-zinc-200 bg-zinc-50 px-3 py-2">
         <button
           type="button"
           onClick={handleAdd}
-          className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 font-medium transition-colors"
+          className="flex items-center gap-1 text-xs font-medium text-orange-600 transition-colors hover:text-orange-700"
         >
           <Plus className="h-3.5 w-3.5" />
           Adicionar linha

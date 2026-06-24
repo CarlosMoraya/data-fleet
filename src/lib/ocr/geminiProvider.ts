@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+
 import type { OcrProvider } from './types';
 
 export class GeminiProvider implements OcrProvider {

@@ -1,20 +1,23 @@
-import React from 'react';
-import { Circle, Search, Plus, Eye, Pencil, ToggleLeft, ToggleRight, History, Loader2, Trash2, AlertTriangle, Ban } from 'lucide-react';
-import { cn } from '../lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
+import { Circle, Search, Plus, Eye, Pencil, ToggleLeft, ToggleRight, History, Loader2, Trash2, AlertTriangle, Ban } from 'lucide-react';
+import React from 'react';
+
+import SelectClientNotice from '../components/SelectClientNotice';
+import TireBatchForm from '../components/TireBatchForm';
+import TireForm from '../components/TireForm';
+import TireHistoryModal from '../components/TireHistoryModal';
 import { useAuth } from '../context/AuthContext';
 import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
+import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
+import { supabase } from '../lib/supabase';
+import { cn } from '../lib/utils';
+
+
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
+import { saveTire, toggleTireActive, deleteTire } from '../services/tireService';
 import { Tire, VehicleTireConfig, AxleConfigEntry } from '../types';
 import { TireRow, tireFromRow, vehicleTireConfigFromRow, VehicleTireConfigRow } from '../lib/tireMappers';
 import { generatePositions, generatePositionsFromConfig } from '../lib/tirePositions';
-import TireForm from '../components/TireForm';
-import TireBatchForm from '../components/TireBatchForm';
-import TireHistoryModal from '../components/TireHistoryModal';
-import { saveTire, toggleTireActive, deleteTire } from '../services/tireService';
-import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
-import SelectClientNotice from '../components/SelectClientNotice';
 
 const ROLES_CAN_VIEW_TIRES = [
   'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager',
@@ -44,28 +47,28 @@ function AddModeModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-        <h2 className="text-lg font-semibold text-zinc-900 mb-1">Adicionar Pneus</h2>
-        <p className="text-sm text-zinc-500 mb-6">Escolha o modo de cadastro</p>
+      <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+        <h2 className="mb-1 text-lg font-semibold text-zinc-900">Adicionar Pneus</h2>
+        <p className="mb-6 text-sm text-zinc-500">Escolha o modo de cadastro</p>
         <div className="flex flex-col gap-3">
           <button
             onClick={onSelectPlate}
-            className="flex flex-col items-start p-4 border border-zinc-200 rounded-xl hover:border-orange-400 hover:bg-orange-50 transition-colors text-left"
+            className="flex flex-col items-start rounded-xl border border-zinc-200 p-4 text-left transition-colors hover:border-orange-400 hover:bg-orange-50"
           >
             <span className="font-medium text-zinc-900">Por Placa (Individual)</span>
-            <span className="text-sm text-zinc-500 mt-0.5">Cadastre pneus em um veículo específico</span>
+            <span className="mt-0.5 text-sm text-zinc-500">Cadastre pneus em um veículo específico</span>
           </button>
           <button
             onClick={onSelectBatch}
-            className="flex flex-col items-start p-4 border border-zinc-200 rounded-xl hover:border-orange-400 hover:bg-orange-50 transition-colors text-left"
+            className="flex flex-col items-start rounded-xl border border-zinc-200 p-4 text-left transition-colors hover:border-orange-400 hover:bg-orange-50"
           >
             <span className="font-medium text-zinc-900">Por Modelo (Lote)</span>
-            <span className="text-sm text-zinc-500 mt-0.5">Cadastre pneus para todos os veículos de um modelo</span>
+            <span className="mt-0.5 text-sm text-zinc-500">Cadastre pneus para todos os veículos de um modelo</span>
           </button>
         </div>
         <button
           onClick={onClose}
-          className="mt-4 w-full text-sm text-zinc-500 hover:text-zinc-700 py-2"
+          className="mt-4 w-full py-2 text-sm text-zinc-500 hover:text-zinc-700"
         >
           Cancelar
         </button>
@@ -89,11 +92,11 @@ function ToggleConfirmModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-        <h2 className="text-lg font-semibold text-zinc-900 mb-2">
+      <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+        <h2 className="mb-2 text-lg font-semibold text-zinc-900">
           {tire.active ? 'Desativar Pneu' : 'Reativar Pneu'}
         </h2>
-        <p className="text-sm text-zinc-600 mb-6">
+        <p className="mb-6 text-sm text-zinc-600">
           {tire.active
             ? `Desativar o pneu na posição ${tire.currentPosition}? Ele continuará no histórico mas não bloqueará posições.`
             : `Reativar o pneu na posição ${tire.currentPosition}? Ele voltará a ocupar essa posição.`}
@@ -101,7 +104,7 @@ function ToggleConfirmModal({
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-2 rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-sm"
+            className="flex-1 rounded-lg border border-zinc-200 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
           >
             Cancelar
           </button>
@@ -109,12 +112,12 @@ function ToggleConfirmModal({
             onClick={onConfirm}
             disabled={isLoading}
             className={cn(
-              'flex-1 py-2 rounded-lg text-sm font-medium text-white',
+              'flex-1 rounded-lg py-2 text-sm font-medium text-white',
               tire.active ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700',
-              isLoading && 'opacity-60 cursor-not-allowed',
+              isLoading && 'cursor-not-allowed opacity-60',
             )}
           >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : (tire.active ? 'Desativar' : 'Reativar')}
+            {isLoading ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : (tire.active ? 'Desativar' : 'Reativar')}
           </button>
         </div>
       </div>
@@ -137,24 +140,24 @@ function DeleteConfirmModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-        <h2 className="text-lg font-semibold text-zinc-900 mb-2">Excluir Pneu</h2>
-        <p className="text-sm text-zinc-600 mb-6">
+      <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+        <h2 className="mb-2 text-lg font-semibold text-zinc-900">Excluir Pneu</h2>
+        <p className="mb-6 text-sm text-zinc-600">
           Excluir o pneu na posição <span className="font-semibold">{tire.currentPosition}</span> ({tire.vehicleLicensePlate ?? tire.vehicleModel ?? 'veículo desconhecido'})? Esta ação é irreversível e também excluirá todo o histórico de movimentação.
         </p>
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-2 rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-sm"
+            className="flex-1 rounded-lg border border-zinc-200 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
           >
             Cancelar
           </button>
           <button
             onClick={onConfirm}
             disabled={isLoading}
-            className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-sm font-medium text-white disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-1 rounded-lg bg-red-500 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : 'Excluir'}
+            {isLoading ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : 'Excluir'}
           </button>
         </div>
       </div>
@@ -173,17 +176,17 @@ function FullVehicleAlertModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-        <div className="flex items-center gap-3 mb-3">
-          <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+      <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-3 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
           <h2 className="text-lg font-semibold text-zinc-900">Todas as posições ocupadas</h2>
         </div>
-        <p className="text-sm text-zinc-600 mb-6">
+        <p className="mb-6 text-sm text-zinc-600">
           O veículo <span className="font-semibold">{licensePlate}</span> já possui pneus ativos em todas as posições. Desative um ou mais pneus para liberar posições antes de cadastrar novos.
         </p>
         <button
           onClick={onClose}
-          className="w-full py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-sm font-medium text-white"
+          className="w-full rounded-lg bg-orange-500 py-2 text-sm font-medium text-white hover:bg-orange-600"
         >
           Entendido
         </button>
@@ -203,19 +206,19 @@ function ReactivateBlockedModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-        <div className="flex items-center gap-3 mb-3">
-          <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+      <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-3 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
           <h2 className="text-lg font-semibold text-zinc-900">Posição já ocupada</h2>
         </div>
-        <p className="text-sm text-zinc-600 mb-6">
-          A posição <span className="font-semibold font-mono">{tire.currentPosition}</span> do veículo{' '}
+        <p className="mb-6 text-sm text-zinc-600">
+          A posição <span className="font-mono font-semibold">{tire.currentPosition}</span> do veículo{' '}
           <span className="font-semibold">{tire.vehicleLicensePlate ?? tire.vehicleModel ?? 'desconhecido'}</span>{' '}
           já está ocupada por outro pneu ativo. Desative o pneu atual nessa posição antes de reativar este.
         </p>
         <button
           onClick={onClose}
-          className="w-full py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-sm font-medium text-white"
+          className="w-full rounded-lg bg-orange-500 py-2 text-sm font-medium text-white hover:bg-orange-600"
         >
           Entendido
         </button>
@@ -250,19 +253,19 @@ function VehiclePickerModal({
   );
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 flex flex-col max-h-[80vh]">
-        <h2 className="text-lg font-semibold text-zinc-900 mb-3">Selecionar Veículo</h2>
+      <div className="mx-4 flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl bg-white p-6 shadow-xl">
+        <h2 className="mb-3 text-lg font-semibold text-zinc-900">Selecionar Veículo</h2>
         <div className="relative mb-3">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <input
             autoFocus
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por placa ou modelo..."
-            className="w-full pl-9 pr-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="w-full rounded-lg border border-zinc-200 py-2 pr-3 pl-9 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
           />
         </div>
-        <div className="flex-1 overflow-y-auto divide-y divide-zinc-100">
+        <div className="flex-1 divide-y divide-zinc-100 overflow-y-auto">
           {filtered.length === 0 && (
             <p className="py-8 text-center text-sm text-zinc-400">Nenhum veículo encontrado</p>
           )}
@@ -273,14 +276,14 @@ function VehiclePickerModal({
                 key={v.id}
                 onClick={() => onSelect(v)}
                 className={cn(
-                  'w-full flex items-center justify-between px-2 py-3 hover:bg-zinc-50 text-left',
+                  'flex w-full items-center justify-between px-2 py-3 text-left hover:bg-zinc-50',
                   isFull && 'opacity-50',
                 )}
               >
                 <div className="flex items-center gap-2">
-                  {isFull && <Ban className="h-3.5 w-3.5 text-red-400 shrink-0" />}
+                  {isFull && <Ban className="h-3.5 w-3.5 shrink-0 text-red-400" />}
                   <span className="font-medium text-zinc-900">{v.licensePlate}</span>
-                  <span className="text-zinc-500 text-sm">{v.model}</span>
+                  <span className="text-sm text-zinc-500">{v.model}</span>
                 </div>
                 <span className="text-xs text-zinc-400">{v.type}</span>
               </button>
@@ -289,7 +292,7 @@ function VehiclePickerModal({
         </div>
         <button
           onClick={onClose}
-          className="mt-4 text-sm text-zinc-500 hover:text-zinc-700 py-2"
+          className="mt-4 py-2 text-sm text-zinc-500 hover:text-zinc-700"
         >
           Cancelar
         </button>
@@ -526,17 +529,17 @@ export default function Tires() {
 
   if (!canView) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-zinc-500 text-sm">Você não tem acesso a esta página.</p>
+      <div className="flex h-64 items-center justify-center">
+        <p className="text-sm text-zinc-500">Você não tem acesso a esta página.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full gap-4 p-4 md:p-6 overflow-hidden">
+    <div className="flex h-full flex-col gap-4 overflow-hidden p-4 md:p-6">
       {blockWrite && <SelectClientNotice />}
       {/* Header */}
-      <div className="flex items-center justify-between shrink-0">
+      <div className="flex shrink-0 items-center justify-between">
         <div className="flex items-center gap-2">
           <Circle className="h-6 w-6 text-orange-500" />
           <h1 className="text-xl font-semibold text-zinc-900">Gestão de Pneus</h1>
@@ -544,7 +547,7 @@ export default function Tires() {
         {canRegister && (
           <button
             onClick={() => setAddModeOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition-colors"
+            className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
           >
             <Plus className="h-4 w-4" />
             Adicionar Pneus
@@ -554,42 +557,42 @@ export default function Tires() {
 
       {/* Barra de busca */}
       <div className="relative shrink-0">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" />
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por especificação ou placa..."
-          className="w-full pl-9 pr-4 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+          className="w-full rounded-lg border border-zinc-200 py-2 pr-4 pl-9 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
         />
       </div>
 
       {/* Tabela */}
-      <div className="flex-1 min-h-0 bg-white rounded-xl border border-zinc-200 flex flex-col overflow-hidden">
-        <div className="overflow-auto flex-1">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white">
+        <div className="flex-1 overflow-auto">
           {tiresLoading ? (
-            <div className="flex items-center justify-center h-40">
+            <div className="flex h-40 items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-zinc-400">
-              <Circle className="h-8 w-8 mb-2 opacity-30" />
+            <div className="flex h-40 flex-col items-center justify-center text-zinc-400">
+              <Circle className="mb-2 h-8 w-8 opacity-30" />
               <p className="text-sm">
                 {tires.length === 0 ? (blockWrite ? 'Nenhum pneu cadastrado em nenhum cliente.' : 'Nenhum pneu cadastrado.') : 'Nenhum pneu encontrado com os filtros aplicados.'}
               </p>
             </div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="border-b border-zinc-100 sticky top-0 bg-zinc-50">
+              <thead className="sticky top-0 border-b border-zinc-100 bg-zinc-50">
                 <tr>
                   {blockWrite && (
-                    <th className="px-4 py-3 text-left font-medium text-zinc-500 uppercase tracking-wide text-xs">Cliente</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Cliente</th>
                   )}
-                  <th className="px-4 py-3 text-left font-medium text-zinc-500 uppercase tracking-wide text-xs">Especificação</th>
-                  <th className="px-4 py-3 text-left font-medium text-zinc-500 uppercase tracking-wide text-xs">Veículo</th>
-                  <th className="px-4 py-3 text-left font-medium text-zinc-500 uppercase tracking-wide text-xs">Posição</th>
-                  <th className="px-4 py-3 text-left font-medium text-zinc-500 uppercase tracking-wide text-xs">Classificação</th>
-                  <th className="px-4 py-3 text-left font-medium text-zinc-500 uppercase tracking-wide text-xs">Status</th>
-                  <th className="px-4 py-3 text-right font-medium text-zinc-500 uppercase tracking-wide text-xs">Ações</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Especificação</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Veículo</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Posição</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Classificação</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Status</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-zinc-500 uppercase">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-50">
@@ -605,30 +608,30 @@ export default function Tires() {
                     <td className="px-4 py-3 text-zinc-600">
                       <div>{tire.specification}</div>
                       {tire.dot && (
-                        <div className="text-xs text-zinc-400 mt-0.5">DOT {tire.dot}</div>
+                        <div className="mt-0.5 text-xs text-zinc-400">DOT {tire.dot}</div>
                       )}
                     </td>
                     <td className="px-4 py-3 text-zinc-600">
                       <span className="font-medium">{tire.vehicleLicensePlate ?? '—'}</span>
                       {tire.vehicleModel && (
-                        <span className="ml-1 text-zinc-400 text-xs">{tire.vehicleModel}</span>
+                        <span className="ml-1 text-xs text-zinc-400">{tire.vehicleModel}</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="font-mono text-zinc-700 bg-zinc-100 px-2 py-0.5 rounded text-xs">
+                      <span className="rounded bg-zinc-100 px-2 py-0.5 font-mono text-xs text-zinc-700">
                         {tire.currentPosition}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', classificationBadge(tire.visualClassification))}>
+                      <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', classificationBadge(tire.visualClassification))}>
                         {tire.visualClassification}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       {tire.active ? (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">Ativo</span>
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Ativo</span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-400">Inativo</span>
+                        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-400">Inativo</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -636,7 +639,7 @@ export default function Tires() {
                         <button
                           onClick={() => setHistoryTire(tire)}
                           title="Histórico"
-                          className="p-1.5 rounded hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600"
+                          className="rounded p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
                         >
                           <History className="h-4 w-4" />
                         </button>
@@ -645,14 +648,14 @@ export default function Tires() {
                             <button
                               onClick={() => handleEditTire(tire)}
                               title="Editar"
-                              className="p-1.5 rounded hover:bg-zinc-100 text-zinc-400 hover:text-blue-600"
+                              className="rounded p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-blue-600"
                             >
                               <Pencil className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleToggleTire(tire)}
                               title={tire.active ? 'Desativar' : 'Reativar'}
-                              className="p-1.5 rounded hover:bg-zinc-100 text-zinc-400 hover:text-orange-500"
+                              className="rounded p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-orange-500"
                             >
                               {tire.active
                                 ? <ToggleRight className="h-4 w-4 text-emerald-500" />
@@ -664,7 +667,7 @@ export default function Tires() {
                           <button
                             onClick={() => setTireToDelete(tire)}
                             title="Excluir"
-                            className="p-1.5 rounded hover:bg-zinc-100 text-zinc-400 hover:text-red-600"
+                            className="rounded p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-red-600"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -678,7 +681,7 @@ export default function Tires() {
           )}
         </div>
         {filtered.length > 0 && (
-          <div className="px-4 py-2 border-t border-zinc-100 text-xs text-zinc-400 shrink-0">
+          <div className="shrink-0 border-t border-zinc-100 px-4 py-2 text-xs text-zinc-400">
             {filtered.length} pneu{filtered.length !== 1 ? 's' : ''} exibido{filtered.length !== 1 ? 's' : ''}
           </div>
         )}

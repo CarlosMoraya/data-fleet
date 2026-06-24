@@ -1,6 +1,8 @@
 import React from 'react';
-import type { AxleConfigEntry } from '../types/tire';
+
 import { calculateBlueprintLayout, type TireNodeStatus } from '../lib/tireInspectionBlueprintLayout';
+
+import type { AxleConfigEntry } from '../types/tire';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -41,7 +43,7 @@ export function VehicleBlueprintDiagram({
   return (
     <svg
       viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-      className="w-full max-w-sm mx-auto"
+      className="mx-auto w-full max-w-sm"
       aria-label="Diagrama de pneus do veículo"
     >
       {/* Vehicle body */}

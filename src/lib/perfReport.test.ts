@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import {
   summarizeBundle,
   diffAgainstBaseline,
@@ -102,7 +103,7 @@ describe('diffAgainstBaseline', () => {
 
     const diff = diffAgainstBaseline(current, base, threshold);
 
-    const shellRow = diff.find((r) => r.metric === 'coldStart.shellMs')!;
+    const shellRow = diff.find((r) => r.metric === 'coldStart.shellMs');
     expect(shellRow.status).toBe('regression');
     expect(shellRow.current).toBe(1560);
     expect(shellRow.deltaPct).toBeGreaterThan(0);

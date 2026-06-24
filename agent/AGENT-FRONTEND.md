@@ -105,3 +105,55 @@ Ao detectar params legados na URL, um `useEffect` na tela reescreve a URL para o
 
 ### Preferências persistentes
 Preferências que devem sobreviver entre sessões continuam em `bf:v1:ui` via `usePersistentUiState` (escopo `preference` em localStorage). A busca textual (`q`) NÃO é mais persistida em `sessionStorage` — nas telas de Veículos e Motoristas ela vive exclusivamente na URL.
+
+---
+
+## 🔍 Linting e Qualidade de Código
+
+O projeto adota **ESLint 9+ (flat config)** como ferramenta oficial de qualidade de código, integrada ao `tsc --noEmit` em um único pipeline.
+
+### Configuração
+- **Arquivo**: `eslint.config.js` (flat config — **não** usar `.eslintrc*` nem `.eslintignore`).
+- **Escopo de lint**: apenas `src/` (configs, `e2e/`, `scripts/`, `supabase/` e `docs/` são ignorados via `ignores`).
+- **Plugins aplicados**:
+  | Plugin | Função |
+  | :--- | :--- |
+  | `@eslint/js` | Base recomendada de regras JS |
+  | `@typescript-eslint` (type-aware) | Regras TS com tipagem real via `projectService` |
+  | `eslint-plugin-react` + `eslint-plugin-react-hooks` | Regras React 19 (novo JSX transform) |
+  | `eslint-plugin-tailwindcss` | Validação Tailwind v4 (lê `src/index.css`) |
+  | `eslint-plugin-security` | Padrões OWASP |
+  | `eslint-plugin-import` | Ordenação e duplicidade de imports |
+- **Type-aware**: o parser usa `projectService: true`, então regras que dependem de tipos (ex.: `no-misused-promises`) estão ativas. O projeto **não** usa `strict`; a família `no-unsafe-*` é reportada como **warning** (não bloqueia) para evitar enchente sem refatoração fora do escopo.
+- **Tailwind v4**: sem `tailwind.config.js`. O plugin aponta `settings.tailwindcss.config` para `src/index.css` (path absoluto) para carregar o design system. `no-custom-classname` permanece **off** para evitar falsos-positivos da v4 parcial.
+
+### Comandos
+| Comando | Descrição |
+| :--- | :--- |
+| `npm run lint` | Roda `eslint src/` + `tsc --noEmit`. Exit 0 = sem erros (warnings são aceitos). |
+| `npm run lint:fix` | Aplica auto-correção (`--fix`) + `tsc --noEmit`. |
+| `npx eslint src/` | Lint isolado (sem typecheck). |
+| `npx eslint <caminho> --fix` | Lint/fix de subconjunto. |
+
+### Regras de destaque
+- `react-hooks/rules-of-hooks`: **error**.
+- `react-hooks/exhaustive-deps`: warn.
+- `@typescript-eslint/no-unused-vars`: warn (ignora `_`, args, rest siblings).
+- `no-console`: warn (permite `warn`/`error`/`info`).
+- `import/order`: warn (grupos `builtin/external/internal/parent/sibling/index/type`, separados por linha, alfabético).
+- `tailwindcss/classnames-order`, `enforces-shorthand`, `enforces-negative-arbitrary-values`, `no-unnecessary-arbitrary-value`: warn.
+- `security/*` (OWASP): regras `detect-*` em warn/error conforme `recommended`; `detect-object-injection` off (muitos falsos-positivos em TS).
+
+### Fluxo de desenvolvimento
+1. Após mudanças em `src/`, rodar `npm run lint:fix` para auto-ordenar imports e classes.
+2. Rodar `npm run lint`; deve terminar com **exit 0**. Warnings residuais são aceitos e reportados.
+3. Se uma regra legítima for ruído para o caso, **desativar inline** com comentário justificativo (`// eslint-disable-next-line ...`) — não silenciar globalmente sem motivo.
+4. Não gerar `.eslintignore` nem `.eslintrc*` — toda configuração vive em `eslint.config.js`.
+5. Não alterar `tsconfig.json` além de tipos ESLint; a separação entre lint (qualidade) e typecheck (tipos) é mantida dentro do mesmo pipeline.
+
+### CI/CD
+- Workflow: `.github/workflows/lint.yml` (3 jobs paralelos).
+  - **lint**: `npm run lint` — falha o PR se houver erros de ESLint/tsc.
+  - **test**: `npm run test:unit` (Vitest).
+  - **smoke**: `npm run test:smoke` (Playwright Chromium), exige secrets `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+- Os jobs rodam em `push`/`pull_request` contra `main`/`master`. O smoke só tem utilidade com os secrets configurados no repositório.

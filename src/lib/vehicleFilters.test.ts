@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Vehicle } from '../types';
+
 import {
   EMPTY_STRUCTURED_FILTERS,
   LEGACY_VEHICLE_ISSUE_VALUES,
@@ -15,6 +15,8 @@ import {
   vehicleMatchesSearch,
   type PendencyContext,
 } from './vehicleFilters';
+
+import type { Vehicle } from '../types';
 
 const ctx: PendencyContext = {
   todayIso: '2026-06-17',
@@ -44,7 +46,7 @@ function vehicle(overrides: Partial<Vehicle>): Vehicle {
     owner: 'Empresa',
     autonomy: 500,
     ...overrides,
-  } as Vehicle;
+  };
 }
 
 describe('vehicleFilters', () => {

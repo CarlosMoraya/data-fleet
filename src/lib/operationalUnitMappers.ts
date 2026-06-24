@@ -1,4 +1,5 @@
 import { OperationalUnit } from '../types';
+
 import { capitalizeWords, normalizeUpper, normalizeTrim } from './inputHelpers';
 
 // ─── Tipo espelho do banco (snake_case) ─────────────────────────────────────
@@ -43,7 +44,7 @@ export function operationalUnitToRow(
 ): Omit<OperationalUnitRow, 'id' | 'shippers'> {
   return {
     client_id: clientId,
-    shipper_id: unit.shipperId!,
+    shipper_id: unit.shipperId,
     name: capitalizeWords(unit.name),
     code: normalizeUpper(unit.code) || null,
     city: capitalizeWords(unit.city) || null,

@@ -1,4 +1,5 @@
 import { vehicleToRow, vehicleFromRow, type VehicleRow } from './vehicleMappers';
+
 import type { AxleConfigEntry } from '../types';
 import type { Vehicle } from '../types/vehicle';
 
@@ -136,7 +137,7 @@ describe('round-trip de crlv_expiration_date', () => {
     const vehicle = vehicleFromRow(row);
     expect(vehicle.crlvExpirationDate).toBe('2027-02-15');
 
-    const backToRow = vehicleToRow({ crlvExpirationDate: '2027-02-15' } as Partial<Vehicle>, 'c1');
+    const backToRow = vehicleToRow({ crlvExpirationDate: '2027-02-15' }, 'c1');
     expect(backToRow.crlv_expiration_date).toBe('2027-02-15');
   });
 

@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { X, Link2, Copy, Check, Loader2, Trash2, Building2, RefreshCw } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
+import { X, Link2, Copy, Check, Loader2, Trash2, Building2, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+
 import { useAuth } from '../context/AuthContext';
-import { WorkshopInvitation, WorkshopPartnership } from '../types';
-import { workshopInvitationFromRow, workshopPartnershipFromRow } from '../lib/workshopAccountMappers';
 import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
+import { supabase } from '../lib/supabase';
+import { workshopInvitationFromRow, workshopPartnershipFromRow } from '../lib/workshopAccountMappers';
+import { WorkshopInvitation, WorkshopPartnership } from '../types';
 
 interface Props {
   onClose: () => void;
@@ -27,7 +28,7 @@ export default function InviteWorkshopModal({ onClose }: Props) {
         .in('status', ['pending'])
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return (data as any[]).map(workshopInvitationFromRow);
+      return (data).map(workshopInvitationFromRow);
     },
     enabled: !!currentClient?.id,
   });
@@ -43,7 +44,7 @@ export default function InviteWorkshopModal({ onClose }: Props) {
         .eq('status', 'active')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as any[];
+      return data;
     },
     enabled: !!currentClient?.id,
   });
@@ -143,11 +144,11 @@ export default function InviteWorkshopModal({ onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="relative flex w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl">
 
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-zinc-200 px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100">
               <Link2 className="h-4 w-4 text-orange-600" />
@@ -157,23 +158,23 @@ export default function InviteWorkshopModal({ onClose }: Props) {
               <p className="text-xs text-zinc-500">Gere um link de convite para a oficina aceitar</p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 hover:bg-zinc-100 transition-colors">
+          <button onClick={onClose} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 p-6 space-y-6">
+        <div className="flex-1 space-y-6 overflow-y-auto p-6">
 
           {/* Botão gerar convite */}
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-zinc-800">Link de convite</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Válido por 30 dias. Compartilhe com a oficina.</p>
+              <p className="mt-0.5 text-xs text-zinc-500">Válido por 30 dias. Compartilhe com a oficina.</p>
             </div>
             <button
               onClick={() => createMutation.mutate()}
               disabled={createMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-60"
             >
               {createMutation.isPending
                 ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -191,11 +192,11 @@ export default function InviteWorkshopModal({ onClose }: Props) {
           {/* Convites pendentes */}
           {loadingInvitations ? (
             <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 text-zinc-300 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin text-zinc-300" />
             </div>
           ) : invitations.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
+              <h3 className="mb-3 text-xs font-semibold tracking-wider text-zinc-500 uppercase">
                 Convites pendentes ({invitations.length})
               </h3>
               <div className="space-y-2">
@@ -204,13 +205,13 @@ export default function InviteWorkshopModal({ onClose }: Props) {
                   const copied = copiedToken === inv.token;
                   return (
                     <div key={inv.id} className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-mono text-zinc-600 truncate">{url}</p>
-                        <p className="text-xs text-zinc-400 mt-0.5">Expira em {formatExpiry(inv.expiresAt)}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-mono text-xs text-zinc-600">{url}</p>
+                        <p className="mt-0.5 text-xs text-zinc-400">Expira em {formatExpiry(inv.expiresAt)}</p>
                       </div>
                       <button
                         onClick={() => handleCopy(url, inv.token)}
-                        className="flex-shrink-0 p-2 rounded-lg text-zinc-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
+                        className="flex-shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-orange-50 hover:text-orange-600"
                         title="Copiar link"
                       >
                         {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
@@ -218,7 +219,7 @@ export default function InviteWorkshopModal({ onClose }: Props) {
                       <button
                         onClick={() => revokeMutation.mutate(inv.id)}
                         disabled={revokeMutation.isPending}
-                        className="flex-shrink-0 p-2 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        className="flex-shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600"
                         title="Revogar convite"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -233,11 +234,11 @@ export default function InviteWorkshopModal({ onClose }: Props) {
           {/* Partnerships ativas */}
           {loadingPartnerships ? (
             <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 text-zinc-300 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin text-zinc-300" />
             </div>
           ) : partnerships.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
+              <h3 className="mb-3 text-xs font-semibold tracking-wider text-zinc-500 uppercase">
                 Parcerias ativas ({partnerships.length})
               </h3>
               <div className="space-y-2">
@@ -248,7 +249,7 @@ export default function InviteWorkshopModal({ onClose }: Props) {
                       <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-zinc-100">
                         <Building2 className="h-4 w-4 text-zinc-500" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-zinc-900">{wa?.name ?? '—'}</p>
                         <p className="text-xs text-zinc-400">
                           {wa?.address_city && wa?.address_state
@@ -264,7 +265,7 @@ export default function InviteWorkshopModal({ onClose }: Props) {
                             deactivateMutation.mutate(p.id);
                           }}
                           disabled={deactivateMutation.isPending}
-                          className="flex-shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 hover:border-red-300 hover:text-red-600 transition-colors"
+                          className="flex-shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:border-red-300 hover:text-red-600"
                         >
                           Desvincular
                         </button>
@@ -277,19 +278,19 @@ export default function InviteWorkshopModal({ onClose }: Props) {
           )}
 
           {!loadingPartnerships && partnerships.length === 0 && invitations.length === 0 && (
-            <div className="text-center py-8 text-zinc-400">
-              <Building2 className="h-10 w-10 mx-auto mb-2 opacity-30" />
+            <div className="py-8 text-center text-zinc-400">
+              <Building2 className="mx-auto mb-2 h-10 w-10 opacity-30" />
               <p className="text-sm">Nenhuma oficina parceira ainda.</p>
-              <p className="text-xs mt-1">Gere um link e compartilhe com a oficina.</p>
+              <p className="mt-1 text-xs">Gere um link e compartilhe com a oficina.</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex-shrink-0 border-t border-zinc-200 px-6 py-4 flex justify-end">
+        <div className="flex flex-shrink-0 justify-end border-t border-zinc-200 px-6 py-4">
           <button
             onClick={onClose}
-            className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+            className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
           >
             Fechar
           </button>

@@ -1,6 +1,3 @@
-import type { Vehicle, Driver } from '../types';
-import { performOcr } from './ocr/ocrEngine';
-import { loadPdfjs } from './ocr/pdfLoader';
 import {
   filterDigitsOnly,
   filterPlate,
@@ -11,6 +8,10 @@ import {
   normalizeUpper,
   capitalizeWords,
 } from './inputHelpers';
+import { performOcr } from './ocr/ocrEngine';
+import { loadPdfjs } from './ocr/pdfLoader';
+
+import type { Vehicle, Driver } from '../types';
 
 // ─────────────────────────────────────────────────────────────
 // Debug logging — ative com VITE_DEBUG_OCR=1 no .env

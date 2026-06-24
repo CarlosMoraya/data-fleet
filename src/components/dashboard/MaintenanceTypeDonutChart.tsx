@@ -92,13 +92,13 @@ export default function MaintenanceTypeDonutChart({
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-      <h3 className="text-base font-semibold text-zinc-900 mb-1">{title}</h3>
+      <h3 className="mb-1 text-base font-semibold text-zinc-900">{title}</h3>
       {activeFilter && (
-        <p className="text-xs text-blue-600 mb-2">
+        <p className="mb-2 text-xs text-blue-600">
           Filtro ativo: <span className="font-medium">{activeFilter}</span>{' '}
           <button
             onClick={() => onFilterChange(null)}
-            className="underline ml-1 text-zinc-400 hover:text-zinc-600"
+            className="ml-1 text-zinc-400 underline hover:text-zinc-600"
           >
             limpar
           </button>
@@ -106,7 +106,7 @@ export default function MaintenanceTypeDonutChart({
       )}
       {!activeFilter && <div className="mb-2" />}
       {isEmpty ? (
-        <div className="h-64 flex items-center justify-center">
+        <div className="flex h-64 items-center justify-center">
           <p className="text-sm text-zinc-400">Sem dados no período.</p>
         </div>
       ) : (
@@ -165,7 +165,7 @@ export default function MaintenanceTypeDonutChart({
             </ResponsiveContainer>
           </div>
           {isFilterable && (
-            <p className="text-xs text-zinc-400 mt-1 text-center">
+            <p className="mt-1 text-center text-xs text-zinc-400">
               Clique em uma fatia para filtrar
             </p>
           )}

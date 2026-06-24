@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import {
   OTHER_BUDGET_SYSTEM,
   BUDGET_SYSTEM_OPTIONS,

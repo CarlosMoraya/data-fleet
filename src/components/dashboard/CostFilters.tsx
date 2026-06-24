@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
 import { Filter, RotateCcw, Search } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+
 import type { CostDashboardFilters } from '../../lib/dashboardKpi';
 
 interface CostFiltersProps {
@@ -31,7 +32,7 @@ function CompactSelect({
       <select
         value={value ?? ''}
         onChange={(event) => onChange(event.target.value || null)}
-        className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-200"
+        className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 shadow-sm transition outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200"
       >
         <option value="">Todos</option>
         {options.map((option) => (
@@ -107,7 +108,7 @@ export default function CostFilters({ value, options, onChange, onReset }: CostF
         <div className="relative flex min-w-0 flex-col gap-1">
           <span className="text-xs font-medium text-zinc-500">Modelo</span>
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <input
               type="text"
               role="combobox"
@@ -123,11 +124,11 @@ export default function CostFilters({ value, options, onChange, onReset }: CostF
                 }
               }}
               placeholder="Buscar modelo"
-              className="h-10 w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-200"
+              className="h-10 w-full rounded-xl border border-zinc-200 bg-white py-2 pr-3 pl-9 text-sm text-zinc-900 shadow-sm transition outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200"
             />
           </div>
           {isModelOpen && filteredModels.length > 0 && (
-            <div className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-lg">
+            <div className="absolute top-full right-0 left-0 z-10 mt-1 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-lg">
               <div className="max-h-56 overflow-y-auto py-1">
                 {filteredModels.map((model) => (
                   <button
@@ -145,7 +146,7 @@ export default function CostFilters({ value, options, onChange, onReset }: CostF
             </div>
           )}
           {isModelOpen && filteredModels.length === 0 && (
-            <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-500 shadow-lg">
+            <div className="absolute top-full right-0 left-0 z-10 mt-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-500 shadow-lg">
               Nenhum modelo encontrado.
             </div>
           )}

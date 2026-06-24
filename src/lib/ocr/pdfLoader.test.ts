@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+
 import { loadPdfjs } from './pdfLoader';
 
 const mockState = vi.hoisted(() => ({

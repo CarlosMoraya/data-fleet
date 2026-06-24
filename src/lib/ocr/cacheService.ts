@@ -17,7 +17,7 @@ export async function getOcrCache(fileHash: string): Promise<OcrCacheEntry | nul
     .single();
 
   if (error || !data) return null;
-  return data as OcrCacheEntry;
+  return data;
 }
 
 /**

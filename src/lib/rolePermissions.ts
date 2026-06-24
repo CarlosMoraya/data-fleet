@@ -98,23 +98,23 @@ export const TENANT_USER_ROLE_OPTIONS: Role[] = [
 const OPERATIONS_MANAGER_ALLOWED_ROUTES = ['/agendamentos', '/manutencao', '/conta/senha'] as const;
 
 export function hasRoleAccess(role: Role | undefined): boolean {
-  return ROLES_WITH_ACCESS.includes(role as Role);
+  return ROLES_WITH_ACCESS.includes(role);
 }
 
 export function canCreate(role: Role | undefined): boolean {
-  return ROLES_CAN_CREATE.includes(role as Role);
+  return ROLES_CAN_CREATE.includes(role);
 }
 
 export function canEdit(role: Role | undefined): boolean {
-  return ROLES_CAN_EDIT.includes(role as Role);
+  return ROLES_CAN_EDIT.includes(role);
 }
 
 export function canDelete(role: Role | undefined): boolean {
-  return ROLES_CAN_DELETE.includes(role as Role);
+  return ROLES_CAN_DELETE.includes(role);
 }
 
 export function getRoleRank(role: Role | undefined): number {
-  return ROLE_RANK[role as Role] ?? -1;
+  return ROLE_RANK[role] ?? -1;
 }
 
 export function getRoleLabel(role: Role | undefined): string {
@@ -130,7 +130,7 @@ export function canManageOperationsManagerScope(role: Role | null | undefined): 
 }
 
 export function canCorrectOdometer(role: Role | undefined | null): boolean {
-  return ROLES_CAN_CORRECT_ODOMETER.includes(role as Role);
+  return ROLES_CAN_CORRECT_ODOMETER.includes(role);
 }
 
 export function canAccessOperationsReadonlyModules(role: Role | null | undefined): boolean {

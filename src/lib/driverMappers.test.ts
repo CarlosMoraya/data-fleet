@@ -1,4 +1,5 @@
 import { driverToRow, driverFromRow, type DriverRow } from './driverMappers';
+
 import type { Driver } from '../types/driver';
 
 describe('driverToRow', () => {

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+
 import {
   buildUiStateKey,
   safeParseJson,
@@ -20,7 +21,7 @@ const mockStorage = (): Storage => {
     get length() { return Object.keys(store).length; },
     key: (index: number) => Object.keys(store)[index] ?? null,
     clear: () => { store = {}; },
-  } as Storage;
+  };
 };
 
 describe('buildUiStateKey', () => {

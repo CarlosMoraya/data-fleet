@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
 import { X, Upload, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+
 import { supabase } from '../../lib/supabase';
 import { importRevisionHistory } from '../../services/warrantyRevisionService';
 
@@ -115,13 +116,13 @@ export default function WarrantyImportHistoryModal({ eventId, vehicleId, clientI
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
-      <div className="relative flex w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl max-h-[90vh]">
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 flex-shrink-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-zinc-200 px-6 py-4">
           <h2 className="text-base font-semibold text-zinc-900">
             Importar histórico de revisão
           </h2>
-          <button onClick={onClose} className="rounded-lg p-1 hover:bg-zinc-100 transition-colors">
+          <button onClick={onClose} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
@@ -130,7 +131,7 @@ export default function WarrantyImportHistoryModal({ eventId, vehicleId, clientI
           <p className="px-6 pt-4 text-sm text-zinc-500">{label}</p>
         )}
 
-        <div className="overflow-y-auto flex-1 p-6">
+        <div className="flex-1 overflow-y-auto p-6">
           <form id="warranty-import-form" onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
@@ -154,7 +155,7 @@ export default function WarrantyImportHistoryModal({ eventId, vehicleId, clientI
           </form>
         </div>
 
-        <div className="flex-shrink-0 border-t border-zinc-200 px-6 py-4 bg-zinc-50 rounded-b-2xl">
+        <div className="flex-shrink-0 rounded-b-2xl border-t border-zinc-200 bg-zinc-50 px-6 py-4">
           {error && (
             <p className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
           )}
@@ -164,7 +165,7 @@ export default function WarrantyImportHistoryModal({ eventId, vehicleId, clientI
               Cancelar
             </button>
             <button type="submit" form="warranty-import-form" disabled={saving}
-              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 inline-flex items-center">
+              className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60">
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
               {saving ? 'Importando...' : 'Importar'}
             </button>

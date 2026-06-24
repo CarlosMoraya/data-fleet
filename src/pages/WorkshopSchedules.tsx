@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CalendarClock,
   MapPin,
@@ -14,11 +13,15 @@ import {
   ChevronUp,
   ClipboardList,
 } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
+
+import ScheduleForm from '../components/ScheduleForm';
+import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { WorkshopSchedule } from '../types';
+import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { isOperationsManager } from '../lib/rolePermissions';
+import { supabase } from '../lib/supabase';
 import {
   WorkshopScheduleRow,
   scheduleFromRow,
@@ -26,9 +29,7 @@ import {
   buildGoogleMapsUrl,
   formatWorkshopAddress,
 } from '../lib/workshopScheduleMappers';
-import ScheduleForm from '../components/ScheduleForm';
-import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
-import SelectClientNotice from '../components/SelectClientNotice';
+import { WorkshopSchedule } from '../types';
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
 
@@ -173,12 +174,12 @@ function DriverView() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Agendamentos</h1>
-          <p className="text-sm text-zinc-500 mt-1">Seus próximos agendamentos de oficina.</p>
+          <p className="mt-1 text-sm text-zinc-500">Seus próximos agendamentos de oficina.</p>
         </div>
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 py-16 text-center">
-          <CalendarClock className="h-10 w-10 text-zinc-300 mb-3" />
+          <CalendarClock className="mb-3 h-10 w-10 text-zinc-300" />
           <p className="text-sm font-medium text-zinc-500">Dados de cliente não carregados</p>
-          <p className="text-xs text-zinc-400 mt-1">Seu perfil de motorista não está associado a nenhum cliente. Contate o administrador.</p>
+          <p className="mt-1 text-xs text-zinc-400">Seu perfil de motorista não está associado a nenhum cliente. Contate o administrador.</p>
         </div>
       </div>
     );
@@ -266,12 +267,12 @@ function DriverView() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Agendamentos</h1>
-          <p className="text-sm text-zinc-500 mt-1">Seus próximos agendamentos de oficina.</p>
+          <p className="mt-1 text-sm text-zinc-500">Seus próximos agendamentos de oficina.</p>
         </div>
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-amber-300 bg-amber-50 py-16 text-center">
-          <CalendarClock className="h-10 w-10 text-amber-300 mb-3" />
+          <CalendarClock className="mb-3 h-10 w-10 text-amber-300" />
           <p className="text-sm font-medium text-amber-900">{diagnosticError}</p>
-          <p className="text-xs text-amber-700 mt-1">Recarregue a página ou contate o administrador se o problema persistir.</p>
+          <p className="mt-1 text-xs text-amber-700">Recarregue a página ou contate o administrador se o problema persistir.</p>
         </div>
       </div>
     );
@@ -284,15 +285,15 @@ function DriverView() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Agendamentos</h1>
-        <p className="text-sm text-zinc-500 mt-1">Seus próximos agendamentos de oficina.</p>
+        <p className="mt-1 text-sm text-zinc-500">Seus próximos agendamentos de oficina.</p>
       </div>
 
       {/* Agendamentos pendentes */}
       {pending.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 py-16 text-center">
-          <CalendarClock className="h-10 w-10 text-zinc-300 mb-3" />
+          <CalendarClock className="mb-3 h-10 w-10 text-zinc-300" />
           <p className="text-sm font-medium text-zinc-500">Nenhum agendamento pendente</p>
-          <p className="text-xs text-zinc-400 mt-1">Quando houver um agendamento para seu veículo, ele aparecerá aqui.</p>
+          <p className="mt-1 text-xs text-zinc-400">Quando houver um agendamento para seu veículo, ele aparecerá aqui.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -307,7 +308,7 @@ function DriverView() {
         <div>
           <button
             onClick={() => setShowHistory((v) => !v)}
-            className="flex items-center gap-2 text-sm font-medium text-zinc-500 hover:text-zinc-700 transition-colors"
+            className="flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-700"
           >
             {showHistory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             Histórico ({history.length})
@@ -333,19 +334,19 @@ const DriverScheduleCard: React.FC<{ schedule: WorkshopSchedule; dimmed?: boolea
   return (
     <div className={`rounded-2xl border bg-white p-5 shadow-sm ${dimmed ? 'border-zinc-200' : 'border-orange-200 shadow-orange-50'}`}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[schedule.status]}`}>
               {STATUS_LABELS[schedule.status]}
             </span>
             <span className="text-xs text-zinc-400">{formatDate(schedule.scheduledDate)}</span>
           </div>
-          <h3 className="mt-2 text-base font-semibold text-zinc-900 truncate">{schedule.workshopName ?? 'Oficina'}</h3>
+          <h3 className="mt-2 truncate text-base font-semibold text-zinc-900">{schedule.workshopName ?? 'Oficina'}</h3>
 
           {hasAddress && (
             <div className="mt-2 flex items-start gap-1.5">
-              <MapPin className="h-4 w-4 text-zinc-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-zinc-500 whitespace-pre-line">{address}</p>
+              <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-zinc-400" />
+              <p className="text-sm whitespace-pre-line text-zinc-500">{address}</p>
             </div>
           )}
 
@@ -360,7 +361,7 @@ const DriverScheduleCard: React.FC<{ schedule: WorkshopSchedule; dimmed?: boolea
             target="_blank"
             rel="noopener noreferrer"
             title="Abrir no Google Maps"
-            className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 transition-colors hover:bg-blue-100"
           >
             <MapPin className="h-5 w-5" />
           </a>
@@ -514,21 +515,21 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
       {blockWrite && <SelectClientNotice />}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Agendamentos</h1>
-        <p className="text-sm text-zinc-500 mt-1">
+        <p className="mt-1 text-sm text-zinc-500">
           {operationsManager ? 'Visualize os agendamentos dentro do seu escopo.' : 'Gerencie os agendamentos de visita às oficinas.'}
         </p>
       </div>
 
       {/* Barra de ações */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+        <div className="relative max-w-sm flex-1">
+          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <input
             type="text"
             placeholder="Buscar por placa ou oficina..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-zinc-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-xl border border-zinc-300 py-2 pr-3 pl-9 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
           />
         </div>
         {canWriteSchedules && (
@@ -540,7 +541,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
               setEditingSchedule(null);
               setIsFormOpen(true);
             }}
-            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
           >
             <Plus className="h-4 w-4" />
             Novo Agendamento
@@ -558,10 +559,10 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
               <button
                 key={tab.key}
                 onClick={() => setStatusFilter(tab.key)}
-                className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-3 text-sm transition-colors ${
+                className={`flex items-center gap-1.5 border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors ${
                   isActive
-                    ? 'border-orange-500 text-orange-600 font-medium'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
+                    ? 'border-orange-500 font-medium text-orange-600'
+                    : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
                 }`}
               >
                 {tab.label}
@@ -583,12 +584,12 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">Erro ao carregar agendamentos.</div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 py-16 text-center">
-          <CalendarClock className="h-10 w-10 text-zinc-300 mb-3" />
+          <CalendarClock className="mb-3 h-10 w-10 text-zinc-300" />
           <p className="text-sm font-medium text-zinc-500">
             {search || statusFilter !== 'all' ? 'Nenhum agendamento encontrado' : 'Nenhum agendamento cadastrado'}
           </p>
           {!search && statusFilter === 'all' && canWriteSchedules && (
-            <p className="text-xs text-zinc-400 mt-1">Clique em "Novo Agendamento" para começar.</p>
+            <p className="mt-1 text-xs text-zinc-400">Clique em "Novo Agendamento" para começar.</p>
           )}
         </div>
       ) : (
@@ -597,14 +598,14 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50">
                 {blockWrite && (
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Cliente</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Cliente</th>
                 )}
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Veículo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Oficina</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 hidden sm:table-cell">Data</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 hidden md:table-cell">Criado por</th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">Ações</th>
+                <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Veículo</th>
+                <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Oficina</th>
+                <th className="hidden px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase sm:table-cell">Data</th>
+                <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Status</th>
+                <th className="hidden px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase md:table-cell">Criado por</th>
+                <th className="px-4 py-3 text-right text-xs font-medium tracking-wider text-zinc-500 uppercase">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
@@ -672,7 +673,7 @@ const ScheduleRow: React.FC<{
   const hasAddress = address.trim().length > 0;
 
   return (
-    <tr className="hover:bg-zinc-50 transition-colors">
+    <tr className="transition-colors hover:bg-zinc-50">
       {blockWrite && (
         <td className="px-4 py-3 text-sm text-zinc-600">
           <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
@@ -690,7 +691,7 @@ const ScheduleRow: React.FC<{
             href={mapsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 mt-0.5"
+            className="mt-0.5 inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700"
             title="Ver no Google Maps"
           >
             <MapPin className="h-3 w-3" />
@@ -698,16 +699,16 @@ const ScheduleRow: React.FC<{
           </a>
         )}
       </td>
-      <td className="px-4 py-3 text-zinc-600 hidden sm:table-cell">{formatDate(schedule.scheduledDate)}</td>
+      <td className="hidden px-4 py-3 text-zinc-600 sm:table-cell">{formatDate(schedule.scheduledDate)}</td>
       <td className="px-4 py-3">
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[schedule.status]}`}>
           {STATUS_LABELS[schedule.status]}
         </span>
         {schedule.completedAt && (
-          <div className="text-xs text-zinc-400 mt-0.5">{formatDate(schedule.completedAt.split('T')[0])}</div>
+          <div className="mt-0.5 text-xs text-zinc-400">{formatDate(schedule.completedAt.split('T')[0])}</div>
         )}
       </td>
-      <td className="px-4 py-3 text-zinc-500 text-xs hidden md:table-cell">{schedule.createdByName ?? '-'}</td>
+      <td className="hidden px-4 py-3 text-xs text-zinc-500 md:table-cell">{schedule.createdByName ?? '-'}</td>
       <td className="px-4 py-3">
         <div className="flex items-center justify-end gap-1">
           {canWriteSchedules && isScheduled && onEdit && onComplete && onCancel && (
@@ -715,21 +716,21 @@ const ScheduleRow: React.FC<{
               <button
                 onClick={onEdit}
                 title="Editar"
-                className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
               >
                 <Pencil className="h-4 w-4" />
               </button>
               <button
                 onClick={onComplete}
                 title="Concluir manualmente"
-                className="rounded-lg p-1.5 text-green-500 hover:bg-green-50 hover:text-green-700 transition-colors"
+                className="rounded-lg p-1.5 text-green-500 transition-colors hover:bg-green-50 hover:text-green-700"
               >
                 <CheckCircle className="h-4 w-4" />
               </button>
               <button
                 onClick={onCancel}
                 title="Cancelar agendamento"
-                className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-red-500 transition-colors"
+                className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-red-500"
               >
                 <XCircle className="h-4 w-4" />
               </button>
@@ -739,7 +740,7 @@ const ScheduleRow: React.FC<{
             <button
               onClick={onGenerateMaintenance}
               title="Gerar OS de Manutenção"
-              className="rounded-lg p-1.5 text-zinc-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
             >
               <ClipboardList className="h-4 w-4" />
             </button>
@@ -748,7 +749,7 @@ const ScheduleRow: React.FC<{
             <button
               onClick={onDelete}
               title="Excluir"
-              className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-500"
             >
               <Trash2 className="h-4 w-4" />
             </button>

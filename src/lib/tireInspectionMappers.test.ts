@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import {
   tireInspectionFromRow,
   tireInspectionResponseFromRow,
@@ -6,6 +7,7 @@ import {
   type TireInspectionRow,
   type TireInspectionResponseRow,
 } from './tireInspectionMappers';
+
 import type { TireInspectionResponse } from '../types';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────

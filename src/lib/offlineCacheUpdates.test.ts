@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { applyOfflineKm, applyOfflineWorkshop, upsertResponse } from './offlineCacheUpdates';
 
 describe('offline cache updates', () => {

@@ -2,6 +2,55 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-06-24 (ESLint 9+ como ferramenta oficial de qualidade de código)
+
+### Instalação e configuração do ESLint
+
+**O que foi implementado:** ESLint 9+ (flat config) como ferramenta oficial de qualidade de código, integrado ao `tsc --noEmit` no mesmo pipeline. Adiciona `npm run lint` e `npm run lint:fix`, workflow GitHub Actions (lint + test + smoke) e auto-fix aplicado à base de código atual (180 arquivos).
+
+**Arquitetura (padrões aplicados):** ESLint flat config (`eslint.config.js`), type-aware linting via `@typescript-eslint` com `projectService`, `eslint-plugin-react` (React 19 / novo JSX transform), `eslint-plugin-tailwindcss` (Tailwind v4 — sem `tailwind.config.js`, `settings.tailwindcss.config` aponta para `src/index.css` com path absoluto), `eslint-plugin-security` (OWASP), `eslint-plugin-import`.
+
+**Arquivos criados:**
+- `eslint.config.js` — flat config completo (ignores, base JS, `tseslint.configs['flat/recommended-type-checked']`, setup de React/Hooks/Tailwind/Security/Import, globals e overrides).
+- `.github/workflows/lint.yml` — CI/CD com 3 jobs paralelos (lint, test unit, smoke) em `push`/`pull_request` contra `main`/`master`.
+
+**Arquivos modificados:**
+- `package.json` — scripts `lint` = `eslint src/ && tsc --noEmit`, `lint:fix` = `eslint src/ --fix && tsc --noEmit`; adicionadas 10 dependências dev (`eslint@^9.15.0`, `@eslint/js`, `@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`, `eslint-plugin-react`, `eslint-plugin-react-hooks`, `eslint-plugin-tailwindcss`, `eslint-plugin-security`, `eslint-plugin-import`).
+- `package-lock.json` — lockfile atualizado (+168 packages).
+- ~180 arquivos em `src/` — auto-correção de `import/order` (ordenação alfabética com grupos e linhas em branco) e `tailwindcss/classnames-order`. Nenhuma lógica de negócio alterada pelo fixer.
+- `src/components/dashboard/PeriodRangeFilter.test.tsx` — cast `as HTMLInputElement[]` restaurado após o fixer removê-lo (regra `no-unnecessary-type-assertion` desativada por divergência entre ESLint type-service e `tsc`).
+- `agent/AGENT-FRONTEND.md` — adicionada seção "🔍 Linting e Qualidade de Código" (configuração, comandos, regras de destaque, fluxo de dev, CI/CD).
+- `docs/MEMORY.md` — estado vigente atualizado.
+- `docs/MEMORY-HISTORY.md` — este registro.
+
+**Decisões confirmadas:**
+- Flat config (`eslint.config.js`); **não** usar `.eslintrc*` nem `.eslintignore` (usar `ignores` em flat config).
+- `no-unnecessary-type-assertion` permanece `off` — o ESLint type-service e `tsc` divergem em `querySelectorAll('input[type="date"]')` e o fixer removia casts que o `tsc` exige.
+- Família `no-unsafe-*` e regras type-checked/major (`no-floating-promises`, `no-explicit-any`, `require-await`, `rules-of-hooks`, `unbound-method`, etc.) reportadas como **warning** no baseline (codebase não usa `strict`); devono ser tightenadas para `error` incrementalmente em sessões dedicadas.
+- `tailwindcss/no-custom-classname` permanece `off` (falsos-positivos na v4 parcial).
+- `security/detect-object-injection` desativada (muitos falsos-positivos em TS).
+- Escopo de lint: apenas `src/` (configs, `e2e/`, `scripts/`, `supabase/`, `docs/` ignorados).
+- `tsconfig.json` não modificado (restrição do guardrail).
+
+**Erros residuais (7447 warnings, 0 errors):**
+- `no-unsafe-member-access` (2328), `no-unsafe-assignment` (1850), `no-unsafe-call` (1713), `no-unsafe-return` (682), `no-unsafe-argument` (477) — codebase non-strict.
+- `no-floating-promises` (84), `no-explicit-any` (83), `rules-of-hooks` (68), `no-unused-vars` (53), `no-useless-escape` (20), `import/order` (15), `require-await` (12), `exhaustive-deps` (11), `no-base-to-string` (8), `react/no-unescaped-entities` (8), `security/detect-unsafe-regex` (7), `no-console` (5), `no-misused-promises` (4), `security/detect-non-literal-*` (8), `unbound-method` (3), etc.
+
+**Validações executadas:**
+- `npx eslint --version` → v9.39.4 ✅
+- `npm run lint:fix` → executou (auto-fix em 180 arquivos) ✅
+- `npm run lint` → exit 0 (0 errors, 7447 warnings) ✅
+- `npm run test:unit` → 608/608 ✅
+- `npm run test:smoke` → 6/6 ✅
+
+**Observações para sessões futuras:**
+- Tightenar regras `warn` → `error` incrementalmente (começar por `react-hooks/rules-of-hooks` e `no-floating-promises`).
+- Re-avaliar `no-unnecessary-type-assertion` após migrar para TS strict.
+- `@typescript-eslint/no-redundant-type-constituents` (3 warnings) indica tipos de união redundantes que podem ser simplificados.
+- Relatório completo em `eslint-report.txt` (transitório, não versionado por padrão).
+
+---
+
 ## Sessão — 2026-06-24 (Manutenção: filtros de Unidade Operacional e Embarcador)
 
 ### Filtros de Unidade Operacional e Embarcador na tela de Manutenção

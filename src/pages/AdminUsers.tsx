@@ -1,13 +1,14 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Pencil, Trash2, Plus, Search, X, Loader2 } from 'lucide-react';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
+
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
-import { Pencil, Trash2, Plus, Search, X, Loader2 } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Role } from '../types';
 import { capitalizeWords } from '../lib/inputHelpers';
 import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
 import { ROLE_COLORS, getRoleLabel } from '../lib/rolePermissions';
+import { supabase } from '../lib/supabase';
+import { Role } from '../types';
 
 const ALL_ROLES: Role[] = [
   'Driver', 'Yard Auditor', 'Fleet Assistant',
@@ -116,7 +117,7 @@ function CreateUserModal({
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
           <h2 className="text-base font-semibold text-zinc-900">Novo Usuário</h2>
-          <button onClick={onClose} className="rounded-lg p-1 hover:bg-zinc-100 transition-colors">
+          <button onClick={onClose} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
@@ -127,7 +128,7 @@ function CreateUserModal({
             <input
               type="text" required value={form.name} onChange={set('name')}
               placeholder="Ex: João Silva"
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             />
           </div>
 
@@ -136,7 +137,7 @@ function CreateUserModal({
             <input
               type="email" required value={form.email} onChange={set('email')}
               placeholder="joao@empresa.com"
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             />
           </div>
 
@@ -145,7 +146,7 @@ function CreateUserModal({
             <input
               type="password" required minLength={6} value={form.password} onChange={set('password')}
               placeholder="Mínimo 6 caracteres"
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             />
           </div>
 
@@ -153,7 +154,7 @@ function CreateUserModal({
             <label className="block text-sm font-medium text-zinc-700">Cargo *</label>
             <select
               required value={form.role} onChange={set('role')}
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             >
               {ALL_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
@@ -163,7 +164,7 @@ function CreateUserModal({
             <label className="block text-sm font-medium text-zinc-700">Cliente *</label>
             <select
               required value={form.client_id} onChange={set('client_id')}
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             >
               <option value="">Selecione um cliente...</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -177,13 +178,13 @@ function CreateUserModal({
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button" onClick={onClose}
-              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
             >
               Cancelar
             </button>
             <button
               type="submit" disabled={createMutation.isPending}
-              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center min-w-[120px]"
+              className="flex min-w-[120px] items-center justify-center rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-60"
             >
               {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : 'Criar Usuário'}
             </button>
@@ -265,7 +266,7 @@ function EditUserModal({
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
           <h2 className="text-base font-semibold text-zinc-900">Editar Usuário</h2>
-          <button onClick={onClose} className="rounded-lg p-1 hover:bg-zinc-100 transition-colors">
+          <button onClick={onClose} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
@@ -275,7 +276,7 @@ function EditUserModal({
             <label className="block text-sm font-medium text-zinc-700">Nome *</label>
             <input
               type="text" required value={form.name} onChange={set('name')}
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             />
           </div>
 
@@ -283,7 +284,7 @@ function EditUserModal({
             <label className="block text-sm font-medium text-zinc-700">Cargo *</label>
             <select
               required value={form.role} onChange={set('role')}
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             >
               {ALL_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
@@ -293,7 +294,7 @@ function EditUserModal({
             <label className="block text-sm font-medium text-zinc-700">Cliente *</label>
             <select
               required value={form.client_id} onChange={set('client_id')}
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             >
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -306,13 +307,13 @@ function EditUserModal({
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button" onClick={onClose}
-              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
             >
               Cancelar
             </button>
             <button
               type="submit" disabled={editMutation.isPending}
-              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center min-w-[120px]"
+              className="flex min-w-[120px] items-center justify-center rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-60"
             >
               {editMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : 'Salvar'}
             </button>
@@ -358,7 +359,7 @@ export default function AdminUsers() {
     queryFn: async () => {
       const { data, error } = await supabase.from('clients').select('id, name').order('name');
       if (error) throw error;
-      return data as ClientOption[];
+      return data;
     }
   });
 
@@ -388,7 +389,7 @@ export default function AdminUsers() {
   };
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex h-full flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -397,7 +398,7 @@ export default function AdminUsers() {
         </div>
         <button
           onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
+          className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
         >
           <Plus className="h-4 w-4" />
           Novo Usuário
@@ -406,17 +407,17 @@ export default function AdminUsers() {
 
       <div className="flex flex-wrap gap-3">
         <div className="relative max-w-xs flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <input
             type="text" placeholder="Buscar por nome..."
             value={search} onChange={(e) => setSearch(e.target.value)}
-            className="block w-full rounded-xl border border-zinc-200 py-2 pl-9 pr-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="block w-full rounded-xl border border-zinc-200 py-2 pr-3 pl-9 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
           />
         </div>
       </div>
 
       {/* Tabela */}
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm flex-1 min-h-0 flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-6 w-6 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
@@ -428,18 +429,18 @@ export default function AdminUsers() {
         ) : (
           <div className="flex-1 overflow-auto">
             <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50 sticky top-0 z-10">
+              <thead className="sticky top-0 z-10 bg-zinc-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Usuário</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cargo</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cliente</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cadastrado em</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Usuário</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Cargo</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Cliente</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Cadastrado em</th>
                   <th className="px-6 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {filtered.map((u) => (
-                  <tr key={u.id} className="hover:bg-zinc-50 transition-colors">
+                  <tr key={u.id} className="transition-colors hover:bg-zinc-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <UserInitials name={u.name} />
@@ -457,14 +458,14 @@ export default function AdminUsers() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => setEditingUser(u)}
-                          className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                          className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
                           title="Editar"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(u)}
-                          className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                          className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600"
                           title="Excluir"
                         >
                           <Trash2 className="h-4 w-4" />

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { stampTimestampOnImage } from './stampTimestampOnImage';
 
 // ─── Mock canvas API (jsdom não implementa toBlob com conteúdo real) ──────────

@@ -1,5 +1,3 @@
-import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard,
   Truck,
@@ -17,9 +15,14 @@ import {
   KeyRound,
   ShieldCheck,
 } from 'lucide-react';
-import { cn } from '../lib/utils';
-import type { Role } from '../types';
+import { NavLink, useNavigate } from 'react-router-dom';
+
+import { useAuth } from '../context/AuthContext';
 import { getRoleLabel, isOperationsManager } from '../lib/rolePermissions';
+import { cn } from '../lib/utils';
+
+import type { Role } from '../types';
+
 
 interface NavItem {
   name: string;
@@ -64,7 +67,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Mobile overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-zinc-900/80 backdrop-blur-sm lg:hidden transition-opacity"
+          className="fixed inset-0 z-40 bg-zinc-900/80 backdrop-blur-sm transition-opacity lg:hidden"
           onClick={onClose}
         />
       )}
@@ -76,12 +79,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex h-[80px] shrink-0 items-center px-6 border-b border-blue-800 bg-blue-900">
-          <div className="flex flex-col justify-center w-full" aria-label="BetaFleet Logo">
-            <span className="text-[30px] font-bold tracking-tight text-white leading-none flex items-baseline">
-              <span className="text-orange-500 mr-[2px] text-[32px]">β</span>etaFleet
+        <div className="flex h-[80px] shrink-0 items-center border-b border-blue-800 bg-blue-900 px-6">
+          <div className="flex w-full flex-col justify-center" aria-label="BetaFleet Logo">
+            <span className="flex items-baseline text-[30px] leading-none font-bold tracking-tight text-white">
+              <span className="mr-[2px] text-[32px] text-orange-500">β</span>etaFleet
             </span>
-            <span className="text-[10px] font-medium text-blue-200/80 uppercase tracking-[0.25em] ml-5 mt-1">
+            <span className="mt-1 ml-5 text-[10px] font-medium tracking-[0.25em] text-blue-200/80 uppercase">
               GESTÃO DE FROTAS
             </span>
           </div>
@@ -98,7 +101,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 className={({ isActive }) =>
                   cn(
                     isActive
-                      ? 'bg-blue-700 text-white font-medium'
+                      ? 'bg-blue-700 font-medium text-white'
                       : 'text-blue-200 hover:bg-blue-800 hover:text-white',
                     'group flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors'
                   )
@@ -116,14 +119,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {user?.role === 'Admin Master' && (
           <div className="border-t border-blue-800 px-3 py-4">
-            <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-blue-400">Admin</p>
+            <p className="mb-1 px-3 text-xs font-semibold tracking-wider text-blue-400 uppercase">Admin</p>
             <NavLink
               to="/admin/clients"
               onClick={onClose}
               className={({ isActive }) =>
                 cn(
                   isActive
-                    ? 'bg-blue-700 text-white font-medium'
+                    ? 'bg-blue-700 font-medium text-white'
                     : 'text-blue-200 hover:bg-blue-800 hover:text-white',
                   'group flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors'
                 )
@@ -138,7 +141,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               className={({ isActive }) =>
                 cn(
                   isActive
-                    ? 'bg-blue-700 text-white font-medium'
+                    ? 'bg-blue-700 font-medium text-white'
                     : 'text-blue-200 hover:bg-blue-800 hover:text-white',
                   'group flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors'
                 )
@@ -152,7 +155,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         <div className="border-t border-blue-800 p-4">
           {user?.role && (
-            <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-blue-300">
+            <p className="mb-3 px-3 text-xs font-semibold tracking-wider text-blue-300 uppercase">
               {getRoleLabel(user.role)}
             </p>
           )}
@@ -162,7 +165,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             className={({ isActive }) =>
               cn(
                 isActive
-                  ? 'bg-blue-700 text-white font-medium'
+                  ? 'bg-blue-700 font-medium text-white'
                   : 'text-blue-200 hover:bg-blue-800 hover:text-white',
                 'group flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors'
               )
@@ -173,7 +176,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </NavLink>
           <button
             onClick={handleLogout}
-            className="group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium text-blue-200 hover:bg-blue-800 hover:text-white transition-colors"
+            className="group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium text-blue-200 transition-colors hover:bg-blue-800 hover:text-white"
           >
             <LogOut className="mr-3 h-5 w-5 text-blue-300 group-hover:text-blue-200" aria-hidden="true" />
             Logout

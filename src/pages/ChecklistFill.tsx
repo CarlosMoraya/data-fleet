@@ -1,24 +1,27 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { CheckCircle, XCircle, MinusCircle, Camera, ChevronLeft, Loader2, Lock, AlertTriangle, Building2, Gauge } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, XCircle, MinusCircle, Camera, ChevronLeft, Loader2, Lock, AlertTriangle, Building2, Gauge } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../context/AuthContext';
-import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
-import { checklistItemFromRow, type ChecklistItemRow } from '../lib/checklistTemplateMappers';
-import { uploadChecklistPhoto } from '../lib/checklistStorageHelpers';
-import { enqueueOperation, enqueuePhoto } from '../lib/offline/syncService';
-import { autoCompleteWorkshopSchedule } from '../lib/workshopScheduleUtils';
+
 import CameraCapture from '../components/CameraCapture';
 import OfflineBanner from '../components/OfflineBanner';
+import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePendingSyncCount } from '../hooks/usePendingSyncCount';
-import type { Checklist, ChecklistItem, ChecklistContext, ResponseStatus } from '../types';
-import { ODOMETER_UPDATE_CONTEXT, WORKSHOP_CONTEXTS } from '../types';
-import { cn } from '../lib/utils';
-import { applyOfflineKm, applyOfflineWorkshop, upsertResponse } from '../lib/offlineCacheUpdates';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { validateChecklistOdometerKm } from '../lib/checklistKmValidation';
+import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
+import { uploadChecklistPhoto } from '../lib/checklistStorageHelpers';
+import { checklistItemFromRow, type ChecklistItemRow } from '../lib/checklistTemplateMappers';
 import { evaluateOdometerTolerance } from '../lib/odometerToleranceValidation';
+import { enqueueOperation, enqueuePhoto } from '../lib/offline/syncService';
+import { applyOfflineKm, applyOfflineWorkshop, upsertResponse } from '../lib/offlineCacheUpdates';
+import { cn } from '../lib/utils';
+import { autoCompleteWorkshopSchedule } from '../lib/workshopScheduleUtils';
+import { ODOMETER_UPDATE_CONTEXT, WORKSHOP_CONTEXTS } from '../types';
+
+import type { Checklist, ChecklistItem, ChecklistContext, ResponseStatus } from '../types';
+
+import { supabase } from '../lib/supabase';
 
 interface ItemState {
   item: ChecklistItem;
@@ -84,8 +87,8 @@ export default function ChecklistFill() {
       const { data, error } = await supabase
         .from('checklist_items')
         .select('*')
-        .eq('template_id', checklist!.templateId)
-        .eq('version_number', checklist!.versionNumber)
+        .eq('template_id', checklist.templateId)
+        .eq('version_number', checklist.versionNumber)
         .order('order_number');
       if (error) throw error;
       return (data ?? []).map(r => checklistItemFromRow(r as ChecklistItemRow));
@@ -110,9 +113,9 @@ export default function ChecklistFill() {
     networkMode: 'offlineFirst',
   });
 
-  const templateContext = checklist?.templateContext as ChecklistContext | null;
+  const templateContext = checklist?.templateContext;
   const isOdometerContext = templateContext === ODOMETER_UPDATE_CONTEXT;
-  const needsWorkshop = templateContext !== null && WORKSHOP_CONTEXTS.includes(templateContext as typeof WORKSHOP_CONTEXTS[number]);
+  const needsWorkshop = templateContext !== null && WORKSHOP_CONTEXTS.includes(templateContext);
   // Use workshop from checklist record or selected via local UI
   const effectiveWorkshopId = checklist?.workshopId || selectedWorkshopId;
   const workshopSaved = !!checklist?.workshopId;
@@ -126,9 +129,9 @@ export default function ChecklistFill() {
       const { data } = await supabase
         .from('vehicles')
         .select('initial_km')
-        .eq('id', checklist!.vehicleId!)
+        .eq('id', checklist.vehicleId)
         .single();
-      return (data as { initial_km: number | null } | null)?.initial_km ?? null;
+      return (data)?.initial_km ?? null;
     },
     enabled: !!checklist?.vehicleId,
     gcTime: Infinity,
@@ -142,7 +145,7 @@ export default function ChecklistFill() {
     queryKey: ['lastOdometerKm', checklist?.vehicleId],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_vehicle_max_effective_km', {
-        p_vehicle_id: checklist!.vehicleId!,
+        p_vehicle_id: checklist.vehicleId,
       });
       if (error) throw error;
       return (data as number | null) ?? null;
@@ -156,7 +159,7 @@ export default function ChecklistFill() {
     queryKey: ['lastOdometerReadingAt', checklist?.vehicleId],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_vehicle_last_odometer_reading_at', {
-        p_vehicle_id: checklist!.vehicleId!,
+        p_vehicle_id: checklist.vehicleId,
       });
       if (error) throw error;
       return (data as string | null) ?? null;
@@ -175,7 +178,7 @@ export default function ChecklistFill() {
         .eq('client_id', currentClient!.id)
         .maybeSingle();
       if (error) throw error;
-      return data as { odometer_km_tolerance_per_day: number | null; odometer_update_day_interval: number | null } | null;
+      return data;
     },
     enabled: isOdometerContext && !!currentClient?.id,
     gcTime: Infinity,
@@ -192,7 +195,7 @@ export default function ChecklistFill() {
         .eq('active', true)
         .order('name');
       if (error) throw error;
-      return (data ?? []) as WorkshopOption[];
+      return (data ?? []);
     },
     enabled: needsWorkshop && !!currentClient?.id,
     gcTime: 30 * 60 * 1000,
@@ -243,10 +246,10 @@ export default function ChecklistFill() {
         const respondedAt = new Date().toISOString();
         await enqueueOperation(
           { type: 'save_response', itemId, status, observation, photoUrl, respondedAt },
-          checklistId!,
+          checklistId,
         );
         queryClient.setQueryData(['checklistResponses', checklistId], (old: any[] | undefined) => upsertResponse(old, {
-          checklist_id: checklistId!,
+          checklist_id: checklistId,
           item_id: itemId,
           status,
           observation,
@@ -276,7 +279,7 @@ export default function ChecklistFill() {
     networkMode: 'offlineFirst',
     mutationFn: async (km: number) => {
       if (!navigator.onLine) {
-        await enqueueOperation({ type: 'confirm_km', odometerKm: km }, checklistId!);
+        await enqueueOperation({ type: 'confirm_km', odometerKm: km }, checklistId);
         queryClient.setQueryData(['checklist', checklistId], (old: Checklist | undefined) => applyOfflineKm(old, km));
         return;
       }
@@ -331,7 +334,7 @@ export default function ChecklistFill() {
     networkMode: 'offlineFirst',
     mutationFn: async (workshopId: string) => {
       if (!navigator.onLine) {
-        await enqueueOperation({ type: 'confirm_workshop', workshopId }, checklistId!);
+        await enqueueOperation({ type: 'confirm_workshop', workshopId }, checklistId);
         queryClient.setQueryData(['checklist', checklistId], (old: Checklist | undefined) => applyOfflineWorkshop(old, workshopId));
         return;
       }
@@ -363,7 +366,7 @@ export default function ChecklistFill() {
             workshopId: checklist.workshopId || selectedWorkshopId || undefined,
             vehicleId: checklist.vehicleId,
           },
-          checklistId!,
+          checklistId,
         );
         queryClient.setQueryData(['checklist', checklistId], (old: Checklist | undefined) => old ? { ...old, status: 'completed', completedAt } : old);
         queryClient.setQueriesData({ queryKey: ['openChecklist'] }, null);
@@ -431,7 +434,7 @@ export default function ChecklistFill() {
 
     if (!navigator.onLine) {
       // Armazena o blob offline e cria URL local para preview
-      const pendingPhotoKey = await enqueuePhoto(file, currentClient!.id, checklistId!, itemId);
+      const pendingPhotoKey = await enqueuePhoto(file, currentClient!.id, checklistId, itemId);
       const localPreviewUrl = URL.createObjectURL(file);
       updateItemLocal(itemId, { photoUrl: localPreviewUrl, uploading: false });
 
@@ -441,18 +444,18 @@ export default function ChecklistFill() {
         {
           type: 'save_response',
           itemId,
-          status: currentState.status!,
+          status: currentState.status,
           observation: currentState.observation,
           photoUrl: '',
           pendingPhotoKey,
           respondedAt,
         },
-        checklistId!,
+        checklistId,
       );
       queryClient.setQueryData(['checklistResponses', checklistId], (old: any[] | undefined) => upsertResponse(old, {
-        checklist_id: checklistId!,
+        checklist_id: checklistId,
         item_id: itemId,
-        status: currentState.status!,
+        status: currentState.status,
         observation: currentState.observation,
         photo_url: '',
         responded_at: respondedAt,
@@ -462,13 +465,13 @@ export default function ChecklistFill() {
 
     updateItemLocal(itemId, { uploading: true });
     try {
-      const url = await uploadChecklistPhoto(currentClient!.id, checklistId!, itemId, file);
+      const url = await uploadChecklistPhoto(currentClient!.id, checklistId, itemId, file);
       updateItemLocal(itemId, { photoUrl: url, uploading: false });
 
       const currentState = itemStates[idx];
       saveResponseMutation.mutate({
         itemId,
-        status: currentState.status!,
+        status: currentState.status,
         observation: currentState.observation,
         photoUrl: url
       });
@@ -488,7 +491,7 @@ export default function ChecklistFill() {
     }
 
     try {
-      const url = await uploadChecklistPhoto(currentClient!.id, checklistId!, 'odometer', file);
+      const url = await uploadChecklistPhoto(currentClient!.id, checklistId, 'odometer', file);
       const { error: updateError } = await supabase
         .from('checklists')
         .update({ odometer_photo_url: url })
@@ -525,7 +528,7 @@ export default function ChecklistFill() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
       </div>
     );
@@ -533,24 +536,24 @@ export default function ChecklistFill() {
 
   if (error && !checklist) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-zinc-50">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-zinc-50">
         <p className="text-red-600">{error}</p>
-        <button onClick={() => navigate('/checklists')} className="text-orange-500 hover:underline text-sm">Voltar</button>
+        <button onClick={() => navigate('/checklists')} className="text-sm text-orange-500 hover:underline">Voltar</button>
       </div>
     );
   }
 
   return (
-    <div className="h-full bg-zinc-50 flex flex-col overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-zinc-50">
       {/* Top bar */}
-      <div className="flex-shrink-0 bg-white border-b border-zinc-200 px-4 py-3 z-10">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex items-center gap-3 mb-2">
-            <button onClick={() => navigate('/checklists')} className="p-1.5 rounded-lg hover:bg-zinc-100">
+      <div className="z-10 flex-shrink-0 border-b border-zinc-200 bg-white px-4 py-3">
+        <div className="mx-auto max-w-2xl">
+          <div className="mb-2 flex items-center gap-3">
+            <button onClick={() => navigate('/checklists')} className="rounded-lg p-1.5 hover:bg-zinc-100">
               <ChevronLeft className="h-5 w-5 text-zinc-500" />
             </button>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-zinc-900 truncate">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-zinc-900">
                 {templateContext && <span className="text-orange-500">{templateContext} · </span>}
                 {checklist?.templateName}
               </p>
@@ -558,10 +561,10 @@ export default function ChecklistFill() {
                 <p className="text-xs text-zinc-500">{checklist.vehicleLicensePlate}</p>
               )}
             </div>
-            <span className="text-xs text-zinc-400 flex-shrink-0">{totalAnswered}/{itemStates.length}</span>
+            <span className="flex-shrink-0 text-xs text-zinc-400">{totalAnswered}/{itemStates.length}</span>
           </div>
-          <div className="w-full h-1.5 bg-zinc-200 rounded-full">
-            <div className="h-1.5 bg-orange-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+          <div className="h-1.5 w-full rounded-full bg-zinc-200">
+            <div className="h-1.5 rounded-full bg-orange-500 transition-all" style={{ width: `${progress}%` }} />
           </div>
         </div>
       </div>
@@ -573,13 +576,13 @@ export default function ChecklistFill() {
 
         {/* Workshop selector (for Entrada/Saída de Oficina) */}
         {needsWorkshop && (
-          <div className="px-4 py-4 max-w-2xl mx-auto w-full">
+          <div className="mx-auto w-full max-w-2xl px-4 py-4">
             <div className={cn(
-              'rounded-2xl border p-4 space-y-3',
-              workshopSaved ? 'bg-green-50 border-green-200' : 'bg-white border-orange-200',
+              'space-y-3 rounded-2xl border p-4',
+              workshopSaved ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-white',
             )}>
               <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                <Building2 className="h-4 w-4 flex-shrink-0 text-orange-500" />
                 <p className="text-sm font-semibold text-zinc-800">
                   {workshopSaved ? `Oficina: ${workshops.find(w => w.id === selectedWorkshopId)?.name ?? checklist?.workshopName ?? '—'}` : 'Selecione a oficina'}
                 </p>
@@ -589,7 +592,7 @@ export default function ChecklistFill() {
                   <select
                     value={selectedWorkshopId}
                     onChange={e => setSelectedWorkshopId(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   >
                     <option value="">— Selecione uma oficina —</option>
                     {workshops.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -597,11 +600,11 @@ export default function ChecklistFill() {
                   <button
                     disabled={!selectedWorkshopId}
                     onClick={() => confirmWorkshopMutation.mutate(selectedWorkshopId)}
-                    className="w-full py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 disabled:opacity-40"
+                    className="w-full rounded-lg bg-orange-500 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-40"
                   >
                     Confirmar oficina
                   </button>
-                  <p className="text-xs text-zinc-500 text-center">Selecione a oficina para liberar os itens do checklist</p>
+                  <p className="text-center text-xs text-zinc-500">Selecione a oficina para liberar os itens do checklist</p>
                 </>
               )}
             </div>
@@ -610,13 +613,13 @@ export default function ChecklistFill() {
 
         {/* Odometer KM */}
         {workshopReady && (
-          <div className="px-4 py-4 max-w-2xl mx-auto w-full">
+          <div className="mx-auto w-full max-w-2xl px-4 py-4">
             <div className={cn(
-              'rounded-2xl border p-4 space-y-3',
-              kmConfirmed ? 'bg-green-50 border-green-200' : 'bg-white border-orange-200',
+              'space-y-3 rounded-2xl border p-4',
+              kmConfirmed ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-white',
             )}>
               <div className="flex items-center gap-2">
-                <Gauge className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                <Gauge className="h-4 w-4 flex-shrink-0 text-orange-500" />
                 <p className="text-sm font-semibold text-zinc-800">
                   {kmConfirmed
                     ? `Hodômetro: ${parseInt(kmInput).toLocaleString('pt-BR')} km`
@@ -638,23 +641,23 @@ export default function ChecklistFill() {
                       value={kmInput}
                       onChange={e => setKmInput(e.target.value.replace(/\D/g, ''))}
                       placeholder="Ex: 45000"
-                      className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                     />
-                    <span className="text-sm text-zinc-500 flex-shrink-0">km</span>
+                    <span className="flex-shrink-0 text-sm text-zinc-500">km</span>
                   </div>
                   <button
                     disabled={confirmKmMutation.isPending}
                     onClick={handleConfirmKm}
-                    className="w-full py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 disabled:opacity-40 flex items-center justify-center gap-2"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-40"
                   >
                     {confirmKmMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                     Confirmar hodômetro
                   </button>
-                  <p className="text-xs text-zinc-500 text-center">Informe o hodômetro para liberar os itens do checklist</p>
+                  <p className="text-center text-xs text-zinc-500">Informe o hodômetro para liberar os itens do checklist</p>
                 </>
               )}
               {isOdometerContext && kmConfirmed && toleranceState.requiresPhoto && (
-                <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 space-y-3">
+                <div className="space-y-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-3">
                   <p className="text-xs text-sky-800">
                     O KM informado excedeu a tolerância esperada (máximo {toleranceState.expectedMaxKm?.toLocaleString('pt-BR')} km). Para concluir, envie uma foto do hodômetro como evidência.
                   </p>
@@ -663,7 +666,7 @@ export default function ChecklistFill() {
                     <div className="flex items-center gap-2">
                       <img src={odometerPhotoUrl} alt="foto do hodômetro" className="h-16 w-16 rounded-lg object-cover" />
                       <button onClick={() => setOdometerCameraOpen(true)} className="text-xs text-orange-500 hover:underline">Refazer foto</button>
-                      <span className="text-xs text-green-600 font-medium">✓ Foto registrada</span>
+                      <span className="text-xs font-medium text-green-600">✓ Foto registrada</span>
                     </div>
                   ) : (
                     <button
@@ -674,7 +677,7 @@ export default function ChecklistFill() {
                         }
                         setOdometerCameraOpen(true);
                       }}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl border border-sky-300 text-sm font-medium text-sky-700 bg-white hover:bg-sky-100 transition-colors"
+                      className="flex items-center gap-2 rounded-xl border border-sky-300 bg-white px-4 py-2 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-100"
                     >
                       <Camera className="h-4 w-4" />
                       Tirar foto do hodômetro
@@ -693,12 +696,12 @@ export default function ChecklistFill() {
 
         {/* Items */}
         {canShowItems && (
-          <div className="flex-1 px-4 py-4 max-w-2xl mx-auto w-full space-y-3">
+          <div className="mx-auto w-full max-w-2xl flex-1 space-y-3 px-4 py-4">
             {itemStates.map((s, idx) => (
               <div
                 key={s.item.id}
                 className={cn(
-                  'bg-white rounded-2xl border p-4 space-y-3 transition-colors',
+                  'space-y-3 rounded-2xl border bg-white p-4 transition-colors',
                   s.status === 'ok' && 'border-green-300 bg-green-50/30',
                   s.status === 'issue' && 'border-red-300 bg-red-50/30',
                   s.status === 'not_applicable' && 'border-zinc-300 bg-zinc-50/30',
@@ -710,17 +713,17 @@ export default function ChecklistFill() {
                     <p className="text-sm font-medium text-zinc-900">
                       {idx + 1}. {s.item.title}
                       {s.item.isMandatory && (
-                        <Lock className="inline ml-1 h-3 w-3 text-zinc-400" title="Obrigatório" />
+                        <Lock className="ml-1 inline h-3 w-3 text-zinc-400" title="Obrigatório" />
                       )}
                       {s.item.canBlockVehicle && (
-                        <span className="inline ml-1.5 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium">⚠ Bloqueio</span>
+                        <span className="ml-1.5 inline rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">⚠ Bloqueio</span>
                       )}
                     </p>
                     {s.item.description && (
-                      <p className="text-xs text-zinc-500 mt-0.5">{s.item.description}</p>
+                      <p className="mt-0.5 text-xs text-zinc-500">{s.item.description}</p>
                     )}
                     {s.item.canBlockVehicle && (
-                      <p className="text-xs text-red-500 mt-0.5">Este item pode bloquear o veículo se reprovado</p>
+                      <p className="mt-0.5 text-xs text-red-500">Este item pode bloquear o veículo se reprovado</p>
                     )}
                   </div>
                 </div>
@@ -737,7 +740,7 @@ export default function ChecklistFill() {
                       key={val}
                       onClick={() => handleStatusChange(idx, val)}
                       className={cn(
-                        'flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium flex-1 justify-center min-h-[44px] transition-colors',
+                        'flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors',
                         s.status === val ? active : inactive,
                       )}
                     >
@@ -755,12 +758,12 @@ export default function ChecklistFill() {
                       onBlur={() => handleObservationBlur(idx)}
                       placeholder="Descreva o problema observado..."
                       rows={2}
-                      className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                      className="w-full resize-none rounded-xl border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                     />
 
                     {s.item.canBlockVehicle && (
-                      <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
-                        <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                      <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                        <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-500" />
                         <p className="text-xs text-red-700">Item crítico de segurança — será registrado para alerta de bloqueio</p>
                       </div>
                     )}
@@ -770,16 +773,16 @@ export default function ChecklistFill() {
                         <img src={s.photoUrl} alt="foto" className="h-16 w-16 rounded-lg object-cover" />
                         <button onClick={() => setCameraItemIdx(idx)} className="text-xs text-orange-500 hover:underline">Refazer foto</button>
                         {s.item.requirePhotoIfIssue && (
-                          <span className="text-xs text-green-600 font-medium">✓ Foto registrada</span>
+                          <span className="text-xs font-medium text-green-600">✓ Foto registrada</span>
                         )}
                       </div>
                     ) : (
                       <button
                         onClick={() => setCameraItemIdx(idx)}
                         className={cn(
-                          'flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-colors',
+                          'flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors',
                           s.item.requirePhotoIfIssue
-                            ? 'border-red-400 text-red-600 bg-red-50 hover:bg-red-100'
+                            ? 'border-red-400 bg-red-50 text-red-600 hover:bg-red-100'
                             : 'border-zinc-300 text-zinc-600 hover:bg-zinc-50',
                         )}
                       >
@@ -797,25 +800,25 @@ export default function ChecklistFill() {
       </div>{/* end scrollable area */}
 
       {/* Bottom bar */}
-      <div className="flex-shrink-0 bg-white border-t border-zinc-200 px-4 py-3">
-        <div className="max-w-2xl mx-auto space-y-2">
-          {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+      <div className="flex-shrink-0 border-t border-zinc-200 bg-white px-4 py-3">
+        <div className="mx-auto max-w-2xl space-y-2">
+          {error && <p className="text-center text-sm text-red-600">{error}</p>}
           {!workshopReady && (
-            <p className="text-xs text-amber-600 text-center">Selecione e confirme a oficina para liberar o checklist</p>
+            <p className="text-center text-xs text-amber-600">Selecione e confirme a oficina para liberar o checklist</p>
           )}
           {workshopReady && !kmConfirmed && (
-            <p className="text-xs text-amber-600 text-center">Informe o hodômetro para liberar os itens do checklist</p>
+            <p className="text-center text-xs text-amber-600">Informe o hodômetro para liberar os itens do checklist</p>
           )}
           {workshopReady && kmConfirmed && !mandatoryAnswered && (
-            <p className="text-xs text-amber-600 text-center">Responda todos os itens obrigatórios para finalizar</p>
+            <p className="text-center text-xs text-amber-600">Responda todos os itens obrigatórios para finalizar</p>
           )}
           {odometerPhotoGateBlocked && (
-            <p className="text-xs text-amber-600 text-center">Envie a foto do hodômetro para concluir.</p>
+            <p className="text-center text-xs text-amber-600">Envie a foto do hodômetro para concluir.</p>
           )}
           <button
             onClick={() => finishChecklistMutation.mutate()}
             disabled={!mandatoryAnswered || finishChecklistMutation.isPending || !workshopReady || !kmConfirmed || odometerPhotoGateBlocked}
-            className="w-full py-3 rounded-xl bg-orange-500 text-white font-semibold text-sm disabled:opacity-40 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-40"
           >
             {finishChecklistMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             {finishChecklistMutation.isPending ? 'Finalizando...' : 'Finalizar Checklist'}

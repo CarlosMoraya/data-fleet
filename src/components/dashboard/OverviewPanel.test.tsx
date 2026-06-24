@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import React from 'react';
+import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { act } from 'react';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
 import OverviewPanel from './OverviewPanel';
 
 let container: HTMLDivElement;

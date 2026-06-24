@@ -1,26 +1,29 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, Ban, RotateCcw } from 'lucide-react';
 import React from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, Ban, RotateCcw } from 'lucide-react';
-import { cn } from '../lib/utils';
+
 import MaintenanceDetailModal from '../components/MaintenanceDetailModal';
 import MaintenanceForm from '../components/MaintenanceForm';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
-import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
+import MultiSelectDropdown from '../components/MultiSelectDropdown';
+import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
-import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus } from '../types/maintenance';
-import type { Role } from '../types';
+import { requiresClientSelection } from '../lib/clientScope';
+import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
+import { supabase } from '../lib/supabase';
+import { cn } from '../lib/utils';
 import {
   saveMaintenanceOrder,
   updateMaintenanceStatus,
   cancelMaintenanceOrder,
 } from '../services/maintenanceService';
+
+import type { Role } from '../types';
+import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus } from '../types/maintenance';
+
 import { isOperationsManager } from '../lib/rolePermissions';
-import { requiresClientSelection } from '../lib/clientScope';
-import SelectClientNotice from '../components/SelectClientNotice';
 import { useSessionUiState, usePersistentFilterState, usePersistentTabState } from '../hooks/usePersistentUiState';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
-import MultiSelectDropdown from '../components/MultiSelectDropdown';
 import { buildMaintenanceFilterOptions, applyMaintenanceListFilters } from '../lib/maintenanceFilters';
 
 // Re-export para compatibilidade com componentes que importam daqui
@@ -63,7 +66,7 @@ function budgetStatusBadge(budgetStatus?: BudgetStatus, pdfUrl?: string) {
   };
   return (
     <div className="flex items-center gap-1">
-      <span className={cn('inline-flex text-xs px-2 py-0.5 rounded-full font-medium', colors[budgetStatus] ?? 'bg-zinc-100 text-zinc-600')}>
+      <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', colors[budgetStatus] ?? 'bg-zinc-100 text-zinc-600')}>
         {labels[budgetStatus] ?? budgetStatus}
       </span>
       {pdfUrl && (
@@ -72,7 +75,7 @@ function budgetStatusBadge(budgetStatus?: BudgetStatus, pdfUrl?: string) {
           target="_blank"
           rel="noopener noreferrer"
           onClick={e => e.stopPropagation()}
-          className="p-0.5 rounded text-zinc-400 hover:text-blue-600"
+          className="rounded p-0.5 text-zinc-400 hover:text-blue-600"
           title="Ver PDF do orçamento"
         >
           <ExternalLink className="h-3 w-3" />
@@ -157,7 +160,7 @@ export default function Maintenance() {
   const [isFormOpen, setIsFormOpen] = useSessionUiState<boolean>('maintenance', 'modal', 'form-open', false, { legacyKeys: ['maintenanceFormOpen'] });
   const [orderToEdit, setOrderToEdit] = useSessionUiState<MaintenanceOrder | null>('maintenance', 'selection', 'editing', null, { legacyKeys: ['maintenanceFormEditing'] });
   const [prefillData, setPrefillData] = React.useState<Partial<MaintenanceOrder> | undefined>(
-    () => (operationsManager ? undefined : (location.state as any)?.prefillMaintenance ?? undefined)
+    () => (operationsManager ? undefined : (location.state)?.prefillMaintenance ?? undefined)
   );
   const [orderToCancel, setOrderToCancel] = React.useState<MaintenanceOrder | null>(null);
 
@@ -311,16 +314,16 @@ export default function Maintenance() {
   };
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex h-full flex-col gap-6">
       {blockWrite && <SelectClientNotice />}
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-zinc-900">
             <Wrench className="h-6 w-6 text-orange-500" />
             Manutenção
           </h1>
-          <p className="text-sm text-zinc-500 mt-1">Acompanhe as ordens de serviço e o status dos veículos em manutenção</p>
+          <p className="mt-1 text-sm text-zinc-500">Acompanhe as ordens de serviço e o status dos veículos em manutenção</p>
         </div>
 
         {canWriteMaintenance && (
@@ -329,7 +332,7 @@ export default function Maintenance() {
               setOrderToEdit(null);
               setIsFormOpen(true);
             }}
-            className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 sm:py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors shadow-sm"
+            className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 sm:py-2"
           >
             <Plus className="h-4 w-4" />
             Nova Manutenção
@@ -338,7 +341,7 @@ export default function Maintenance() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
         <button
           onClick={() => setActiveTab('all')}
           className={cn(
@@ -347,7 +350,7 @@ export default function Maintenance() {
           )}
         >
           <p className="text-2xl font-bold text-zinc-900">{counts.all}</p>
-          <p className="text-xs text-zinc-500 mt-0.5">Total em Manutenção</p>
+          <p className="mt-0.5 text-xs text-zinc-500">Total em Manutenção</p>
         </button>
         <button
           onClick={() => setActiveTab('Aguardando orçamento')}
@@ -357,7 +360,7 @@ export default function Maintenance() {
           )}
         >
           <p className="text-2xl font-bold text-yellow-600">{counts['Aguardando orçamento']}</p>
-          <p className="text-xs text-zinc-500 mt-0.5">Aguardando Orçamento</p>
+          <p className="mt-0.5 text-xs text-zinc-500">Aguardando Orçamento</p>
         </button>
         <button
           onClick={() => setActiveTab('Aguardando aprovação')}
@@ -367,7 +370,7 @@ export default function Maintenance() {
           )}
         >
           <p className="text-2xl font-bold text-orange-600">{counts['Aguardando aprovação']}</p>
-          <p className="text-xs text-zinc-500 mt-0.5">Ag. Aprovação</p>
+          <p className="mt-0.5 text-xs text-zinc-500">Ag. Aprovação</p>
         </button>
         <button
           onClick={() => setActiveTab('Serviço em execução')}
@@ -377,11 +380,11 @@ export default function Maintenance() {
           )}
         >
           <p className="text-2xl font-bold text-purple-600">{counts['Serviço em execução']}</p>
-          <p className="text-xs text-zinc-500 mt-0.5">Em Execução</p>
+          <p className="mt-0.5 text-xs text-zinc-500">Em Execução</p>
         </button>
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
           <p className="text-2xl font-bold text-red-600">{counts.corretiva}</p>
-          <p className="text-xs text-zinc-500 mt-0.5">Total Corretiva</p>
+          <p className="mt-0.5 text-xs text-zinc-500">Total Corretiva</p>
         </div>
         <button
           onClick={() => setActiveTab('Cancelado')}
@@ -391,20 +394,20 @@ export default function Maintenance() {
           )}
         >
           <p className="text-2xl font-bold text-zinc-400">{counts['Cancelado']}</p>
-          <p className="text-xs text-zinc-500 mt-0.5">Cancelados</p>
+          <p className="mt-0.5 text-xs text-zinc-500">Cancelados</p>
         </button>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         {/* Tabs */}
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex flex-wrap gap-1">
           {ALL_STATUSES.map(s => (
             <button
               key={s}
               onClick={() => setActiveTab(s)}
               className={cn(
-                'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+                'rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
                 activeTab === s ? 'bg-orange-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
               )}
             >
@@ -421,30 +424,30 @@ export default function Maintenance() {
         <MultiSelectDropdown label="Embarcador" options={filterOptions.shippers} selected={shipperFilter} onChange={setShipperFilter} />
 
         {/* Search */}
-        <div className="relative sm:ml-auto w-full sm:w-64 flex items-center">
+        <div className="relative flex w-full items-center sm:ml-auto sm:w-64">
           <Search className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-zinc-400" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por placa..."
-            className="w-full pl-8 pr-3 rounded-lg border border-zinc-300 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="w-full rounded-lg border border-zinc-300 py-2 pr-3 pl-8 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
           />
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden relative flex-1 min-h-0 flex flex-col">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
         {isLoading ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm z-10">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-2">
-              <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+              <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
               <p className="text-sm text-zinc-500">Carregando manutenções...</p>
             </div>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-16 text-zinc-400">
-            <Wrench className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <div className="py-16 text-center text-zinc-400">
+            <Wrench className="mx-auto mb-3 h-12 w-12 opacity-30" />
             <p className="text-sm">Nenhuma ordem de serviço encontrada.</p>
           </div>
         ) : (
@@ -464,7 +467,7 @@ export default function Maintenance() {
                     'Orçamento',
                     '',
                   ].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold tracking-wider whitespace-nowrap text-zinc-500 uppercase">
                       {h}
                     </th>
                   ))}
@@ -474,21 +477,21 @@ export default function Maintenance() {
                 {filtered.map(o => {
                   const days = daysInWorkshop(o.entryDate);
                   return (
-                    <tr key={o.id} className="hover:bg-zinc-50 transition-colors">
+                    <tr key={o.id} className="transition-colors hover:bg-zinc-50">
                       {blockWrite && (
-                        <td className="px-4 py-3 text-sm text-zinc-600 whitespace-nowrap">
+                        <td className="px-4 py-3 text-sm whitespace-nowrap text-zinc-600">
                           <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
                             {o.clientId ? (clientNameMap.get(o.clientId) ?? o.clientName ?? '—') : (o.clientName ?? '—')}
                           </span>
                         </td>
                       )}
-                      <td className="px-4 py-3 text-sm font-mono font-medium text-zinc-900 whitespace-nowrap">
+                      <td className="px-4 py-3 font-mono text-sm font-medium whitespace-nowrap text-zinc-900">
                         {isWorkshopUser ? (o.workshopOs || o.os) : o.os}
                       </td>
-                      <td className="px-4 py-3 text-sm font-semibold text-zinc-900 whitespace-nowrap">
+                      <td className="px-4 py-3 text-sm font-semibold whitespace-nowrap text-zinc-900">
                         {o.licensePlate}
                       </td>
-                      <td className="px-4 py-3 text-sm text-zinc-600 max-w-[140px] truncate">
+                      <td className="max-w-[140px] truncate px-4 py-3 text-sm text-zinc-600">
                         {isWorkshopUser ? (o.clientName ?? o.workshop) : o.workshop}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -499,16 +502,16 @@ export default function Maintenance() {
                           {days}d
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-zinc-600 whitespace-nowrap">
+                      <td className="px-4 py-3 text-sm whitespace-nowrap text-zinc-600">
                         {formatDate(o.expectedExitDate)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={cn('inline-flex text-xs px-2 py-0.5 rounded-full font-medium', typeColor(o.type))}>
+                        <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', typeColor(o.type))}>
                           {o.type}
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={cn('inline-flex text-xs px-2 py-0.5 rounded-full font-medium', statusColor(o.status))}>
+                        <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', statusColor(o.status))}>
                           {o.status}
                         </span>
                       </td>
@@ -520,7 +523,7 @@ export default function Maintenance() {
                           <button
                             onClick={() => setSelectedOrder(o)}
                             title="Visualizar"
-                            className="p-1.5 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
@@ -531,7 +534,7 @@ export default function Maintenance() {
                                 setIsFormOpen(true);
                               }}
                               title="Editar"
-                              className="p-1.5 rounded-lg text-zinc-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
+                              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-orange-50 hover:text-orange-600"
                             >
                               <Edit className="h-4 w-4" />
                             </button>
@@ -540,7 +543,7 @@ export default function Maintenance() {
                             <button
                               onClick={(e) => handleComplete(o.id, e)}
                               title="Marcar como Concluído"
-                              className="p-1.5 rounded-lg text-zinc-400 hover:text-green-600 hover:bg-green-50 transition-colors"
+                              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-green-50 hover:text-green-600"
                             >
                               <CheckCircle2 className="h-4 w-4" />
                             </button>
@@ -549,7 +552,7 @@ export default function Maintenance() {
                             <button
                               onClick={(e) => { e.stopPropagation(); setOrderToCancel(o); }}
                               title="Cancelar OS"
-                              className="p-1.5 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600"
                             >
                               <Ban className="h-4 w-4" />
                             </button>
@@ -558,14 +561,14 @@ export default function Maintenance() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                                 
                                 const { id, os, status, createdAt, cancelledAt, cancelledById, ...rest } = o;
                                 setPrefillData({ ...rest, status: 'Aguardando orçamento' });
                                 setOrderToEdit(null);
                                 setIsFormOpen(true);
                               }}
                               title="Reabrir (nova OS)"
-                              className="p-1.5 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
                             >
                               <RotateCcw className="h-4 w-4" />
                             </button>
@@ -607,9 +610,9 @@ export default function Maintenance() {
 
       {orderToCancel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+          <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 shrink-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
                 <Ban className="h-5 w-5 text-red-600" />
               </div>
               <div>
@@ -617,7 +620,7 @@ export default function Maintenance() {
                 <p className="text-sm text-zinc-500">Esta ação não pode ser desfeita diretamente.</p>
               </div>
             </div>
-            <div className="rounded-xl bg-zinc-50 border border-zinc-200 px-4 py-3 text-sm space-y-1">
+            <div className="space-y-1 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">
               <div><span className="font-medium text-zinc-700">OS:</span> <span className="font-mono">{orderToCancel.os}</span></div>
               <div><span className="font-medium text-zinc-700">Placa:</span> {orderToCancel.licensePlate}</div>
               <div><span className="font-medium text-zinc-700">Status atual:</span> {orderToCancel.status}</div>
@@ -626,18 +629,18 @@ export default function Maintenance() {
               A OS será marcada como <strong>Cancelado</strong> e não contará mais para cálculos de custo.
               Caso seja necessário, você poderá reabrir uma nova OS a partir deste registro.
             </p>
-            <div className="flex gap-3 justify-end pt-2">
+            <div className="flex justify-end gap-3 pt-2">
               <button
                 onClick={() => setOrderToCancel(null)}
                 disabled={cancelMutation.isPending}
-                className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 rounded-lg hover:bg-zinc-100 transition-colors disabled:opacity-50"
+                className="rounded-lg px-4 py-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50"
               >
                 Voltar
               </button>
               <button
                 onClick={() => cancelMutation.mutate(orderToCancel)}
                 disabled={cancelMutation.isPending}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
               >
                 {cancelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 Confirmar Cancelamento

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+
 import { ODOMETER_UPDATE_CONTEXT, type ChecklistContext } from '../types';
+
 import { canSaveTemplateWithoutItems } from './checklistTemplateRules';
 
 describe('canSaveTemplateWithoutItems', () => {

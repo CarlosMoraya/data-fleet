@@ -1,12 +1,14 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Shipper } from '../types';
-import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react';
+
 import ShipperForm from '../components/ShipperForm';
-import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { shipperFromRow, shipperToRow, formatCNPJ, ShipperRow } from '../lib/shipperMappers';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
+import { Shipper } from '../types';
+
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -138,11 +140,11 @@ export default function Shippers() {
   }, [shippers, search]);
 
   return (
-    <div className="flex flex-col gap-6 h-full">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="flex h-full flex-col gap-6">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Embarcadores</h1>
-          <p className="text-sm text-zinc-500 mt-1">Gerencie os embarcadores da sua frota.</p>
+          <p className="mt-1 text-sm text-zinc-500">Gerencie os embarcadores da sua frota.</p>
         </div>
 
         {canCreate && hasActiveClient && (
@@ -154,9 +156,9 @@ export default function Shippers() {
               setEditingShipper(null);
               setIsFormOpen(true);
             }}
-            className="inline-flex items-center justify-center rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            className="inline-flex items-center justify-center rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
           >
-            <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+            <Plus className="mr-2 -ml-1 h-5 w-5" aria-hidden="true" />
             Adicionar Embarcador
           </button>
         )}
@@ -170,7 +172,7 @@ export default function Shippers() {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="block w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
+          className="block w-full rounded-xl border border-zinc-200 bg-white py-2.5 pr-3 pl-10 text-sm placeholder-zinc-500 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
           placeholder="Buscar por nome ou CNPJ..."
         />
       </div>
@@ -181,7 +183,7 @@ export default function Shippers() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm flex-1 min-h-0 flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         {loadingShippers ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-blue-500" />
@@ -189,23 +191,23 @@ export default function Shippers() {
         ) : (
           <div className="flex-1 overflow-auto">
             <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50 sticky top-0 z-10">
+              <thead className="sticky top-0 z-10 bg-zinc-50">
                 <tr>
-                  <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider sm:pl-6">Embarcador</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">CNPJ</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Contato</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Status</th>
-                  <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                  <th scope="col" className="py-3.5 pr-3 pl-4 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase sm:pl-6">Embarcador</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">CNPJ</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Contato</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Status</th>
+                  <th scope="col" className="relative py-3.5 pr-4 pl-3 sm:pr-6">
                     <span className="sr-only">Ações</span>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 bg-white">
                 {filteredShippers.map((shipper) => (
-                  <tr key={shipper.id} className="hover:bg-zinc-50 transition-colors">
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
+                  <tr key={shipper.id} className="transition-colors hover:bg-zinc-50">
+                    <td className="py-4 pr-3 pl-4 whitespace-nowrap sm:pl-6">
                       <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-zinc-100 flex items-center justify-center border border-zinc-200">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100">
                           <Package className="h-5 w-5 text-zinc-500" />
                         </div>
                         <div className="ml-4">
@@ -216,16 +218,16 @@ export default function Shippers() {
                         </div>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
                       {shipper.cnpj ? formatCNPJ(shipper.cnpj) : <span className="text-zinc-300">—</span>}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
                       <div>{shipper.phone ? formatPhone(shipper.phone) : <span className="text-zinc-300">—</span>}</div>
                       {shipper.email && (
-                        <div className="text-xs text-zinc-400 truncate max-w-[160px]">{shipper.email}</div>
+                        <div className="max-w-[160px] truncate text-xs text-zinc-400">{shipper.email}</div>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap">
                       {shipper.active ? (
                         <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
                           Ativo
@@ -236,7 +238,7 @@ export default function Shippers() {
                         </span>
                       )}
                     </td>
-                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                    <td className="relative py-4 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-6">
                       <div className="flex items-center justify-end gap-3">
                         {canEdit && (
                           <button
@@ -247,7 +249,7 @@ export default function Shippers() {
                               setEditingShipper(shipper);
                               setIsFormOpen(true);
                             }}
-                            className="text-zinc-400 hover:text-zinc-900 transition-colors"
+                            className="text-zinc-400 transition-colors hover:text-zinc-900"
                           >
                             <Edit2 className="h-5 w-5" />
                             <span className="sr-only">Editar</span>
@@ -256,7 +258,7 @@ export default function Shippers() {
                         {canDelete && (
                           <button
                             onClick={() => handleDelete(shipper)}
-                            className="text-zinc-400 hover:text-red-600 transition-colors"
+                            className="text-zinc-400 transition-colors hover:text-red-600"
                           >
                             <Trash2 className="h-5 w-5" />
                             <span className="sr-only">Excluir</span>

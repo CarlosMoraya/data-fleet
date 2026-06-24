@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+
 import { budgetItemFromRow, maintenanceFromRow } from './maintenanceMappers';
+
 import type { MaintenanceBudgetItemRow, MaintenanceOrderRow } from '../types/maintenance';
 
 /** Helper to build a minimal row with sensible defaults. */

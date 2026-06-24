@@ -1,12 +1,17 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Pencil, Trash2, Plus, Search, X, Loader2 } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
+
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
-import { Pencil, Trash2, Plus, Search, X, Loader2 } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { OperationalUnit, OperationsManagerScope, Role, Shipper } from '../types';
 import { capitalizeWords } from '../lib/inputHelpers';
 import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
+import {
+  filterOperationalUnitsByShippers,
+  hasOperationsManagerScopeChanged,
+  normalizeOperationsManagerScope,
+  validateOperationsManagerScope,
+} from '../lib/operationsManagerScope';
 import {
   ROLE_COLORS,
   getCreatableRoles,
@@ -15,12 +20,9 @@ import {
   canManageOperationsManagerScope,
   isOperationsManager,
 } from '../lib/rolePermissions';
-import {
-  filterOperationalUnitsByShippers,
-  hasOperationsManagerScopeChanged,
-  normalizeOperationsManagerScope,
-  validateOperationsManagerScope,
-} from '../lib/operationsManagerScope';
+import { supabase } from '../lib/supabase';
+
+import type { OperationalUnit, OperationsManagerScope, Role, Shipper } from '../types';
 
 export interface UserRow {
   id: string;
@@ -164,7 +166,7 @@ function useOperationsManagerOptions(enabled: boolean, clientId?: string | null)
       const { data, error } = await supabase
         .from('shippers')
         .select('id, client_id, name, cnpj, phone, email, contact_person, notes, active')
-        .eq('client_id', clientId!)
+        .eq('client_id', clientId)
         .eq('active', true)
         .order('name');
 
@@ -180,7 +182,7 @@ function useOperationsManagerOptions(enabled: boolean, clientId?: string | null)
         contactPerson: row.contact_person ?? undefined,
         notes: row.notes ?? undefined,
         active: row.active,
-      })) as Shipper[];
+      }));
     },
   });
 
@@ -191,7 +193,7 @@ function useOperationsManagerOptions(enabled: boolean, clientId?: string | null)
       const { data, error } = await supabase
         .from('operational_units')
         .select('id, client_id, shipper_id, name, code, city, state, notes, active')
-        .eq('client_id', clientId!)
+        .eq('client_id', clientId)
         .eq('active', true)
         .order('name');
 
@@ -207,7 +209,7 @@ function useOperationsManagerOptions(enabled: boolean, clientId?: string | null)
         state: row.state ?? undefined,
         notes: row.notes ?? undefined,
         active: row.active,
-      })) as OperationalUnit[];
+      }));
     },
   });
 
@@ -224,8 +226,8 @@ function useOperationsManagerScope(profileId: string | null, enabled: boolean) {
     enabled: enabled && !!profileId,
     queryFn: async (): Promise<OperationsManagerScope> => {
       const [{ data: shipperRows, error: shipperError }, { data: unitRows, error: unitError }] = await Promise.all([
-        supabase.from('profile_shipper_scopes').select('shipper_id').eq('profile_id', profileId!),
-        supabase.from('profile_operational_unit_scopes').select('operational_unit_id').eq('profile_id', profileId!),
+        supabase.from('profile_shipper_scopes').select('shipper_id').eq('profile_id', profileId),
+        supabase.from('profile_operational_unit_scopes').select('operational_unit_id').eq('profile_id', profileId),
       ]);
 
       if (shipperError) throw shipperError;
@@ -390,7 +392,7 @@ export function CreateUserModal({
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
           <h2 className="text-base font-semibold text-zinc-900">Novo Usuário</h2>
-          <button onClick={onClose} className="rounded-lg p-1 hover:bg-zinc-100 transition-colors">
+          <button onClick={onClose} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
@@ -404,7 +406,7 @@ export function CreateUserModal({
               value={form.name}
               onChange={set('name')}
               placeholder="Ex: João Silva"
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             />
           </div>
 
@@ -416,7 +418,7 @@ export function CreateUserModal({
               value={form.email}
               onChange={set('email')}
               placeholder="joao@empresa.com"
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             />
           </div>
 
@@ -429,7 +431,7 @@ export function CreateUserModal({
               value={form.password}
               onChange={set('password')}
               placeholder="Mínimo 6 caracteres"
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             />
           </div>
 
@@ -447,7 +449,7 @@ export function CreateUserModal({
                   operationalUnitIds: role === 'Operations Manager' ? previous.operationalUnitIds : [],
                 }));
               }}
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             >
               {availableRoles.map((role) => (
                 <option key={role} value={role}>
@@ -485,10 +487,10 @@ export function CreateUserModal({
                   className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
                 />
                 <div>
-                  <label htmlFor="create-can-delete-vehicles" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                  <label htmlFor="create-can-delete-vehicles" className="block cursor-pointer text-sm font-medium text-zinc-700">
                     Pode excluir veículos
                   </label>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="mt-0.5 text-xs text-zinc-500">
                     Permite que este usuário exclua cadastros de veículos da frota.
                   </p>
                 </div>
@@ -502,10 +504,10 @@ export function CreateUserModal({
                   className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
                 />
                 <div>
-                  <label htmlFor="create-can-delete-drivers" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                  <label htmlFor="create-can-delete-drivers" className="block cursor-pointer text-sm font-medium text-zinc-700">
                     Pode excluir motoristas
                   </label>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="mt-0.5 text-xs text-zinc-500">
                     Permite que este usuário exclua cadastros de motoristas da frota.
                   </p>
                 </div>
@@ -519,10 +521,10 @@ export function CreateUserModal({
                   className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
                 />
                 <div>
-                  <label htmlFor="create-can-delete-workshops" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                  <label htmlFor="create-can-delete-workshops" className="block cursor-pointer text-sm font-medium text-zinc-700">
                     Pode excluir oficinas
                   </label>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="mt-0.5 text-xs text-zinc-500">
                     Permite que este usuário exclua cadastros de oficinas parceiras.
                   </p>
                 </div>
@@ -540,9 +542,9 @@ export function CreateUserModal({
                 value={form.budgetLimit}
                 onChange={(e) => setForm((previous) => ({ ...previous, budgetLimit: e.target.value }))}
                 placeholder="R$ 0,00"
-                className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
               />
-              <p className="text-xs text-zinc-500 mt-1">
+              <p className="mt-1 text-xs text-zinc-500">
                 Defina o valor máximo que este usuário pode aprovar. Use 0 para não permitir aprovações.
               </p>
             </div>
@@ -556,14 +558,14 @@ export function CreateUserModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center min-w-[120px]"
+              className="flex min-w-[120px] items-center justify-center rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-60"
             >
               {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : 'Criar Usuário'}
             </button>
@@ -713,7 +715,7 @@ function EditUserModal({
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
           <h2 className="text-base font-semibold text-zinc-900">Editar Usuário</h2>
-          <button onClick={onClose} className="rounded-lg p-1 hover:bg-zinc-100 transition-colors">
+          <button onClick={onClose} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
@@ -726,7 +728,7 @@ function EditUserModal({
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             />
           </div>
 
@@ -765,10 +767,10 @@ function EditUserModal({
                   className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
                 />
                 <div>
-                  <label htmlFor="edit-can-delete-vehicles" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                  <label htmlFor="edit-can-delete-vehicles" className="block cursor-pointer text-sm font-medium text-zinc-700">
                     Pode excluir veículos
                   </label>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="mt-0.5 text-xs text-zinc-500">
                     Permite que este usuário exclua cadastros de veículos da frota.
                   </p>
                 </div>
@@ -782,10 +784,10 @@ function EditUserModal({
                   className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
                 />
                 <div>
-                  <label htmlFor="edit-can-delete-drivers" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                  <label htmlFor="edit-can-delete-drivers" className="block cursor-pointer text-sm font-medium text-zinc-700">
                     Pode excluir motoristas
                   </label>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="mt-0.5 text-xs text-zinc-500">
                     Permite que este usuário exclua cadastros de motoristas da frota.
                   </p>
                 </div>
@@ -799,10 +801,10 @@ function EditUserModal({
                   className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
                 />
                 <div>
-                  <label htmlFor="edit-can-delete-workshops" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                  <label htmlFor="edit-can-delete-workshops" className="block cursor-pointer text-sm font-medium text-zinc-700">
                     Pode excluir oficinas
                   </label>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="mt-0.5 text-xs text-zinc-500">
                     Permite que este usuário exclua cadastros de oficinas parceiras.
                   </p>
                 </div>
@@ -820,9 +822,9 @@ function EditUserModal({
                 value={budgetLimit}
                 onChange={(e) => setBudgetLimit(e.target.value)}
                 placeholder="R$ 0,00"
-                className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
               />
-              <p className="text-xs text-zinc-500 mt-1">
+              <p className="mt-1 text-xs text-zinc-500">
                 Defina o valor máximo que este usuário pode aprovar. Use 0 para não permitir aprovações.
               </p>
             </div>
@@ -836,14 +838,14 @@ function EditUserModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={editMutation.isPending}
-              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center min-w-[120px]"
+              className="flex min-w-[120px] items-center justify-center rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-60"
             >
               {editMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : 'Salvar'}
             </button>
@@ -879,7 +881,7 @@ export default function Users() {
 
       const { data, error } = await query.order('name');
       if (error) throw error;
-      return data as UserRow[];
+      return data;
     },
     enabled: !!currentClient?.id || !currentClient,
   });
@@ -912,7 +914,7 @@ export default function Users() {
   };
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex h-full flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">Usuários</h1>
@@ -923,7 +925,7 @@ export default function Users() {
         {availableRoles.length > 0 && (
           <button
             onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
           >
             <Plus className="h-4 w-4" />
             Novo Usuário
@@ -932,17 +934,17 @@ export default function Users() {
       </div>
 
       <div className="relative max-w-xs">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+        <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" />
         <input
           type="text"
           placeholder="Buscar por nome..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="block w-full rounded-xl border border-zinc-200 py-2 pl-9 pr-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="block w-full rounded-xl border border-zinc-200 py-2 pr-3 pl-9 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
         />
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm flex-1 min-h-0 flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-6 w-6 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
@@ -954,17 +956,17 @@ export default function Users() {
         ) : (
           <div className="flex-1 overflow-auto">
             <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50 sticky top-0 z-10">
+              <thead className="sticky top-0 z-10 bg-zinc-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Usuário</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cargo</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Cadastrado em</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Usuário</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Cargo</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Cadastrado em</th>
                   <th className="px-6 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {filtered.map((listedUser) => (
-                  <tr key={listedUser.id} className="hover:bg-zinc-50 transition-colors">
+                  <tr key={listedUser.id} className="transition-colors hover:bg-zinc-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <UserInitials name={listedUser.name} />
@@ -982,7 +984,7 @@ export default function Users() {
                         {listedUser.id !== user.id && (!isOperationsManager(listedUser.role) || canManageOperationsManagerScope(user.role)) && (
                           <button
                             onClick={() => setEditingUser(listedUser)}
-                            className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                            className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
                             title="Editar"
                           >
                             <Pencil className="h-4 w-4" />
@@ -991,7 +993,7 @@ export default function Users() {
                         {listedUser.id !== user.id && (
                           <button
                             onClick={() => handleDelete(listedUser)}
-                            className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                            className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600"
                             title="Excluir"
                           >
                             <Trash2 className="h-4 w-4" />

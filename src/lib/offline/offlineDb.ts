@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+
 import type { ChecklistContext, ResponseStatus } from '../../types';
 import type { TireInspectionResponseStatus } from '../../types/tireInspection';
 

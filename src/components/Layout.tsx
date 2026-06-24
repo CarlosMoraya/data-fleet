@@ -1,11 +1,13 @@
 import React, { Suspense, useState } from 'react';
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
-import Sidebar from './Sidebar';
-import Topbar from './Topbar';
-import RouteFallback from './RouteFallback';
+
 import { useAuth } from '../context/AuthContext';
 import { useIdleTimeout } from '../hooks/useIdleTimeout';
 import { canAccessRoute, isOperationsManager } from '../lib/rolePermissions';
+
+import RouteFallback from './RouteFallback';
+import Sidebar from './Sidebar';
+import Topbar from './Topbar';
 
 export default function Layout() {
   const { user, loading } = useAuth();
@@ -32,12 +34,12 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-zinc-50 overflow-hidden font-sans text-zinc-900">
+    <div className="flex h-screen w-full overflow-hidden bg-zinc-50 font-sans text-zinc-900">
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar onMenuClick={() => setIsSidebarOpen(true)} />
-        <main className="flex-1 overflow-hidden flex flex-col p-4 md:p-8">
-          <div className="mx-auto max-w-7xl w-full flex-1 min-h-0 flex flex-col">
+        <main className="flex flex-1 flex-col overflow-hidden p-4 md:p-8">
+          <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col">
             <Suspense fallback={<RouteFallback />}>
               <Outlet />
             </Suspense>

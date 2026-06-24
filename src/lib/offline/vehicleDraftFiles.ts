@@ -17,7 +17,7 @@ export async function saveVehicleDraftFile(key: VehicleDraftFileKey, file: File)
     type: file.type,
     lastModified: file.lastModified,
   };
-  await offlineDb.vehicleDraftFiles.put({ key, file: storedFile as unknown as File, savedAt: Date.now() } as VehicleDraftFileEntry);
+  await offlineDb.vehicleDraftFiles.put({ key, file: storedFile as unknown as File, savedAt: Date.now() });
 }
 
 export async function removeVehicleDraftFile(key: VehicleDraftFileKey): Promise<void> {

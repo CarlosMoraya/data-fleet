@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React from 'react';
-import { act } from 'react';
+import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import TireInspectionDetailModal from './TireInspectionDetailModal';
+
 import type { TireInspection } from '../types';
 
 const { fetchTireInspectionComparison, fetchTireInspectionResponses } = vi.hoisted(() => ({
@@ -150,7 +151,7 @@ describe('TireInspectionDetailModal', () => {
     const photo = container.querySelector(`img[src="${photoUrl}"]`);
 
     await act(async () => {
-      photo!.closest('button')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      photo.closest('button').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(container.querySelectorAll(`img[src="${photoUrl}"]`)).toHaveLength(2);
@@ -159,7 +160,7 @@ describe('TireInspectionDetailModal', () => {
     expect(overlay).not.toBeNull();
 
     await act(async () => {
-      overlay!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(container.querySelectorAll(`img[src="${photoUrl}"]`)).toHaveLength(1);

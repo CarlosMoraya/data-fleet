@@ -1,5 +1,6 @@
-import type { ReactElement } from 'react';
 import { Search } from 'lucide-react';
+
+import type { ReactElement } from 'react';
 
 interface DriverActiveFilterBannerProps {
   issueLabel: string | null;

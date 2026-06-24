@@ -1,10 +1,11 @@
-import React from 'react';
 import { Loader2, X, ChevronRight, ChevronLeft, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { cn } from '../lib/utils';
-import { TireVisualClassification, VehicleTireConfig, AxleConfigEntry } from '../types';
-import { generatePositions, generatePositionsFromConfig } from '../lib/tirePositions';
-import { safeRandomUUID } from '../lib/uuid';
+import React from 'react';
+
 import { supabase } from '../lib/supabase';
+import { generatePositions, generatePositionsFromConfig } from '../lib/tirePositions';
+import { cn } from '../lib/utils';
+import { safeRandomUUID } from '../lib/uuid';
+import { TireVisualClassification, VehicleTireConfig, AxleConfigEntry } from '../types';
 
 interface TireBatchFormProps {
   clientId: string;
@@ -256,41 +257,41 @@ export default function TireBatchForm({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 flex flex-col max-h-[90vh]">
+      <div className="mx-4 flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 shrink-0">
+        <div className="flex shrink-0 items-center justify-between border-b border-zinc-100 px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-zinc-900">Cadastro em Lote</h2>
             <p className="text-sm text-zinc-400">Passo {step} de 4</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-100 text-zinc-400">
+          <button onClick={onClose} className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Conteúdo */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {/* Step 1: Selecionar modelo */}
           {step === 1 && (
             <div>
-              <h3 className="font-medium text-zinc-900 mb-1">Selecionar Modelo</h3>
-              <p className="text-sm text-zinc-500 mb-4">Escolha o modelo de veículo para cadastro em lote.</p>
+              <h3 className="mb-1 font-medium text-zinc-900">Selecionar Modelo</h3>
+              <p className="mb-4 text-sm text-zinc-500">Escolha o modelo de veículo para cadastro em lote.</p>
               {modelsLoading ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
                 </div>
               ) : models.length === 0 ? (
-                <p className="text-sm text-zinc-400 text-center py-8">Nenhum veículo cadastrado.</p>
+                <p className="py-8 text-center text-sm text-zinc-400">Nenhum veículo cadastrado.</p>
               ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="max-h-64 space-y-2 overflow-y-auto">
                   {models.map(m => (
                     <button
                       key={m}
                       onClick={() => setSelectedModel(m)}
                       className={cn(
-                        'w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left text-sm transition-colors',
+                        'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition-colors',
                         selectedModel === m
-                          ? 'border-orange-400 bg-orange-50 text-orange-700 font-medium'
+                          ? 'border-orange-400 bg-orange-50 font-medium text-orange-700'
                           : 'border-zinc-200 hover:border-zinc-300',
                       )}
                     >
@@ -306,8 +307,8 @@ export default function TireBatchForm({
           {/* Step 2: Veículos elegíveis */}
           {step === 2 && (
             <div>
-              <h3 className="font-medium text-zinc-900 mb-1">Veículos Elegíveis — {selectedModel}</h3>
-              <p className="text-sm text-zinc-500 mb-4">
+              <h3 className="mb-1 font-medium text-zinc-900">Veículos Elegíveis — {selectedModel}</h3>
+              <p className="mb-4 text-sm text-zinc-500">
                 Veículos do modelo selecionado que ainda não possuem nenhum pneu cadastrado.
               </p>
               {vehiclesLoading ? (
@@ -317,29 +318,29 @@ export default function TireBatchForm({
               ) : axleDivergenceError ? (
                 <div className="flex flex-col items-center gap-2 py-8 text-center">
                   <AlertTriangle className="h-8 w-8 text-amber-400" />
-                  <p className="text-sm text-zinc-600 font-medium">Configuração de eixos divergente</p>
-                  <p className="text-xs text-zinc-500 max-w-xs">
+                  <p className="text-sm font-medium text-zinc-600">Configuração de eixos divergente</p>
+                  <p className="max-w-xs text-xs text-zinc-500">
                     Este modelo de veículo possui uma ou mais unidades com divergência na configuração dos eixos. Verifique qual está divergente e edite para que todos os veículos do mesmo modelo tenham a mesma configuração.
                   </p>
                 </div>
               ) : eligibleVehicles.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-8 text-center">
                   <AlertTriangle className="h-8 w-8 text-yellow-400" />
-                  <p className="text-sm text-zinc-600 font-medium">Nenhum veículo elegível</p>
+                  <p className="text-sm font-medium text-zinc-600">Nenhum veículo elegível</p>
                   <p className="text-xs text-zinc-400">
                     Todos os veículos do modelo <strong>{selectedModel}</strong> já possuem pneus cadastrados.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="max-h-64 space-y-2 overflow-y-auto">
                   {eligibleVehicles.map(v => (
                     <div
                       key={v.id}
-                      className="flex items-center justify-between px-4 py-3 rounded-xl border border-zinc-100 bg-zinc-50"
+                      className="flex items-center justify-between rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3"
                     >
                       <div>
                         <span className="font-medium text-zinc-900">{v.licensePlate}</span>
-                        <span className="ml-2 text-zinc-500 text-sm">{v.brand}</span>
+                        <span className="ml-2 text-sm text-zinc-500">{v.brand}</span>
                       </div>
                       <span className="text-xs text-zinc-400">{countTiresForVehicle(v)} pneus</span>
                     </div>
@@ -353,102 +354,102 @@ export default function TireBatchForm({
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <h3 className="font-medium text-zinc-900 mb-1">Template do Pneu</h3>
+                <h3 className="mb-1 font-medium text-zinc-900">Template do Pneu</h3>
                 <p className="text-sm text-zinc-500">
                   Esses dados serão aplicados a todos os pneus gerados. Cada pneu receberá um código único gerado automaticamente.
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Especificação *</label>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">Especificação *</label>
                 <input
                   value={template.specification}
                   onChange={e => updateTemplate('specification', e.target.value)}
                   placeholder="ex: 295/80R22.5"
                   required
-                  className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">DOT</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">DOT</label>
                   <input
                     value={template.dot}
                     onChange={e => updateTemplate('dot', e.target.value)}
                     placeholder="ex: 2524"
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Marcação de Fogo</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Marcação de Fogo</label>
                   <input
                     value={template.fireMarking}
                     onChange={e => updateTemplate('fireMarking', e.target.value)}
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Fabricante</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Fabricante</label>
                   <input
                     value={template.manufacturer}
                     onChange={e => updateTemplate('manufacturer', e.target.value)}
                     placeholder="ex: Bridgestone"
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Marca</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Marca</label>
                   <input
                     value={template.brand}
                     onChange={e => updateTemplate('brand', e.target.value)}
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Rodízio (km)</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Rodízio (km)</label>
                   <input
                     type="number"
                     min="0"
                     value={template.rotationIntervalKm}
                     onChange={e => updateTemplate('rotationIntervalKm', e.target.value)}
                     placeholder="20000"
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Vida Útil (km)</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Vida Útil (km)</label>
                   <input
                     type="number"
                     min="0"
                     value={template.usefulLifeKm}
                     onChange={e => updateTemplate('usefulLifeKm', e.target.value)}
                     placeholder="120000"
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Recapagem (km)</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Recapagem (km)</label>
                   <input
                     type="number"
                     min="0"
                     value={template.retreadIntervalKm}
                     onChange={e => updateTemplate('retreadIntervalKm', e.target.value)}
                     placeholder="60000"
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Classificação Visual</label>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">Classificação Visual</label>
                 <select
                   value={template.visualClassification}
                   onChange={e => updateTemplate('visualClassification', e.target.value)}
-                  className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                  className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                 >
                   {VISUAL_CLASSIFICATIONS.map(c => (
                     <option key={c} value={c}>{c}</option>
@@ -461,8 +462,8 @@ export default function TireBatchForm({
           {/* Step 4: Confirmação */}
           {step === 4 && (
             <div>
-              <h3 className="font-medium text-zinc-900 mb-1">Confirmar Cadastro em Lote</h3>
-              <p className="text-sm text-zinc-500 mb-4">
+              <h3 className="mb-1 font-medium text-zinc-900">Confirmar Cadastro em Lote</h3>
+              <p className="mb-4 text-sm text-zinc-500">
                 Revise o resumo antes de confirmar.
               </p>
 
@@ -477,7 +478,7 @@ export default function TireBatchForm({
               ) : (
                 <div className="space-y-4">
                   {/* Resumo */}
-                  <div className="bg-zinc-50 rounded-xl p-4 space-y-2">
+                  <div className="space-y-2 rounded-xl bg-zinc-50 p-4">
                     <div className="flex justify-between text-sm">
                       <span className="text-zinc-500">Modelo</span>
                       <span className="font-medium text-zinc-900">{selectedModel}</span>
@@ -492,7 +493,7 @@ export default function TireBatchForm({
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-zinc-500">Especificação</span>
-                      <span className="font-medium text-zinc-900 font-mono">{template.specification}</span>
+                      <span className="font-mono font-medium text-zinc-900">{template.specification}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-zinc-500">Classificação</span>
@@ -501,9 +502,9 @@ export default function TireBatchForm({
                   </div>
 
                   {/* Lista de veículos */}
-                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                  <div className="max-h-48 space-y-1 overflow-y-auto">
                     {eligibleVehicles.map(v => (
-                      <div key={v.id} className="flex items-center justify-between text-sm py-1.5 border-b border-zinc-50 last:border-0">
+                      <div key={v.id} className="flex items-center justify-between border-b border-zinc-50 py-1.5 text-sm last:border-0">
                         <span className="font-mono text-zinc-700">{v.licensePlate}</span>
                         <span className="text-zinc-400">{countTiresForVehicle(v)} pneus</span>
                       </div>
@@ -511,7 +512,7 @@ export default function TireBatchForm({
                   </div>
 
                   {saveError && (
-                    <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                       {saveError}
                     </div>
                   )}
@@ -523,10 +524,10 @@ export default function TireBatchForm({
 
         {/* Footer */}
         {!saveSuccess && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-100 shrink-0">
+          <div className="flex shrink-0 items-center justify-between border-t border-zinc-100 px-6 py-4">
             <button
               onClick={() => step === 1 ? onClose() : setStep(s => (s - 1) as Step)}
-              className="flex items-center gap-1 px-4 py-2 text-sm text-zinc-600 hover:text-zinc-800 border border-zinc-200 rounded-lg hover:bg-zinc-50"
+              className="flex items-center gap-1 rounded-lg border border-zinc-200 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-800"
             >
               {step === 1 ? 'Cancelar' : <><ChevronLeft className="h-4 w-4" /> Voltar</>}
             </button>
@@ -539,7 +540,7 @@ export default function TireBatchForm({
                   (step === 2 && (eligibleVehicles.length === 0 || axleDivergenceError)) ||
                   (step === 3 && !template.specification.trim())
                 }
-                className="flex items-center gap-1 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex items-center gap-1 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Próximo <ChevronRight className="h-4 w-4" />
               </button>
@@ -547,7 +548,7 @@ export default function TireBatchForm({
               <button
                 onClick={handleConfirm}
                 disabled={isSaving}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
                 Confirmar Cadastro em Lote

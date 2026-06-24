@@ -1,5 +1,6 @@
-import type { Vehicle } from '../types';
 import { isBlank, isCrlvExpired, isWithinExpiryWindow } from './dashboardKpi';
+
+import type { Vehicle } from '../types';
 
 export const PENDENCY_VALUES = ['crlv_expired', 'crlv_expiring', 'gr_expiring', 'gr_expired', 'crlv_missing', 'gr_missing', 'insurance_missing', 'maintenance_contract_missing', 'no_driver', 'checklist_overdue'] as const;
 

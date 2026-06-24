@@ -1,5 +1,6 @@
-import type { Checklist, ChecklistResponse, ChecklistStatus, ResponseStatus, ChecklistContext } from '../types';
 import { normalizeTrim } from './inputHelpers';
+
+import type { Checklist, ChecklistResponse, ChecklistStatus, ResponseStatus, ChecklistContext } from '../types';
 
 // ─── Row types (snake_case from Supabase) ─────────────────────────────────────
 

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DRIVER_PENDENCY_VALUES } from './driverFilters';
-import { PENDENCY_VALUES } from './vehicleFilters';
+
 import {
   COMPLIANCE_ACTION_ROUTES,
   GENERAL_ACTION_ROUTES,
@@ -8,6 +7,8 @@ import {
   OPERATIONAL_QUEUE_ROUTES,
   VEHICLE_PENDENCY_ACTION_ROUTES,
 } from './actionQueueRoutes';
+import { DRIVER_PENDENCY_VALUES } from './driverFilters';
+import { PENDENCY_VALUES } from './vehicleFilters';
 
 describe('actionQueueRoutes', () => {
   it('maps general vehicle categories to filtered vehicle routes', () => {

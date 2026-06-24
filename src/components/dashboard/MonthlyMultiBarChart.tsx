@@ -37,7 +37,7 @@ export default function MonthlyMultiBarChart({
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-      <h3 className="text-base font-semibold text-zinc-900 mb-4">{title}</h3>
+      <h3 className="mb-4 text-base font-semibold text-zinc-900">{title}</h3>
       {isEmpty ? (
         <p className="text-sm text-zinc-500">Sem dados no período.</p>
       ) : (

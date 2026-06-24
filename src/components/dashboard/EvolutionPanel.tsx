@@ -1,15 +1,18 @@
-import React, { useMemo, lazy, Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
-import RouteFallback from '../RouteFallback';
-import HorizonSelector from './HorizonSelector';
-import type { MaintenanceOrderDashboard } from '../../types/maintenance';
-import type { HorizonOption } from '../../lib/dashboardKpi';
+import React, { useMemo, lazy, Suspense } from 'react';
+
 import {
   buildCostTrendSeries,
   buildMonthlyOrderCounts,
   buildMonthlyAverageCompletionDays,
   buildMonthlyMaintenanceTypeCounts,
 } from '../../lib/dashboardKpi';
+import RouteFallback from '../RouteFallback';
+
+import HorizonSelector from './HorizonSelector';
+
+import type { HorizonOption } from '../../lib/dashboardKpi';
+import type { MaintenanceOrderDashboard } from '../../types/maintenance';
 
 const CostTrendChart = lazy(() => import('./CostTrendChart'));
 const MonthlyMultiBarChart = lazy(() => import('./MonthlyMultiBarChart'));

@@ -7,10 +7,10 @@ interface FormLabelProps {
 
 export function FormLabel({ children, required, optional, htmlFor }: FormLabelProps) {
   return (
-    <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">
+    <label htmlFor={htmlFor} className="mb-1 block text-sm font-medium text-gray-700">
       {children}
-      {optional && <span className="text-gray-400 text-xs ml-1">(opcional)</span>}
-      {required && !optional && <span className="text-red-500 ml-1">*</span>}
+      {optional && <span className="ml-1 text-xs text-gray-400">(opcional)</span>}
+      {required && !optional && <span className="ml-1 text-red-500">*</span>}
     </label>
   );
 }

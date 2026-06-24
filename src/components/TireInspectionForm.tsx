@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from 'react';
 import { X, Camera, CheckCircle, XCircle } from 'lucide-react';
-import CameraCapture from './CameraCapture';
+import React, { useState, useEffect } from 'react';
+
 import { stampTimestampOnImage } from '../lib/stampTimestampOnImage';
+
+import CameraCapture from './CameraCapture';
+
+
 import type { TireInspectionResponse, TireInspectionResponseStatus } from '../types';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -103,11 +107,11 @@ export function TireInspectionForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-      <div className="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white sm:max-w-md sm:rounded-xl">
         <Header positionCode={positionCode} positionLabel={positionLabel} tireCode={tireCode} onClose={onClose} />
 
-        <div className="p-4 space-y-4">
+        <div className="space-y-4 p-4">
           {/* Campos opcionais */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="DOT (opcional)">
@@ -162,11 +166,11 @@ export function TireInspectionForm({
           <Field label="Foto *">
             {photoPreview ? (
               <div className="relative">
-                <img src={photoPreview} alt="Foto do pneu" className="w-full rounded-lg object-cover max-h-48" />
+                <img src={photoPreview} alt="Foto do pneu" className="max-h-48 w-full rounded-lg object-cover" />
                 <button
                   type="button"
                   onClick={() => setShowCamera(true)}
-                  className="absolute bottom-2 right-2 bg-white rounded-full p-1 shadow text-sm"
+                  className="absolute right-2 bottom-2 rounded-full bg-white p-1 text-sm shadow"
                 >
                   Refazer
                 </button>
@@ -175,7 +179,7 @@ export function TireInspectionForm({
               <button
                 type="button"
                 onClick={() => setShowCamera(true)}
-                className="flex items-center gap-2 w-full justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-colors"
+                className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 p-6 text-gray-500 transition-colors hover:border-blue-400 hover:text-blue-500"
               >
                 <Camera size={20} />
                 <span>Tirar foto</span>
@@ -221,7 +225,7 @@ export function TireInspectionForm({
             type="button"
             onClick={handleSave}
             disabled={!canSave || saving}
-            className="w-full py-3 rounded-lg bg-blue-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
+            className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? 'Salvando...' : 'Salvar'}
           </button>
@@ -240,7 +244,7 @@ function Header({ positionCode, positionLabel, tireCode, onClose }: {
   onClose: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between p-4 border-b">
+    <div className="flex items-center justify-between border-b p-4">
       <div>
         <p className="font-semibold text-gray-900">{positionLabel}</p>
         <p className="text-sm text-gray-500">
@@ -257,7 +261,7 @@ function Header({ positionCode, positionLabel, tireCode, onClose }: {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
       {children}
     </div>
   );
@@ -279,7 +283,7 @@ function StatusButton({ active, onClick, icon, label, color }: {
     <button
       type="button"
       onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-2 py-2 border-2 rounded-lg font-medium transition-colors ${colorMap[color]}`}
+      className={`flex flex-1 items-center justify-center gap-2 rounded-lg border-2 py-2 font-medium transition-colors ${colorMap[color]}`}
     >
       {icon}
       <span className="text-sm">{label}</span>

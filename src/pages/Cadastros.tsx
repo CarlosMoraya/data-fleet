@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { NavLink, Outlet, Navigate } from 'react-router-dom';
+
 import RouteFallback from '../components/RouteFallback';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
@@ -54,10 +55,10 @@ export default function Cadastros() {
   const visibleTabs = TABS.filter((tab) => tab.roles.includes(user?.role || ''));
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex h-full flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Cadastros</h1>
-        <p className="text-sm text-zinc-500 mt-1">Gerencie os cadastros da sua frota.</p>
+        <p className="mt-1 text-sm text-zinc-500">Gerencie os cadastros da sua frota.</p>
       </div>
 
       {/* Tab bar */}
@@ -70,9 +71,9 @@ export default function Cadastros() {
               className={({ isActive }) =>
                 cn(
                   isActive
-                    ? 'border-orange-500 text-orange-600 font-medium'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300',
-                  'flex items-center whitespace-nowrap border-b-2 px-4 py-3 text-sm transition-colors'
+                    ? 'border-orange-500 font-medium text-orange-600'
+                    : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700',
+                  'flex items-center border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors'
                 )
               }
             >
@@ -83,7 +84,7 @@ export default function Cadastros() {
       </div>
 
       {/* Sub-page content */}
-      <div className="flex-1 min-h-0">
+      <div className="min-h-0 flex-1">
         <Suspense fallback={<RouteFallback />}>
           <Outlet />
         </Suspense>

@@ -1,14 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ClipboardList, Loader2, Search } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import React, { useState, useMemo } from 'react';
+
+import ActionPlanModal from '../components/ActionPlanModal';
+import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { actionPlanFromRow, actionStatusLabel, actionStatusColor, type ActionPlanRow } from '../lib/actionPlanMappers';
-import type { ActionPlan, ActionPlanStatus } from '../types';
-import ActionPlanModal from '../components/ActionPlanModal';
-import { cn } from '../lib/utils';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
-import SelectClientNotice from '../components/SelectClientNotice';
+import { supabase } from '../lib/supabase';
+import { cn } from '../lib/utils';
+
+import type { ActionPlan, ActionPlanStatus } from '../types';
+
 
 const ALL_STATUSES: (ActionPlanStatus | 'all')[] = ['all', 'pending', 'in_progress', 'awaiting_conclusion', 'completed', 'cancelled'];
 const STATUS_TAB_LABEL: Record<string, string> = {
@@ -62,7 +65,7 @@ export default function ActionPlans() {
         if (r.completed_by && !r.completed_by_profile) missingIds.add(r.completed_by);
       });
 
-      let profileMap: Record<string, string> = {};
+      const profileMap: Record<string, string> = {};
       if (missingIds.size > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
@@ -120,20 +123,20 @@ export default function ActionPlans() {
   }, [clients]);
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex h-full flex-col gap-6">
       {blockWrite && <SelectClientNotice />}
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-zinc-900">
           <ClipboardList className="h-6 w-6 text-orange-500" />
           Plano de Ação
         </h1>
-        <p className="text-sm text-zinc-500 mt-1">Gerencie as ações geradas por não conformidades nos checklists</p>
+        <p className="mt-1 text-sm text-zinc-500">Gerencie as ações geradas por não conformidades nos checklists</p>
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {(['pending', 'in_progress', 'awaiting_conclusion', 'completed', 'cancelled'] as ActionPlanStatus[]).map(s => (
           <button
             key={s}
@@ -144,21 +147,21 @@ export default function ActionPlans() {
             )}
           >
             <p className="text-2xl font-bold text-zinc-900">{counts[s]}</p>
-            <p className="text-xs text-zinc-500 mt-0.5">{actionStatusLabel(s)}</p>
+            <p className="mt-0.5 text-xs text-zinc-500">{actionStatusLabel(s)}</p>
           </button>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         {/* Tabs */}
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex flex-wrap gap-1">
           {ALL_STATUSES.map(s => (
             <button
               key={s}
               onClick={() => setActiveTab(s)}
               className={cn(
-                'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+                'rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
                 activeTab === s ? 'bg-orange-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
               )}
             >
@@ -171,28 +174,28 @@ export default function ActionPlans() {
         </div>
 
         {/* Search */}
-        <div className="relative sm:ml-auto w-full sm:w-72">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+        <div className="relative w-full sm:ml-auto sm:w-72">
+          <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por placa, nome, responsável..."
-            className="w-full pl-8 pr-3 rounded-lg border border-zinc-300 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="w-full rounded-lg border border-zinc-300 py-2 pr-3 pl-8 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
           />
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden flex-1 min-h-0 flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
         {isLoading ? (
           <div className="flex items-center justify-center py-16 text-zinc-400">
-            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            <Loader2 className="mr-2 h-6 w-6 animate-spin" />
             <span className="text-sm">Carregando ações...</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-16 text-zinc-400">
-            <ClipboardList className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <div className="py-16 text-center text-zinc-400">
+            <ClipboardList className="mx-auto mb-3 h-12 w-12 opacity-30" />
             <p className="text-sm">{blockWrite ? 'Nenhuma ação encontrada em nenhum cliente.' : 'Nenhuma ação encontrada.'}</p>
           </div>
         ) : (
@@ -204,7 +207,7 @@ export default function ActionPlans() {
                     ...(blockWrite ? ['Cliente'] : []),
                     'Nome / Ação', 'Veículo', 'Status', 'Responsável', 'Prazo', 'Criado em', '',
                   ].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">
                       {h}
                     </th>
                   ))}
@@ -215,7 +218,7 @@ export default function ActionPlans() {
                   <tr
                     key={p.id}
                     onClick={() => !blockWrite && setSelectedPlan(p)}
-                    className={cn('hover:bg-zinc-50 transition-colors', !blockWrite && 'cursor-pointer')}
+                    className={cn('transition-colors hover:bg-zinc-50', !blockWrite && 'cursor-pointer')}
                   >
                     {blockWrite && (
                       <td className="px-4 py-3 text-sm text-zinc-600">
@@ -224,20 +227,20 @@ export default function ActionPlans() {
                         </span>
                       </td>
                     )}
-                    <td className="px-4 py-3 max-w-[220px]">
-                      {p.name && <p className="text-sm font-medium text-zinc-900 truncate">{p.name}</p>}
-                      <p className="text-xs text-zinc-500 truncate">{p.suggestedAction}</p>
+                    <td className="max-w-[220px] px-4 py-3">
+                      {p.name && <p className="truncate text-sm font-medium text-zinc-900">{p.name}</p>}
+                      <p className="truncate text-xs text-zinc-500">{p.suggestedAction}</p>
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-zinc-900">
-                      {p.vehicleLicensePlate ?? <span className="italic text-zinc-400">—</span>}
+                      {p.vehicleLicensePlate ?? <span className="text-zinc-400 italic">—</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={cn('inline-flex text-xs px-2 py-0.5 rounded-full font-medium', actionStatusColor(p.status))}>
+                      <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', actionStatusColor(p.status))}>
                         {actionStatusLabel(p.status)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-zinc-600">
-                      <div>{p.responsibleName ?? <span className="italic text-zinc-400">—</span>}</div>
+                      <div>{p.responsibleName ?? <span className="text-zinc-400 italic">—</span>}</div>
                       {p.claimedByName && (
                         <div className="text-xs text-zinc-400">Assumido: {p.claimedByName}</div>
                       )}
@@ -247,7 +250,7 @@ export default function ActionPlans() {
                     </td>
                     <td className="px-4 py-3 text-xs text-zinc-400">{formatDate(p.createdAt)}</td>
                     <td className="px-4 py-3">
-                      <span className={cn('text-xs text-orange-500 hover:underline', blockWrite && 'opacity-40 pointer-events-none')}>
+                      <span className={cn('text-xs text-orange-500 hover:underline', blockWrite && 'pointer-events-none opacity-40')}>
                         Gerenciar
                       </span>
                     </td>

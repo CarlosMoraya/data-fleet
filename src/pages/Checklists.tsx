@@ -1,29 +1,32 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle, Disc, Gauge } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle, Disc, Gauge } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+
+import ChecklistDetailModal from '../components/ChecklistDetailModal';
+import CreateActionPlanModal from '../components/CreateActionPlanModal';
+import SelectClientNotice from '../components/SelectClientNotice';
+import TireInspectionDetailModal from '../components/TireInspectionDetailModal';
 import { useAuth } from '../context/AuthContext';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { usePersistentTabState, usePersistentFilterState, useSessionUiState } from '../hooks/usePersistentUiState';
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
+import { supabase } from '../lib/supabase';
 import { templateFromRow, type ChecklistTemplateRow } from '../lib/checklistTemplateMappers';
 import { tireInspectionFromRow, type TireInspectionRow } from '../lib/tireInspectionMappers';
-import type { Checklist, ChecklistTemplate, TireInspection } from '../types';
-import { ODOMETER_UPDATE_CONTEXT } from '../types';
-import ChecklistDetailModal from '../components/ChecklistDetailModal';
-import TireInspectionDetailModal from '../components/TireInspectionDetailModal';
-import CreateActionPlanModal from '../components/CreateActionPlanModal';
 import {
   validateTireInspectionEligibility,
   createTireInspection,
   findOpenTireInspection,
 } from '../services/tireInspectionService';
-import { usePersistentTabState, usePersistentFilterState, useSessionUiState } from '../hooks/usePersistentUiState';
+import { ODOMETER_UPDATE_CONTEXT } from '../types';
+
+import type { Checklist, ChecklistTemplate, TireInspection } from '../types';
+
 import { buildUiStateKey, safeParseJson } from '../lib/uiStateStorage';
 import { cn } from '../lib/utils';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { getChecklistStartBlockMessage, getTireInspectionStartBlockMessage } from '../lib/checklistStartGuard';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
-import SelectClientNotice from '../components/SelectClientNotice';
 
 const STATUS_LABEL: Record<string, string> = { in_progress: 'Em andamento', completed: 'Concluído' };
 const STATUS_COLOR: Record<string, string> = {
@@ -123,7 +126,7 @@ export default function Checklists() {
         .from('checklist_templates')
         .select('*')
         .eq('client_id', currentClient!.id)
-        .eq('vehicle_category', vehicleInfo!.category!)
+        .eq('vehicle_category', vehicleInfo.category)
         .eq('status', 'published')
         .neq('context', 'Auditoria')
         .order('context');
@@ -164,7 +167,7 @@ export default function Checklists() {
         .from('checklist_templates')
         .select('*')
         .eq('client_id', currentClient!.id)
-        .eq('vehicle_category', selectedAuditorVehicle!.category!)
+        .eq('vehicle_category', selectedAuditorVehicle!.category)
         .eq('context', 'Auditoria')
         .eq('status', 'published');
       return (data ?? []).map(r => templateFromRow(r as ChecklistTemplateRow));
@@ -406,14 +409,14 @@ export default function Checklists() {
   }
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex h-full flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-zinc-900">
             <ClipboardCheck className="h-6 w-6 text-orange-500" />
             Checklists
           </h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <p className="mt-1 text-sm text-zinc-500">
             {isDriverOrAuditor ? 'Inicie ou continue um checklist' : 'Histórico de inspeções do tenant'}
           </p>
         </div>
@@ -421,21 +424,21 @@ export default function Checklists() {
 
       {/* ── Driver view ─────────────────────────────── */}
       {isDriver && (
-        <div className="flex flex-col gap-6 flex-1 min-h-0 overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
           {openChecklist && (
-            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-center gap-4">
-              <ClipboardCheck className="h-8 w-8 text-orange-500 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-4 rounded-2xl border border-orange-200 bg-orange-50 p-4">
+              <ClipboardCheck className="h-8 w-8 flex-shrink-0 text-orange-500" />
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-orange-800">Checklist em andamento</p>
-                <p className="text-xs text-orange-600 truncate">
+                <p className="truncate text-xs text-orange-600">
                   {openChecklist.templateContext && <span className="font-medium">{openChecklist.templateContext} · </span>}
                   {openChecklist.templateName} — {formatDate(openChecklist.startedAt)}
                 </p>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex flex-shrink-0 items-center gap-2">
                 <button
                   onClick={() => setConfirmDelete(openChecklist)}
-                  className="flex items-center gap-1.5 px-3 py-2 border border-red-200 text-red-600 text-sm font-medium rounded-xl hover:bg-red-50"
+                  className="flex items-center gap-1.5 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
                   title="Cancelar checklist em andamento"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -443,7 +446,7 @@ export default function Checklists() {
                 </button>
                 <button
                   onClick={() => navigate(`/checklists/preencher/${openChecklist.id}`)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded-xl hover:bg-orange-600"
+                  className="flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
                 >
                   <Play className="h-4 w-4" />
                   Continuar
@@ -452,8 +455,8 @@ export default function Checklists() {
             </div>
           )}
 
-          <div className="bg-white rounded-2xl border border-zinc-200 p-5">
-            <h2 className="text-sm font-semibold text-zinc-700 mb-3 flex items-center gap-2">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-700">
               <Truck className="h-4 w-4 text-orange-500" />
               Meu veículo
             </h2>
@@ -466,7 +469,7 @@ export default function Checklists() {
                 {publishedTemplates.length > 0 ? (
                   <div className="space-y-2">
                     {publishedTemplates.map(t => (
-                      <div key={t.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-zinc-100 hover:bg-zinc-50">
+                      <div key={t.id} className="flex items-center justify-between gap-3 rounded-xl border border-zinc-100 p-3 hover:bg-zinc-50">
                         <div>
                           <p className="text-sm font-medium text-zinc-900">{t.name}</p>
                           <p className="text-xs text-zinc-500">{t.context}</p>
@@ -474,7 +477,7 @@ export default function Checklists() {
                         <button
                           disabled={!!openChecklist || starting === t.id}
                           onClick={() => startChecklist(t, vehicleInfo.id)}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white text-xs font-medium rounded-lg hover:bg-orange-600 disabled:opacity-50"
+                          className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-medium text-white hover:bg-orange-600 disabled:opacity-50"
                         >
                           {starting === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                           Iniciar
@@ -487,17 +490,17 @@ export default function Checklists() {
                 )}
 
                 {startError && (
-                  <p className="text-xs text-red-600 mt-2">{startError}</p>
+                  <p className="mt-2 text-xs text-red-600">{startError}</p>
                 )}
                 {/* Inspeção de Pneus */}
                 {tireInspectionError && (
-                  <p className="text-xs text-red-600 mt-2">{tireInspectionError}</p>
+                  <p className="mt-2 text-xs text-red-600">{tireInspectionError}</p>
                 )}
-                <div className="mt-3 pt-3 border-t border-zinc-100">
+                <div className="mt-3 border-t border-zinc-100 pt-3">
                   <button
                     disabled={startingTireInspection || !!openChecklist}
                     onClick={() => handleStartTireInspection(vehicleInfo.id)}
-                    className="flex items-center gap-1.5 px-3 py-2 border border-blue-300 text-blue-600 text-xs font-medium rounded-lg hover:bg-blue-50 disabled:opacity-50 w-full justify-center"
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-blue-300 px-3 py-2 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
                   >
                     {startingTireInspection ? <Loader2 className="h-3 w-3 animate-spin" /> : <Disc className="h-3 w-3" />}
                     Inspeção de Pneus
@@ -523,27 +526,27 @@ export default function Checklists() {
 
       {/* ── Auditor view ─────────────────────────────── */}
       {isAuditor && (
-        <div className="flex flex-col gap-6 flex-1 min-h-0 overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
           {openChecklist && (
-            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-center gap-4">
-              <ClipboardCheck className="h-8 w-8 text-orange-500 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-4 rounded-2xl border border-orange-200 bg-orange-50 p-4">
+              <ClipboardCheck className="h-8 w-8 flex-shrink-0 text-orange-500" />
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-orange-800">Checklist em andamento</p>
-                <p className="text-xs text-orange-600 truncate">
+                <p className="truncate text-xs text-orange-600">
                   {openChecklist.templateContext && <span className="font-medium">{openChecklist.templateContext} · </span>}
                   {openChecklist.templateName} — {formatDate(openChecklist.startedAt)}
                 </p>
               </div>
               <button
                 onClick={() => navigate(`/checklists/preencher/${openChecklist.id}`)}
-                className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded-xl hover:bg-orange-600"
+                className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
               >
                 <Play className="h-4 w-4" />
                 Continuar
               </button>
               <button
                 onClick={() => setConfirmDelete(openChecklist)}
-                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 border border-red-200 text-red-600 text-sm font-medium rounded-xl hover:bg-red-50"
+                className="flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
                 title="Cancelar checklist em andamento"
               >
                 <Trash2 className="h-4 w-4" />
@@ -552,18 +555,18 @@ export default function Checklists() {
             </div>
           )}
 
-          <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-zinc-700 flex items-center gap-2">
+          <div className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-5">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
               <Truck className="h-4 w-4 text-orange-500" />
               Iniciar Auditoria
             </h2>
 
             <div>
-              <label className="block text-xs font-medium text-zinc-500 mb-1">Selecionar veículo</label>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">Selecionar veículo</label>
               <select
                 value={selectedVehicleId}
                 onChange={e => setSelectedVehicleId(e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
               >
                 <option value="">— Selecione um veículo —</option>
                 {auditorVehicles.map(v => (
@@ -573,8 +576,8 @@ export default function Checklists() {
             </div>
 
             {selectedAuditorVehicle && (
-              <div className="flex items-center gap-2 rounded-lg bg-zinc-50 border border-zinc-100 px-3 py-2">
-                <User className="h-4 w-4 text-zinc-400 flex-shrink-0" />
+              <div className="flex items-center gap-2 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2">
+                <User className="h-4 w-4 flex-shrink-0 text-zinc-400" />
                 <span className="text-sm text-zinc-700">
                   Motorista: <strong>{selectedAuditorVehicle.driverName ?? 'Sem motorista'}</strong>
                 </span>
@@ -582,7 +585,7 @@ export default function Checklists() {
             )}
 
             {selectedVehicleId && auditorTemplates.length === 0 && (
-              <p className="text-sm text-zinc-400 italic text-center py-2">
+              <p className="py-2 text-center text-sm text-zinc-400 italic">
                 Nenhum template de Auditoria publicado para {selectedAuditorVehicle?.category ?? 'esta categoria'}.
               </p>
             )}
@@ -590,7 +593,7 @@ export default function Checklists() {
             {auditorTemplates.length > 0 && (
               <div className="space-y-2">
                 {auditorTemplates.map(t => (
-                  <div key={t.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-zinc-100 hover:bg-zinc-50">
+                  <div key={t.id} className="flex items-center justify-between gap-3 rounded-xl border border-zinc-100 p-3 hover:bg-zinc-50">
                     <div>
                       <p className="text-sm font-medium text-zinc-900">{t.name}</p>
                       <p className="text-xs text-zinc-500">{t.context}</p>
@@ -598,7 +601,7 @@ export default function Checklists() {
                     <button
                       disabled={!!openChecklist || starting === t.id}
                       onClick={() => startChecklist(t, selectedVehicleId)}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white text-xs font-medium rounded-lg hover:bg-orange-600 disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-medium text-white hover:bg-orange-600 disabled:opacity-50"
                     >
                       {starting === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                       Iniciar
@@ -609,18 +612,18 @@ export default function Checklists() {
             )}
 
             {startError && (
-              <p className="text-xs text-red-600 mt-2">{startError}</p>
+              <p className="mt-2 text-xs text-red-600">{startError}</p>
             )}
             {/* Inspeção de Pneus — Auditor */}
             {selectedVehicleId && (
-              <div className="pt-2 border-t border-zinc-100 space-y-1">
+              <div className="space-y-1 border-t border-zinc-100 pt-2">
                 {tireInspectionError && (
                   <p className="text-xs text-red-600">{tireInspectionError}</p>
                 )}
                 <button
                   disabled={startingTireInspection || !!openChecklist}
                   onClick={() => handleStartTireInspection(selectedVehicleId)}
-                  className="flex items-center gap-1.5 px-3 py-2 border border-blue-300 text-blue-600 text-xs font-medium rounded-lg hover:bg-blue-50 disabled:opacity-50 w-full justify-center"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-blue-300 px-3 py-2 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
                 >
                   {startingTireInspection ? <Loader2 className="h-3 w-3 animate-spin" /> : <Disc className="h-3 w-3" />}
                   Inspeção de Pneus
@@ -645,7 +648,7 @@ export default function Checklists() {
       {isAssistantPlus && (
         <div className="flex flex-col gap-4">
           {blockWrite && <SelectClientNotice />}
-          <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden flex-1 min-h-0 flex flex-col">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
           <div className="border-b border-zinc-200 px-4">
             <nav className="-mb-px flex gap-1">
               <button
@@ -653,9 +656,9 @@ export default function Checklists() {
                 onClick={() => setActiveTab('checklists')}
                 className={cn(
                   activeTab === 'checklists'
-                    ? 'border-orange-500 text-orange-600 font-medium'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300',
-                  'flex items-center whitespace-nowrap border-b-2 px-4 py-3 text-sm transition-colors',
+                    ? 'border-orange-500 font-medium text-orange-600'
+                    : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700',
+                  'flex items-center border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors',
                 )}
               >
                 Checklists
@@ -665,9 +668,9 @@ export default function Checklists() {
                 onClick={() => setActiveTab('tireInspections')}
                 className={cn(
                   activeTab === 'tireInspections'
-                    ? 'border-orange-500 text-orange-600 font-medium'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300',
-                  'flex items-center whitespace-nowrap border-b-2 px-4 py-3 text-sm transition-colors',
+                    ? 'border-orange-500 font-medium text-orange-600'
+                    : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700',
+                  'flex items-center border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors',
                 )}
               >
                 Inspeções de Pneus
@@ -677,11 +680,11 @@ export default function Checklists() {
 
           {activeTab === 'checklists' && (
             <>
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-100">
+              <div className="flex items-center gap-2 border-b border-zinc-100 px-4 py-3">
                 <button
                   onClick={() => setOnlyWithIssues(false)}
                   className={cn(
-                    'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
                     !onlyWithIssues ? 'bg-zinc-700 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
                   )}
                 >
@@ -690,7 +693,7 @@ export default function Checklists() {
                 <button
                   onClick={() => setOnlyWithIssues(true)}
                   className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
                     onlyWithIssues ? 'bg-red-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
                   )}
                 >
@@ -703,7 +706,7 @@ export default function Checklists() {
                 <button
                   onClick={() => setOnlyOdometer(v => !v)}
                   className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
                     onlyOdometer ? 'bg-sky-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
                   )}
                 >
@@ -713,8 +716,8 @@ export default function Checklists() {
               </div>
 
               {checklists.length === 0 ? (
-                <div className="text-center py-16 text-zinc-400">
-                  <ClipboardCheck className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                <div className="py-16 text-center text-zinc-400">
+                  <ClipboardCheck className="mx-auto mb-3 h-12 w-12 opacity-30" />
                   <p className="text-sm">{blockWrite ? 'Nenhum checklist realizado em nenhum cliente.' : 'Nenhum checklist realizado neste tenant.'}</p>
                 </div>
               ) : (
@@ -723,7 +726,7 @@ export default function Checklists() {
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-zinc-50">
                         {[...(blockWrite ? ['Cliente'] : []), 'Template', 'Contexto', 'Veículo', 'Preenchido por', 'Data', 'Status', 'Ações'].map(h => (
-                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">
                             {h}
                           </th>
                         ))}
@@ -745,7 +748,7 @@ export default function Checklists() {
                           <td className="px-4 py-3 text-sm text-zinc-900">
                             <div className="flex items-center gap-1.5">
                               {issueChecklistIds.has(c.id) && (
-                                <AlertCircle className="h-3.5 w-3.5 text-red-400 flex-shrink-0" title="Contém inconformidades" />
+                                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 text-red-400" title="Contém inconformidades" />
                               )}
                               {c.templateName ?? '—'}
                             </div>
@@ -755,19 +758,19 @@ export default function Checklists() {
                           <td className="px-4 py-3 text-sm text-zinc-600">{c.filledByName ?? '—'}</td>
                           <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(c.startedAt)}</td>
                           <td className="px-4 py-3">
-                            <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', STATUS_COLOR[c.status])}>
+                            <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[c.status])}>
                               {STATUS_LABEL[c.status]}
                             </span>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
-                              <button onClick={() => setViewChecklist(c)} className="p-1.5 rounded hover:bg-zinc-100" title="Visualizar">
+                              <button onClick={() => setViewChecklist(c)} className="rounded p-1.5 hover:bg-zinc-100" title="Visualizar">
                                 <Eye className="h-4 w-4 text-zinc-400" />
                               </button>
                               {isAnalystPlus && c.status === 'completed' && issueChecklistIds.has(c.id) && !blockWrite && (
                                 <button
                                   onClick={() => setCreatePlanChecklist(c)}
-                                  className="p-1.5 rounded hover:bg-orange-50 text-orange-400"
+                                  className="rounded p-1.5 text-orange-400 hover:bg-orange-50"
                                   title="Criar Plano de Ação"
                                 >
                                   <ClipboardList className="h-4 w-4" />
@@ -776,7 +779,7 @@ export default function Checklists() {
                               {isAdminMaster && (
                                 <button
                                   onClick={() => setConfirmDelete(c)}
-                                  className="p-1.5 rounded hover:bg-red-50 text-red-400"
+                                  className="rounded p-1.5 text-red-400 hover:bg-red-50"
                                   title="Excluir (Admin Master)"
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -795,8 +798,8 @@ export default function Checklists() {
 
           {activeTab === 'tireInspections' && (
             tireInspections.length === 0 ? (
-              <div className="text-center py-16 text-zinc-400">
-                <Disc className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <div className="py-16 text-center text-zinc-400">
+                <Disc className="mx-auto mb-3 h-12 w-12 opacity-30" />
                 <p className="text-sm">{blockWrite ? 'Nenhuma inspeção de pneus registrada em nenhum cliente.' : 'Nenhuma inspeção de pneus registrada neste tenant.'}</p>
               </div>
             ) : (
@@ -805,7 +808,7 @@ export default function Checklists() {
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-zinc-50">
                       {[...(blockWrite ? ['Cliente'] : []), 'Veículo', 'Inspetor', 'Início', 'Conclusão', 'Status', 'Ações'].map(h => (
-                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">
                           {h}
                         </th>
                       ))}
@@ -823,7 +826,7 @@ export default function Checklists() {
                         )}
                         <td className="px-4 py-3 text-sm text-zinc-900">
                           <div className="flex items-center gap-1.5">
-                            <Disc className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
+                            <Disc className="h-3.5 w-3.5 flex-shrink-0 text-blue-400" />
                             {ti.vehicleLicensePlate ?? '—'}
                           </div>
                         </td>
@@ -831,12 +834,12 @@ export default function Checklists() {
                         <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(ti.startedAt)}</td>
                         <td className="px-4 py-3 text-xs text-zinc-500">{ti.completedAt ? formatDate(ti.completedAt) : '—'}</td>
                         <td className="px-4 py-3">
-                          <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', STATUS_COLOR[ti.status])}>
+                          <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[ti.status])}>
                             {STATUS_LABEL[ti.status]}
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <button onClick={() => setViewTireInspection(ti)} className="p-1.5 rounded hover:bg-zinc-100" title="Visualizar">
+                          <button onClick={() => setViewTireInspection(ti)} className="rounded p-1.5 hover:bg-zinc-100" title="Visualizar">
                             <Eye className="h-4 w-4 text-zinc-400" />
                           </button>
                         </td>
@@ -872,7 +875,7 @@ export default function Checklists() {
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+          <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-red-700">Excluir checklist</h3>
             <p className="text-sm text-zinc-600">
               Esta ação é <strong>irreversível</strong>. O checklist, todas as respostas e ações vinculadas serão removidos permanentemente.
@@ -880,14 +883,14 @@ export default function Checklists() {
             <p className="text-sm font-medium text-zinc-900">
               Template: <span className="text-orange-600">{confirmDelete.templateName}</span>
             </p>
-            <div className="flex gap-3 justify-end">
+            <div className="flex justify-end gap-3">
               <button onClick={() => setConfirmDelete(null)} disabled={deleteMutation.isPending} className="px-4 py-2 text-sm text-zinc-600">
                 Cancelar
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleteMutation.isPending}
-                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {deleteMutation.isPending ? 'Excluindo...' : 'Excluir permanentemente'}
               </button>
@@ -913,18 +916,18 @@ interface HistoryCardProps {
 
 function HistoryCard({ checklists, historySearch, setHistorySearch, historyStatusFilter, setHistoryStatusFilter, onView, formatDate }: HistoryCardProps) {
   return (
-    <div className="bg-white rounded-2xl border border-zinc-200 p-5">
-      <h2 className="text-sm font-semibold text-zinc-700 mb-3">Histórico</h2>
+    <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+      <h2 className="mb-3 text-sm font-semibold text-zinc-700">Histórico</h2>
 
-      <div className="flex flex-col sm:flex-row gap-2 mb-3">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+          <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
           <input
             type="text"
             value={historySearch}
             onChange={e => setHistorySearch(e.target.value)}
             placeholder="Buscar por template ou contexto..."
-            className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="w-full rounded-lg border border-zinc-200 py-1.5 pr-3 pl-8 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
           />
         </div>
         <div className="flex gap-1">
@@ -933,7 +936,7 @@ function HistoryCard({ checklists, historySearch, setHistorySearch, historyStatu
               key={s}
               onClick={() => setHistoryStatusFilter(s)}
               className={cn(
-                'px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                'rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
                 historyStatusFilter === s ? 'bg-zinc-700 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
               )}
             >
@@ -944,20 +947,20 @@ function HistoryCard({ checklists, historySearch, setHistorySearch, historyStatu
       </div>
 
       {checklists.length === 0 ? (
-        <p className="text-sm text-zinc-400 italic text-center py-4">Nenhum checklist encontrado.</p>
+        <p className="py-4 text-center text-sm text-zinc-400 italic">Nenhum checklist encontrado.</p>
       ) : (
         <div className="space-y-2">
           {checklists.map(c => (
-            <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl border border-zinc-100">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-zinc-900 truncate">{c.templateName}</p>
+            <div key={c.id} className="flex items-center gap-3 rounded-xl border border-zinc-100 p-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-zinc-900">{c.templateName}</p>
                 <p className="text-xs text-zinc-500">{c.vehicleLicensePlate && `${c.vehicleLicensePlate} · `}{c.templateContext && `${c.templateContext} · `}{formatDate(c.startedAt)}</p>
               </div>
-              <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0', STATUS_COLOR[c.status])}>
+              <span className={cn('flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[c.status])}>
                 {STATUS_LABEL[c.status]}
               </span>
               {c.status === 'completed' && (
-                <button onClick={() => onView(c)} className="p-1.5 rounded-lg hover:bg-zinc-100 flex-shrink-0">
+                <button onClick={() => onView(c)} className="flex-shrink-0 rounded-lg p-1.5 hover:bg-zinc-100">
                   <Eye className="h-4 w-4 text-zinc-400" />
                 </button>
               )}

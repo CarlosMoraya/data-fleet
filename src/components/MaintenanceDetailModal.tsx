@@ -1,12 +1,17 @@
-import React from 'react';
-import { X, Wrench, Building2, Calendar, User, FileText, DollarSign, Clock, ExternalLink, BadgeCheck } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { cn } from '../lib/utils';
-import type { MaintenanceOrder } from '../types/maintenance';
-import { supabase } from '../lib/supabase';
+import { X, Wrench, Building2, Calendar, User, FileText, DollarSign, Clock, ExternalLink, BadgeCheck } from 'lucide-react';
+import React from 'react';
+
 import { useAuth } from '../context/AuthContext';
-import BudgetItemsTable from './BudgetItemsTable';
 import { budgetItemFromRow, type MaintenanceBudgetItemRow } from '../lib/maintenanceMappers';
+import { supabase } from '../lib/supabase';
+import { cn } from '../lib/utils';
+
+import BudgetItemsTable from './BudgetItemsTable';
+
+import type { MaintenanceOrder } from '../types/maintenance';
+
+
 
 interface Props {
   order: MaintenanceOrder;
@@ -58,7 +63,7 @@ function formatCurrency(value: number) {
 function Field({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
   return (
     <div className={cn('flex flex-col gap-0.5', className)}>
-      <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide">{label}</span>
+      <span className="text-xs font-medium tracking-wide text-zinc-400 uppercase">{label}</span>
       <span className="text-sm text-zinc-800">{value ?? '—'}</span>
     </div>
   );
@@ -86,43 +91,43 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl">
 
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-zinc-100">
+        <div className="flex items-start justify-between border-b border-zinc-100 p-6">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="mb-1 flex items-center gap-2">
               <Wrench className="h-5 w-5 text-orange-500" />
               <h2 className="text-lg font-bold text-zinc-900">{order.os}</h2>
             </div>
             <div className="flex items-center gap-2">
-              <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', typeColor(order.type))}>
+              <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', typeColor(order.type))}>
                 {order.type}
               </span>
-              <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', statusColor(order.status))}>
+              <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', statusColor(order.status))}>
                 {order.status}
               </span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-600 transition-colors p-1 rounded-lg hover:bg-zinc-100"
+            className="rounded-lg p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="overflow-y-auto p-6 space-y-6">
+        <div className="space-y-6 overflow-y-auto p-6">
 
           {/* Seção 1 — Identificação */}
           <section>
-            <div className="flex items-center gap-2 mb-3">
+            <div className="mb-3 flex items-center gap-2">
               <FileText className="h-4 w-4 text-zinc-400" />
-              <h3 className="text-sm font-semibold text-zinc-600 uppercase tracking-wide">Identificação</h3>
+              <h3 className="text-sm font-semibold tracking-wide text-zinc-600 uppercase">Identificação</h3>
             </div>
-            <div className="grid grid-cols-2 gap-4 bg-zinc-50 rounded-xl p-4">
+            <div className="grid grid-cols-2 gap-4 rounded-xl bg-zinc-50 p-4">
               <Field label="Número da OS" value={order.os} />
               <Field label="Placa do Veículo" value={
                 <span className="font-mono font-semibold text-zinc-900">{order.licensePlate}</span>
@@ -132,11 +137,11 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
 
           {/* Seção 2 — Oficina */}
           <section>
-            <div className="flex items-center gap-2 mb-3">
+            <div className="mb-3 flex items-center gap-2">
               <Building2 className="h-4 w-4 text-zinc-400" />
-              <h3 className="text-sm font-semibold text-zinc-600 uppercase tracking-wide">Oficina</h3>
+              <h3 className="text-sm font-semibold tracking-wide text-zinc-600 uppercase">Oficina</h3>
             </div>
-            <div className="grid grid-cols-2 gap-4 bg-zinc-50 rounded-xl p-4">
+            <div className="grid grid-cols-2 gap-4 rounded-xl bg-zinc-50 p-4">
               <Field label="Nome da Oficina" value={order.workshop} className={isWorkshopUser && order.clientName ? 'col-span-1' : 'col-span-2'} />
               {isWorkshopUser && order.clientName && (
                 <Field label="Transportadora" value={order.clientName} />
@@ -167,11 +172,11 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
 
           {/* Seção 3 — Serviço */}
           <section>
-            <div className="flex items-center gap-2 mb-3">
+            <div className="mb-3 flex items-center gap-2">
               <Wrench className="h-4 w-4 text-zinc-400" />
-              <h3 className="text-sm font-semibold text-zinc-600 uppercase tracking-wide">Serviço</h3>
+              <h3 className="text-sm font-semibold tracking-wide text-zinc-600 uppercase">Serviço</h3>
             </div>
-            <div className="grid grid-cols-2 gap-4 bg-zinc-50 rounded-xl p-4">
+            <div className="grid grid-cols-2 gap-4 rounded-xl bg-zinc-50 p-4">
               <Field label="Descrição do Serviço" value={order.description} className="col-span-2" />
               <Field label="Mecânico Responsável" value={
                 <span className="flex items-center gap-1.5">
@@ -187,7 +192,7 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
               } />
               {order.approvedCost !== undefined && (
                 <Field label="Valor Aprovado" value={
-                  <span className="flex items-center gap-1.5 text-green-700 font-semibold">
+                  <span className="flex items-center gap-1.5 font-semibold text-green-700">
                     <DollarSign className="h-3.5 w-3.5" />
                     {formatCurrency(order.approvedCost)}
                   </span>
@@ -199,17 +204,17 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
           {/* Seção 4 — Orçamento */}
           {(hasBudget || order.budgetPdfUrl) && (
             <section>
-              <div className="flex items-center gap-2 mb-3">
+              <div className="mb-3 flex items-center gap-2">
                 <BadgeCheck className="h-4 w-4 text-zinc-400" />
-                <h3 className="text-sm font-semibold text-zinc-600 uppercase tracking-wide">Orçamento</h3>
+                <h3 className="text-sm font-semibold tracking-wide text-zinc-600 uppercase">Orçamento</h3>
               </div>
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-4 bg-zinc-50 rounded-xl p-4">
+                <div className="grid grid-cols-2 gap-4 rounded-xl bg-zinc-50 p-4">
                   {order.budgetStatus && (
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Status</span>
+                      <span className="text-xs font-medium tracking-wide text-zinc-400 uppercase">Status</span>
                       <span className={cn(
-                        'self-start text-xs px-2 py-0.5 rounded-full font-medium',
+                        'self-start rounded-full px-2 py-0.5 text-xs font-medium',
                         budgetStatusLabel(order.budgetStatus).cls
                       )}>
                         {budgetStatusLabel(order.budgetStatus).label}
@@ -218,12 +223,12 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
                   )}
                   {order.budgetPdfUrl && (
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide">PDF do Orçamento</span>
+                      <span className="text-xs font-medium tracking-wide text-zinc-400 uppercase">PDF do Orçamento</span>
                       <a
                         href={order.budgetPdfUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700 font-medium"
+                        className="flex items-center gap-1 text-sm font-medium text-orange-600 hover:text-orange-700"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                         Ver PDF
@@ -246,11 +251,11 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
 
           {/* Seção 5 — Registro */}
           <section>
-            <div className="flex items-center gap-2 mb-3">
+            <div className="mb-3 flex items-center gap-2">
               <User className="h-4 w-4 text-zinc-400" />
-              <h3 className="text-sm font-semibold text-zinc-600 uppercase tracking-wide">Registro</h3>
+              <h3 className="text-sm font-semibold tracking-wide text-zinc-600 uppercase">Registro</h3>
             </div>
-            <div className="grid grid-cols-2 gap-4 bg-zinc-50 rounded-xl p-4">
+            <div className="grid grid-cols-2 gap-4 rounded-xl bg-zinc-50 p-4">
               <Field label="Criado por" value={order.createdBy} />
               <Field label="Criado em" value={formatDate(order.createdAt)} />
               {order.notes && (
@@ -261,10 +266,10 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="border-t border-zinc-100 p-4 flex justify-end">
+        <div className="flex justify-end border-t border-zinc-100 p-4">
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-lg bg-zinc-100 text-zinc-700 text-sm font-medium hover:bg-zinc-200 transition-colors"
+            className="rounded-lg bg-zinc-100 px-5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-200"
           >
             Fechar
           </button>

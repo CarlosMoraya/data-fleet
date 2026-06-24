@@ -1,7 +1,8 @@
-import type { BudgetItem } from './maintenanceMappers';
 import { inferBudgetSystem, normalizeBudgetSystem } from './budgetSystems';
 import { performOcr } from './ocr/ocrEngine';
 import { loadPdfjs } from './ocr/pdfLoader';
+
+import type { BudgetItem } from './maintenanceMappers';
 
 const DEBUG = import.meta.env.VITE_DEBUG_OCR === '1';
 const debug = (...args: unknown[]) => {

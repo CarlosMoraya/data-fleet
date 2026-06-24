@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import {
   applyCostFilters,
   countActiveInMaintenance,
@@ -1817,7 +1818,7 @@ describe('buildVehicleFinancialRanking', () => {
 
     const result = buildVehicleFinancialRanking({ filteredVehicles: vehicles, filteredOrders: orders, vehicleKmRows });
 
-    const v1Row = result.find((r) => r.vehicleId === 'v1')!;
+    const v1Row = result.find((r) => r.vehicleId === 'v1');
     expect(v1Row.totalCost).toBe(1800);
     expect(v1Row.orderCount).toBe(3);
     expect(v1Row.correctiveOrderCount).toBe(2);
@@ -1833,12 +1834,12 @@ describe('buildVehicleFinancialRanking', () => {
 
     const result = buildVehicleFinancialRanking({ filteredVehicles: vehicles, filteredOrders: orders, vehicleKmRows });
 
-    const v3Row = result.find((r) => r.vehicleId === 'v3')!;
+    const v3Row = result.find((r) => r.vehicleId === 'v3');
     expect(v3Row.totalCost).toBe(800);
     expect(v3Row.kmDriven).toBeNull();
     expect(v3Row.costPerKm).toBeNull();
 
-    const v2Row = result.find((r) => r.vehicleId === 'v2')!;
+    const v2Row = result.find((r) => r.vehicleId === 'v2');
     expect(v2Row.kmDriven).toBeNull();
     expect(v2Row.costPerKm).toBeNull();
   });

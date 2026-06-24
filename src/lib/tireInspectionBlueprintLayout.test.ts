@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
+
 import { calculateBlueprintLayout } from './tireInspectionBlueprintLayout';
 import { generatePositionsFromConfig } from './tirePositions';
+
 import type { AxleConfigEntry } from '../types/tire';
 
 // ─── Fixtures de AxleConfig ───────────────────────────────────────────────────
@@ -117,7 +119,7 @@ describe('calculateBlueprintLayout — estepes', () => {
   it('estepes ficam posicionados abaixo do corpo do veículo', () => {
     const layout = calculateBlueprintLayout(twoAxleSimples, 1, 'Truck');
 
-    const spare = layout.nodes.find(n => n.side === 'Step')!;
+    const spare = layout.nodes.find(n => n.side === 'Step');
     const bodyBottom = layout.bodyY + layout.bodyHeight;
 
     expect(spare.y).toBeGreaterThan(bodyBottom);
@@ -178,9 +180,9 @@ describe('calculateBlueprintLayout — status', () => {
     const answered = new Set(['E1', 'D1']);
     const layout = calculateBlueprintLayout(twoAxleSimples, 0, 'Truck', answered);
 
-    const e1 = layout.nodes.find(n => n.positionCode === 'E1')!;
-    const d1 = layout.nodes.find(n => n.positionCode === 'D1')!;
-    const e2 = layout.nodes.find(n => n.positionCode === 'E2')!;
+    const e1 = layout.nodes.find(n => n.positionCode === 'E1');
+    const d1 = layout.nodes.find(n => n.positionCode === 'D1');
+    const e2 = layout.nodes.find(n => n.positionCode === 'E2');
 
     expect(e1.status).toBe('done');
     expect(d1.status).toBe('done');

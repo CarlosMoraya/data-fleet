@@ -30,9 +30,9 @@ export function FileField({ label, url, labelLink }: FileFieldProps) {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mt-1"
+        className="mt-1 flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
       >
-        <ExternalLink className="w-3 h-3" />
+        <ExternalLink className="h-3 w-3" />
         {labelLink || 'Ver documento'}
       </a>
     </div>
@@ -45,7 +45,7 @@ interface SectionTitleProps {
 
 export function SectionTitle({ children }: SectionTitleProps) {
   return (
-    <h3 className="text-base font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-3">
+    <h3 className="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">
       {children}
     </h3>
   );

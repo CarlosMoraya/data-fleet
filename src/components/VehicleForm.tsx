@@ -1,9 +1,9 @@
+import { X, FileText, ExternalLink, Loader2 , CalendarClock } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
-import { Vehicle, VehicleFieldSettings, AxleConfigEntry } from '../types';
-import { X, FileText, ExternalLink, Loader2 } from 'lucide-react';
-import AxleConfigEditor from './AxleConfigEditor';
+
+import { useAuth } from '../context/AuthContext';
 import { getPhysicalAxles } from '../lib/axleConfigUtils';
-import { validateFile } from '../lib/storageHelpers';
+import { extractCrlvData, ExtractionStatus, ExtractionResult } from '../lib/documentOcr';
 import { isFieldRequired } from '../lib/fieldSettingsMappers';
 import {
   filterDigitsOnly,
@@ -13,7 +13,6 @@ import {
   filterAlpha,
   filterAlphanumeric,
 } from '../lib/inputHelpers';
-import { extractCrlvData, ExtractionStatus, ExtractionResult } from '../lib/documentOcr';
 import {
   saveVehicleDraftFile,
   removeVehicleDraftFile,
@@ -21,11 +20,14 @@ import {
   clearVehicleDraftFiles,
   type VehicleDraftFileKey,
 } from '../lib/offline/vehicleDraftFiles';
-import { useAuth } from '../context/AuthContext';
-import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
+import { validateFile } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
+import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
+import { Vehicle, VehicleFieldSettings, AxleConfigEntry } from '../types';
+
+import AxleConfigEditor from './AxleConfigEditor';
 import WarrantyPlanByPlateModal from './warranty/WarrantyPlanByPlateModal';
-import { CalendarClock } from 'lucide-react';
+
 
 interface VehicleFormFiles {
   crlv: File | null;
@@ -396,7 +398,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
   // Label com asterisco vermelho para campos obrigatórios
   const Label = ({ name, children }: { name: string; children: React.ReactNode }) => (
     <label className="block text-sm font-medium text-zinc-700">
-      {children}{req(name) && <span className="text-red-500 ml-0.5">*</span>}
+      {children}{req(name) && <span className="ml-0.5 text-red-500">*</span>}
     </label>
   );
 
@@ -404,15 +406,15 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     <>
       {url && !selectedFile && (
         <div className="mt-2 mb-2 flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-          <FileText className="h-4 w-4 text-zinc-400 flex-shrink-0" />
+          <FileText className="h-4 w-4 flex-shrink-0 text-zinc-400" />
           <span className="flex-1 truncate">{label}</span>
-          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700">
             Visualizar <ExternalLink className="h-3 w-3" />
           </a>
         </div>
       )}
       {selectedFile && (
-        <p className="mt-1 text-xs text-emerald-600 font-medium">
+        <p className="mt-1 text-xs font-medium text-emerald-600">
           ✓ {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
           {selectedFile.type.startsWith('image/') ? ' — será comprimida antes do upload' : ''}
         </p>
@@ -421,13 +423,13 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-full flex flex-col my-8">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true">
+      <div className="my-8 flex max-h-full w-full max-w-3xl flex-col rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
           <h2 className="text-xl font-semibold text-zinc-900">
             {vehicle ? 'Editar Veículo' : 'Cadastrar Veículo'}
           </h2>
-          <button onClick={handleClose} className="text-zinc-400 hover:text-zinc-500 transition-colors">
+          <button onClick={handleClose} className="text-zinc-400 transition-colors hover:text-zinc-500">
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -442,22 +444,22 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
           <form id="vehicle-form" onSubmit={handleSubmit} className="space-y-8">
             {/* Basic Info */}
             <div>
-              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Informações Básicas</h3>
-              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+              <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Informações Básicas</h3>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700">Placa<span className="text-red-500 ml-0.5">*</span></label>
+                  <label className="block text-sm font-medium text-zinc-700">Placa<span className="ml-0.5 text-red-500">*</span></label>
                   <input type="text" name="licensePlate" required inputMode="text" value={formData.licensePlate || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700">Marca<span className="text-red-500 ml-0.5">*</span></label>
+                  <label className="block text-sm font-medium text-zinc-700">Marca<span className="ml-0.5 text-red-500">*</span></label>
                   <input type="text" name="brand" required value={formData.brand || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700">Modelo<span className="text-red-500 ml-0.5">*</span></label>
+                  <label className="block text-sm font-medium text-zinc-700">Modelo<span className="ml-0.5 text-red-500">*</span></label>
                   <input type="text" name="model" required value={formData.model || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700">Ano<span className="text-red-500 ml-0.5">*</span></label>
+                  <label className="block text-sm font-medium text-zinc-700">Ano<span className="ml-0.5 text-red-500">*</span></label>
                   <input type="text" name="year" required inputMode="numeric" maxLength={4} value={formData.year || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
@@ -481,10 +483,10 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
 
             {/* Ownership & Tracking */}
             <div>
-              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Propriedade & Rastreamento</h3>
-              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+              <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Propriedade & Rastreamento</h3>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700">Aquisição<span className="text-red-500 ml-0.5">*</span></label>
+                  <label className="block text-sm font-medium text-zinc-700">Aquisição<span className="ml-0.5 text-red-500">*</span></label>
                   <select name="acquisition" value={formData.acquisition || 'Owned'} onChange={handleChange} className={inputClass}>
                     <option value="Owned">Próprio</option>
                     <option value="Rented">Locado</option>
@@ -561,7 +563,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                   </p>
                   {crlvExtractionStatus === 'extracting' && (
                     <div className="mt-2 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
-                      <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                      <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin" />
                       Extraindo dados do documento…
                     </div>
                   )}
@@ -576,7 +578,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                       {crlvExtractionResult.fieldCount}/{crlvExtractionResult.totalFields} campos extraídos via{' '}
                       {crlvExtractionResult.method === 'regex' ? 'leitura direta' : 'IA'}.
                       {crlvExtractionResult.warnings.length > 0 && (
-                        <span className="block mt-0.5 text-xs">
+                        <span className="mt-0.5 block text-xs">
                           Não encontrados: {crlvExtractionResult.warnings.join(', ')}
                         </span>
                       )}
@@ -593,8 +595,8 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
 
             {/* Documentos & Acessórios */}
             <div>
-              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Documentos & Acessórios</h3>
-              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+              <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Documentos & Acessórios</h3>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                 <div>
                   <Label name="category">Categoria</Label>
                   <select name="category" required={req('category')} value={formData.category || ''} onChange={handleChange} className={inputClass}>
@@ -605,7 +607,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                   </select>
                 </div>
 
-                <div className="flex flex-col gap-4 justify-center">
+                <div className="flex flex-col justify-center gap-4">
                   <div className="flex items-center gap-2">
                     <input id="spareKey" name="spareKey" type="checkbox" checked={formData.spareKey || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600" />
                     <label htmlFor="spareKey" className="text-sm text-zinc-900">Chave reserva</label>
@@ -656,10 +658,10 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
 
             {/* Technical Specs & Conditional Logic */}
             <div>
-              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Especificações Técnicas</h3>
-              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+              <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Especificações Técnicas</h3>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700">Tipo<span className="text-red-500 ml-0.5">*</span></label>
+                  <label className="block text-sm font-medium text-zinc-700">Tipo<span className="ml-0.5 text-red-500">*</span></label>
                   <select name="type" value={formData.type || 'Passeio'} onChange={handleChange} className={inputClass}>
                     {formData.category && CATEGORY_TYPES_MAP[formData.category as keyof typeof CATEGORY_TYPES_MAP] ? (
                       CATEGORY_TYPES_MAP[formData.category as keyof typeof CATEGORY_TYPES_MAP].map(t => (
@@ -680,7 +682,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700">Fonte de Energia<span className="text-red-500 ml-0.5">*</span></label>
+                  <label className="block text-sm font-medium text-zinc-700">Fonte de Energia<span className="ml-0.5 text-red-500">*</span></label>
                   <select name="energySource" value={formData.energySource || 'Combustão'} onChange={handleChange} className={inputClass}>
                     <option value="Combustão">Combustão</option>
                     <option value="Elétrico">Elétrico</option>
@@ -723,7 +725,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                 {/* Conditional: Cavalo */}
                 {formData.type === 'Cavalo' && (
                   <>
-                    <div className="flex items-center h-full pt-6">
+                    <div className="flex h-full items-center pt-6">
                       <input id="semiReboque" name="semiReboque" type="checkbox" checked={formData.semiReboque || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600" />
                       <label htmlFor="semiReboque" className="ml-2 block text-sm text-zinc-900">Possui Semi-reboque?</label>
                     </div>
@@ -754,7 +756,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                   </>
                 )}
 
-                <div className="flex items-center h-full pt-6">
+                <div className="flex h-full items-center pt-6">
                   <input id="coolingEquipment" name="coolingEquipment" type="checkbox" checked={formData.coolingEquipment || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600" />
                   <label htmlFor="coolingEquipment" className="ml-2 block text-sm text-zinc-900">Equipamento de Refrigeração?</label>
                 </div>
@@ -775,9 +777,9 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
 
             {/* Garantia & Revisões */}
             <div>
-              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Garantia & Revisões</h3>
-              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
-                <div className="flex items-center h-full pt-6">
+              <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Garantia & Revisões</h3>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                <div className="flex h-full items-center pt-6">
                   <input id="warranty" name="warranty" type="checkbox" checked={formData.warranty || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600" />
                   <label htmlFor="warranty" className="ml-2 block text-sm text-zinc-900">Veículo em garantia?</label>
                 </div>
@@ -794,7 +796,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                     <button
                       type="button"
                       onClick={() => setScheduleModalOpen(true)}
-                      className="mt-2 inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                      className="mt-2 inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100"
                     >
                       <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
                       Criar programação de revisão
@@ -810,9 +812,9 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
 
             {/* Seguro & Contrato de Manutenção */}
             <div>
-              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Seguro & Contrato de Manutenção</h3>
-              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
-                <div className="flex items-center h-full pt-2">
+              <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Seguro & Contrato de Manutenção</h3>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                <div className="flex h-full items-center pt-2">
                   <input id="hasInsurance" name="hasInsurance" type="checkbox" checked={formData.hasInsurance || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600" />
                   <label htmlFor="hasInsurance" className="ml-2 block text-sm text-zinc-900">Veículo possui seguro?</label>
                 </div>
@@ -833,7 +835,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                     </p>
                   </div>
                 )}
-                <div className="flex items-center h-full pt-2">
+                <div className="flex h-full items-center pt-2">
                   <input id="hasMaintenanceContract" name="hasMaintenanceContract" type="checkbox" checked={formData.hasMaintenanceContract || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600" />
                   <label htmlFor="hasMaintenanceContract" className="ml-2 block text-sm text-zinc-900">Veículo possui contrato de manutenção?</label>
                 </div>
@@ -859,8 +861,8 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
 
             {/* Motorista Responsável */}
             <div>
-              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Motorista Responsável</h3>
-              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+              <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Motorista Responsável</h3>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-zinc-700">Motorista</label>
                   <select
@@ -893,8 +895,8 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
 
             {/* Logística */}
             <div>
-              <h3 className="text-lg font-medium leading-6 text-zinc-900 border-b border-zinc-200 pb-2 mb-4">Logística</h3>
-              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+              <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Logística</h3>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Embarcador</label>
                   <select
@@ -934,11 +936,11 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
           </form>
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-zinc-200 bg-zinc-50 rounded-b-2xl">
-          <button type="button" onClick={handleClose} disabled={saving} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 transition-colors disabled:opacity-50">
+        <div className="flex items-center justify-end gap-3 rounded-b-2xl border-t border-zinc-200 bg-zinc-50 px-6 py-4">
+          <button type="button" onClick={handleClose} disabled={saving} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50">
             Cancelar
           </button>
-          <button type="submit" form="vehicle-form" disabled={saving} className="inline-flex justify-center items-center gap-2 rounded-xl border border-transparent bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50">
+          <button type="submit" form="vehicle-form" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl border border-transparent bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50">
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             {saving ? 'Salvando...' : 'Salvar Veículo'}
           </button>

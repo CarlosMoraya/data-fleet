@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import React from 'react';
+import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { act } from 'react';
-import type { MaintenanceOrderDashboard } from '../../types/maintenance';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
 import type { HorizonOption } from '../../lib/dashboardKpi';
+import type { MaintenanceOrderDashboard } from '../../types/maintenance';
 
 vi.mock('./CostTrendChart', () => ({
   default: ({ data, title }: { data: { name: string; value: number }[]; title: string }) => (
@@ -139,7 +139,7 @@ describe('EvolutionPanel', () => {
     );
     expect(twelveMonthBtn).toBeDefined();
     act(() => {
-      twelveMonthBtn!.click();
+      twelveMonthBtn.click();
     });
     expect(selected).toBe('12m');
   });

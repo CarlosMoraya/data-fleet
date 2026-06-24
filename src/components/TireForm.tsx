@@ -1,9 +1,10 @@
-import React from 'react';
 import { Loader2, X, AlertTriangle } from 'lucide-react';
+import React from 'react';
+
+import { generatePositions, generatePositionsFromConfig, validatePositionAssignment } from '../lib/tirePositions';
 import { cn } from '../lib/utils';
 import { safeRandomUUID } from '../lib/uuid';
 import { Tire, TireVisualClassification, VehicleTireConfig, AxleConfigEntry } from '../types';
-import { generatePositions, generatePositionsFromConfig, validatePositionAssignment } from '../lib/tirePositions';
 
 interface TireFormProps {
   vehicleId: string;
@@ -172,23 +173,23 @@ export default function TireForm({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 flex flex-col max-h-[90vh]">
+      <div className="mx-4 flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 shrink-0">
+        <div className="flex shrink-0 items-center justify-between border-b border-zinc-100 px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-zinc-900">
               {isEditing ? 'Editar Pneu' : 'Novo Pneu'}
             </h2>
             <p className="text-sm text-zinc-500">{vehiclePlate} — {vehicleType}</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-100 text-zinc-400">
+          <button onClick={onClose} className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Conteúdo */}
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="flex-1 space-y-5 overflow-y-auto px-6 py-4">
 
             {/* Fallback: todas as posições ocupadas */}
             {!isEditing && freePositions.length === 0 && (
@@ -203,7 +204,7 @@ export default function TireForm({
 
             {/* Toggle de modo (somente na criação) */}
             {!isEditing && (
-              <div className="flex rounded-lg border border-zinc-200 overflow-hidden">
+              <div className="flex overflow-hidden rounded-lg border border-zinc-200">
                 <button
                   type="button"
                   onClick={() => setRegisterMode('single')}
@@ -234,13 +235,13 @@ export default function TireForm({
             {/* Código do pneu (somente em edição, read-only) */}
             {isEditing && (
               <section>
-                <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3">Identificação</h3>
+                <h3 className="mb-3 text-xs font-semibold tracking-wide text-zinc-400 uppercase">Identificação</h3>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Código do Pneu</label>
-                  <div className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-zinc-50 text-zinc-500 font-mono">
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Código do Pneu</label>
+                  <div className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-sm text-zinc-500">
                     {editingTire.tireCode}
                   </div>
-                  <p className="text-xs text-zinc-400 mt-1">O código do pneu não pode ser alterado.</p>
+                  <p className="mt-1 text-xs text-zinc-400">O código do pneu não pode ser alterado.</p>
                 </div>
               </section>
             )}
@@ -248,11 +249,11 @@ export default function TireForm({
             {/* Especificação e demais campos */}
             <section>
               {!isEditing && (
-                <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3">Identificação</h3>
+                <h3 className="mb-3 text-xs font-semibold tracking-wide text-zinc-400 uppercase">Identificação</h3>
               )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">
                     Especificação *
                   </label>
                   <input
@@ -260,24 +261,24 @@ export default function TireForm({
                     onChange={e => setSpecification(e.target.value)}
                     required
                     placeholder="ex: 295/80R22.5"
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">DOT</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">DOT</label>
                   <input
                     value={dot}
                     onChange={e => setDot(e.target.value)}
                     placeholder="ex: 2524"
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Marcação de Fogo</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Marcação de Fogo</label>
                   <input
                     value={fireMarking}
                     onChange={e => setFireMarking(e.target.value)}
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
               </div>
@@ -285,24 +286,24 @@ export default function TireForm({
 
             {/* Fabricante */}
             <section>
-              <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3">Fabricante</h3>
+              <h3 className="mb-3 text-xs font-semibold tracking-wide text-zinc-400 uppercase">Fabricante</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Fabricante</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Fabricante</label>
                   <input
                     value={manufacturer}
                     onChange={e => setManufacturer(e.target.value)}
                     placeholder="ex: Bridgestone"
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Marca</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Marca</label>
                   <input
                     value={brand}
                     onChange={e => setBrand(e.target.value)}
                     placeholder="ex: R295"
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
               </div>
@@ -310,39 +311,39 @@ export default function TireForm({
 
             {/* Intervalos */}
             <section>
-              <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3">Intervalos (Km)</h3>
+              <h3 className="mb-3 text-xs font-semibold tracking-wide text-zinc-400 uppercase">Intervalos (Km)</h3>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Rodízio</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Rodízio</label>
                   <input
                     type="number"
                     min="0"
                     value={rotationIntervalKm}
                     onChange={e => setRotationIntervalKm(e.target.value)}
                     placeholder="ex: 20000"
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Vida Útil</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Vida Útil</label>
                   <input
                     type="number"
                     min="0"
                     value={usefulLifeKm}
                     onChange={e => setUsefulLifeKm(e.target.value)}
                     placeholder="ex: 120000"
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Recapagem</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Recapagem</label>
                   <input
                     type="number"
                     min="0"
                     value={retreadIntervalKm}
                     onChange={e => setRetreadIntervalKm(e.target.value)}
                     placeholder="ex: 60000"
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
               </div>
@@ -350,9 +351,9 @@ export default function TireForm({
 
             {/* Hodômetro */}
             <section>
-              <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3">Hodômetro</h3>
+              <h3 className="mb-3 text-xs font-semibold tracking-wide text-zinc-400 uppercase">Hodômetro</h3>
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                <label className="mb-1 block text-sm font-medium text-zinc-700">
                   Km atual do veículo
                 </label>
                 <input
@@ -362,25 +363,25 @@ export default function TireForm({
                   value={odometerKm}
                   onChange={e => setOdometerKm(e.target.value)}
                   placeholder="ex: 125000"
-                  className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                 />
-                <p className="text-xs text-zinc-400 mt-1">Opcional — registrado no histórico de movimentação.</p>
+                <p className="mt-1 text-xs text-zinc-400">Opcional — registrado no histórico de movimentação.</p>
               </div>
             </section>
 
             {/* Classificação e Posição */}
             <section>
-              <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3">
+              <h3 className="mb-3 text-xs font-semibold tracking-wide text-zinc-400 uppercase">
                 {registerMode === 'all' && !isEditing ? 'Classificação' : 'Classificação & Posição'}
               </h3>
               <div className={cn('grid gap-3', registerMode === 'all' && !isEditing ? 'grid-cols-1' : 'grid-cols-2')}>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Classificação Visual *</label>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Classificação Visual *</label>
                   <select
                     value={visualClassification}
                     onChange={e => setVisualClassification(e.target.value as TireVisualClassification)}
                     required
-                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                    className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   >
                     {VISUAL_CLASSIFICATIONS.map(c => (
                       <option key={c} value={c}>{c}</option>
@@ -391,13 +392,13 @@ export default function TireForm({
                 {/* Seletor de posição (pneu único ou edição) */}
                 {(isEditing || registerMode === 'single') && (
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">Posição *</label>
+                    <label className="mb-1 block text-sm font-medium text-zinc-700">Posição *</label>
                     <select
                       value={currentPosition}
                       onChange={e => handlePositionChange(e.target.value)}
                       required
                       className={cn(
-                        'w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white',
+                        'w-full rounded-lg border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none',
                         positionError ? 'border-red-400' : 'border-zinc-200',
                       )}
                     >
@@ -414,7 +415,7 @@ export default function TireForm({
                       })}
                     </select>
                     {positionError && (
-                      <p className="text-xs text-red-500 mt-1">{positionError}</p>
+                      <p className="mt-1 text-xs text-red-500">{positionError}</p>
                     )}
                   </div>
                 )}
@@ -424,13 +425,13 @@ export default function TireForm({
             {/* Lista de posições no modo "todos os pneus" */}
             {!isEditing && registerMode === 'all' && (
               <section>
-                <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3">
+                <h3 className="mb-3 text-xs font-semibold tracking-wide text-zinc-400 uppercase">
                   Posições a registrar
                 </h3>
                 {positions.length === 0 ? (
                   <p className="text-sm text-zinc-400">Nenhuma posição disponível para este veículo.</p>
                 ) : (
-                  <div className="border border-zinc-200 rounded-lg overflow-hidden divide-y divide-zinc-100 max-h-52 overflow-y-auto">
+                  <div className="max-h-52 divide-y divide-zinc-100 overflow-hidden overflow-y-auto rounded-lg border border-zinc-200">
                     {positions.map(pos => {
                       const occupant = existingTires.find(t => t.active && t.currentPosition === pos.code);
                       return (
@@ -442,7 +443,7 @@ export default function TireForm({
                           )}
                         >
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-zinc-700 text-xs bg-zinc-100 px-1.5 py-0.5 rounded">
+                            <span className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs text-zinc-700">
                               {pos.code}
                             </span>
                             <span className="text-zinc-600">{pos.label}</span>
@@ -450,7 +451,7 @@ export default function TireForm({
                           {occupant ? (
                             <span className="text-xs text-zinc-400">já registrado</span>
                           ) : (
-                            <span className="text-xs text-emerald-600 font-medium">livre</span>
+                            <span className="text-xs font-medium text-emerald-600">livre</span>
                           )}
                         </div>
                       );
@@ -458,7 +459,7 @@ export default function TireForm({
                   </div>
                 )}
                 {occupiedPositions.length > 0 && (
-                  <p className="text-xs text-zinc-400 mt-2">
+                  <p className="mt-2 text-xs text-zinc-400">
                     {occupiedPositions.length} posição(ões) já registrada(s) serão ignoradas.
                   </p>
                 )}
@@ -466,7 +467,7 @@ export default function TireForm({
             )}
 
             {saveError && (
-              <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {saveError}
               </div>
             )}
@@ -475,18 +476,18 @@ export default function TireForm({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-zinc-100 shrink-0">
+          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-zinc-100 px-6 py-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-800 border border-zinc-200 rounded-lg hover:bg-zinc-50"
+              className="rounded-lg border border-zinc-200 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-800"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={submitDisabled}
-              className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isEditing

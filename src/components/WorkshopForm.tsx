@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
 import { X, Wrench, AlertCircle } from 'lucide-react';
-import { Workshop } from '../types';
-import { workshopToRow, WORKSHOP_SPECIALTIES } from '../lib/workshopMappers';
-import { filterText, filterCNPJ, filterPhone, filterCEP, filterAlpha } from '../lib/inputHelpers';
+import React, { useState, useEffect } from 'react';
+
 import { isValidCNPJ } from '../lib/cnpjValidator';
+import { filterText, filterCNPJ, filterPhone, filterCEP, filterAlpha } from '../lib/inputHelpers';
 import { supabase } from '../lib/supabase';
+import { workshopToRow, WORKSHOP_SPECIALTIES } from '../lib/workshopMappers';
+import { Workshop } from '../types';
 
 // ─── Estilos ─────────────────────────────────────────────────────────────────
 
@@ -137,9 +138,9 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="relative flex w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl max-h-[90vh]">
+      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-zinc-200 px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100">
               <Wrench className="h-4 w-4 text-orange-600" />
@@ -148,21 +149,21 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
               {workshop ? 'Editar Oficina' : 'Nova Oficina'}
             </h2>
           </div>
-          <button onClick={handleClose} className="rounded-lg p-1 hover:bg-zinc-100 transition-colors">
+          <button onClick={handleClose} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto flex-1">
+        <div className="flex-1 overflow-y-auto">
           <form id="workshop-form" onSubmit={handleSubmit} className="space-y-8 p-6">
 
             {/* Seção 1: Dados da Oficina */}
             <div>
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-500">
+              <h3 className="mb-4 text-sm font-semibold tracking-wider text-zinc-500 uppercase">
                 Dados da Oficina
               </h3>
-              <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <Label htmlFor="name" required>Nome da Oficina</Label>
                   <input
@@ -185,7 +186,7 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
                   />
                   {!workshop && cnpjGlobalExists && (
                     <div className="mt-1.5 flex items-start gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
-                      <AlertCircle className="h-3.5 w-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
                       <p className="text-xs text-blue-700">
                         Este CNPJ já possui conta no sistema. Use <strong>Convidar Oficina</strong> para vinculá-la ao seu cliente.
                       </p>
@@ -228,10 +229,10 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
 
             {/* Seção 2: Endereço */}
             <div>
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-500">
+              <h3 className="mb-4 text-sm font-semibold tracking-wider text-zinc-500 uppercase">
                 Endereço
               </h3>
-              <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-6">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-6">
                 <div className="sm:col-span-4">
                   <Label htmlFor="addressStreet">Logradouro</Label>
                   <input
@@ -307,7 +308,7 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
 
             {/* Seção: Especialidades e Detalhes */}
             <div>
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-500">
+              <h3 className="mb-4 text-sm font-semibold tracking-wider text-zinc-500 uppercase">
                 Especialidades e Detalhes
               </h3>
               <div className="space-y-4">
@@ -317,7 +318,7 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
                     {WORKSHOP_SPECIALTIES.map((specialty) => (
                       <label
                         key={specialty}
-                        className="flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 hover:bg-zinc-100 transition-colors"
+                        className="flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 transition-colors hover:bg-zinc-100"
                       >
                         <input
                           type="checkbox"
@@ -352,10 +353,10 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
                     className="h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
                   />
                   <div>
-                    <label htmlFor="active" className="block text-sm font-medium text-zinc-700 cursor-pointer">
+                    <label htmlFor="active" className="block cursor-pointer text-sm font-medium text-zinc-700">
                       Oficina ativa
                     </label>
-                    <p className="text-xs text-zinc-500 mt-0.5">
+                    <p className="mt-0.5 text-xs text-zinc-500">
                       Oficinas inativas não aparecem para seleção em manutenções.
                     </p>
                   </div>
@@ -377,7 +378,7 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
             >
               Cancelar
             </button>
@@ -385,7 +386,7 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
               type="submit"
               form="workshop-form"
               disabled={saving}
-              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60"
+              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-60"
             >
               {saving ? 'Salvando...' : workshop ? 'Salvar Alterações' : 'Cadastrar Oficina'}
             </button>

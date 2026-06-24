@@ -1,17 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
 import { X, Wrench, Loader2, FileText, ExternalLink, AlertTriangle } from 'lucide-react';
-import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType } from '../types/maintenance';
-import { supabase } from '../lib/supabase';
+import React, { useState, useEffect, useCallback } from 'react';
+
+
 import { useAuth } from '../context/AuthContext';
-import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
-import type { BudgetItem } from '../lib/maintenanceMappers';
-import { budgetItemFromRow, type MaintenanceBudgetItemRow } from '../lib/maintenanceMappers';
-import { validateFile } from '../lib/storageHelpers';
 import { extractBudgetData } from '../lib/budgetOcr';
 import { isKnownBudgetSystem } from '../lib/budgetSystems';
-import BudgetItemsTable from './BudgetItemsTable';
-import { listPendingEventsForVehicle } from '../services/warrantyRevisionService';
 import { validateMaintenanceCurrentKm } from '../lib/maintenanceKmValidation';
+import { budgetItemFromRow, type MaintenanceBudgetItemRow , BudgetItem } from '../lib/maintenanceMappers';
+import { validateFile } from '../lib/storageHelpers';
+import { supabase } from '../lib/supabase';
+import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
+import { listPendingEventsForVehicle } from '../services/warrantyRevisionService';
+
+import BudgetItemsTable from './BudgetItemsTable';
+
+import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType } from '../types/maintenance';
 
 const inputClass =
   'mt-1 block w-full rounded-xl border border-zinc-300 py-2 px-3 text-sm shadow-sm ' +
@@ -51,8 +54,8 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
   const defaultFormData: Partial<MaintenanceOrder> = order
     ? { ...order }
     : {
-      type: 'Preventiva' as MaintenanceType,
-      status: 'Aguardando orçamento' as MaintenanceStatus,
+      type: 'Preventiva',
+      status: 'Aguardando orçamento',
       estimatedCost: 0,
       ...prefill,
     };
@@ -134,7 +137,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
         .order('name'),
     ]);
     setVehicles((vehiclesData ?? []).map((v: { id: string; license_plate: string; initial_km: number | null }) => ({ id: v.id, licensePlate: v.license_plate, initialKm: v.initial_km ?? null })));
-    setWorkshops((workshopsData ?? []) as WorkshopOption[]);
+    setWorkshops((workshopsData ?? []));
     setLoadingOptions(false);
   }, [currentClient?.id, isWorkshopMode]);
 
@@ -273,10 +276,10 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
   const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD em horário local
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="relative flex w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-zinc-200 px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100">
               <Wrench className="h-4 w-4 text-orange-600" />
@@ -285,13 +288,13 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
               {isWorkshopMode ? 'Preencher OS da Oficina' : order ? 'Editar OS / Orçamento' : 'Nova Manutenção'}
             </h2>
           </div>
-          <button onClick={handleClose} className="rounded-lg p-1 hover:bg-zinc-100 transition-colors">
+          <button onClick={handleClose} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto flex-1 p-6">
+        <div className="flex-1 overflow-y-auto p-6">
           {loadingOptions ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
@@ -304,13 +307,13 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
                 <>
                   {/* Info da OS (read-only) */}
                   {order && (
-                    <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 space-y-1">
+                    <div className="space-y-1 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
                       <div><span className="font-medium">Veículo:</span> {order.licensePlate}</div>
                       <div><span className="font-medium">OS Interna:</span> <span className="font-mono">{order.os}</span></div>
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <Label htmlFor="expectedExitDate" required>Previsão de Saída</Label>
                       <input
@@ -375,7 +378,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
                         type="file"
                         accept="application/pdf,image/*"
                         onChange={handleBudgetUpload}
-                        className="mt-1 block w-full text-sm text-zinc-500 file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100 transition-colors cursor-pointer"
+                        className="mt-1 block w-full cursor-pointer text-sm text-zinc-500 transition-colors file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100"
                       />
                       {existingBudgetPdfUrl && !budgetFile && (
                         <a
@@ -398,7 +401,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
 
                     {extractionWarning && (
                       <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                         <span>{extractionWarning}</span>
                       </div>
                     )}
@@ -414,7 +417,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
                 /* ── MODO PADRÃO: formulário completo ── */
                 <>
                   {/* Grid 2 colunas */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     {/* Linha 1 */}
                     <div>
                       <Label htmlFor="vehicleId" required>Veículo (Placa)</Label>
@@ -556,10 +559,10 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
                   )}
 
                   {/* OS Interna (read-only) e OS da Oficina */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <Label>OS Interna</Label>
-                      <div className="mt-1 flex h-9 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm font-mono text-zinc-500 select-all cursor-default">
+                      <div className="mt-1 flex h-9 cursor-default items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 font-mono text-sm text-zinc-500 select-all">
                         {order?.os ?? 'Será gerada automaticamente'}
                       </div>
                     </div>
@@ -586,7 +589,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
                         type="file"
                         accept="application/pdf,image/*"
                         onChange={handleBudgetUpload}
-                        className="mt-1 block w-full text-sm text-zinc-500 file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100 transition-colors cursor-pointer"
+                        className="mt-1 block w-full cursor-pointer text-sm text-zinc-500 transition-colors file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100"
                       />
                       {existingBudgetPdfUrl && !budgetFile && (
                         <a
@@ -609,7 +612,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
 
                     {extractionWarning && (
                       <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                         <span>{extractionWarning}</span>
                       </div>
                     )}
@@ -670,7 +673,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
         </div>
 
         {/* Footer */}
-        <div className="flex-shrink-0 border-t border-zinc-200 px-6 py-4 bg-zinc-50 rounded-b-2xl">
+        <div className="flex-shrink-0 rounded-b-2xl border-t border-zinc-200 bg-zinc-50 px-6 py-4">
           {error && (
             <p className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
               {error}
@@ -680,7 +683,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
             >
               Cancelar
             </button>
@@ -688,7 +691,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
               type="submit"
               form="maintenance-form"
               disabled={saving || loadingOptions || extracting}
-              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center min-w-[120px]"
+              className="flex min-w-[120px] items-center justify-center rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : isWorkshopMode ? 'Enviar Orçamento' : order ? 'Salvar Edição' : 'Criar Manutenção'}
             </button>

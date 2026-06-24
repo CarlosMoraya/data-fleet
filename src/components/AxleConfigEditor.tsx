@@ -1,5 +1,5 @@
 import React from 'react';
-import { AxleConfigEntry, AxleType, RodagemType } from '../types';
+
 import {
   getPhysicalAxles,
   getAvailableAxleTypes,
@@ -9,6 +9,7 @@ import {
   AXLE_TYPE_LABELS,
   RODAGEM_LABELS,
 } from '../lib/axleConfigUtils';
+import { AxleConfigEntry, AxleType, RodagemType } from '../types';
 
 interface AxleConfigEditorProps {
   targetAxles: number;
@@ -97,10 +98,10 @@ export default function AxleConfigEditor({
   if (targetAxles < 1) return null;
 
   return (
-    <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-4">
+    <div className="mt-4 space-y-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold text-blue-900">Configuração de Eixos</h4>
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${isComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${isComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
           {usedSlots}/{targetAxles} eixos configurados
         </span>
       </div>
@@ -116,17 +117,17 @@ export default function AxleConfigEditor({
 
           return (
             <div key={idx} className="flex flex-wrap items-end gap-3 rounded-xl border border-blue-100 bg-white p-3">
-              <div className="flex-shrink-0 w-24">
-                <label className="block text-xs font-medium text-zinc-500 mb-1">
+              <div className="w-24 flex-shrink-0">
+                <label className="mb-1 block text-xs font-medium text-zinc-500">
                   {getAxleLabel(entry, slotsBefore)}
                 </label>
-                <div className="text-xs text-zinc-400 mt-0.5">
+                <div className="mt-0.5 text-xs text-zinc-400">
                   {entry.physicalAxles > 1 ? `${entry.physicalAxles} físicos` : '1 físico'}
                 </div>
               </div>
 
-              <div className="flex-1 min-w-[160px]">
-                <label className="block text-xs font-medium text-zinc-700 mb-1">Tipo de Eixo</label>
+              <div className="min-w-[160px] flex-1">
+                <label className="mb-1 block text-xs font-medium text-zinc-700">Tipo de Eixo</label>
                 <select
                   value={entry.type}
                   disabled={disabled || isFirst}
@@ -139,8 +140,8 @@ export default function AxleConfigEditor({
                 </select>
               </div>
 
-              <div className="flex-1 min-w-[180px]">
-                <label className="block text-xs font-medium text-zinc-700 mb-1">Rodagem</label>
+              <div className="min-w-[180px] flex-1">
+                <label className="mb-1 block text-xs font-medium text-zinc-700">Rodagem</label>
                 <select
                   value={entry.rodagem}
                   disabled={disabled}
@@ -157,7 +158,7 @@ export default function AxleConfigEditor({
                 <button
                   type="button"
                   onClick={() => removeEntry(idx)}
-                  className="flex-shrink-0 text-xs text-red-500 hover:text-red-700 font-medium px-2 py-2 self-end"
+                  className="flex-shrink-0 self-end px-2 py-2 text-xs font-medium text-red-500 hover:text-red-700"
                 >
                   Remover
                 </button>
@@ -170,7 +171,7 @@ export default function AxleConfigEditor({
           <button
             type="button"
             onClick={addNextEntry}
-            className="w-full rounded-xl border-2 border-dashed border-blue-300 py-2 text-sm font-medium text-blue-600 hover:border-blue-400 hover:text-blue-700 transition-colors"
+            className="w-full rounded-xl border-2 border-dashed border-blue-300 py-2 text-sm font-medium text-blue-600 transition-colors hover:border-blue-400 hover:text-blue-700"
           >
             + Adicionar eixo {usedSlots + 1}
             {remainingSlots > 1 ? ` (${remainingSlots} slots restantes)` : ''}
@@ -179,9 +180,9 @@ export default function AxleConfigEditor({
       </div>
 
       {/* Estepes */}
-      <div className="border-t border-blue-100 pt-3 flex items-end gap-4">
+      <div className="flex items-end gap-4 border-t border-blue-100 pt-3">
         <div className="w-48">
-          <label className="block text-xs font-medium text-zinc-700 mb-1">
+          <label className="mb-1 block text-xs font-medium text-zinc-700">
             Estepes de fábrica
           </label>
           <input

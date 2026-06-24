@@ -1,10 +1,11 @@
-import { supabase } from '../lib/supabase';
-import type { Vehicle } from '../types/vehicle';
-import { vehicleToRow } from '../lib/vehicleMappers';
 import {
   uploadVehicleDocument,
   deleteVehicleDocument,
 } from '../lib/storageHelpers';
+import { supabase } from '../lib/supabase';
+import { vehicleToRow } from '../lib/vehicleMappers';
+
+import type { Vehicle } from '../types/vehicle';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 

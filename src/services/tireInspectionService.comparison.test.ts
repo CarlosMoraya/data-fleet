@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { fetchTireInspectionComparison } from './tireInspectionService';
+
 import type { TireInspection } from '../types';
 import type { AxleConfigEntry } from '../types/tire';
 
@@ -49,7 +51,7 @@ function makeResponsesChain(returnValue: unknown) {
         returnValue
         && typeof returnValue === 'object'
         && 'data' in returnValue
-        && Array.isArray((returnValue as { data: unknown }).data)
+        && Array.isArray((returnValue).data)
       ) {
         return Promise.resolve({
           ...(returnValue as { data: Array<{ inspection_id: string }> }),

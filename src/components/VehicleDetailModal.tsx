@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
 import { X, ExternalLink, Truck } from 'lucide-react';
+import React, { useState } from 'react';
+
 import { Vehicle } from '../types';
+
 import VehicleKmHistoryTab from './VehicleKmHistoryTab';
 
 interface Props {
@@ -12,7 +14,7 @@ function DetailField({ label, value }: { label: string; value?: string | number 
   return (
     <div>
       <p className="text-xs text-zinc-400">{label}</p>
-      <p className="text-sm text-zinc-800 font-medium">{value ?? '—'}</p>
+      <p className="text-sm font-medium text-zinc-800">{value ?? '—'}</p>
     </div>
   );
 }
@@ -21,7 +23,7 @@ function BoolField({ label, value }: { label: string; value?: boolean }) {
   return (
     <div>
       <p className="text-xs text-zinc-400">{label}</p>
-      <p className="text-sm text-zinc-800 font-medium">{value ? 'Sim' : 'Não'}</p>
+      <p className="text-sm font-medium text-zinc-800">{value ? 'Sim' : 'Não'}</p>
     </div>
   );
 }
@@ -37,7 +39,7 @@ function FileField({ label, url }: { label: string; url?: string | null }) {
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-sm text-orange-600 underline underline-offset-2 hover:text-orange-700"
         >
-          Visualizar <ExternalLink className="w-3 h-3" />
+          Visualizar <ExternalLink className="h-3 w-3" />
         </a>
       ) : (
         <span className="text-sm text-zinc-400">Não enviado</span>
@@ -48,7 +50,7 @@ function FileField({ label, url }: { label: string; url?: string | null }) {
 
 function SectionTitle({ title }: { title: string }) {
   return (
-    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 border-b border-zinc-100 pb-2">
+    <h3 className="border-b border-zinc-100 pb-2 text-xs font-semibold tracking-wider text-zinc-400 uppercase">
       {title}
     </h3>
   );
@@ -64,14 +66,14 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl flex flex-col my-8">
+      <div className="my-8 flex w-full max-w-3xl flex-col rounded-2xl bg-white shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+        <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-orange-50 flex items-center justify-center">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50">
               <Truck className="h-5 w-5 text-orange-500" />
             </div>
             <div>
@@ -81,14 +83,14 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+            className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="overflow-y-auto px-6 py-6 space-y-6">
+        <div className="space-y-6 overflow-y-auto px-6 py-6">
           <div className="flex gap-2 border-b border-zinc-100" role="tablist" aria-label="Detalhes do veículo">
             <button
               type="button"
@@ -123,7 +125,7 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
               {/* Identificação */}
               <div className="space-y-3">
                 <SectionTitle title="Identificação" />
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
                   <DetailField label="Placa" value={vehicle.licensePlate} />
                   <DetailField label="Marca" value={vehicle.brand} />
                   <DetailField label="Modelo" value={vehicle.model} />
@@ -140,7 +142,7 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
           {/* Propriedade */}
           <div className="space-y-3">
             <SectionTitle title="Propriedade e Especificações" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
               <DetailField label="Fonte de Energia" value={vehicle.energySource} />
               <DetailField label="Proprietário" value={vehicle.owner} />
               <DetailField label="Aquisição" value={vehicle.acquisition === 'Owned' ? 'Próprio' : 'Locado'} />
@@ -159,7 +161,7 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
           {/* Itens opcionais */}
           <div className="space-y-3">
             <SectionTitle title="Equipamentos e Acessórios" />
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
               <BoolField label="Chave Reserva" value={vehicle.spareKey} />
               <BoolField label="Manual do Veículo" value={vehicle.vehicleManual} />
               <BoolField label="Equipamento de Resfriamento" value={vehicle.coolingEquipment} />
@@ -171,7 +173,7 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
           {(vehicle.energySource === 'Combustão' || vehicle.coolingEquipment || vehicle.semiReboque) && (
             <div className="space-y-3">
               <SectionTitle title="Informações Adicionais" />
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
                 {vehicle.energySource === 'Combustão' && (
                   <>
                     <DetailField label="Tipo de Combustível" value={vehicle.fuelType} />
@@ -203,7 +205,7 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
           {/* Documentos */}
           <div className="space-y-3">
             <SectionTitle title="Documentos" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
               <FileField label="CRLV" url={vehicle.crlvUpload} />
               <FileField label="Vistoria Sanitária" url={vehicle.sanitaryInspectionUpload} />
               <FileField label="GR (Gerenciamento de Risco)" url={vehicle.grUpload} />
@@ -216,7 +218,7 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
           {/* Garantia e Revisão */}
           <div className="space-y-3">
             <SectionTitle title="Garantia e Revisão" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
               <BoolField label="Possui Garantia" value={vehicle.warranty} />
               <DetailField label="Vencimento da Garantia" value={formatDate(vehicle.warrantyEndDate)} />
               <DetailField label="1ª Revisão — Km Máximo" value={vehicle.firstRevisionMaxKm} />
@@ -242,10 +244,10 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end px-6 py-4 border-t border-zinc-100">
+        <div className="flex justify-end border-t border-zinc-100 px-6 py-4">
           <button
             onClick={onClose}
-            className="rounded-xl border border-zinc-200 px-5 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+            className="rounded-xl border border-zinc-200 px-5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
           >
             Fechar
           </button>

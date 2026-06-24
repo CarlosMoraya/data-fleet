@@ -1,5 +1,5 @@
-import React from 'react';
 import { AlertTriangle, Clock } from 'lucide-react';
+import React from 'react';
 
 interface ActionQueueItemLike {
   category: string;
@@ -42,7 +42,7 @@ export default function ActionQueue({ items, onItemClick, title = 'Fila de Açã
 
           const content = (
             <div className="w-full">
-              <div className="flex items-center justify-between w-full">
+              <div className="flex w-full items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Icon className={`h-5 w-5 shrink-0 ${textClass}`} />
                   <span className={`text-sm font-medium ${textClass}`}>{item.label}</span>
@@ -52,7 +52,7 @@ export default function ActionQueue({ items, onItemClick, title = 'Fila de Açã
                 </span>
               </div>
               {item.details.length > 0 && (
-                <div className="ml-8 mt-2 flex flex-wrap gap-1.5 text-xs text-zinc-500">
+                <div className="mt-2 ml-8 flex flex-wrap gap-1.5 text-xs text-zinc-500">
                   {visibleDetails.map((detail) => (
                     <span key={detail} className="rounded-full bg-zinc-100 px-2 py-0.5">
                       {detail}
@@ -70,7 +70,7 @@ export default function ActionQueue({ items, onItemClick, title = 'Fila de Açã
                 key={item.category}
                 type="button"
                 onClick={() => onItemClick(item.category)}
-                className="w-full text-left rounded-lg px-3 py-2.5 hover:bg-zinc-50 transition-colors"
+                className="w-full rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-zinc-50"
               >
                 {content}
               </button>

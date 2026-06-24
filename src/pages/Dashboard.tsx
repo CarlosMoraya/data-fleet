@@ -1,19 +1,17 @@
-import React, { useMemo, Suspense } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useUiPreference, usePersistentTabState, usePersistentFilterState } from '../hooks/usePersistentUiState';
-import { LayoutDashboard, DollarSign, Activity, LineChart, ShieldCheck } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
-import { cn } from '../lib/utils';
-import OperationalPanel from '../components/dashboard/OperationalPanel';
-import CostPanel from '../components/dashboard/CostPanel';
-import OverviewPanel from '../components/dashboard/OverviewPanel';
+import { LayoutDashboard, DollarSign, Activity, LineChart, ShieldCheck } from 'lucide-react';
+import React, { useMemo, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
+
 import ConformityPanel from '../components/dashboard/ConformityPanel';
+import CostPanel from '../components/dashboard/CostPanel';
+import OperationalPanel from '../components/dashboard/OperationalPanel';
+import OverviewPanel from '../components/dashboard/OverviewPanel';
 import PeriodRangeFilter from '../components/dashboard/PeriodRangeFilter';
 import RouteFallback from '../components/RouteFallback';
-import type { VehicleRow } from '../components/dashboard/OperationalPanel';
-import type { MaintenanceOrderDashboard } from '../types/maintenance';
+import { useAuth } from '../context/AuthContext';
+import { useUiPreference, usePersistentTabState, usePersistentFilterState } from '../hooks/usePersistentUiState';
+import { COMPLIANCE_ACTION_ROUTES, OPERATIONAL_QUEUE_ROUTES } from '../lib/actionQueueRoutes';
 import {
   buildComplianceActionQueue,
   calculateFleetAvailability,
@@ -61,7 +59,11 @@ import {
   type HorizonOption,
   type BudgetItemForCost,
 } from '../lib/dashboardKpi';
-import { COMPLIANCE_ACTION_ROUTES, OPERATIONAL_QUEUE_ROUTES } from '../lib/actionQueueRoutes';
+import { supabase } from '../lib/supabase';
+import { cn } from '../lib/utils';
+
+import type { VehicleRow } from '../components/dashboard/OperationalPanel';
+import type { MaintenanceOrderDashboard } from '../types/maintenance';
 
 const EvolutionPanel = React.lazy(() => import('../components/dashboard/EvolutionPanel'));
 
@@ -158,7 +160,7 @@ export default function Dashboard() {
           row.operational_units && typeof row.operational_units === 'object' && !Array.isArray(row.operational_units)
             ? (row.operational_units as Record<string, unknown>).name as string | null
             : null,
-      })) as VehicleRow[];
+      }));
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -450,7 +452,7 @@ export default function Dashboard() {
       }
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as { client_id: string; rotina_day_interval: number | null; seguranca_day_interval: number | null }[];
+      return (data ?? []);
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -518,7 +520,7 @@ export default function Dashboard() {
   const currentYear = today.slice(0, 4);
 
   const driverIdsWithVehicle = useMemo(
-    () => new Set(vehicles.filter((vehicle) => vehicle.driver_id).map((vehicle) => vehicle.driver_id as string)),
+    () => new Set(vehicles.filter((vehicle) => vehicle.driver_id).map((vehicle) => vehicle.driver_id)),
     [vehicles]
   );
 
@@ -786,7 +788,7 @@ export default function Dashboard() {
           plateByVehicleId
         ),
         actionPlansOpen: mapVehicleIdsToPlates(
-          openActionPlans.map((plan) => plan.vehicle_id).filter(Boolean) as string[],
+          openActionPlans.map((plan) => plan.vehicle_id).filter(Boolean),
           plateByVehicleId
         ),
         osDueSoon: mapVehicleIdsToPlates(
@@ -837,7 +839,7 @@ export default function Dashboard() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex h-full flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
           Dashboard
@@ -857,8 +859,8 @@ export default function Dashboard() {
                 className={cn(
                   'flex items-center gap-2 border-b-2 px-4 py-3 text-sm transition-colors',
                   isActive
-                    ? 'border-orange-500 text-orange-600 font-medium'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
+                    ? 'border-orange-500 font-medium text-orange-600'
+                    : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -870,7 +872,7 @@ export default function Dashboard() {
       </div>
 
       {/* Panels */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {activeTab === 'geral' && (
           <OverviewPanel
             vehicles={vehicles}

@@ -1,6 +1,7 @@
-import type { AxleConfigEntry } from '../types/tire';
-import { generatePositionsFromConfig } from './tirePositions';
 import { getPhysicalAxles, tiresPerPhysicalAxle } from './axleConfigUtils';
+import { generatePositionsFromConfig } from './tirePositions';
+
+import type { AxleConfigEntry } from '../types/tire';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -101,14 +102,14 @@ function buildNodes(
   for (const pos of positions) {
     if (pos.side === 'Step') continue;
     if (!axleGroups.has(pos.axle)) axleGroups.set(pos.axle, []);
-    axleGroups.get(pos.axle)!.push(pos);
+    axleGroups.get(pos.axle).push(pos);
   }
 
   const sortedAxles = [...axleGroups.keys()].sort((a, b) => a - b);
 
   for (let ai = 0; ai < sortedAxles.length; ai++) {
     const axleNum = sortedAxles[ai];
-    const axlePositions = axleGroups.get(axleNum)!;
+    const axlePositions = axleGroups.get(axleNum);
     const axleCenterY = bodyY + ai * AXLE_ROW_H + AXLE_ROW_H / 2;
 
     const leftPositions = axlePositions.filter(p => p.side === 'E');

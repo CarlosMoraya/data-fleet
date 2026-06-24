@@ -1,15 +1,11 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Loader2, Truck, UserCircle, Gauge, CalendarDays } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
+
+import ChecklistDayIntervalSettings from '../components/ChecklistDayIntervalSettings';
+import VehicleKmIntervalSettings from '../components/VehicleKmIntervalSettings';
 import { useAuth } from '../context/AuthContext';
-import { VehicleFieldSettings, DriverFieldSettings } from '../types';
-import { supabase } from '../lib/supabase';
-import {
-  fieldSettingsFromRow,
-  fieldSettingsToRow,
-  defaultFieldSettings,
-  CONFIGURABLE_FIELDS,
-  VehicleFieldSettingsRow,
-} from '../lib/fieldSettingsMappers';
 import {
   driverFieldSettingsFromRow,
   driverFieldSettingsToRow,
@@ -17,11 +13,16 @@ import {
   DRIVER_CONFIGURABLE_FIELDS,
   DriverFieldSettingsRow,
 } from '../lib/driverFieldSettingsMappers';
-import { Loader2, Truck, UserCircle, Gauge, CalendarDays } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  fieldSettingsFromRow,
+  fieldSettingsToRow,
+  defaultFieldSettings,
+  CONFIGURABLE_FIELDS,
+  VehicleFieldSettingsRow,
+} from '../lib/fieldSettingsMappers';
+import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
-import VehicleKmIntervalSettings from '../components/VehicleKmIntervalSettings';
-import ChecklistDayIntervalSettings from '../components/ChecklistDayIntervalSettings';
+import { VehicleFieldSettings, DriverFieldSettings } from '../types';
 
 const ROLES_CAN_MANAGE_FIELDS = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_ACCESS_SETTINGS = ['Coordinator', 'Manager', 'Director', 'Admin Master'];
@@ -122,7 +123,7 @@ export default function Settings() {
     if (!settings) return;
     const newSettings = { ...settings };
     CONFIGURABLE_FIELDS.forEach(field => {
-      newSettings[field.key as keyof VehicleFieldSettings] = makeOptional as never;
+      newSettings[field.key] = makeOptional as never;
     });
     setSettings(newSettings);
     setSuccess(false);
@@ -138,7 +139,7 @@ export default function Settings() {
     if (!driverSettings) return;
     const newSettings = { ...driverSettings };
     DRIVER_CONFIGURABLE_FIELDS.forEach(field => {
-      newSettings[field.key as keyof DriverFieldSettings] = makeOptional as never;
+      newSettings[field.key] = makeOptional as never;
     });
     setDriverSettings(newSettings);
     setDriverSuccess(false);
@@ -257,10 +258,10 @@ export default function Settings() {
   ];
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl h-full">
+    <div className="flex h-full max-w-3xl flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Configurações</h1>
-        <p className="text-sm text-zinc-500 mt-1">Gerencie as configurações do sistema para este cliente.</p>
+        <p className="mt-1 text-sm text-zinc-500">Gerencie as configurações do sistema para este cliente.</p>
       </div>
 
       {/* Bar de abas */}
@@ -272,12 +273,12 @@ export default function Settings() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
+                onClick={() => setActiveTab(tab.id)}
                 className={cn(
                   isActive
-                    ? 'border-orange-500 text-orange-600 font-medium'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300',
-                  'flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm transition-colors cursor-pointer'
+                    ? 'border-orange-500 font-medium text-orange-600'
+                    : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700',
+                  'flex cursor-pointer items-center gap-2 border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors'
                 )}
               >
                 <Icon className={cn("h-4 w-4", isActive ? "text-orange-500" : "text-zinc-400")} />
@@ -288,11 +289,11 @@ export default function Settings() {
         </nav>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
       {activeTab === 'vehicles' && (
         /* ─── Card: Campos Obrigatórios do Veículo ─── */
-        <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden animate-in fade-in duration-300">
-          <div className="px-6 py-4 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="animate-in fade-in overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm duration-300">
+          <div className="flex flex-col justify-between gap-4 border-b border-zinc-200 px-6 py-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3">
               <Truck className="h-5 w-5 text-zinc-400" />
               <div>
@@ -300,16 +301,16 @@ export default function Settings() {
                 <p className="text-sm text-zinc-500">Controle quais campos são obrigatórios no cadastro de veículos.</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex shrink-0 items-center gap-2">
               <button
                 onClick={() => handleToggleAllVehicles(false)}
-                className="text-xs px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium transition-colors border border-orange-200 cursor-pointer"
+                className="cursor-pointer rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-xs font-medium text-orange-700 transition-colors hover:bg-orange-100"
               >
                 Marcar Todos
               </button>
               <button
                 onClick={() => handleToggleAllVehicles(true)}
-                className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-50 text-zinc-700 hover:bg-zinc-100 font-medium transition-colors border border-zinc-200 cursor-pointer"
+                className="cursor-pointer rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
               >
                 Desmarcar Todos
               </button>
@@ -330,9 +331,9 @@ export default function Settings() {
           <div className="divide-y divide-zinc-100">
             {Object.entries(vehicleSections).map(([sectionName, fields]) => (
               <div key={sectionName} className="px-6 py-4">
-                <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-3">{sectionName}</h3>
+                <h3 className="mb-3 text-sm font-semibold tracking-wider text-zinc-500 uppercase">{sectionName}</h3>
                 {sectionName === 'Campos Condicionais' && (
-                  <p className="text-xs text-zinc-400 mb-3">Estes campos só são exigidos quando a condição correspondente está ativa no formulário.</p>
+                  <p className="mb-3 text-xs text-zinc-400">Estes campos só são exigidos quando a condição correspondente está ativa no formulário.</p>
                 )}
                 <div className="space-y-3">
                   {fields.map(field => {
@@ -346,7 +347,7 @@ export default function Settings() {
                         <button
                           type="button"
                           onClick={() => handleToggle(field.key)}
-                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none ${
                             !isOptional ? 'bg-orange-500' : 'bg-zinc-200'
                           }`}
                           role="switch"
@@ -367,15 +368,15 @@ export default function Settings() {
             ))}
           </div>
 
-          <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 flex items-center justify-between">
+          <div className="flex items-center justify-between border-t border-zinc-200 bg-zinc-50 px-6 py-4">
             <p className="text-xs text-zinc-400">
-              <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-1 align-middle" /> Obrigatório
-              <span className="inline-block w-3 h-3 rounded-full bg-zinc-200 ml-3 mr-1 align-middle" /> Opcional
+              <span className="mr-1 inline-block h-3 w-3 rounded-full bg-orange-500 align-middle" /> Obrigatório
+              <span className="mr-1 ml-3 inline-block h-3 w-3 rounded-full bg-zinc-200 align-middle" /> Opcional
             </p>
             <button
               onClick={handleSave}
               disabled={saveVehicleMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
             >
               {saveVehicleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {saveVehicleMutation.isPending ? 'Salvando...' : 'Salvar'}
@@ -386,8 +387,8 @@ export default function Settings() {
 
       {activeTab === 'drivers' && (
         /* ─── Card: Campos Obrigatórios do Motorista ─── */
-        <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden animate-in fade-in duration-300">
-          <div className="px-6 py-4 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="animate-in fade-in overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm duration-300">
+          <div className="flex flex-col justify-between gap-4 border-b border-zinc-200 px-6 py-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3">
               <UserCircle className="h-5 w-5 text-zinc-400" />
               <div>
@@ -395,16 +396,16 @@ export default function Settings() {
                 <p className="text-sm text-zinc-500">Controle quais campos são obrigatórios no cadastro de motoristas.</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex shrink-0 items-center gap-2">
               <button
                 onClick={() => handleToggleAllDrivers(false)}
-                className="text-xs px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium transition-colors border border-orange-200 cursor-pointer"
+                className="cursor-pointer rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-xs font-medium text-orange-700 transition-colors hover:bg-orange-100"
               >
                 Marcar Todos
               </button>
               <button
                 onClick={() => handleToggleAllDrivers(true)}
-                className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-50 text-zinc-700 hover:bg-zinc-100 font-medium transition-colors border border-zinc-200 cursor-pointer"
+                className="cursor-pointer rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
               >
                 Desmarcar Todos
               </button>
@@ -425,7 +426,7 @@ export default function Settings() {
           <div className="divide-y divide-zinc-100">
             {Object.entries(driverSections).map(([sectionName, fields]) => (
               <div key={sectionName} className="px-6 py-4">
-                <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-3">{sectionName}</h3>
+                <h3 className="mb-3 text-sm font-semibold tracking-wider text-zinc-500 uppercase">{sectionName}</h3>
                 <div className="space-y-3">
                   {fields.map(field => {
                     const isOptional = driverSettings ? (driverSettings[field.key] as boolean) : false;
@@ -438,7 +439,7 @@ export default function Settings() {
                         <button
                           type="button"
                           onClick={() => handleDriverToggle(field.key)}
-                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none ${
                             !isOptional ? 'bg-orange-500' : 'bg-zinc-200'
                           }`}
                           role="switch"
@@ -459,15 +460,15 @@ export default function Settings() {
             ))}
           </div>
 
-          <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 flex items-center justify-between">
+          <div className="flex items-center justify-between border-t border-zinc-200 bg-zinc-50 px-6 py-4">
             <p className="text-xs text-zinc-400">
-              <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-1 align-middle" /> Obrigatório
-              <span className="inline-block w-3 h-3 rounded-full bg-zinc-200 ml-3 mr-1 align-middle" /> Opcional
+              <span className="mr-1 inline-block h-3 w-3 rounded-full bg-orange-500 align-middle" /> Obrigatório
+              <span className="mr-1 ml-3 inline-block h-3 w-3 rounded-full bg-zinc-200 align-middle" /> Opcional
             </p>
             <button
               onClick={handleDriverSave}
               disabled={saveDriverMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
             >
               {saveDriverMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {saveDriverMutation.isPending ? 'Salvando...' : 'Salvar'}

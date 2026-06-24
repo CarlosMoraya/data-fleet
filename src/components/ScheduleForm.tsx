@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
 import { X, CalendarClock, Loader2 } from 'lucide-react';
-import { WorkshopSchedule } from '../types';
-import { supabase } from '../lib/supabase';
+import React, { useState, useEffect, useCallback } from 'react';
+
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
+import { WorkshopSchedule } from '../types';
 
 // ─── Estilos ─────────────────────────────────────────────────────────────────
 
@@ -77,7 +78,7 @@ export default function ScheduleForm({ schedule, onClose, onSave }: ScheduleForm
         .order('name'),
     ]);
     setVehicles((vehiclesData ?? []).map((v: { id: string; license_plate: string }) => ({ id: v.id, licensePlate: v.license_plate })));
-    setWorkshops((workshopsData ?? []) as WorkshopOption[]);
+    setWorkshops((workshopsData ?? []));
     setLoadingOptions(false);
   }, [currentClient?.id]);
 
@@ -122,9 +123,9 @@ export default function ScheduleForm({ schedule, onClose, onSave }: ScheduleForm
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="relative flex w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl max-h-[90vh]">
+      <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-zinc-200 px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100">
               <CalendarClock className="h-4 w-4 text-orange-600" />
@@ -133,13 +134,13 @@ export default function ScheduleForm({ schedule, onClose, onSave }: ScheduleForm
               {schedule ? 'Editar Agendamento' : 'Novo Agendamento'}
             </h2>
           </div>
-          <button onClick={handleClose} className="rounded-lg p-1 hover:bg-zinc-100 transition-colors">
+          <button onClick={handleClose} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto flex-1">
+        <div className="flex-1 overflow-y-auto">
           {loadingOptions ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
@@ -233,7 +234,7 @@ export default function ScheduleForm({ schedule, onClose, onSave }: ScheduleForm
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
             >
               Cancelar
             </button>
@@ -241,7 +242,7 @@ export default function ScheduleForm({ schedule, onClose, onSave }: ScheduleForm
               type="submit"
               form="schedule-form"
               disabled={saving || loadingOptions}
-              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60"
+              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-60"
             >
               {saving ? 'Salvando...' : schedule ? 'Salvar Alterações' : 'Agendar'}
             </button>

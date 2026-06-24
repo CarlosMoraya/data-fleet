@@ -1,6 +1,5 @@
-import { supabase } from '../lib/supabase';
 import { calculateTotalTires } from '../lib/axleConfigUtils';
-import { generatePositionsFromConfig } from '../lib/tirePositions';
+import { supabase } from '../lib/supabase';
 import {
   tireInspectionFromRow,
   tireInspectionResponseFromRow,
@@ -8,6 +7,8 @@ import {
   type TireInspectionRow,
   type TireInspectionResponseRow,
 } from '../lib/tireInspectionMappers';
+import { generatePositionsFromConfig } from '../lib/tirePositions';
+
 import type { TireInspection, TireInspectionResponse, TireInspectionResponseStatus } from '../types';
 import type { AxleConfigEntry } from '../types/tire';
 

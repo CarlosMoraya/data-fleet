@@ -1,9 +1,10 @@
+import { Wrench, Loader2, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Wrench, Loader2, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+
 import { isValidCNPJ, formatCNPJ } from '../lib/cnpjValidator';
 import { filterCNPJ } from '../lib/inputHelpers';
+import { supabase } from '../lib/supabase';
 
 const inputClass =
   'mt-1 block w-full rounded-xl border border-zinc-300 py-2.5 px-3 text-sm shadow-sm ' +
@@ -134,9 +135,9 @@ export default function WorkshopJoin() {
   // ── Tela: validando token ──────────────────────────────────
   if (step === 'validating') {
     return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
           <p className="text-sm text-zinc-500">Validando convite...</p>
         </div>
       </div>
@@ -146,17 +147,17 @@ export default function WorkshopJoin() {
   // ── Tela: token inválido ───────────────────────────────────
   if (step === 'invalid') {
     return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-zinc-200 p-8 text-center">
-          <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-full bg-red-100 mb-4">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4">
+        <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
             <AlertCircle className="h-6 w-6 text-red-600" />
           </div>
-          <h1 className="text-lg font-semibold text-zinc-900 mb-2">Convite inválido</h1>
+          <h1 className="mb-2 text-lg font-semibold text-zinc-900">Convite inválido</h1>
           <p className="text-sm text-zinc-500">{tokenInfo?.reason ?? 'Este link de convite não é válido.'}</p>
-          <p className="text-xs text-zinc-400 mt-4">
+          <p className="mt-4 text-xs text-zinc-400">
             Solicite um novo convite à transportadora.
           </p>
-          <p className="text-xs text-zinc-300 mt-8">Powered by Betafleet</p>
+          <p className="mt-8 text-xs text-zinc-300">Powered by Betafleet</p>
         </div>
       </div>
     );
@@ -165,23 +166,23 @@ export default function WorkshopJoin() {
   // ── Tela: sucesso ──────────────────────────────────────────
   if (step === 'success') {
     return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-zinc-200 p-8 text-center">
-          <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-full bg-green-100 mb-4">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4">
+        <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
             <CheckCircle2 className="h-6 w-6 text-green-600" />
           </div>
-          <h1 className="text-lg font-semibold text-zinc-900 mb-2">Parceria confirmada!</h1>
-          <p className="text-sm text-zinc-500 mb-6">
+          <h1 className="mb-2 text-lg font-semibold text-zinc-900">Parceria confirmada!</h1>
+          <p className="mb-6 text-sm text-zinc-500">
             Sua oficina agora está vinculada a <strong>{tokenInfo?.clientName}</strong>.
             Você pode acessar as ordens de serviço diretamente.
           </p>
           <button
             onClick={handleGoToSystem}
-            className="w-full rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 transition-colors"
+            className="w-full rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-600"
           >
             Acessar o sistema
           </button>
-          <p className="text-xs text-zinc-300 mt-6">Powered by Betafleet</p>
+          <p className="mt-6 text-xs text-zinc-300">Powered by Betafleet</p>
         </div>
       </div>
     );
@@ -192,57 +193,57 @@ export default function WorkshopJoin() {
   const clientName = tokenInfo?.clientName ?? 'a transportadora';
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex flex-col items-center justify-center p-4">
-      <div className="max-w-md w-full">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 p-4">
+      <div className="w-full max-w-md">
 
         {/* Branding da transportadora */}
-        <div className="text-center mb-8">
+        <div className="mb-8 text-center">
           {clientLogo ? (
-            <img src={clientLogo} alt={clientName} className="h-12 mx-auto mb-3 object-contain" />
+            <img src={clientLogo} alt={clientName} className="mx-auto mb-3 h-12 object-contain" />
           ) : (
-            <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-xl bg-orange-100 mb-3">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100">
               <Wrench className="h-6 w-6 text-orange-600" />
             </div>
           )}
           <h1 className="text-xl font-bold text-zinc-900">{clientName}</h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <p className="mt-1 text-sm text-zinc-500">
             convidou sua oficina para integrar o sistema de gestão de manutenção
           </p>
         </div>
 
         {/* Card principal */}
-        <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden">
+        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
 
           {/* Escolha do fluxo */}
           {step === 'choose' && (
-            <div className="p-8 space-y-4">
-              <h2 className="text-base font-semibold text-zinc-900 text-center mb-6">
+            <div className="space-y-4 p-8">
+              <h2 className="mb-6 text-center text-base font-semibold text-zinc-900">
                 Como deseja prosseguir?
               </h2>
               <button
                 onClick={() => setStep('register')}
-                className="w-full rounded-xl border-2 border-orange-200 bg-orange-50 hover:bg-orange-100 px-4 py-4 text-left transition-colors"
+                className="w-full rounded-xl border-2 border-orange-200 bg-orange-50 px-4 py-4 text-left transition-colors hover:bg-orange-100"
               >
                 <p className="text-sm font-semibold text-zinc-900">Criar nova conta</p>
-                <p className="text-xs text-zinc-500 mt-0.5">Minha oficina ainda não tem acesso ao sistema</p>
+                <p className="mt-0.5 text-xs text-zinc-500">Minha oficina ainda não tem acesso ao sistema</p>
               </button>
               <button
                 onClick={() => setStep('login')}
-                className="w-full rounded-xl border-2 border-zinc-200 bg-zinc-50 hover:bg-zinc-100 px-4 py-4 text-left transition-colors"
+                className="w-full rounded-xl border-2 border-zinc-200 bg-zinc-50 px-4 py-4 text-left transition-colors hover:bg-zinc-100"
               >
                 <p className="text-sm font-semibold text-zinc-900">Já tenho conta</p>
-                <p className="text-xs text-zinc-500 mt-0.5">Quero vincular minha conta existente a {clientName}</p>
+                <p className="mt-0.5 text-xs text-zinc-500">Quero vincular minha conta existente a {clientName}</p>
               </button>
             </div>
           )}
 
           {/* Registro de nova conta */}
           {step === 'register' && (
-            <form onSubmit={handleRegister} className="p-8 space-y-4">
+            <form onSubmit={handleRegister} className="space-y-4 p-8">
               <button
                 type="button"
                 onClick={() => { setStep('choose'); setError(null); }}
-                className="text-xs text-zinc-400 hover:text-zinc-600 mb-2"
+                className="mb-2 text-xs text-zinc-400 hover:text-zinc-600"
               >
                 ← Voltar
               </button>
@@ -289,7 +290,7 @@ export default function WorkshopJoin() {
                     className={inputClass} placeholder="Mínimo 6 caracteres"
                   />
                   <button type="button" onClick={() => setShowPassword(p => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 mt-0.5">
+                    className="absolute top-1/2 right-3 mt-0.5 -translate-y-1/2 text-zinc-400 hover:text-zinc-600">
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
@@ -303,7 +304,7 @@ export default function WorkshopJoin() {
 
               <button
                 type="submit" disabled={loading}
-                className="w-full rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-60"
               >
                 {loading && <Loader2 className="h-4 w-4 animate-spin" />}
                 {loading ? 'Criando conta...' : 'Criar conta e aceitar convite'}
@@ -313,11 +314,11 @@ export default function WorkshopJoin() {
 
           {/* Login com conta existente */}
           {step === 'login' && (
-            <form onSubmit={handleLogin} className="p-8 space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4 p-8">
               <button
                 type="button"
                 onClick={() => { setStep('choose'); setError(null); }}
-                className="text-xs text-zinc-400 hover:text-zinc-600 mb-2"
+                className="mb-2 text-xs text-zinc-400 hover:text-zinc-600"
               >
                 ← Voltar
               </button>
@@ -341,7 +342,7 @@ export default function WorkshopJoin() {
                     className={inputClass} placeholder="Sua senha"
                   />
                   <button type="button" onClick={() => setShowLoginPassword(p => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 mt-0.5">
+                    className="absolute top-1/2 right-3 mt-0.5 -translate-y-1/2 text-zinc-400 hover:text-zinc-600">
                     {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
@@ -355,7 +356,7 @@ export default function WorkshopJoin() {
 
               <button
                 type="submit" disabled={loading}
-                className="w-full rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-60"
               >
                 {loading && <Loader2 className="h-4 w-4 animate-spin" />}
                 {loading ? 'Conectando...' : 'Entrar e aceitar convite'}
@@ -364,7 +365,7 @@ export default function WorkshopJoin() {
           )}
         </div>
 
-        <p className="text-xs text-zinc-300 text-center mt-6">Powered by Betafleet</p>
+        <p className="mt-6 text-center text-xs text-zinc-300">Powered by Betafleet</p>
       </div>
     </div>
   );

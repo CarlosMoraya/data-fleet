@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
 import { X, Plus, Trash2, ChevronUp, ChevronDown, GripVertical, Lock, AlertTriangle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import React, { useState, useEffect, useCallback } from 'react';
+
 import { useAuth } from '../context/AuthContext';
 import {
   templateToRow,
@@ -10,9 +10,10 @@ import {
   type SuggestionRow,
   type ChecklistItemRow,
 } from '../lib/checklistTemplateMappers';
-import { ODOMETER_UPDATE_CONTEXT, type ChecklistTemplate, type ChecklistItem, type ChecklistItemSuggestion, type TemplateCategory, type ChecklistContext } from '../types';
-import { cn } from '../lib/utils';
 import { canSaveTemplateWithoutItems } from '../lib/checklistTemplateRules';
+import { supabase } from '../lib/supabase';
+import { cn } from '../lib/utils';
+import { ODOMETER_UPDATE_CONTEXT, type ChecklistTemplate, type ChecklistItem, type ChecklistItemSuggestion, type TemplateCategory, type ChecklistContext } from '../types';
 
 interface Props {
   template?: ChecklistTemplate | null;
@@ -257,25 +258,25 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl my-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4">
+      <div className="relative my-4 w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+        <div className="flex items-center justify-between border-b px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-zinc-900">
               {isEdit ? 'Editar Template' : 'Novo Template de Checklist'}
             </h2>
             <p className="text-sm text-zinc-500">Passo {step} de 2</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-100">
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
 
         {/* Step indicator */}
-        <div className="flex px-6 pt-4 gap-2">
+        <div className="flex gap-2 px-6 pt-4">
           {['Metadados', 'Itens'].map((label, i) => (
-            <div key={label} className="flex items-center gap-2 flex-1">
+            <div key={label} className="flex flex-1 items-center gap-2">
               <button
                 onClick={() => {
                   if (i + 1 < step) setStep(i + 1);
@@ -286,36 +287,36 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
                   }
                 }}
                 className={cn(
-                  'w-7 h-7 rounded-full flex items-center justify-center text-sm font-medium transition-colors',
+                  'flex h-7 w-7 items-center justify-center rounded-full text-sm font-medium transition-colors',
                   step === i + 1 ? 'bg-orange-500 text-white' : step > i + 1 ? 'bg-green-500 text-white' : 'bg-zinc-200 text-zinc-500',
                 )}
               >
                 {i + 1}
               </button>
-              <span className={cn('text-sm', step === i + 1 ? 'text-zinc-900 font-medium' : 'text-zinc-400')}>{label}</span>
-              {i < 1 && <div className="flex-1 h-px bg-zinc-200 mx-1" />}
+              <span className={cn('text-sm', step === i + 1 ? 'font-medium text-zinc-900' : 'text-zinc-400')}>{label}</span>
+              {i < 1 && <div className="mx-1 h-px flex-1 bg-zinc-200" />}
             </div>
           ))}
         </div>
 
-        <div className="px-6 py-4 space-y-4">
+        <div className="space-y-4 px-6 py-4">
           {error && (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
           )}
 
           {/* ── Step 1: Metadata ─────────────────────────────────────────────── */}
           {step === 1 && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Categoria</label>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">Categoria</label>
                 <div className="grid grid-cols-2 gap-2">
                   {CATEGORIES.map(cat => (
                     <label
                       key={cat.value}
                       className={cn(
-                        'flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors',
+                        'flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors',
                         category === cat.value ? 'border-orange-400 bg-orange-50' : 'border-zinc-200 hover:border-zinc-300',
-                        isEdit && 'opacity-60 cursor-not-allowed',
+                        isEdit && 'cursor-not-allowed opacity-60',
                       )}
                     >
                       <input
@@ -337,15 +338,15 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Contexto</label>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">Contexto</label>
                 <div className="grid grid-cols-1 gap-2">
                   {CONTEXTS.map(ctx => (
                     <label
                       key={ctx.value}
                       className={cn(
-                        'flex items-start gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors',
+                        'flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 transition-colors',
                         context === ctx.value ? 'border-orange-400 bg-orange-50' : 'border-zinc-200 hover:border-zinc-300',
-                        isEdit && 'opacity-60 cursor-not-allowed',
+                        isEdit && 'cursor-not-allowed opacity-60',
                       )}
                     >
                       <input
@@ -355,7 +356,7 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
                         checked={context === ctx.value}
                         onChange={() => !isEdit && setContext(ctx.value)}
                         disabled={isEdit}
-                        className="accent-orange-500 mt-0.5"
+                        className="mt-0.5 accent-orange-500"
                       />
                       <div>
                         <p className="text-sm font-medium">{ctx.label}</p>
@@ -370,13 +371,13 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Descrição (opcional)</label>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">Descrição (opcional)</label>
                 <textarea
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                   rows={2}
                   placeholder="Descreva o objetivo deste checklist..."
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                  className="w-full resize-none rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                 />
               </div>
             </div>
@@ -386,25 +387,25 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
           {step === 2 && (
             <div className="space-y-3">
               {isSecurityContext && (
-                <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                   <span>Template de <strong>Segurança</strong>: ative "Bloqueia veículo" nos itens críticos. Quando implementado, veículos serão alertados visualmente.</span>
                 </div>
               )}
 
               {isOdometerContext && (
-                <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                   <span>Este contexto coleta apenas o KM atual do veículo. A foto do hodômetro é exigida somente quando a leitura excede a tolerância configurada. Não é necessário cadastrar perguntas.</span>
                 </div>
               )}
 
               {!isOdometerContext && loadingSuggestions && (
-                <div className="text-center py-8 text-zinc-400 text-sm">Carregando sugestões...</div>
+                <div className="py-8 text-center text-sm text-zinc-400">Carregando sugestões...</div>
               )}
 
               {!isOdometerContext && !loadingSuggestions && items.length === 0 && (
-                <div className="text-center py-8 text-zinc-400 text-sm">Nenhuma sugestão encontrada para esta categoria.</div>
+                <div className="py-8 text-center text-sm text-zinc-400">Nenhuma sugestão encontrada para esta categoria.</div>
               )}
 
               {!isOdometerContext && items.map((item, idx) => {
@@ -413,12 +414,12 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
                   <div
                     key={idx}
                     className={cn(
-                      'rounded-lg border p-3 space-y-2',
-                      item.enabled === false ? 'bg-zinc-50 border-zinc-200 opacity-60' : 'border-zinc-200',
+                      'space-y-2 rounded-lg border p-3',
+                      item.enabled === false ? 'border-zinc-200 bg-zinc-50 opacity-60' : 'border-zinc-200',
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <GripVertical className="h-4 w-4 text-zinc-300 flex-shrink-0" />
+                      <GripVertical className="h-4 w-4 flex-shrink-0 text-zinc-300" />
 
                       {item.fromSuggestion && !isLocked && (
                         <button
@@ -431,14 +432,14 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
                         >
                           <span
                             className={cn(
-                              'block h-4 w-4 rounded-full bg-white shadow ml-0.5 transition-transform',
+                              'ml-0.5 block h-4 w-4 rounded-full bg-white shadow transition-transform',
                               item.enabled ? 'translate-x-4' : 'translate-x-0',
                             )}
                           />
                         </button>
                       )}
 
-                      {isLocked && <Lock className="h-4 w-4 text-zinc-400 flex-shrink-0" title="Item obrigatório do sistema" />}
+                      {isLocked && <Lock className="h-4 w-4 flex-shrink-0 text-zinc-400" title="Item obrigatório do sistema" />}
 
                       <input
                         type="text"
@@ -446,22 +447,22 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
                         onChange={e => updateItem(idx, { title: e.target.value })}
                         disabled={!!isLocked}
                         placeholder="Título do item *"
-                        className="flex-1 rounded-md border border-zinc-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:bg-zinc-50 disabled:text-zinc-400"
+                        className="flex-1 rounded-md border border-zinc-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none disabled:bg-zinc-50 disabled:text-zinc-400"
                       />
 
                       {item.canBlockVehicle && (
-                        <span className="flex-shrink-0 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium">⚠ Bloqueio</span>
+                        <span className="flex-shrink-0 rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">⚠ Bloqueio</span>
                       )}
 
                       <div className="flex gap-1">
-                        <button type="button" onClick={() => moveItem(idx, -1)} disabled={idx === 0} className="p-1 rounded hover:bg-zinc-100 disabled:opacity-30">
+                        <button type="button" onClick={() => moveItem(idx, -1)} disabled={idx === 0} className="rounded p-1 hover:bg-zinc-100 disabled:opacity-30">
                           <ChevronUp className="h-4 w-4" />
                         </button>
-                        <button type="button" onClick={() => moveItem(idx, 1)} disabled={idx === items.length - 1} className="p-1 rounded hover:bg-zinc-100 disabled:opacity-30">
+                        <button type="button" onClick={() => moveItem(idx, 1)} disabled={idx === items.length - 1} className="rounded p-1 hover:bg-zinc-100 disabled:opacity-30">
                           <ChevronDown className="h-4 w-4" />
                         </button>
                         {!isLocked && (
-                          <button type="button" onClick={() => removeItem(idx)} className="p-1 rounded hover:bg-red-50 text-red-500">
+                          <button type="button" onClick={() => removeItem(idx)} className="rounded p-1 text-red-500 hover:bg-red-50">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
@@ -469,24 +470,24 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
                     </div>
 
                     {item.enabled !== false && (
-                      <div className="pl-8 space-y-2">
+                      <div className="space-y-2 pl-8">
                         <input
                           type="text"
                           value={item.description}
                           onChange={e => updateItem(idx, { description: e.target.value })}
                           placeholder="Descrição (opcional)"
-                          className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                          className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                         />
                         <input
                           type="text"
                           value={item.defaultAction}
                           onChange={e => updateItem(idx, { defaultAction: e.target.value })}
                           placeholder="Ação sugerida se não conforme (opcional)"
-                          className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                          className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                         />
 
                         <div className="flex flex-wrap gap-4">
-                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <label className="flex cursor-pointer items-center gap-2 text-sm">
                             <button
                               type="button"
                               onClick={() => updateItem(idx, { isMandatory: !item.isMandatory })}
@@ -500,7 +501,7 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
                             <span className={cn('text-zinc-700', item.isMandatory && 'font-medium text-orange-600')}>Obrigatório</span>
                           </label>
 
-                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <label className="flex cursor-pointer items-center gap-2 text-sm">
                             <input
                               type="checkbox"
                               checked={item.requirePhotoIfIssue}
@@ -511,7 +512,7 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
                           </label>
 
                           {isSecurityContext && (
-                            <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <label className="flex cursor-pointer items-center gap-2 text-sm">
                               <button
                                 type="button"
                                 onClick={() => updateItem(idx, { canBlockVehicle: !item.canBlockVehicle })}
@@ -536,7 +537,7 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
                 <button
                   type="button"
                   onClick={addItem}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-zinc-300 py-3 text-sm text-zinc-500 hover:border-orange-400 hover:text-orange-500 transition-colors"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-zinc-300 py-3 text-sm text-zinc-500 transition-colors hover:border-orange-400 hover:text-orange-500"
                 >
                   <Plus className="h-4 w-4" />
                   Adicionar item
@@ -547,7 +548,7 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t bg-zinc-50 rounded-b-2xl">
+        <div className="flex items-center justify-between rounded-b-2xl border-t bg-zinc-50 px-6 py-4">
           <button
             onClick={() => step > 1 ? setStep(step - 1) : onClose()}
             className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900"
@@ -558,7 +559,7 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
           {step < 2 ? (
             <button
               onClick={goToStep2}
-              className="px-5 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600"
+              className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-medium text-white hover:bg-orange-600"
             >
               Próximo
             </button>
@@ -566,7 +567,7 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-5 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 disabled:opacity-50"
+              className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50"
             >
               {saving ? 'Salvando...' : isEdit ? 'Salvar alterações' : 'Criar template'}
             </button>

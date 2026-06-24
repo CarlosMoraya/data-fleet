@@ -1,15 +1,18 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, Gauge, Loader2, CheckCircle } from 'lucide-react';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Gauge, Loader2, CheckCircle } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { generatePositionsFromConfig } from '../lib/tirePositions';
+
+import OfflineBanner from '../components/OfflineBanner';
+import { TireInspectionForm } from '../components/TireInspectionForm';
+import { VehicleBlueprintDiagram } from '../components/VehicleBlueprintDiagram';
 import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePendingTireInspectionCount } from '../hooks/usePendingTireInspectionCount';
-import OfflineBanner from '../components/OfflineBanner';
-import { VehicleBlueprintDiagram } from '../components/VehicleBlueprintDiagram';
-import { TireInspectionForm } from '../components/TireInspectionForm';
 import { enqueueOperation, enqueuePhoto } from '../lib/offline/syncService';
+import { applyOfflineKm } from '../lib/offlineCacheUpdates';
+import { supabase } from '../lib/supabase';
+import { generatePositionsFromConfig } from '../lib/tirePositions';
 import {
   fetchTireInspection,
   fetchTireInspectionResponses,
@@ -18,8 +21,7 @@ import {
   saveInspectionResponse,
   completeTireInspection,
 } from '../services/tireInspectionService';
-import { supabase } from '../lib/supabase';
-import { applyOfflineKm } from '../lib/offlineCacheUpdates';
+
 import type { TireInspection, TireInspectionResponse } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -49,7 +51,7 @@ export default function TireInspectionFill() {
 
   const { data: inspection, isLoading: loadingInspection } = useQuery({
     queryKey: ['tireInspection', inspectionId],
-    queryFn: () => fetchTireInspection(inspectionId!),
+    queryFn: () => fetchTireInspection(inspectionId),
     enabled: !!inspectionId,
     gcTime: Infinity,
     networkMode: 'offlineFirst',
@@ -57,7 +59,7 @@ export default function TireInspectionFill() {
 
   const { data: responses = [] } = useQuery({
     queryKey: ['tireInspectionResponses', inspectionId],
-    queryFn: () => fetchTireInspectionResponses(inspectionId!),
+    queryFn: () => fetchTireInspectionResponses(inspectionId),
     enabled: !!inspectionId && (kmConfirmed || !!inspection?.odometerKm),
     gcTime: Infinity,
     networkMode: 'offlineFirst',
@@ -65,13 +67,13 @@ export default function TireInspectionFill() {
 
   const { data: manufacturers = [] } = useQuery({
     queryKey: ['tireManufacturers', inspection?.vehicleId],
-    queryFn: () => fetchDistinctManufacturers(inspection!.vehicleId),
+    queryFn: () => fetchDistinctManufacturers(inspection.vehicleId),
     enabled: !!inspection?.vehicleId,
   });
 
   const { data: brands = [] } = useQuery({
     queryKey: ['tireBrands', inspection?.vehicleId],
-    queryFn: () => fetchDistinctBrands(inspection!.vehicleId),
+    queryFn: () => fetchDistinctBrands(inspection.vehicleId),
     enabled: !!inspection?.vehicleId,
   });
 
@@ -82,7 +84,7 @@ export default function TireInspectionFill() {
       const { data, error } = await supabase
         .from('tires')
         .select('id, tire_code, current_position')
-        .eq('vehicle_id', inspection!.vehicleId)
+        .eq('vehicle_id', inspection.vehicleId)
         .eq('active', true);
       if (error) throw error;
       return Object.fromEntries(
@@ -134,7 +136,7 @@ export default function TireInspectionFill() {
     mutationFn: async (km: number) => {
       const startedAt = new Date().toISOString();
       if (!isOnline) {
-        await enqueueOperation({ type: 'confirm_tire_km', odometerKm: km, startedAt }, '', inspectionId!);
+        await enqueueOperation({ type: 'confirm_tire_km', odometerKm: km, startedAt }, '', inspectionId);
         queryClient.setQueryData(
           ['tireInspection', inspectionId],
           (old: TireInspection | undefined) => (old ? { ...applyOfflineKm(old, km), startedAt } : old),
@@ -169,7 +171,7 @@ export default function TireInspectionFill() {
     networkMode: 'offlineFirst',
     mutationFn: async ({ data, blob }: { data: Omit<TireInspectionResponse, 'id'>; blob?: Blob }) => {
       if (!isOnline && blob) {
-        const photoKey = await enqueuePhoto(blob, currentClient!.id, inspectionId!, data.positionCode);
+        const photoKey = await enqueuePhoto(blob, currentClient!.id, inspectionId, data.positionCode);
         await enqueueOperation({
           type: 'save_tire_response',
           positionCode: data.positionCode,
@@ -184,18 +186,18 @@ export default function TireInspectionFill() {
           status: data.status,
           observation: data.observation,
           respondedAt: data.respondedAt,
-        }, inspectionId!);
+        }, inspectionId);
         queryClient.setQueryData(['tireInspectionResponses', inspectionId], (old: TireInspectionResponse[] | undefined) => {
-          const response: TireInspectionResponse = { ...data, id: `offline-${data.positionCode}`, inspectionId: inspectionId!, photoUrl: '' };
+          const response: TireInspectionResponse = { ...data, id: `offline-${data.positionCode}`, inspectionId: inspectionId, photoUrl: '' };
           const base = old ?? [];
           return [...base.filter(r => r.positionCode !== response.positionCode), response];
         });
         return;
       }
       await saveInspectionResponse({
-        inspectionId: inspectionId!,
+        inspectionId: inspectionId,
         clientId: currentClient!.id,
-        response: { ...data, inspectionId: inspectionId! },
+        response: { ...data, inspectionId: inspectionId },
         photoBlob: blob,
         photoFilename: `${data.positionCode}_${Date.now()}.jpg`,
       });
@@ -216,12 +218,12 @@ export default function TireInspectionFill() {
         await enqueueOperation({
           type: 'finish_tire_inspection',
           completedAt,
-          vehicleId: inspection!.vehicleId,
-        }, inspectionId!);
+          vehicleId: inspection.vehicleId,
+        }, inspectionId);
         queryClient.setQueryData(['tireInspection', inspectionId], (old: TireInspection | undefined) => old ? { ...old, status: 'completed', completedAt } : old);
         return;
       }
-      await completeTireInspection(inspectionId!, inspection!.odometerKm ?? 0);
+      await completeTireInspection(inspectionId, inspection.odometerKm ?? 0);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tireInspection', inspectionId] });
@@ -234,7 +236,7 @@ export default function TireInspectionFill() {
 
   if (loadingInspection) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="animate-spin text-blue-600" size={32} />
       </div>
     );
@@ -252,23 +254,23 @@ export default function TireInspectionFill() {
       <OfflineBanner isOnline={isOnline} pendingCount={pendingCount} />
 
       {/* Header */}
-      <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
+      <div className="flex items-center gap-3 border-b bg-white px-4 py-3">
         <button type="button" onClick={() => navigate('/checklists')} className="text-gray-400 hover:text-gray-600">
           <ChevronLeft size={24} />
         </button>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 truncate">Inspeção de Pneus</p>
-          <p className="text-sm text-gray-500 truncate">{inspection.vehicleLicensePlate}</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold text-gray-900">Inspeção de Pneus</p>
+          <p className="truncate text-sm text-gray-500">{inspection.vehicleLicensePlate}</p>
         </div>
         {isCompleted && (
-          <span className="flex items-center gap-1 text-green-600 text-sm font-medium">
+          <span className="flex items-center gap-1 text-sm font-medium text-green-600">
             <CheckCircle size={16} />
             Concluída
           </span>
         )}
       </div>
 
-      <div className="max-w-lg mx-auto p-4 space-y-6">
+      <div className="mx-auto max-w-lg space-y-6 p-4">
 
         {/* Step 1: KM */}
         {showKmStep && (
@@ -284,8 +286,8 @@ export default function TireInspectionFill() {
         {/* Step 2: Blueprint */}
         {(kmConfirmed || isCompleted) && (
           <>
-            <div className="bg-white rounded-xl border p-4">
-              <p className="text-sm text-gray-500 mb-3">
+            <div className="rounded-xl border bg-white p-4">
+              <p className="mb-3 text-sm text-gray-500">
                 Toque em cada pneu para inspecionar.
               </p>
               <VehicleBlueprintDiagram
@@ -302,12 +304,12 @@ export default function TireInspectionFill() {
             {/* Finish button */}
             {!isCompleted && (
               <div>
-                {finishError && <p className="text-sm text-red-600 mb-2">{finishError}</p>}
+                {finishError && <p className="mb-2 text-sm text-red-600">{finishError}</p>}
                 <button
                   type="button"
                   onClick={() => completeMutation.mutate()}
                   disabled={completeMutation.isPending}
-                  className="w-full py-3 rounded-lg bg-green-600 text-white font-medium disabled:opacity-50 hover:bg-green-700 transition-colors"
+                  className="w-full rounded-lg bg-green-600 py-3 font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
                 >
                   {completeMutation.isPending ? 'Finalizando...' : 'Finalizar Inspeção'}
                 </button>
@@ -347,7 +349,7 @@ function KmStep({ kmInput, kmError, loading, onChange, onConfirm }: {
   onConfirm: () => void;
 }) {
   return (
-    <div className="bg-white rounded-xl border p-4 space-y-3">
+    <div className="space-y-3 rounded-xl border bg-white p-4">
       <div className="flex items-center gap-2 text-gray-700">
         <Gauge size={20} />
         <span className="font-medium">KM atual do veículo</span>
@@ -366,7 +368,7 @@ function KmStep({ kmInput, kmError, loading, onChange, onConfirm }: {
         type="button"
         onClick={onConfirm}
         disabled={loading}
-        className="w-full py-2 rounded-lg bg-blue-600 text-white font-medium disabled:opacity-50"
+        className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white disabled:opacity-50"
       >
         {loading ? 'Confirmando...' : 'Confirmar KM'}
       </button>
@@ -377,14 +379,14 @@ function KmStep({ kmInput, kmError, loading, onChange, onConfirm }: {
 function ProgressBar({ total, done }: { total: number; done: number }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
-    <div className="bg-white rounded-xl border p-4">
-      <div className="flex justify-between text-sm text-gray-600 mb-2">
+    <div className="rounded-xl border bg-white p-4">
+      <div className="mb-2 flex justify-between text-sm text-gray-600">
         <span>Progresso</span>
         <span>{done} / {total} pneus</span>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2">
+      <div className="h-2 w-full rounded-full bg-gray-200">
         <div
-          className="bg-blue-600 h-2 rounded-full transition-all"
+          className="h-2 rounded-full bg-blue-600 transition-all"
           style={{ width: `${pct}%` }}
         />
       </div>

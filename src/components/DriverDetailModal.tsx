@@ -1,5 +1,6 @@
-import React from 'react';
 import { X, ExternalLink, UserCircle } from 'lucide-react';
+import React from 'react';
+
 import { Driver } from '../types';
 
 interface Props {
@@ -12,7 +13,7 @@ function DetailField({ label, value }: { label: string; value?: string | null })
   return (
     <div>
       <p className="text-xs text-zinc-400">{label}</p>
-      <p className="text-sm text-zinc-800 font-medium">{value || '—'}</p>
+      <p className="text-sm font-medium text-zinc-800">{value || '—'}</p>
     </div>
   );
 }
@@ -28,7 +29,7 @@ function FileField({ label, url }: { label: string; url?: string | null }) {
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-sm text-orange-600 underline underline-offset-2 hover:text-orange-700"
         >
-          Visualizar <ExternalLink className="w-3 h-3" />
+          Visualizar <ExternalLink className="h-3 w-3" />
         </a>
       ) : (
         <span className="text-sm text-zinc-400">Não enviado</span>
@@ -39,7 +40,7 @@ function FileField({ label, url }: { label: string; url?: string | null }) {
 
 function SectionTitle({ title }: { title: string }) {
   return (
-    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 border-b border-zinc-100 pb-2">
+    <h3 className="border-b border-zinc-100 pb-2 text-xs font-semibold tracking-wider text-zinc-400 uppercase">
       {title}
     </h3>
   );
@@ -67,14 +68,14 @@ function formatPhone(phone?: string | null): string | undefined {
 export default function DriverDetailModal({ driver, vehiclePlate, onClose }: Props) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl flex flex-col my-8">
+      <div className="my-8 flex w-full max-w-3xl flex-col rounded-2xl bg-white shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+        <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-orange-50 flex items-center justify-center">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50">
               <UserCircle className="h-5 w-5 text-orange-500" />
             </div>
             <div>
@@ -84,19 +85,19 @@ export default function DriverDetailModal({ driver, vehiclePlate, onClose }: Pro
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+            className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="overflow-y-auto px-6 py-6 space-y-6">
+        <div className="space-y-6 overflow-y-auto px-6 py-6">
 
           {/* Dados Pessoais */}
           <div className="space-y-3">
             <SectionTitle title="Dados Pessoais" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
               <DetailField label="Nome" value={driver.name} />
               <DetailField label="CPF" value={formatCPF(driver.cpf)} />
               <DetailField label="Telefone de Contato" value={formatPhone(driver.phone)} />
@@ -106,7 +107,7 @@ export default function DriverDetailModal({ driver, vehiclePlate, onClose }: Pro
           {/* CNH */}
           <div className="space-y-3">
             <SectionTitle title="CNH" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
               <DetailField label="Número de Registro" value={driver.registrationNumber} />
               <DetailField label="Categoria" value={driver.category} />
               <DetailField label="RENACH" value={driver.renach} />
@@ -119,7 +120,7 @@ export default function DriverDetailModal({ driver, vehiclePlate, onClose }: Pro
           {/* GR */}
           <div className="space-y-3">
             <SectionTitle title="GR — Gerenciamento de Risco" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
               <DetailField label="Validade do GR" value={formatDate(driver.grExpirationDate)} />
               <FileField label="Arquivo GR" url={driver.grUpload} />
             </div>
@@ -161,10 +162,10 @@ export default function DriverDetailModal({ driver, vehiclePlate, onClose }: Pro
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end px-6 py-4 border-t border-zinc-100">
+        <div className="flex justify-end border-t border-zinc-100 px-6 py-4">
           <button
             onClick={onClose}
-            className="rounded-xl border border-zinc-200 px-5 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+            className="rounded-xl border border-zinc-200 px-5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
           >
             Fechar
           </button>

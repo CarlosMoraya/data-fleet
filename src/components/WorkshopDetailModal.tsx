@@ -1,7 +1,8 @@
-import React from 'react';
 import { X, Wrench, MapPin } from 'lucide-react';
-import { Workshop } from '../types';
+import React from 'react';
+
 import { formatCNPJ } from '../lib/workshopMappers';
+import { Workshop } from '../types';
 
 interface Props {
   workshop: Workshop;
@@ -12,14 +13,14 @@ function DetailField({ label, value }: { label: string; value?: string | null })
   return (
     <div>
       <p className="text-xs text-zinc-400">{label}</p>
-      <p className="text-sm text-zinc-800 font-medium">{value || '—'}</p>
+      <p className="text-sm font-medium text-zinc-800">{value || '—'}</p>
     </div>
   );
 }
 
 function SectionTitle({ title }: { title: string }) {
   return (
-    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 border-b border-zinc-100 pb-2">
+    <h3 className="border-b border-zinc-100 pb-2 text-xs font-semibold tracking-wider text-zinc-400 uppercase">
       {title}
     </h3>
   );
@@ -47,14 +48,14 @@ export default function WorkshopDetailModal({ workshop, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl flex flex-col my-8">
+      <div className="my-8 flex w-full max-w-3xl flex-col rounded-2xl bg-white shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+        <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-orange-50 flex items-center justify-center">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50">
               <Wrench className="h-5 w-5 text-orange-500" />
             </div>
             <div>
@@ -64,19 +65,19 @@ export default function WorkshopDetailModal({ workshop, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+            className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="overflow-y-auto px-6 py-6 space-y-6">
+        <div className="space-y-6 overflow-y-auto px-6 py-6">
 
           {/* Identificação */}
           <div className="space-y-3">
             <SectionTitle title="Identificação" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
               <DetailField label="Nome" value={workshop.name} />
               <DetailField label="CNPJ" value={formatCNPJ(workshop.cnpj)} />
               <DetailField label="Pessoa de Contato" value={workshop.contactPerson} />
@@ -109,11 +110,11 @@ export default function WorkshopDetailModal({ workshop, onClose }: Props) {
             <SectionTitle title="Endereço" />
             {fullAddress ? (
               <div className="flex items-start gap-2 text-sm text-zinc-700">
-                <MapPin className="h-4 w-4 text-zinc-400 mt-0.5 flex-shrink-0" />
+                <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-zinc-400" />
                 <span>{fullAddress}</span>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
                 <DetailField label="Logradouro" value={workshop.addressStreet} />
                 <DetailField label="Número" value={workshop.addressNumber} />
                 <DetailField label="Complemento" value={workshop.addressComplement} />
@@ -148,17 +149,17 @@ export default function WorkshopDetailModal({ workshop, onClose }: Props) {
           {workshop.notes && (
             <div className="space-y-3">
               <SectionTitle title="Observações" />
-              <p className="text-sm text-zinc-700 whitespace-pre-wrap leading-relaxed">{workshop.notes}</p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-zinc-700">{workshop.notes}</p>
             </div>
           )}
 
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end px-6 py-4 border-t border-zinc-100">
+        <div className="flex justify-end border-t border-zinc-100 px-6 py-4">
           <button
             onClick={onClose}
-            className="rounded-xl border border-zinc-200 px-5 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+            className="rounded-xl border border-zinc-200 px-5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
           >
             Fechar
           </button>

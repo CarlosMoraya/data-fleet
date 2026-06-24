@@ -3,18 +3,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { queryClient, persister } from './lib/react-query';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { useOnlineStatus } from './hooks/useOnlineStatus';
+
+import ChunkErrorBoundary from './components/ChunkErrorBoundary';
 import Layout from './components/Layout';
 import RouteFallback from './components/RouteFallback';
-import ChunkErrorBoundary from './components/ChunkErrorBoundary';
-import Login from './pages/Login';
-import { getDefaultRouteForRole } from './lib/rolePermissions';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { shouldPersistQuery } from './lib/cachePolicy';
+import { queryClient, persister } from './lib/react-query';
+import { getDefaultRouteForRole } from './lib/rolePermissions';
+import Login from './pages/Login';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Vehicles = lazy(() => import('./pages/Vehicles'));

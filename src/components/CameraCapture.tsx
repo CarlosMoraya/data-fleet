@@ -1,5 +1,5 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Camera, X, RotateCcw, Check } from 'lucide-react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 
 interface Props {
   onCapture: (file: File, latitude?: number, longitude?: number) => void;
@@ -113,7 +113,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-black">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-safe-top pt-4 pb-2 text-white">
+      <div className="pt-safe-top flex items-center justify-between px-4 pt-4 pb-2 text-white">
         <span className="text-sm font-medium">Tirar foto</span>
         <button onClick={onClose} className="p-2">
           <X className="h-6 w-6" />
@@ -121,23 +121,23 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
       </div>
 
       {error && (
-        <div className="mx-4 rounded-lg bg-red-900/60 text-red-200 text-sm px-4 py-2">{error}</div>
+        <div className="mx-4 rounded-lg bg-red-900/60 px-4 py-2 text-sm text-red-200">{error}</div>
       )}
 
       {/* Camera / Preview area */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden">
+      <div className="flex flex-1 items-center justify-center overflow-hidden">
         {useFileInput ? (
-          <div className="text-center px-8 space-y-4">
+          <div className="space-y-4 px-8 text-center">
             {preview ? (
-              <img src={preview} alt="preview" className="max-h-96 rounded-lg mx-auto" />
+              <img src={preview} alt="preview" className="mx-auto max-h-96 rounded-lg" />
             ) : (
               <>
-                <Camera className="h-16 w-16 mx-auto text-zinc-400" />
-                <p className="text-zinc-300 text-sm">
+                <Camera className="mx-auto h-16 w-16 text-zinc-400" />
+                <p className="text-sm text-zinc-300">
                   Câmera ao vivo indisponível neste endereço (requer HTTPS). Use o botão abaixo para fotografar com a câmera do dispositivo.
                 </p>
                 <label className="block cursor-pointer">
-                  <span className="px-6 py-3 bg-orange-500 text-white rounded-xl font-medium text-sm">
+                  <span className="rounded-xl bg-orange-500 px-6 py-3 text-sm font-medium text-white">
                     Tirar foto
                   </span>
                   <input
@@ -169,20 +169,20 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
 
       {/* GPS indicator */}
       {gps && (
-        <div className="text-center text-xs text-zinc-400 pb-1">
+        <div className="pb-1 text-center text-xs text-zinc-400">
           GPS: {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
         </div>
       )}
 
       {/* Controls */}
-      <div className="pb-safe-bottom pb-8 pt-4 flex items-center justify-center gap-8">
+      <div className="pb-safe-bottom flex items-center justify-center gap-8 pt-4 pb-8">
         {preview ? (
           <>
             <button
               onClick={retake}
               className="flex flex-col items-center gap-1 text-white"
             >
-              <div className="h-12 w-12 rounded-full border-2 border-white flex items-center justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white">
                 <RotateCcw className="h-5 w-5" />
               </div>
               <span className="text-xs">Refazer</span>
@@ -192,7 +192,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
               onClick={confirm}
               className="flex flex-col items-center gap-1 text-white"
             >
-              <div className="h-16 w-16 rounded-full bg-green-500 flex items-center justify-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500">
                 <Check className="h-7 w-7" />
               </div>
               <span className="text-xs">Usar foto</span>
@@ -201,7 +201,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
         ) : !useFileInput ? (
           <button
             onClick={capturePhoto}
-            className="h-20 w-20 rounded-full border-4 border-white bg-white/20 flex items-center justify-center"
+            className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-white/20"
           >
             <div className="h-14 w-14 rounded-full bg-white" />
           </button>

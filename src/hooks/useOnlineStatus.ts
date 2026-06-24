@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+
 import { flushQueue } from '../lib/offline/syncService';
 
 export function useOnlineStatus(): boolean {

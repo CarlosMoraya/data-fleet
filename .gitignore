@@ -23,8 +23,11 @@ session/
 # Transient implementation plans — readable by agents when explicitly cited,
 # but never committed unless the user explicitly asks to version the plan.
 # Canonical location: session/implementation/ ; root-level copies are tolerated.
-IMPLEMENTATION.md
-IMPLEMENTATION_FIXBUG.md
+# These are kept out of commits by selective staging (per AGENT.md §4),
+# NOT by gitignore.
 
 # Supabase CLI temp cache
 supabase/.temp/
+
+# ESLint transient report
+eslint-report.txt

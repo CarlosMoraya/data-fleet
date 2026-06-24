@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+
 import { canAccessRoute, canCorrectOdometer } from './rolePermissions';
+
 import type { Role } from '../types';
 
 describe('canAccessRoute', () => {

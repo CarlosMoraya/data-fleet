@@ -74,9 +74,9 @@ export function scheduleToRow(
 } {
   return {
     client_id: clientId,
-    vehicle_id: schedule.vehicleId!,
-    workshop_id: schedule.workshopId!,
-    scheduled_date: schedule.scheduledDate!,
+    vehicle_id: schedule.vehicleId,
+    workshop_id: schedule.workshopId,
+    scheduled_date: schedule.scheduledDate,
     notes: schedule.notes?.trim() || null,
     created_by: createdBy,
   };

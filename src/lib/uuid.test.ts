@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
 import { safeRandomUUID, uuidV4Regex } from './uuid';
 
 describe('safeRandomUUID', () => {
@@ -29,7 +30,7 @@ describe('safeRandomUUID', () => {
     Object.defineProperty(globalThis, 'crypto', {
       value: {
         ...globalThis.crypto,
-        getRandomValues: globalThis.crypto!.getRandomValues.bind(globalThis.crypto),
+        getRandomValues: globalThis.crypto.getRandomValues.bind(globalThis.crypto),
       },
       writable: true,
       configurable: true,

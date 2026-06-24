@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+
 import { canApprove } from './BudgetApprovals';
+
 import type { User } from '../types';
 
 const alwaysApproveRoles: Array<User['role']> = ['Coordinator', 'Director', 'Admin Master'];

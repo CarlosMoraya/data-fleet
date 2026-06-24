@@ -1,6 +1,7 @@
-import type { Driver } from '../types';
 import { isBlank, isWithinExpiryWindow } from './dashboardKpi';
 import { SEARCH_PARAM, parseSearchFromParams as _parseSearchFromParams } from './vehicleFilters';
+
+import type { Driver } from '../types';
 
 export { SEARCH_PARAM, _parseSearchFromParams as parseSearchFromParams };
 

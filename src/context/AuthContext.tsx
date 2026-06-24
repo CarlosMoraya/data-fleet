@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
-import { User, Role, Client, WorkshopAccount, WorkshopPartnership } from '../types';
-import { isOperationsManager } from '../lib/rolePermissions';
+
 import { queryClient, persister } from '../lib/react-query';
+import { isOperationsManager } from '../lib/rolePermissions';
+import { supabase } from '../lib/supabase';
 import { clearCurrentUserUiState } from '../lib/uiStateStorage';
+import { User, Role, Client, WorkshopAccount, WorkshopPartnership } from '../types';
 
 interface AuthContextType {
   user: User | null;

@@ -1,5 +1,5 @@
-import React from 'react';
 import { CalendarDays } from 'lucide-react';
+import React from 'react';
 
 interface PeriodRangeFilterProps {
   value: { from: string; to: string };
@@ -29,7 +29,7 @@ export default function PeriodRangeFilter({
             value={value.from}
             max={value.to}
             onChange={(e) => onChange({ ...value, from: e.target.value })}
-            className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 focus:ring-2 focus:ring-orange-400 focus:outline-none"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -39,12 +39,12 @@ export default function PeriodRangeFilter({
             value={value.to}
             min={value.from}
             onChange={(e) => onChange({ ...value, to: e.target.value })}
-            className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 focus:ring-2 focus:ring-orange-400 focus:outline-none"
           />
         </div>
         <button
           onClick={onReset}
-          className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100 transition-colors"
+          className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs text-zinc-600 transition-colors hover:bg-zinc-100"
         >
           Mês atual
         </button>

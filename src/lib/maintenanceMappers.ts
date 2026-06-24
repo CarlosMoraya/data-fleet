@@ -4,6 +4,7 @@ import {
   MaintenanceOrderRow,
   MaintenanceBudgetItemRow,
 } from '../types/maintenance';
+
 import { normalizeBudgetSystem } from './budgetSystems';
 
 // Re-export para compatibilidade com código que importa daqui

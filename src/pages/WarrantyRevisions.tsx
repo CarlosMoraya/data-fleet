@@ -1,9 +1,12 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus, LayoutTemplate, Search, ShieldCheck } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+
+import WarrantyPlanByModelModal from '../components/warranty/WarrantyPlanByModelModal';
+import WarrantyPlanByPlateModal from '../components/warranty/WarrantyPlanByPlateModal';
 import { useAuth } from '../context/AuthContext';
 import { requiresClientSelection } from '../lib/clientScope';
-import { listWarrantyOverview } from '../services/warrantyRevisionService';
 import { resolveNextRevision } from '../lib/warrantyRevisionResolver';
 import {
   WARRANTY_STATUS_BADGE,
@@ -12,9 +15,8 @@ import {
   formatDate,
   WARRANTY_ISSUE_VALUES,
 } from '../lib/warrantyRevisionStatusBadge';
-import WarrantyPlanByPlateModal from '../components/warranty/WarrantyPlanByPlateModal';
-import WarrantyPlanByModelModal from '../components/warranty/WarrantyPlanByModelModal';
-import { Plus, LayoutTemplate, Search, ShieldCheck } from 'lucide-react';
+import { listWarrantyOverview } from '../services/warrantyRevisionService';
+
 
 const ROLES_WITH_ACCESS = ['Fleet Analyst', 'Supervisor', 'Coordinator', 'Manager', 'Director', 'Admin Master'];
 const ROLES_CAN_MANAGE = ['Coordinator', 'Manager', 'Director', 'Admin Master'];
@@ -130,15 +132,15 @@ export default function WarrantyRevisions() {
   };
 
   return (
-    <div className="h-full flex flex-col gap-6">
+    <div className="flex h-full flex-col gap-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-zinc-900">
             <ShieldCheck className="h-6 w-6 text-blue-600" />
             Revisões de Garantia
           </h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <p className="mt-1 text-sm text-zinc-500">
             Programação de revisões em garantia com precedência sobre a regra preventiva.
           </p>
         </div>
@@ -146,16 +148,16 @@ export default function WarrantyRevisions() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setByPlateOpen(true)}
-              className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
             >
-              <Plus className="-ml-1 mr-2 h-5 w-5" />
+              <Plus className="mr-2 -ml-1 h-5 w-5" />
               Cadastrar por placa
             </button>
             <button
               onClick={() => setByModelOpen(true)}
-              className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 transition-colors"
+              className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50"
             >
-              <LayoutTemplate className="-ml-1 mr-2 h-5 w-5" />
+              <LayoutTemplate className="mr-2 -ml-1 h-5 w-5" />
               Cadastrar por modelo
             </button>
           </div>
@@ -181,13 +183,13 @@ export default function WarrantyRevisions() {
             value={qFilter}
             onChange={(e) => setParam('q', e.target.value, true)}
             placeholder="Buscar por placa, marca ou modelo"
-            className="block w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="block w-full rounded-xl border border-zinc-200 bg-white py-2 pr-3 pl-9 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
           />
         </div>
         <select
           value={unitFilter}
           onChange={(e) => setParam('unit', e.target.value)}
-          className="block w-full rounded-xl border border-zinc-200 bg-white py-2 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="block w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
         >
           <option value="">Todas as unidades</option>
           {units.map((u) => (
@@ -197,7 +199,7 @@ export default function WarrantyRevisions() {
         <select
           value={issueFilter}
           onChange={(e) => setParam('issue', e.target.value)}
-          className="block w-full rounded-xl border border-zinc-200 bg-white py-2 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="block w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
         >
           <option value="">Todos os status</option>
           {WARRANTY_ISSUE_VALUES.map((s) => (
@@ -207,7 +209,7 @@ export default function WarrantyRevisions() {
       </div>
 
       {/* Tabela */}
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm flex-1 min-h-0 flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-blue-500" />
@@ -215,7 +217,7 @@ export default function WarrantyRevisions() {
         ) : (
           <div className="flex-1 overflow-auto">
             <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50 sticky top-0 z-10">
+              <thead className="sticky top-0 z-10 bg-zinc-50">
                 <tr>
                   <Th>Placa</Th>
                   <Th>Modelo</Th>
@@ -228,26 +230,26 @@ export default function WarrantyRevisions() {
               </thead>
               <tbody className="divide-y divide-zinc-200 bg-white">
                 {filteredRows.map((r) => (
-                  <tr key={r.vehicleId} className="hover:bg-zinc-50 transition-colors">
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-zinc-900 sm:pl-6">
+                  <tr key={r.vehicleId} className="transition-colors hover:bg-zinc-50">
+                    <td className="py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap text-zinc-900 sm:pl-6">
                       {r.licensePlate}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-700">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-700">
                       {r.brand} {r.model}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
                       {r.operationalUnitName ?? <span className="text-zinc-300">—</span>}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
                       {r.warranty ? formatDate(r.warrantyEndDate) : <span className="text-zinc-300">—</span>}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-right text-sm text-zinc-700">
+                    <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-zinc-700">
                       {formatKm(r.currentKm)}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-right text-sm text-zinc-700">
+                    <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-zinc-700">
                       {r.regime === 'none' ? <span className="text-zinc-300">—</span> : formatKm(r.nextRevisionKm)}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${WARRANTY_STATUS_BADGE[r.status]}`}>
                         {WARRANTY_STATUS_LABEL[r.status]}
                       </span>
@@ -293,7 +295,7 @@ function Th({ children, className = '' }: { children: React.ReactNode; className
   return (
     <th
       scope="col"
-      className={`py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider sm:pl-6 ${className}`}
+      className={`py-3.5 pr-3 pl-4 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase sm:pl-6 ${className}`}
     >
       {children}
     </th>
@@ -309,8 +311,8 @@ const KPI_TONES: Record<string, string> = {
 
 function KpiCard({ label, value, tone }: { label: string; value: number; tone: keyof typeof KPI_TONES }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm p-5">
-      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">{label}</p>
+    <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <p className="text-xs font-semibold tracking-wider text-zinc-500 uppercase">{label}</p>
       <p className={`mt-2 text-3xl font-bold ${KPI_TONES[tone]}`}>{value}</p>
     </div>
   );

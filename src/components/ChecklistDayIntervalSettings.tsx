@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+
 import { supabase } from '../lib/supabase';
 
 interface Props {
@@ -51,7 +52,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
         .eq('client_id', clientId)
         .maybeSingle();
       if (error) throw error;
-      return data as IntervalRow | null;
+      return data;
     },
     enabled: !!clientId,
   });
@@ -116,9 +117,9 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden animate-in fade-in duration-300">
+    <div className="animate-in fade-in overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm duration-300">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-zinc-200 flex items-center gap-3">
+      <div className="flex items-center gap-3 border-b border-zinc-200 px-6 py-4">
         <CalendarDays className="h-5 w-5 text-zinc-400" />
         <div>
           <h2 className="text-lg font-medium text-zinc-900">Intervalo entre Checklists</h2>
@@ -147,20 +148,20 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
         <div className="flex items-center justify-between py-5">
           <div>
             <span className="text-sm font-medium text-zinc-800">Rotina</span>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="mt-0.5 text-xs text-zinc-500">
               Intervalo máximo em dias entre checklists de Rotina consecutivos.
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
             <input
               type="number"
               min="1"
               value={rotinaDays}
               onChange={handleChange(setRotinaDays)}
               placeholder="—"
-              className="w-24 h-9 rounded-lg border border-zinc-200 px-3 text-sm text-right text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors"
+              className="h-9 w-24 rounded-lg border border-zinc-200 px-3 text-right text-sm text-zinc-800 transition-colors placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500 focus:outline-none"
             />
-            <span className="text-xs text-zinc-400 w-8">dias</span>
+            <span className="w-8 text-xs text-zinc-400">dias</span>
           </div>
         </div>
 
@@ -168,20 +169,20 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
         <div className="flex items-center justify-between py-5">
           <div>
             <span className="text-sm font-medium text-zinc-800">Segurança</span>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="mt-0.5 text-xs text-zinc-500">
               Intervalo máximo em dias entre checklists de Segurança consecutivos.
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
             <input
               type="number"
               min="1"
               value={segurancaDays}
               onChange={handleChange(setSegurancaDays)}
               placeholder="—"
-              className="w-24 h-9 rounded-lg border border-zinc-200 px-3 text-sm text-right text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors"
+              className="h-9 w-24 rounded-lg border border-zinc-200 px-3 text-right text-sm text-zinc-800 transition-colors placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500 focus:outline-none"
             />
-            <span className="text-xs text-zinc-400 w-8">dias</span>
+            <span className="w-8 text-xs text-zinc-400">dias</span>
           </div>
         </div>
 
@@ -189,11 +190,11 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
         <div className="flex items-center justify-between py-5">
           <div>
             <span className="text-sm font-medium text-zinc-800">Pneus (Inspeção)</span>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="mt-0.5 text-xs text-zinc-500">
               Intervalo mínimo entre inspeções de pneus consecutivas. Defina 0 para não exigir intervalo.
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
             <input
               type="number"
               min="0"
@@ -208,9 +209,9 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
               }}
               placeholder="7"
               title="Mínimo: 0 dias"
-              className="w-24 h-9 rounded-lg border border-zinc-200 px-3 text-sm text-right text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors"
+              className="h-9 w-24 rounded-lg border border-zinc-200 px-3 text-right text-sm text-zinc-800 transition-colors placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500 focus:outline-none"
             />
-            <span className="text-xs text-zinc-400 w-8">dias</span>
+            <span className="w-8 text-xs text-zinc-400">dias</span>
           </div>
         </div>
 
@@ -218,11 +219,11 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
         <div className="flex items-center justify-between py-5">
           <div>
             <span className="text-sm font-medium text-zinc-800">Atualização de Hodômetro</span>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="mt-0.5 text-xs text-zinc-500">
               Frequência esperada e tolerância máxima de KM por dia para o contexto Atualização de Hodômetro.
             </p>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-3 shrink-0">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
             <label className="flex items-center gap-2">
               <span className="text-xs text-zinc-500">Frequência (dias)</span>
               <input
@@ -231,7 +232,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
                 value={odometerDays}
                 onChange={handleChange(setOdometerDays)}
                 placeholder="—"
-                className="w-24 h-9 rounded-lg border border-zinc-200 px-3 text-sm text-right text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors"
+                className="h-9 w-24 rounded-lg border border-zinc-200 px-3 text-right text-sm text-zinc-800 transition-colors placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500 focus:outline-none"
               />
             </label>
             <label className="flex items-center gap-2">
@@ -242,7 +243,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
                 value={odometerTolerance}
                 onChange={handleChange(setOdometerTolerance)}
                 placeholder="—"
-                className="w-24 h-9 rounded-lg border border-zinc-200 px-3 text-sm text-right text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors"
+                className="h-9 w-24 rounded-lg border border-zinc-200 px-3 text-right text-sm text-zinc-800 transition-colors placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500 focus:outline-none"
               />
             </label>
           </div>
@@ -250,11 +251,11 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 flex items-center justify-end">
+      <div className="flex items-center justify-end border-t border-zinc-200 bg-zinc-50 px-6 py-4">
         <button
           onClick={() => saveMutation.mutate()}
           disabled={!isDirty || saveMutation.isPending}
-          className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
+          className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
         >
           {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
           {saveMutation.isPending ? 'Salvando...' : 'Salvar'}

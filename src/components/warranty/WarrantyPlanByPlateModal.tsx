@@ -1,13 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
 import { X, ShieldCheck, Plus, Trash2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import {
   createPlanWithItems,
   assignPlanToVehicles,
   getVehicleCurrentKmMap,
-} from '../../services/warrantyRevisionService';
-import { mirrorFirstRevisionToVehicle } from '../../services/warrantyRevisionService';
+ mirrorFirstRevisionToVehicle } from '../../services/warrantyRevisionService';
+
 import type { WarrantyRevisionPlanItem } from '../../types/warrantyRevision';
 
 const inputClass =
@@ -148,21 +149,21 @@ export default function WarrantyPlanByPlateModal({ prefillVehicleId, onClose, on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
-      <div className="relative flex w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl max-h-[90vh]">
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 flex-shrink-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-zinc-200 px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100">
               <ShieldCheck className="h-4 w-4 text-blue-600" />
             </div>
             <h2 className="text-base font-semibold text-zinc-900">Cadastrar revisão por placa</h2>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 hover:bg-zinc-100 transition-colors">
+          <button onClick={onClose} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 p-6">
+        <div className="flex-1 overflow-y-auto p-6">
           <form id="warranty-plate-form" onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
@@ -201,7 +202,7 @@ export default function WarrantyPlanByPlateModal({ prefillVehicleId, onClose, on
 
             {/* Etapas */}
             <div>
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-zinc-500">Etapas da revisão</h3>
+              <h3 className="mb-3 text-sm font-semibold tracking-wider text-zinc-500 uppercase">Etapas da revisão</h3>
               <div className="space-y-3">
                 {items.map((it, idx) => {
                   const currentKm = vehicleId ? kmMap.get(vehicleId) : null;
@@ -269,7 +270,7 @@ export default function WarrantyPlanByPlateModal({ prefillVehicleId, onClose, on
           </form>
         </div>
 
-        <div className="flex-shrink-0 border-t border-zinc-200 px-6 py-4 bg-zinc-50 rounded-b-2xl">
+        <div className="flex-shrink-0 rounded-b-2xl border-t border-zinc-200 bg-zinc-50 px-6 py-4">
           {error && (
             <p className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
           )}

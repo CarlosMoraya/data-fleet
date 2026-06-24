@@ -1,5 +1,6 @@
-import type { ActionPlan, ActionPlanStatus } from '../types';
 import { normalizeTrim } from './inputHelpers';
+
+import type { ActionPlan, ActionPlanStatus } from '../types';
 
 // ─── Row type (snake_case from Supabase) ──────────────────────────────────────
 

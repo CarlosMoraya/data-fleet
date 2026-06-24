@@ -1,6 +1,8 @@
 import { AlertTriangle, CalendarClock, FileWarning, FileX, Loader2, ShieldCheck, Truck, UserX } from 'lucide-react';
-import DashboardKpiCard from './DashboardKpiCard';
+
 import ActionQueue from './ActionQueue';
+import DashboardKpiCard from './DashboardKpiCard';
+
 import type { ComplianceActionCategory, ComplianceActionItem } from '../../lib/dashboardKpi';
 
 interface ConformityPanelProps {

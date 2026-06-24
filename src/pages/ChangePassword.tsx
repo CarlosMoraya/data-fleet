@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+
 import PasswordField from '../components/PasswordField';
 import { useAuth } from '../context/AuthContext';
 import { validateNewPassword } from '../lib/passwordValidation';
@@ -86,13 +87,13 @@ export default function ChangePassword() {
           />
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
               {error}
             </p>
           )}
 
           {success && (
-            <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
               Senha alterada com sucesso.
             </p>
           )}
@@ -100,7 +101,7 @@ export default function ChangePassword() {
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex justify-center rounded-xl border border-transparent bg-orange-500 py-2.5 px-4 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex justify-center rounded-xl border border-transparent bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? (
               <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />

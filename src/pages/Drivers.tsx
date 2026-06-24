@@ -1,21 +1,16 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Edit2, Trash2, UserCircle, Truck, Eye } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Driver, DriverFieldSettings } from '../types';
-import { Plus, Search, Edit2, Trash2, UserCircle, Truck, Eye } from 'lucide-react';
-import DriverForm from '../components/DriverForm';
-import DriverDetailModal from '../components/DriverDetailModal';
+
 import DriverActiveFilterBanner from '../components/DriverActiveFilterBanner';
-import { supabase } from '../lib/supabase';
-import { driverFromRow, DriverRow } from '../lib/driverMappers';
-import { driverFieldSettingsFromRow, defaultDriverFieldSettings, DriverFieldSettingsRow } from '../lib/driverFieldSettingsMappers';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { saveDriver, deleteDriver } from '../services/driverService';
-import type { DriverFiles } from '../services/driverService';
+import DriverDetailModal from '../components/DriverDetailModal';
+import DriverForm from '../components/DriverForm';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import SelectClientNotice from '../components/SelectClientNotice';
+import { useAuth } from '../context/AuthContext';
 import { useSessionUiState } from '../hooks/usePersistentUiState';
-import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
+import { driverFieldSettingsFromRow, defaultDriverFieldSettings, DriverFieldSettingsRow } from '../lib/driverFieldSettingsMappers';
 import {
   DRIVER_PENDENCY_LABELS,
   DRIVER_PENDENCY_VALUES,
@@ -29,6 +24,13 @@ import {
   type DriverStructuredFilters,
   type DriverVehicleLink,
 } from '../lib/driverFilters';
+import { driverFromRow, DriverRow } from '../lib/driverMappers';
+import { supabase } from '../lib/supabase';
+import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
+import { saveDriver, deleteDriver } from '../services/driverService';
+import { Driver, DriverFieldSettings } from '../types';
+
+import type { DriverFiles } from '../services/driverService';
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -260,12 +262,12 @@ export default function Drivers() {
   }, [clients]);
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex h-full flex-col gap-6">
       {blockWrite && <SelectClientNotice />}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Motoristas</h1>
-          <p className="text-sm text-zinc-500 mt-1">Gerencie os motoristas da sua frota.</p>
+          <p className="mt-1 text-sm text-zinc-500">Gerencie os motoristas da sua frota.</p>
         </div>
 
         {canCreate && (
@@ -275,15 +277,15 @@ export default function Drivers() {
               setEditingDriver(null);
               setIsFormOpen(true);
             }}
-            className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
+            className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none"
           >
-            <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+            <Plus className="mr-2 -ml-1 h-5 w-5" aria-hidden="true" />
             Adicionar Motorista
           </button>
         )}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <Search className="h-5 w-5 text-zinc-400" aria-hidden="true" />
@@ -292,7 +294,7 @@ export default function Drivers() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="block w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
+            className="block w-full rounded-xl border border-zinc-200 bg-white py-2.5 pr-3 pl-10 text-sm placeholder-zinc-500 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
             placeholder="Buscar por nome ou CPF..."
           />
         </div>
@@ -300,7 +302,7 @@ export default function Drivers() {
           aria-label="Embarcador"
           value={filters.shipperId ?? ''}
           onChange={(e) => updateFilter({ shipperId: e.target.value || null })}
-          className="rounded-xl border border-zinc-200 bg-white py-2.5 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
         >
           <option value="">Todos os embarcadores</option>
           {shipperOptions.map((shipper) => (
@@ -311,7 +313,7 @@ export default function Drivers() {
           aria-label="Base / Unidade Operacional"
           value={filters.operationalUnitId ?? ''}
           onChange={(e) => updateFilter({ operationalUnitId: e.target.value || null })}
-          className="rounded-xl border border-zinc-200 bg-white py-2.5 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
         >
           <option value="">Todas as unidades</option>
           {unitOptions.map((unit) => (
@@ -322,7 +324,7 @@ export default function Drivers() {
           aria-label="Situação"
           value={filters.pendency ?? ''}
           onChange={(e) => updateFilter({ pendency: (e.target.value || null) as DriverPendency | null })}
-          className="rounded-xl border border-zinc-200 bg-white py-2.5 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
         >
           <option value="">Todas as situações</option>
           {DRIVER_PENDENCY_VALUES.map((pendency) => (
@@ -334,7 +336,7 @@ export default function Drivers() {
             type="button"
             aria-label="Limpar filtros"
             onClick={clearAllFilters}
-            className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
           >
             Limpar filtros
           </button>
@@ -352,7 +354,7 @@ export default function Drivers() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm flex-1 min-h-0 flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         {loadingDrivers ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-orange-500" />
@@ -360,34 +362,34 @@ export default function Drivers() {
         ) : (
           <div className="flex-1 overflow-auto">
             <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50 sticky top-0 z-10">
+              <thead className="sticky top-0 z-10 bg-zinc-50">
                 <tr>
                   {blockWrite && (
-                    <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Cliente</th>
+                    <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Cliente</th>
                   )}
-                  <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider sm:pl-6">Motorista</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">CPF</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Categoria CNH</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Validade CNH</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Veículo</th>
-                  <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                  <th scope="col" className="py-3.5 pr-3 pl-4 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase sm:pl-6">Motorista</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">CPF</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Categoria CNH</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Validade CNH</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Veículo</th>
+                  <th scope="col" className="relative py-3.5 pr-4 pl-3 sm:pr-6">
                     <span className="sr-only">Ações</span>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 bg-white">
                 {filteredDrivers.map((driver) => (
-                  <tr key={driver.id} className="hover:bg-zinc-50 transition-colors">
+                  <tr key={driver.id} className="transition-colors hover:bg-zinc-50">
                     {blockWrite && (
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-600">
+                      <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-600">
                         <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
                           {driver.clientId ? (clientNameMap.get(driver.clientId) ?? '—') : '—'}
                         </span>
                       </td>
                     )}
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
+                    <td className="py-4 pr-3 pl-4 whitespace-nowrap sm:pl-6">
                       <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-zinc-100 flex items-center justify-center border border-zinc-200">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100">
                           <UserCircle className="h-5 w-5 text-zinc-500" />
                         </div>
                         <div className="ml-4">
@@ -395,34 +397,34 @@ export default function Drivers() {
                         </div>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
                       {formatCPF(driver.cpf)}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
                       {driver.category || <span className="text-zinc-300">—</span>}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
                       {driver.expirationDate
                         ? new Date(driver.expirationDate + 'T00:00:00').toLocaleDateString('pt-BR')
                         : <span className="text-zinc-300">—</span>
                       }
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
                       {driverVehicleInfo[driver.id]?.plate ? (
                         <div className="flex items-center gap-1.5">
-                          <Truck className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
-                          <span className="text-zinc-900 font-medium">{driverVehicleInfo[driver.id]?.plate}</span>
+                          <Truck className="h-3.5 w-3.5 flex-shrink-0 text-orange-500" />
+                          <span className="font-medium text-zinc-900">{driverVehicleInfo[driver.id]?.plate}</span>
                         </div>
                       ) : (
                         <span className="text-zinc-400 italic">Sem veículo</span>
                       )}
                     </td>
-                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                    <td className="relative py-4 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-6">
                       <div className="flex items-center justify-end gap-3">
                         <button
                           onClick={() => setViewingDriver(driver)}
                           title="Visualizar"
-                          className="text-zinc-400 hover:text-zinc-700 transition-colors"
+                          className="text-zinc-400 transition-colors hover:text-zinc-700"
                         >
                           <Eye className="h-5 w-5" />
                           <span className="sr-only">Visualizar</span>
@@ -434,7 +436,7 @@ export default function Drivers() {
                               setEditingDriver(driver);
                               setIsFormOpen(true);
                             }}
-                            className="text-zinc-400 hover:text-zinc-900 transition-colors"
+                            className="text-zinc-400 transition-colors hover:text-zinc-900"
                           >
                             <Edit2 className="h-5 w-5" />
                             <span className="sr-only">Editar</span>
@@ -443,7 +445,7 @@ export default function Drivers() {
                         {canDelete && (
                           <button
                             onClick={() => handleDelete(driver)}
-                            className="text-zinc-400 hover:text-red-600 transition-colors"
+                            className="text-zinc-400 transition-colors hover:text-red-600"
                           >
                             <Trash2 className="h-5 w-5" />
                             <span className="sr-only">Excluir</span>

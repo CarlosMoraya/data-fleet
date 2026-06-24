@@ -1,11 +1,6 @@
-import React, { useMemo, lazy, Suspense } from 'react';
 import { DollarSign, Truck, Gauge, Loader2, TrendingUp, ReceiptText, Wrench } from 'lucide-react';
-import DashboardKpiCard from './DashboardKpiCard';
-import RouteFallback from '../RouteFallback';
-import VehicleFinancialRanking from './VehicleFinancialRanking';
-import type { VehicleRow } from './OperationalPanel';
-import type { MaintenanceOrderDashboard } from '../../types/maintenance';
-import CostFilters from './CostFilters';
+import React, { useMemo, lazy, Suspense } from 'react';
+
 import {
   applyCostFilters,
   buildCostFilterOptions,
@@ -23,6 +18,16 @@ import {
   type CostDashboardFilters,
   type BudgetItemForCost,
 } from '../../lib/dashboardKpi';
+import RouteFallback from '../RouteFallback';
+
+import CostFilters from './CostFilters';
+import DashboardKpiCard from './DashboardKpiCard';
+import VehicleFinancialRanking from './VehicleFinancialRanking';
+
+import type { VehicleRow } from './OperationalPanel';
+import type { MaintenanceOrderDashboard } from '../../types/maintenance';
+
+
 
 const VehicleTypeBarChart = lazy(() => import('./VehicleTypeBarChart'));
 const MaintenanceTypeDonutChart = lazy(() => import('./MaintenanceTypeDonutChart'));

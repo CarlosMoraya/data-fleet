@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+
 import { filterEligibleVehicles, type EligibilityCriteria } from './warrantyRevisionEligibility';
+
 import type { Vehicle } from '../types';
 
 function makeVehicle(over: Partial<Vehicle> & { id: string }): Vehicle {
@@ -27,7 +29,7 @@ function makeVehicle(over: Partial<Vehicle> & { id: string }): Vehicle {
     category: over.category,
     operationalUnitId: over.operationalUnitId,
     acquisitionDate: over.acquisitionDate,
-  } as Vehicle;
+  };
 }
 
 const base: Vehicle = makeVehicle({ id: 'v1' });

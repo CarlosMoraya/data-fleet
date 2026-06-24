@@ -1,7 +1,8 @@
-import { offlineDb, type SyncOperation, type SyncQueueEntry } from './offlineDb';
-import { supabase } from '../supabase';
 import { uploadChecklistPhoto } from '../checklistStorageHelpers';
+import { supabase } from '../supabase';
 import { autoCompleteWorkshopSchedule } from '../workshopScheduleUtils';
+
+import { offlineDb, type SyncOperation, type SyncQueueEntry } from './offlineDb';
 
 // ─── Concurrency guard ────────────────────────────────────────────────────────
 
@@ -50,7 +51,7 @@ export async function flushQueue(): Promise<void> {
 
   try {
     // Process entries one by one in FIFO order
-    // eslint-disable-next-line no-constant-condition
+     
     while (true) {
       // Atomically claim one pending entry
       let entry: SyncQueueEntry | undefined;
@@ -68,10 +69,10 @@ export async function flushQueue(): Promise<void> {
 
       try {
         await processEntry(entry);
-        await offlineDb.syncQueue.delete(entry.id!);
+        await offlineDb.syncQueue.delete(entry.id);
       } catch (err) {
         const newRetryCount = (entry.retryCount ?? 0) + 1;
-        await offlineDb.syncQueue.update(entry.id!, {
+        await offlineDb.syncQueue.update(entry.id, {
           status: newRetryCount >= 3 ? 'error' : 'pending',
           errorMessage: err instanceof Error ? err.message : String(err),
           retryCount: newRetryCount,

@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Pencil, X } from 'lucide-react';
+import React, { useState } from 'react';
+
 import { useAuth } from '../context/AuthContext';
-import { canCorrectOdometer } from '../lib/rolePermissions';
 import { validateOdometerCorrection } from '../lib/odometerCorrectionValidation';
+import { canCorrectOdometer } from '../lib/rolePermissions';
 import {
   createOdometerCorrection,
   listVehicleOdometerHistory,
 } from '../services/odometerCorrectionService';
+
 import type { OdometerReading } from '../types/odometerCorrection';
 
 function formatDateTime(value: string | null): string {
@@ -46,7 +48,7 @@ function KmHistoryTable({
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-zinc-200 text-sm">
           <thead className="sticky top-0 bg-zinc-50">
-            <tr className="text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            <tr className="text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">
               <th className="px-4 py-3">Data</th>
               <th className="px-4 py-3">Origem</th>
               <th className="px-4 py-3">KM informado</th>
@@ -62,7 +64,7 @@ function KmHistoryTable({
                 <td className="px-4 py-3 whitespace-nowrap">{formatDateTime(reading.readingAt)}</td>
                 <td className="px-4 py-3">{reading.sourceContext ?? 'Checklist'}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatKm(reading.originalKm)}</td>
-                <td className="px-4 py-3 whitespace-nowrap font-medium text-zinc-900">{formatKm(reading.effectiveKm)}</td>
+                <td className="px-4 py-3 font-medium whitespace-nowrap text-zinc-900">{formatKm(reading.effectiveKm)}</td>
                 <td className="px-4 py-3"><StatusBadge corrected={reading.isCorrected} hasEvidence={reading.hasEvidence} /></td>
                 <td className="px-4 py-3">{reading.isCorrected ? reading.correctedBy ?? '—' : '—'}</td>
                 {canCorrect && (
@@ -70,7 +72,7 @@ function KmHistoryTable({
                     <button
                       type="button"
                       onClick={() => onCorrect(reading)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50 transition-colors"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 px-3 py-1.5 text-xs font-medium text-orange-700 transition-colors hover:bg-orange-50"
                     >
                       <Pencil className="h-3.5 w-3.5" />
                       Corrigir KM

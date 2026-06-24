@@ -1,4 +1,3 @@
-import React, { lazy, Suspense, useMemo } from 'react';
 import {
   Truck,
   Wrench,
@@ -10,13 +9,19 @@ import {
   ShieldCheck,
   Loader2,
 } from 'lucide-react';
-import DashboardKpiCard from './DashboardKpiCard';
-import RouteFallback from '../RouteFallback';
-import type { VehicleRow } from './OperationalPanel';
+import React, { lazy, Suspense, useMemo } from 'react';
+
 import {
   buildFleetCountByKey,
   buildTopFleetModels,
 } from '../../lib/dashboardKpi';
+import RouteFallback from '../RouteFallback';
+
+import DashboardKpiCard from './DashboardKpiCard';
+
+
+import type { VehicleRow } from './OperationalPanel';
+
 
 const VehicleTypeBarChart = lazy(() => import('./VehicleTypeBarChart'));
 

@@ -1,11 +1,12 @@
-import { supabase } from '../lib/supabase';
-import type { Driver } from '../types/driver';
 import { driverToRow } from '../lib/driverMappers';
 import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
 import {
   uploadDriverDocument,
   deleteDriverDocument,
 } from '../lib/storageHelpers';
+import { supabase } from '../lib/supabase';
+
+import type { Driver } from '../types/driver';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ async function uploadDriverFiles(
     const file = files[key];
     if (!file) continue;
 
-    const existingUrl = driver[DOC_FIELD_MAP[key]] as string | undefined;
+    const existingUrl = driver[DOC_FIELD_MAP[key]];
     if (existingUrl) {
       await deleteDriverDocument(existingUrl);
     }

@@ -1,4 +1,5 @@
 import { Vehicle, AxleConfigEntry } from '../types';
+
 import {
   normalizeUpper,
   capitalizeWords,

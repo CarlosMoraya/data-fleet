@@ -1,7 +1,8 @@
-import { supabase } from '../lib/supabase';
-import type { MaintenanceOrder, BudgetItem, BudgetStatus } from '../types/maintenance';
-import { uploadMaintenanceBudget } from '../lib/storageHelpers';
 import { normalizeBudgetSystem } from '../lib/budgetSystems';
+import { uploadMaintenanceBudget } from '../lib/storageHelpers';
+import { supabase } from '../lib/supabase';
+
+import type { MaintenanceOrder, BudgetItem, BudgetStatus } from '../types/maintenance';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 

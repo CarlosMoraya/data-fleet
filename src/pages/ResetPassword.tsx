@@ -1,10 +1,11 @@
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+
 import PasswordField from '../components/PasswordField';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
 import { validateNewPassword } from '../lib/passwordValidation';
+import { supabase } from '../lib/supabase';
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('');
@@ -52,30 +53,30 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="relative min-h-screen bg-zinc-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 overflow-hidden">
+    <div className="relative flex min-h-screen flex-col justify-center overflow-hidden bg-zinc-900 py-12 sm:px-6 lg:px-8">
       <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex flex-col items-center mb-8">
-          <span className="text-[36px] font-bold tracking-tight leading-none flex items-baseline">
-            <span className="text-orange-500 mr-[2px] text-[38px]">β</span>
+        <div className="mb-8 flex flex-col items-center">
+          <span className="flex items-baseline text-[36px] leading-none font-bold tracking-tight">
+            <span className="mr-[2px] text-[38px] text-orange-500">β</span>
             <span className="text-white">etaFleet</span>
           </span>
-          <span className="text-[11px] font-medium text-white/50 uppercase tracking-[0.25em] mt-1 ml-5">
+          <span className="mt-1 ml-5 text-[11px] font-medium tracking-[0.25em] text-white/50 uppercase">
             GESTÃO DE FROTAS
           </span>
         </div>
 
-        <h2 className="text-center text-2xl font-semibold tracking-tight text-white mb-8">
+        <h2 className="mb-8 text-center text-2xl font-semibold tracking-tight text-white">
           Definir nova senha
         </h2>
 
-        <div className="bg-white/95 backdrop-blur-sm py-8 px-4 shadow-xl rounded-2xl sm:px-10 border border-white/20">
+        <div className="rounded-2xl border border-white/20 bg-white/95 px-4 py-8 shadow-xl backdrop-blur-sm sm:px-10">
           {checkingSession ? (
             <div className="flex justify-center py-6">
               <Loader2 className="h-6 w-6 animate-spin text-orange-500" aria-hidden="true" />
             </div>
           ) : !ready ? (
             <div className="space-y-6">
-              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+              <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
                 Link inválido ou expirado. Solicite um novo link de recuperação.
               </p>
               <Link
@@ -104,7 +105,7 @@ export default function ResetPassword() {
               />
 
               {error && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
                   {error}
                 </p>
               )}
@@ -112,7 +113,7 @@ export default function ResetPassword() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex w-full justify-center rounded-xl border border-transparent bg-orange-500 py-2.5 px-4 text-sm font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex w-full justify-center rounded-xl border border-transparent bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting ? (
                   <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
