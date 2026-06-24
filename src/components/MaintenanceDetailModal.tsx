@@ -25,6 +25,7 @@ function statusColor(status: MaintenanceOrder['status']) {
     case 'Orçamento aprovado': return 'bg-blue-100 text-blue-800';
     case 'Serviço em execução': return 'bg-orange-100 text-orange-800';
     case 'Concluído': return 'bg-green-100 text-green-800';
+    case 'Veículo retirado': return 'bg-teal-100 text-teal-800';
     case 'Cancelado': return 'bg-zinc-100 text-zinc-500';
   }
 }
@@ -158,6 +159,10 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
                   {formatDate(order.expectedExitDate)}
                 </span>
               } />
+              <Field
+                label="Data de Saída Real"
+                value={order.actualExitDate ? formatDate(order.actualExitDate) : '—'}
+              />
               <Field label="Dias em Oficina" value={
                 <span className={cn(
                   'flex items-center gap-1.5 font-semibold',

@@ -137,7 +137,7 @@ export async function updateMaintenanceStatus(
     .from('maintenance_orders')
     .update({
       status,
-      actual_exit_date: status === 'Concluído' ? new Date().toISOString() : null,
+      actual_exit_date: status === 'Veículo retirado' ? new Date().toISOString() : null,
     })
     .eq('id', id);
   if (error) throw error;

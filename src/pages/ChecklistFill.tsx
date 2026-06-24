@@ -16,7 +16,7 @@ import { evaluateOdometerTolerance } from '../lib/odometerToleranceValidation';
 import { enqueueOperation, enqueuePhoto } from '../lib/offline/syncService';
 import { applyOfflineKm, applyOfflineWorkshop, upsertResponse } from '../lib/offlineCacheUpdates';
 import { cn } from '../lib/utils';
-import { autoCompleteWorkshopSchedule } from '../lib/workshopScheduleUtils';
+import { autoCompleteWorkshopSchedule, autoRetireVehicleFromWorkshop } from '../lib/workshopScheduleUtils';
 import { ODOMETER_UPDATE_CONTEXT, WORKSHOP_CONTEXTS } from '../types';
 
 import type { Checklist, ChecklistItem, ChecklistContext, ResponseStatus } from '../types';
@@ -386,6 +386,15 @@ export default function ChecklistFill() {
           checklist.vehicleId,
           checklist.workshopId,
           completedAt,
+          checklistId,
+        );
+      }
+
+      // Auto-retirar veículo quando checklist de "Saída de Oficina" é concluído
+      if (templateContext === 'Saída de Oficina' && checklist.workshopId && checklist.vehicleId) {
+        await autoRetireVehicleFromWorkshop(
+          checklist.vehicleId,
+          checklist.workshopId,
           checklistId,
         );
       }

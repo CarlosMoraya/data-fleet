@@ -1,6 +1,6 @@
 // ─── Manutenção ───────────────────────────────────────────────────────────────
 
-export type MaintenanceStatus = 'Aguardando orçamento' | 'Aguardando aprovação' | 'Orçamento aprovado' | 'Serviço em execução' | 'Concluído' | 'Cancelado';
+export type MaintenanceStatus = 'Aguardando orçamento' | 'Aguardando aprovação' | 'Orçamento aprovado' | 'Serviço em execução' | 'Concluído' | 'Veículo retirado' | 'Cancelado';
 export type MaintenanceType = 'Preventiva' | 'Preditiva' | 'Corretiva';
 export type BudgetStatus = 'sem_orcamento' | 'pendente' | 'aprovado' | 'reprovado';
 
@@ -35,6 +35,7 @@ export interface MaintenanceOrder {
   shipperName?: string;
   operationalUnitName?: string;
   warrantyRevisionEventId?: string; // Vínculo opcional a um evento de revisão em garantia
+  actualExitDate?: string;
 }
 
 export interface BudgetItem {

@@ -59,5 +59,6 @@ export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
     shipperName: row.vehicles?.shippers?.name || undefined,
     operationalUnitName: row.vehicles?.operational_units?.name || undefined,
     warrantyRevisionEventId: row.warranty_revision_event_id || undefined,
+    actualExitDate: row.actual_exit_date || undefined,
   };
 }

@@ -85,6 +85,19 @@ function makeMaintenanceRow(overrides: Partial<MaintenanceOrderRow> = {}): Maint
   };
 }
 
+describe('maintenanceFromRow — actualExitDate', () => {
+  it('maps actualExitDate from row', () => {
+    // null → undefined
+    const nullRow = makeMaintenanceRow({ actual_exit_date: null });
+    expect(maintenanceFromRow(nullRow).actualExitDate).toBeUndefined();
+
+    // ISO string → preserved
+    const iso = '2026-06-24T10:00:00Z';
+    const isoRow = makeMaintenanceRow({ actual_exit_date: iso });
+    expect(maintenanceFromRow(isoRow).actualExitDate).toBe(iso);
+  });
+});
+
 describe('maintenanceFromRow — shipperName / operationalUnitName', () => {
   it('maps shipperName and operationalUnitName when present', () => {
     const row = makeMaintenanceRow({

@@ -38,6 +38,7 @@ const ALL_STATUSES: StatusFilter[] = [
   'Orçamento aprovado',
   'Serviço em execução',
   'Concluído',
+  'Veículo retirado',
   'Cancelado',
 ];
 
@@ -48,6 +49,7 @@ function statusColor(status: MaintenanceStatus) {
     case 'Orçamento aprovado': return 'bg-blue-100 text-blue-800';
     case 'Serviço em execução': return 'bg-purple-100 text-purple-800';
     case 'Concluído': return 'bg-green-100 text-green-800';
+    case 'Veículo retirado': return 'bg-teal-100 text-teal-800';
     case 'Cancelado': return 'bg-zinc-100 text-zinc-500';
   }
 }
@@ -281,12 +283,13 @@ export default function Maintenance() {
 
   const counts = React.useMemo(() => {
     return {
-      all: orders.length,
+      all: orders.filter(o => o.status !== 'Veículo retirado' && o.status !== 'Cancelado').length,
       'Aguardando orçamento': orders.filter(o => o.status === 'Aguardando orçamento').length,
       'Aguardando aprovação': orders.filter(o => o.status === 'Aguardando aprovação').length,
       'Orçamento aprovado': orders.filter(o => o.status === 'Orçamento aprovado').length,
       'Serviço em execução': orders.filter(o => o.status === 'Serviço em execução').length,
       'Concluído': orders.filter(o => o.status === 'Concluído').length,
+      'Veículo retirado': orders.filter(o => o.status === 'Veículo retirado').length,
       'Cancelado': orders.filter(o => o.status === 'Cancelado').length,
       corretiva: orders.filter(o => o.type === 'Corretiva').length,
       preventiva: orders.filter(o => o.type === 'Preventiva').length,
@@ -310,7 +313,7 @@ export default function Maintenance() {
 
   const handleComplete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    updateStatusMutation.mutate({ id, status: 'Concluído' });
+    updateStatusMutation.mutate({ id, status: 'Veículo retirado' });
   };
 
   return (
@@ -539,14 +542,38 @@ export default function Maintenance() {
                               <Edit className="h-4 w-4" />
                             </button>
                           )}
-                          {canWriteMaintenance && o.status !== 'Concluído' && o.status !== 'Cancelado' && (
+                          {canWriteMaintenance && o.status === 'Concluído' && (
                             <button
                               onClick={(e) => handleComplete(o.id, e)}
-                              title="Marcar como Concluído"
+                              title="Retirar Veículo"
                               className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-green-50 hover:text-green-600"
                             >
                               <CheckCircle2 className="h-4 w-4" />
                             </button>
+                          )}
+                          {canWriteMaintenance && o.status !== 'Veículo retirado' && o.status !== 'Cancelado' && (
+                            <select
+                              value=""
+                              onChange={(e) => {
+                                const next = e.target.value;
+                                if (next) {
+                                  updateStatusMutation.mutate({ id: o.id, status: next as MaintenanceStatus });
+                                  e.target.value = '';
+                                }
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              title="Ações"
+                              className="rounded-lg border border-zinc-200 px-2 py-1 text-xs text-zinc-600 transition-colors hover:border-orange-300"
+                            >
+                              <option value="">Ações</option>
+                              {o.status === 'Serviço em execução' && (
+                                <option value="Concluído">Concluído</option>
+                              )}
+                              {o.status === 'Concluído' && (
+                                <option value="Veículo retirado">Veículo retirado</option>
+                              )}
+                              <option value="Cancelar">Cancelar</option>
+                            </select>
                           )}
                           {canWriteMaintenance && o.status !== 'Concluído' && o.status !== 'Cancelado' && (
                             <button
