@@ -144,3 +144,13 @@ Testes adicionados: cachePolicy.test.ts — "does not persist Set-returning quer
 
 - Todo o histórico anterior deste arquivo foi arquivado em `docs/MEMORY-HISTORY.md`, sob `## Arquivamento — 2026-06-14`.
 - Sessão de 2026-06-19: auditoria e sincronização de bancos Dev/Prod registrada em `docs/MEMORY-HISTORY.md` sob `## Arquivamento — 2026-06-19`.
+
+---
+
+## Correção de bug — Veículos Indisponíveis contabiliza "Veículo retirado" (2026-06-24)
+
+Bug corrigido: Veículos com status "Veículo retirado" contabilizados como indisponíveis no Dashboard
+Causa raiz: Commit 5e3d80f (24/06/2026) introduziu novo status terminal "Veículo retirado" mas não atualizou countVehiclesInMaintenance em dashboardKpi.ts para excluí-lo do filtro de ordens ativas
+Correção aplicada: adicionado && o.status !== 'Veículo retirado' ao filtro em dashboardKpi.ts:339-341
+Arquivos modificados: src/lib/dashboardKpi.ts (função countVehiclesInMaintenance), src/lib/dashboardKpi.test.ts (novo teste)
+Testes adicionados: dashboardKpi.test.ts — "exclui veículos com status Veículo retirado"

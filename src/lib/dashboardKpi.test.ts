@@ -395,6 +395,21 @@ describe('countVehiclesInMaintenance', () => {
     expect(countVehiclesInMaintenance(orders, null, vehicles)).toBe(1);
   });
 
+  it('exclui veículos com status "Veículo retirado" (não são indisponíveis)', () => {
+    const orders = [
+      { vehicle_id: 'v1', status: 'Aguardando orçamento' },
+      { vehicle_id: 'v2', status: 'Veículo retirado' },
+      { vehicle_id: 'v3', status: 'Concluído' },
+    ];
+    const vehicles = [
+      { id: 'v1', type: 'Truck' },
+      { id: 'v2', type: 'Van' },
+      { id: 'v3', type: 'Truck' },
+    ];
+    // Esperado: apenas v1 é ativa (v2 e v3 são status terminal)
+    expect(countVehiclesInMaintenance(orders, null, vehicles)).toBe(1);
+  });
+
   it('conta apenas veículos do tipo filtrado', () => {
     const orders = [
       { vehicle_id: 'v1', status: 'Aguardando orçamento' },

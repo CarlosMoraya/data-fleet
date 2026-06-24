@@ -337,7 +337,7 @@ export function countVehiclesInMaintenance(
   vehicles: Pick<VehicleRow, 'id' | 'type'>[]
 ): number {
   const active = orders.filter(
-    (o) => o.status !== 'Concluído' && o.status !== 'Cancelado'
+    (o) => o.status !== 'Concluído' && o.status !== 'Cancelado' && o.status !== 'Veículo retirado'
   );
 
   if (vehicleTypeFilter) {
