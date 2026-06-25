@@ -106,7 +106,7 @@ export default function ChecklistTemplates() {
           const isDuplicate = updateError.code === '23P01' || updateError.message.includes('unique_published_category');
           if (isDuplicate) {
             setActionError(`Já existe um template publicado para "${t.vehicleCategory} — ${t.context}". Descontinue-o antes de publicar este.`);
-            return; // Don't close modal — user sees error
+            throw updateError;
           }
           throw updateError;
         }
