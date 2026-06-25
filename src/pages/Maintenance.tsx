@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, Ban, RotateCcw } from 'lucide-react';
+import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, Ban, RotateCcw, X } from 'lucide-react';
 import React from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 
@@ -24,17 +24,14 @@ import {
 import type { Role } from '../types';
 import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus } from '../types/maintenance';
 
-import { useSessionUiState, usePersistentFilterState, usePersistentTabState } from '../hooks/usePersistentUiState';
+import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import { buildMaintenanceFilterOptions, applyMaintenanceListFilters } from '../lib/maintenanceFilters';
 
 // Re-export para compatibilidade com componentes que importam daqui
 export type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus };
 
-type StatusFilter = MaintenanceStatus | 'all';
-
-const ALL_STATUSES: StatusFilter[] = [
-  'all',
+const MAINTENANCE_STATUS_OPTIONS: MaintenanceStatus[] = [
   'Aguardando orçamento',
   'Aguardando aprovação',
   'Orçamento aprovado',
@@ -107,6 +104,21 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('pt-BR');
 }
 
+function computeMaintenanceCounts(list: MaintenanceOrder[]) {
+  return {
+    all: list.filter(o => o.status !== 'Veículo retirado' && o.status !== 'Cancelado').length,
+    'Aguardando orçamento': list.filter(o => o.status === 'Aguardando orçamento').length,
+    'Aguardando aprovação': list.filter(o => o.status === 'Aguardando aprovação').length,
+    'Orçamento aprovado': list.filter(o => o.status === 'Orçamento aprovado').length,
+    'Serviço em execução': list.filter(o => o.status === 'Serviço em execução').length,
+    'Concluído': list.filter(o => o.status === 'Concluído').length,
+    'Veículo retirado': list.filter(o => o.status === 'Veículo retirado').length,
+    'Cancelado': list.filter(o => o.status === 'Cancelado').length,
+    corretiva: list.filter(o => o.type === 'Corretiva').length,
+    preventiva: list.filter(o => o.type === 'Preventiva').length,
+  };
+}
+
 export function shouldEnableMaintenanceOrdersQuery(params: {
   isWorkshopUser: boolean;
   isMultiWorkshop: boolean;
@@ -129,10 +141,11 @@ export default function Maintenance() {
   const canWriteMaintenance = !operationsManager && !isWorkshopUser && !blockWrite;
   const canFillWorkshop = canEditWorkshopOrder(profile?.role);
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = usePersistentTabState('maintenance', 'status', 'all');
+  const [statusFilter, setStatusFilter] = usePersistentFilterState<string[]>('maintenance', 'statuses', []);
   const [search, setSearch] = usePersistentFilterState<string>('maintenance', 'search', '');
   const [shipperFilter, setShipperFilter] = usePersistentFilterState<string[]>('maintenance', 'shippers', []);
   const [unitFilter, setUnitFilter] = usePersistentFilterState<string[]>('maintenance', 'units', []);
+  const [workshopFilter, setWorkshopFilter] = usePersistentFilterState<string[]>('maintenance', 'workshops', []);
   const [searchParams, setSearchParams] = useSearchParams();
   React.useEffect(() => {
     const placa = searchParams.get('placa');
@@ -168,6 +181,7 @@ export default function Maintenance() {
     () => (operationsManager ? undefined : (location.state)?.prefillMaintenance ?? undefined)
   );
   const [orderToCancel, setOrderToCancel] = React.useState<MaintenanceOrder | null>(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = React.useState(false);
 
   const clearMaintenanceDraft = () => {
     if (profile?.id) {
@@ -298,29 +312,31 @@ export default function Maintenance() {
 
   const filterOptions = React.useMemo(() => buildMaintenanceFilterOptions(orders), [orders]);
 
-  const counts = React.useMemo(() => {
-    return {
-      all: orders.filter(o => o.status !== 'Veículo retirado' && o.status !== 'Cancelado').length,
-      'Aguardando orçamento': orders.filter(o => o.status === 'Aguardando orçamento').length,
-      'Aguardando aprovação': orders.filter(o => o.status === 'Aguardando aprovação').length,
-      'Orçamento aprovado': orders.filter(o => o.status === 'Orçamento aprovado').length,
-      'Serviço em execução': orders.filter(o => o.status === 'Serviço em execução').length,
-      'Concluído': orders.filter(o => o.status === 'Concluído').length,
-      'Veículo retirado': orders.filter(o => o.status === 'Veículo retirado').length,
-      'Cancelado': orders.filter(o => o.status === 'Cancelado').length,
-      corretiva: orders.filter(o => o.type === 'Corretiva').length,
-      preventiva: orders.filter(o => o.type === 'Preventiva').length,
-    };
-  }, [orders]);
+  const counts = React.useMemo(() => computeMaintenanceCounts(orders), [orders]);
 
   const filtered = React.useMemo(() => {
-    const byTabAndSearch = orders.filter(o => {
-      const matchTab = activeTab === 'all' || o.status === activeTab;
-      const matchSearch = !search || o.licensePlate.toLowerCase().includes(search.toLowerCase()) || o.os.toLowerCase().includes(search.toLowerCase());
-      return matchTab && matchSearch;
+    const bySearch = orders.filter(o =>
+      !search ||
+      o.licensePlate.toLowerCase().includes(search.toLowerCase()) ||
+      o.os.toLowerCase().includes(search.toLowerCase()),
+    );
+    return applyMaintenanceListFilters(bySearch, {
+      statuses: statusFilter,
+      shippers: shipperFilter,
+      operationalUnits: unitFilter,
+      workshops: workshopFilter,
     });
-    return applyMaintenanceListFilters(byTabAndSearch, { shippers: shipperFilter, operationalUnits: unitFilter });
-  }, [orders, activeTab, search, shipperFilter, unitFilter]);
+  }, [orders, search, statusFilter, shipperFilter, unitFilter, workshopFilter]);
+
+  const filteredCounts = React.useMemo(() => computeMaintenanceCounts(filtered), [filtered]);
+  const activeFilterGroups = [statusFilter, shipperFilter, unitFilter, workshopFilter].filter(a => a.length > 0).length;
+  const hasActiveDropdownFilter = activeFilterGroups > 0;
+  const filterChips: { key: string; label: string; onRemove: () => void }[] = [
+    ...statusFilter.map(v => ({ key: `status:${v}`, label: v, onRemove: () => setStatusFilter(statusFilter.filter(x => x !== v)) })),
+    ...shipperFilter.map(v => ({ key: `shipper:${v}`, label: v, onRemove: () => setShipperFilter(shipperFilter.filter(x => x !== v)) })),
+    ...unitFilter.map(v => ({ key: `unit:${v}`, label: v, onRemove: () => setUnitFilter(unitFilter.filter(x => x !== v)) })),
+    ...workshopFilter.map(v => ({ key: `workshop:${v}`, label: v, onRemove: () => setWorkshopFilter(workshopFilter.filter(x => x !== v)) })),
+  ];
 
   const clientNameMap = React.useMemo(() => {
     const map = new Map<string, string>();
@@ -362,89 +378,78 @@ export default function Maintenance() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
-        <button
-          onClick={() => setActiveTab('all')}
-          className={cn(
-            'rounded-2xl border p-4 text-left transition-colors hover:border-orange-300',
-            activeTab === 'all' ? 'border-orange-400 bg-orange-50' : 'border-zinc-200 bg-white',
-          )}
-        >
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
           <p className="text-2xl font-bold text-zinc-900">{counts.all}</p>
+          {hasActiveDropdownFilter && (
+            <p className="text-[10px] text-zinc-400">({filteredCounts.all})</p>
+          )}
           <p className="mt-0.5 text-xs text-zinc-500">Total em Manutenção</p>
-        </button>
-        <button
-          onClick={() => setActiveTab('Aguardando orçamento')}
-          className={cn(
-            'rounded-2xl border p-4 text-left transition-colors hover:border-orange-300',
-            activeTab === 'Aguardando orçamento' ? 'border-orange-400 bg-orange-50' : 'border-zinc-200 bg-white',
-          )}
-        >
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
           <p className="text-2xl font-bold text-yellow-600">{counts['Aguardando orçamento']}</p>
+          {hasActiveDropdownFilter && (
+            <p className="text-[10px] text-zinc-400">({filteredCounts['Aguardando orçamento']})</p>
+          )}
           <p className="mt-0.5 text-xs text-zinc-500">Aguardando Orçamento</p>
-        </button>
-        <button
-          onClick={() => setActiveTab('Aguardando aprovação')}
-          className={cn(
-            'rounded-2xl border p-4 text-left transition-colors hover:border-orange-300',
-            activeTab === 'Aguardando aprovação' ? 'border-orange-400 bg-orange-50' : 'border-zinc-200 bg-white',
-          )}
-        >
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
           <p className="text-2xl font-bold text-orange-600">{counts['Aguardando aprovação']}</p>
-          <p className="mt-0.5 text-xs text-zinc-500">Ag. Aprovação</p>
-        </button>
-        <button
-          onClick={() => setActiveTab('Serviço em execução')}
-          className={cn(
-            'rounded-2xl border p-4 text-left transition-colors hover:border-orange-300',
-            activeTab === 'Serviço em execução' ? 'border-orange-400 bg-orange-50' : 'border-zinc-200 bg-white',
+          {hasActiveDropdownFilter && (
+            <p className="text-[10px] text-zinc-400">({filteredCounts['Aguardando aprovação']})</p>
           )}
-        >
+          <p className="mt-0.5 text-xs text-zinc-500">Ag. Aprovação</p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
           <p className="text-2xl font-bold text-purple-600">{counts['Serviço em execução']}</p>
+          {hasActiveDropdownFilter && (
+            <p className="text-[10px] text-zinc-400">({filteredCounts['Serviço em execução']})</p>
+          )}
           <p className="mt-0.5 text-xs text-zinc-500">Em Execução</p>
-        </button>
+        </div>
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
           <p className="text-2xl font-bold text-red-600">{counts.corretiva}</p>
+          {hasActiveDropdownFilter && (
+            <p className="text-[10px] text-zinc-400">({filteredCounts.corretiva})</p>
+          )}
           <p className="mt-0.5 text-xs text-zinc-500">Total Corretiva</p>
         </div>
-        <button
-          onClick={() => setActiveTab('Cancelado')}
-          className={cn(
-            'rounded-2xl border p-4 text-left transition-colors hover:border-zinc-400',
-            activeTab === 'Cancelado' ? 'border-zinc-500 bg-zinc-50' : 'border-zinc-200 bg-white',
-          )}
-        >
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
           <p className="text-2xl font-bold text-zinc-400">{counts['Cancelado']}</p>
+          {hasActiveDropdownFilter && (
+            <p className="text-[10px] text-zinc-400">({filteredCounts['Cancelado']})</p>
+          )}
           <p className="mt-0.5 text-xs text-zinc-500">Cancelados</p>
-        </button>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        {/* Tabs */}
-        <div className="flex flex-wrap gap-1">
-          {ALL_STATUSES.map(s => (
-            <button
-              key={s}
-              onClick={() => setActiveTab(s)}
-              className={cn(
-                'rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
-                activeTab === s ? 'bg-orange-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
-              )}
-            >
-              {s === 'all' ? 'Todos' : s}
-              {counts[s as keyof typeof counts] > 0 && (
-                <span className="ml-1.5 text-xs opacity-70">({counts[s as keyof typeof counts]})</span>
-              )}
-            </button>
-          ))}
+      <div className="flex flex-col gap-3">
+        <div className="hidden flex-wrap items-center gap-2 sm:flex">
+          <MultiSelectDropdown label="Status" options={MAINTENANCE_STATUS_OPTIONS} selected={statusFilter} onChange={setStatusFilter} />
+          <MultiSelectDropdown label="Embarcador" options={filterOptions.shippers} selected={shipperFilter} onChange={setShipperFilter} />
+          <MultiSelectDropdown label="Unidade Operacional" options={filterOptions.operationalUnits} selected={unitFilter} onChange={setUnitFilter} />
+          <MultiSelectDropdown label="Oficina" options={filterOptions.workshops} selected={workshopFilter} onChange={setWorkshopFilter} />
         </div>
 
-        {/* Multi-select filters */}
-        <MultiSelectDropdown label="Unidade Operacional" options={filterOptions.operationalUnits} selected={unitFilter} onChange={setUnitFilter} />
-        <MultiSelectDropdown label="Embarcador" options={filterOptions.shippers} selected={shipperFilter} onChange={setShipperFilter} />
+        <div className="sm:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(v => !v)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+          >
+            🎯 Filtros{activeFilterGroups > 0 ? ` (${activeFilterGroups})` : ''}
+          </button>
+          {mobileFiltersOpen && (
+            <div className="mt-2 flex flex-col gap-2">
+              <MultiSelectDropdown label="Status" options={MAINTENANCE_STATUS_OPTIONS} selected={statusFilter} onChange={setStatusFilter} />
+              <MultiSelectDropdown label="Embarcador" options={filterOptions.shippers} selected={shipperFilter} onChange={setShipperFilter} />
+              <MultiSelectDropdown label="Unidade Operacional" options={filterOptions.operationalUnits} selected={unitFilter} onChange={setUnitFilter} />
+              <MultiSelectDropdown label="Oficina" options={filterOptions.workshops} selected={workshopFilter} onChange={setWorkshopFilter} />
+            </div>
+          )}
+        </div>
 
-        {/* Search */}
-        <div className="relative flex w-full items-center sm:ml-auto sm:w-64">
+        <div className="relative flex w-full items-center sm:w-64">
           <Search className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-zinc-400" />
           <input
             type="text"
@@ -454,6 +459,19 @@ export default function Maintenance() {
             className="w-full rounded-lg border border-zinc-300 py-2 pr-3 pl-8 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
           />
         </div>
+
+        {filterChips.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {filterChips.map(chip => (
+              <span key={chip.key} className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+                {chip.label}
+                <button type="button" onClick={chip.onRemove} className="text-zinc-400 transition-colors hover:text-zinc-700" aria-label={`Remover filtro ${chip.label}`}>
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Table */}
