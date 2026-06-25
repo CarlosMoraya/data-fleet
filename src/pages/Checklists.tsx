@@ -132,7 +132,11 @@ export default function Checklists() {
         .order('context');
       return (data ?? []).map(r => templateFromRow(r as ChecklistTemplateRow));
     },
-    enabled: isDriver && !!vehicleInfo?.category && !!currentClient?.id
+    enabled: isDriver && !!vehicleInfo?.category && !!currentClient?.id,
+    // Templates publicados devem refletir imediatamente: ignorar o cache persistido
+    // (o staleTime global de 3 min + persister em localStorage atrasava a aparição
+    // de templates recém-publicados, exigindo refresh repetido pelo usuário).
+    staleTime: 0,
   });
 
   // ── Queries for Auditor ───────────────────────────────────────────────────
@@ -172,7 +176,11 @@ export default function Checklists() {
         .eq('status', 'published');
       return (data ?? []).map(r => templateFromRow(r as ChecklistTemplateRow));
     },
-    enabled: isAuditor && !!selectedAuditorVehicle?.category && !!currentClient?.id
+    enabled: isAuditor && !!selectedAuditorVehicle?.category && !!currentClient?.id,
+    // Templates publicados devem refletir imediatamente: ignorar o cache persistido
+    // (o staleTime global de 3 min + persister em localStorage atrasava a aparição
+    // de templates recém-publicados de auditoria, exigindo refresh repetido pelo Auditor).
+    staleTime: 0,
   });
 
   // ── Shared Queries (Driver/Auditor/History) ────────────────────────────────

@@ -154,3 +154,19 @@ Causa raiz: Commit 5e3d80f (24/06/2026) introduziu novo status terminal "Veícul
 Correção aplicada: adicionado && o.status !== 'Veículo retirado' ao filtro em dashboardKpi.ts:339-341
 Arquivos modificados: src/lib/dashboardKpi.ts (função countVehiclesInMaintenance), src/lib/dashboardKpi.test.ts (novo teste)
 Testes adicionados: dashboardKpi.test.ts — "exclui veículos com status Veículo retirado"
+
+## Correção de bug — Auditor não vê templates de checklist (2026-06-24)
+
+Bug corrigido: Auditor (Yard Auditor) não conseguia visualizar templates de checklist na tela /checklists
+Causa raiz: RLS policy checklist_templates_select não incluía role 'Yard Auditor' na lista de roles permitidos para SELECT
+Correção aplicada: Nova migration adicionando 'Yard Auditor' à política de SELECT em checklist_templates
+Arquivos modificados: supabase/migrations/20260624000000_fix_auditor_checklist_templates_rls.sql (novo)
+Testes adicionados: e2e/completed/auditor-checklist-visibility.spec.ts (novo, validação funcional do fluxo)
+
+## Correção de performance — staleTime zero nas queries de templates publicados (2026-06-24)
+
+Bug corrigido: Templates de checklist recém-publicados demoravam até 3 min para aparecer ao Auditor (e ao Driver)
+Causa raiz: staleTime global de 3 min + cache persistido em localStorage (PersistQueryClientProvider) impedia refetch ao navegar ou mesmo ao dar F5, pois o cache vazio era servido como "fresco"
+Correção aplicada: Override staleTime=0 nas queries auditorTemplates e publishedTemplates em Checklists.tsx
+Arquivos modificados: src/pages/Checklists.tsx (+ staleTime: 0 nas duas queries)
+Testes adicionados: nenhum (já coberto pelo E2E de visibilidade existente)
