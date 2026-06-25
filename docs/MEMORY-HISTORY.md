@@ -2,6 +2,93 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-06-25 (Fleet Assistant+ anexa Fotos das Peças do computador, sem carimbo)
+
+### O que foi implementado
+
+O `PartPhotosSection` passou a escolher a fonte da imagem conforme o modo do componente. No `mode='immediate'`, usado no `MaintenanceDetailModal` por Fleet Assistant+, o botão "Adicionar foto" agora abre o seletor de arquivos do computador com multi-seleção e envia o lote sem aplicar `stampTimestampOnImage`. No `mode='staged'`, usado pelo Workshop no formulário "Preencher OS", o fluxo com câmera ao vivo e carimbo permanece intacto.
+
+### Arquivos modificados
+
+- `src/components/PartPhotosSection.tsx`
+- `src/lib/maintenanceWorkshop.ts`
+- `src/lib/maintenanceWorkshop.test.ts`
+- `docs/MEMORY.md`
+- `docs/MEMORY-HISTORY.md`
+
+### Decisões confirmadas
+
+- Workshop continua exclusivo na captura por câmera ao vivo com carimbo.
+- Fleet Assistant+ usa anexo de arquivo com `multiple`, sem carimbo.
+- A legenda digitada no grupo é aplicada a todas as fotos do lote enviado pelo Assistant.
+- O limite por tipo continua em 10; arquivos acima da capacidade restante são ignorados com aviso inline, sem erro fatal.
+
+### Validações executadas
+
+- `npm run lint` ✅ 0 erros
+- `npm run test:unit` ✅ 619 passando
+- `npm run test:smoke` ⏸️ não executado nesta sessão
+
+## Sessão — 2026-06-25 (Workshop edita OS existente + Fotos das Peças com timestamp)
+
+### O que foi implementado
+
+Workshop passou a conseguir **editar apenas OS já existentes** em `Aguardando orçamento` e `Serviço em execução`, via botão `Preencher OS` na lista de manutenção. O fluxo continua sem criação de OS para Workshop. Foi adicionada a capacidade de anexar **Fotos das Peças** em dois grupos (`broken`/`new`), com limite de 10 por tipo, timestamp estampado na imagem no momento da captura e legenda opcional.
+
+### Arquitetura aplicada
+
+- **RLS multi-tenant + partnership**: nova tabela `maintenance_part_photos` com 3 policies (`SELECT`, `INSERT`, `DELETE`) espelhando o padrão de `maintenance_budget_items`, incluindo Admin Master cross-tenant e Workshop atrelado à oficina/parceria ativa.
+- **Storage path dedicado**: `{client_id}/maintenance/{order_id}/parts/{file}` no bucket `vehicle-documents`, com correção de RLS para permitir upload do Workshop mesmo com `profiles.client_id = NULL`.
+- **Defense in depth**: trigger `enforce_workshop_maintenance_columns` bloqueia alterações forjadas de campos protegidos em `maintenance_orders`; Workshop só pode empurrar a OS para `Aguardando aprovação` e `budget_status = 'pendente'`.
+- **Reuso de componente**: `PartPhotosSection.tsx` atende os dois modos definidos com o usuário: `staged` no `MaintenanceForm` (sobe no save da OS) e `immediate` no `MaintenanceDetailModal` (sobe e remove na hora).
+
+### Arquivos criados
+
+- `supabase/migrations/20260625000000_create_maintenance_part_photos.sql`
+- `supabase/migrations/20260625000100_fix_vehicle_documents_workshop_storage.sql`
+- `supabase/migrations/20260625000200_enforce_workshop_maintenance_columns.sql`
+- `src/lib/maintenanceWorkshop.ts`
+- `src/services/maintenancePartPhotoService.ts`
+- `src/components/PartPhotosSection.tsx`
+- `src/lib/rolePermissions.workshop.test.ts`
+- `src/lib/maintenanceWorkshop.test.ts`
+- `src/lib/maintenancePartPhotoMappers.test.ts`
+- `src/lib/storageHelpers.partPhotoPath.test.ts`
+
+### Arquivos modificados
+
+- `src/lib/rolePermissions.ts`
+- `src/types/maintenance.ts`
+- `src/lib/maintenanceMappers.ts`
+- `src/lib/storageHelpers.ts`
+- `src/components/MaintenanceForm.tsx`
+- `src/services/maintenanceService.ts`
+- `src/pages/Maintenance.tsx`
+- `src/components/MaintenanceDetailModal.tsx`
+- `docs/MEMORY.md`
+- `docs/MEMORY-HISTORY.md`
+
+### Decisões confirmadas
+
+- Workshop continua fora de `ROLES_CAN_EDIT`, `ROLES_CAN_CREATE`, `ROLES_WITH_ACCESS` e qualquer lista genérica; a permissão nova usa apenas `canEditWorkshopOrder`.
+- `MaintenanceForm` em modo Workshop ficou com persistência `staged`; `MaintenanceDetailModal` ficou com persistência `immediate`.
+- `maintenance_orders.client_id` em edição passa a respeitar `data.clientId ?? currentClientId`, corrigindo o caso Workshop multi-transportadora com cliente ativo nulo.
+- Legenda de foto permanece imutável após insert; editar legenda exige sessão futura com policy/serviço de `UPDATE`.
+- O bucket `vehicle-documents` continua público para `SELECT`; risco aceito registrado em `docs/MEMORY.md`.
+
+### Validações executadas
+
+- `npm run test:unit` ✅ `618/618`
+- `npm run lint` ✅ `0 errors, 7578 warnings`
+- `npx tsc --noEmit` ✅
+- `npm run test:smoke` ⏸️ não executado nesta sessão; usuário rodará
+
+### Pendências fora do workspace local
+
+- Executar manualmente no Supabase DEV as 3 migrations acima.
+- Validar o fluxo manual Workshop/Fleet Assistant após as migrations.
+- Promover ao Prod apenas depois da validação no DEV e autorização consciente.
+
 ## Sessão — 2026-06-24 (ESLint 9+ como ferramenta oficial de qualidade de código)
 
 ### Instalação e configuração do ESLint

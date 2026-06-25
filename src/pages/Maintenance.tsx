@@ -9,9 +9,12 @@ import MultiSelectDropdown from '../components/MultiSelectDropdown';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { requiresClientSelection } from '../lib/clientScope';
+import { canWorkshopFillOrder } from '../lib/maintenanceWorkshop';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
+import { canEditWorkshopOrder, isOperationsManager } from '../lib/rolePermissions';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
+import { savePendingPartPhotos, type PartPhotoDraft } from '../services/maintenancePartPhotoService';
 import {
   saveMaintenanceOrder,
   updateMaintenanceStatus,
@@ -21,7 +24,6 @@ import {
 import type { Role } from '../types';
 import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus } from '../types/maintenance';
 
-import { isOperationsManager } from '../lib/rolePermissions';
 import { useSessionUiState, usePersistentFilterState, usePersistentTabState } from '../hooks/usePersistentUiState';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import { buildMaintenanceFilterOptions, applyMaintenanceListFilters } from '../lib/maintenanceFilters';
@@ -125,6 +127,7 @@ export default function Maintenance() {
   const blockWrite = requiresClientSelection(profile?.role, currentClient?.id);
   const operationsManager = isOperationsManager(profile?.role);
   const canWriteMaintenance = !operationsManager && !isWorkshopUser && !blockWrite;
+  const canFillWorkshop = canEditWorkshopOrder(profile?.role);
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = usePersistentTabState('maintenance', 'status', 'all');
   const [search, setSearch] = usePersistentFilterState<string>('maintenance', 'search', '');
@@ -256,23 +259,37 @@ export default function Maintenance() {
       data,
       budgetItems,
       budgetFile,
+      pendingPartPhotos,
     }: {
       data: Partial<MaintenanceOrder>;
       budgetItems: BudgetItem[];
       budgetFile: File | null;
+      pendingPartPhotos: PartPhotoDraft[];
     }) => {
       if (!profile) throw new Error('Sessão inválida');
-      return saveMaintenanceOrder({
+      const orderId = await saveMaintenanceOrder({
         data,
         budgetItems,
         budgetFile,
         profileId: profile.id,
         currentClientId: currentClient?.id,
       });
+      if (pendingPartPhotos.length > 0) {
+        const clientId = data.clientId ?? currentClient?.id;
+        if (!clientId) throw new Error('client_id é obrigatório');
+        await savePendingPartPhotos({
+          orderId,
+          clientId,
+          uploadedBy: profile.id,
+          drafts: pendingPartPhotos,
+        });
+      }
+      return orderId;
     },
-    onSuccess: () => {
+    onSuccess: (orderId) => {
       queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
       queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
+      queryClient.invalidateQueries({ queryKey: ['partPhotos', orderId] });
       setIsFormOpen(false);
       setOrderToEdit(null);
       clearMaintenanceDraft();
@@ -542,6 +559,18 @@ export default function Maintenance() {
                               <Edit className="h-4 w-4" />
                             </button>
                           )}
+                          {canFillWorkshop && canWorkshopFillOrder(o.status) && (
+                            <button
+                              onClick={() => {
+                                setOrderToEdit(o);
+                                setIsFormOpen(true);
+                              }}
+                              title="Preencher OS"
+                              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-orange-50 hover:text-orange-600"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                          )}
                           {canWriteMaintenance && o.status === 'Concluído' && (
                             <button
                               onClick={(e) => handleComplete(o.id, e)}
@@ -618,7 +647,7 @@ export default function Maintenance() {
         />
       )}
 
-      {isFormOpen && canWriteMaintenance && (
+      {isFormOpen && (canWriteMaintenance || canFillWorkshop) && (
         <MaintenanceForm
           order={orderToEdit}
           prefill={prefillData}
@@ -629,8 +658,8 @@ export default function Maintenance() {
             setPrefillData(undefined);
             clearMaintenanceDraft();
           }}
-          onSave={async (data, budgetItems, budgetFile) => {
-            await saveMutation.mutateAsync({ data, budgetItems, budgetFile });
+          onSave={async (data, budgetItems, budgetFile, pendingPartPhotos) => {
+            await saveMutation.mutateAsync({ data, budgetItems, budgetFile, pendingPartPhotos });
           }}
         />
       )}

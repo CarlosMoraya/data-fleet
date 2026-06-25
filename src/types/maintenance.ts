@@ -100,6 +100,32 @@ export interface MaintenanceBudgetItemRow {
   created_at: string;
 }
 
+export type PartPhotoType = 'broken' | 'new';
+
+export interface MaintenancePartPhoto {
+  id: string;
+  maintenanceOrderId: string;
+  clientId: string;
+  type: PartPhotoType;
+  url: string;
+  caption?: string;
+  takenAt: string;
+  uploadedBy?: string;
+  createdAt: string;
+}
+
+export interface MaintenancePartPhotoRow {
+  id: string;
+  maintenance_order_id: string;
+  client_id: string;
+  type: PartPhotoType;
+  url: string;
+  caption: string | null;
+  taken_at: string;
+  uploaded_by: string | null;
+  created_at: string;
+}
+
 // Dashboard-specific types
 
 export interface MaintenanceOrderDashboard {

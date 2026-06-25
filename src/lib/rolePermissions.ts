@@ -164,3 +164,15 @@ export function canAccessRoute(role: Role | null | undefined, pathname: string):
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   );
 }
+
+export function canEditWorkshopOrder(role: Role | undefined | null): boolean {
+  return role === 'Workshop';
+}
+
+export function canViewPartPhotos(role: Role | undefined | null): boolean {
+  return role === 'Workshop' || getRoleRank(role ?? undefined) >= ROLE_RANK['Fleet Assistant'];
+}
+
+export function canManagePartPhotos(role: Role | undefined | null): boolean {
+  return getRoleRank(role ?? undefined) >= ROLE_RANK['Fleet Assistant'];
+}

@@ -1,13 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { X, Wrench, Building2, Calendar, User, FileText, DollarSign, Clock, ExternalLink, BadgeCheck } from 'lucide-react';
+import { X, Wrench, Building2, Calendar, User, FileText, DollarSign, Clock, ExternalLink, BadgeCheck, Image } from 'lucide-react';
 import React from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { budgetItemFromRow, type MaintenanceBudgetItemRow } from '../lib/maintenanceMappers';
+import { canManagePartPhotos, canViewPartPhotos } from '../lib/rolePermissions';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 
 import BudgetItemsTable from './BudgetItemsTable';
+import PartPhotosSection from './PartPhotosSection';
 
 import type { MaintenanceOrder } from '../types/maintenance';
 
@@ -251,6 +253,22 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
                   <BudgetItemsTable items={budgetItems} readOnly />
                 )}
               </div>
+            </section>
+          )}
+
+          {user?.id && order.clientId && canViewPartPhotos(user.role) && (
+            <section>
+              <div className="mb-3 flex items-center gap-2">
+                <Image className="h-4 w-4 text-zinc-400" />
+                <h3 className="text-sm font-semibold tracking-wide text-zinc-600 uppercase">Fotos das Peças</h3>
+              </div>
+              <PartPhotosSection
+                mode="immediate"
+                orderId={order.id}
+                clientId={order.clientId}
+                uploadedBy={user.id}
+                canManage={canManagePartPhotos(user.role)}
+              />
             </section>
           )}
 

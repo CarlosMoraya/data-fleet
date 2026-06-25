@@ -10,9 +10,11 @@ import { budgetItemFromRow, type MaintenanceBudgetItemRow , BudgetItem } from '.
 import { validateFile } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
+import type { PartPhotoDraft } from '../services/maintenancePartPhotoService';
 import { listPendingEventsForVehicle } from '../services/warrantyRevisionService';
 
 import BudgetItemsTable from './BudgetItemsTable';
+import PartPhotosSection from './PartPhotosSection';
 
 import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType } from '../types/maintenance';
 
@@ -36,7 +38,7 @@ interface MaintenanceFormProps {
   prefill?: Partial<MaintenanceOrder>;
   mode?: 'default' | 'workshop';
   onClose: () => void;
-  onSave: (order: Partial<MaintenanceOrder>, budgetItems: BudgetItem[], budgetFile: File | null) => Promise<void>;
+  onSave: (order: Partial<MaintenanceOrder>, budgetItems: BudgetItem[], budgetFile: File | null, pendingPartPhotos: PartPhotoDraft[]) => Promise<void>;
 }
 
 interface VehicleOption { id: string; licensePlate: string; initialKm: number | null; }
@@ -82,6 +84,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
   const [extracting, setExtracting] = useState(false);
   const [extractionWarning, setExtractionWarning] = useState<string | null>(null);
   const [existingBudgetPdfUrl, setExistingBudgetPdfUrl] = useState<string | undefined>();
+  const [partPhotoDrafts, setPartPhotoDrafts] = useState<PartPhotoDraft[]>([]);
 
   // Inicializa dados
   useEffect(() => {
@@ -265,7 +268,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
     setSaving(true);
     setError(null);
     try {
-      await onSave(formData, budgetItems, budgetFile);
+      await onSave(formData, budgetItems, budgetFile, partPhotoDrafts);
       handleClose();
     } catch (err: any) {
       setError(err?.message ?? 'Erro ao salvar. Tente novamente.');
@@ -411,6 +414,18 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
                       onChange={setBudgetItems}
                       extracting={extracting}
                     />
+
+                    {order?.id && user?.id && order.clientId && (
+                      <PartPhotosSection
+                        mode="staged"
+                        canManage
+                        orderId={order.id}
+                        clientId={order.clientId}
+                        uploadedBy={user.id}
+                        drafts={partPhotoDrafts}
+                        onDraftsChange={setPartPhotoDrafts}
+                      />
+                    )}
                   </div>
                 </>
               ) : (

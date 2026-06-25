@@ -2,7 +2,7 @@ import { normalizeBudgetSystem } from '../lib/budgetSystems';
 import { uploadMaintenanceBudget } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 
-import type { MaintenanceOrder, BudgetItem, BudgetStatus } from '../types/maintenance';
+import type { MaintenanceOrder, BudgetItem } from '../types/maintenance';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -36,10 +36,9 @@ export async function saveMaintenanceOrder(
 ): Promise<string> {
   const { data, budgetItems, budgetFile, profileId, currentClientId } = payload;
 
-  const isWorkshopSave = false; // caller deve passar clientId correto
-  const effectiveClientId = isWorkshopSave
-    ? (data.clientId ?? currentClientId)
-    : currentClientId;
+  // Em edição (Workshop ou Assistant), o client_id da própria OS prevalece;
+  // em criação, usa o cliente selecionado.
+  const effectiveClientId = data.clientId ?? currentClientId;
 
   if (!effectiveClientId) throw new Error('client_id é obrigatório');
 

@@ -3,12 +3,20 @@ import {
   BudgetItem,
   MaintenanceOrderRow,
   MaintenanceBudgetItemRow,
+  MaintenancePartPhoto,
+  MaintenancePartPhotoRow,
 } from '../types/maintenance';
 
 import { normalizeBudgetSystem } from './budgetSystems';
 
 // Re-export para compatibilidade com código que importa daqui
-export type { BudgetItem, MaintenanceBudgetItemRow, MaintenanceOrderRow };
+export type {
+  BudgetItem,
+  MaintenanceBudgetItemRow,
+  MaintenanceOrderRow,
+  MaintenancePartPhoto,
+  MaintenancePartPhotoRow,
+};
 
 export function budgetItemFromRow(row: MaintenanceBudgetItemRow): BudgetItem {
   return {
@@ -20,6 +28,20 @@ export function budgetItemFromRow(row: MaintenanceBudgetItemRow): BudgetItem {
     quantity: Number(row.quantity),
     value: Number(row.value),
     sortOrder: row.sort_order,
+  };
+}
+
+export function partPhotoFromRow(row: MaintenancePartPhotoRow): MaintenancePartPhoto {
+  return {
+    id: row.id,
+    maintenanceOrderId: row.maintenance_order_id,
+    clientId: row.client_id,
+    type: row.type,
+    url: row.url,
+    caption: row.caption ?? undefined,
+    takenAt: row.taken_at,
+    uploadedBy: row.uploaded_by ?? undefined,
+    createdAt: row.created_at,
   };
 }
 

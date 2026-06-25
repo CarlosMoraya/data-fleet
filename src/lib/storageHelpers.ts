@@ -159,6 +159,34 @@ export async function uploadMaintenanceBudget(
   return data.publicUrl;
 }
 
+export function buildMaintenancePartPhotoPath(clientId: string, orderId: string, fileName: string): string {
+  return `${clientId}/maintenance/${orderId}/parts/${fileName}`;
+}
+
+export async function uploadMaintenancePartPhoto(
+  clientId: string,
+  orderId: string,
+  file: File,
+): Promise<string> {
+  validateFile(file);
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Apenas imagens são permitidas nas fotos de peças.');
+  }
+
+  const prepared = await prepareFile(file);
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const path = buildMaintenancePartPhotoPath(clientId, orderId, fileName);
+
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, prepared, { upsert: false, contentType: 'image/jpeg' });
+
+  if (error) throw new Error(`Erro ao enviar foto da peça: ${error.message}`);
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Driver Documents
 // Bucket: driver-documents
