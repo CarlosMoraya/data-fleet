@@ -2,6 +2,43 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-06-27 (Importar itens de template existente + duplicar template publicado)
+
+### O que foi implementado
+
+Templates de checklist passaram a suportar duas novas capacidades no fluxo de criação. A primeira é a importação da estrutura de itens de um template existente do mesmo cliente, no Passo 2, substituindo integralmente a lista atual do rascunho. A segunda é a duplicação de templates publicados a partir da listagem, abrindo o mesmo formulário em modo criação pré-preenchido com nome `Cópia de ...`, categoria, contexto, descrição e itens da versão atual.
+
+Também foi adicionado o campo opcional **Nome do template** em criação, duplicação e edição de rascunhos. Quando deixado em branco, o save continua usando o nome automático `Checklist {categoria} {contexto}`.
+
+### Arquivos criados
+
+- `src/lib/checklistTemplateImport.ts`
+- `src/lib/checklistTemplateImport.test.ts`
+- `e2e/pending/checklist-template-import-duplicate.spec.ts`
+
+### Arquivos modificados
+
+- `src/components/ChecklistTemplateForm.tsx`
+- `src/pages/ChecklistTemplates.tsx`
+- `docs/MEMORY.md`
+- `docs/MEMORY-HISTORY.md`
+
+### Decisões confirmadas
+
+- Importação reaproveita um helper puro (`mapItemRowsToDraftItems`) e **substitui**, nunca soma, os itens do rascunho.
+- O campo `name` é editável em rascunhos; templates publicados/descontinuados continuam sem edição de nome pelo formulário.
+- A exclusão de rascunhos apaga o template; os itens vinculados são removidos pelo `ON DELETE CASCADE` de `checklist_items`.
+- O botão **Duplicar** aparece somente para templates `published` e a cópia sempre nasce como `draft`.
+- `duplicatingTemplate` permanece efêmero na tela de listagem e não vai para `sessionStorage`.
+- O spec E2E ficou em `e2e/pending/` por depender de credenciais/massa Manager específicas no DEV.
+
+### Validações executadas
+
+- `npx vitest run src/lib/checklistTemplateImport.test.ts` ✅ 6/6
+- `npm run test:unit` ✅ 632/632
+- `npm run lint` ✅ 0 errors, 7711 warnings
+- `npm run test:smoke` ✅ 6/6
+
 ## Sessão — 2026-06-25 (Fleet Assistant+ anexa Fotos das Peças do computador, sem carimbo)
 
 ### O que foi implementado

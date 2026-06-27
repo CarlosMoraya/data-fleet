@@ -1,8 +1,9 @@
 import { X, Plus, Trash2, ChevronUp, ChevronDown, GripVertical, Lock, AlertTriangle } from 'lucide-react';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import {
+  templateFromRow,
   templateToRow,
   checklistItemToRow,
   checklistItemFromRow,
@@ -10,18 +11,20 @@ import {
   type SuggestionRow,
   type ChecklistItemRow,
 } from '../lib/checklistTemplateMappers';
+import { buildDuplicateName, mapItemRowsToDraftItems, resolveTemplateName } from '../lib/checklistTemplateImport';
 import { canSaveTemplateWithoutItems } from '../lib/checklistTemplateRules';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
-import { ODOMETER_UPDATE_CONTEXT, type ChecklistTemplate, type ChecklistItem, type ChecklistItemSuggestion, type TemplateCategory, type ChecklistContext } from '../types';
+import { ODOMETER_UPDATE_CONTEXT, type ChecklistTemplate, type ChecklistItemSuggestion, type TemplateCategory, type ChecklistContext } from '../types';
 
 interface Props {
+  duplicateSource?: ChecklistTemplate | null;
   template?: ChecklistTemplate | null;
   onClose: () => void;
   onSaved: () => void;
 }
 
-interface DraftItem {
+export interface DraftItem {
   id?: string;
   title: string;
   description: string;
@@ -51,18 +54,25 @@ const CONTEXTS: { value: ChecklistContext; label: string; description: string }[
   { value: 'Atualização de Hodômetro', label: 'Atualização de Hodômetro', description: 'Registro rápido apenas do KM atual do veículo.' },
 ];
 
-export default function ChecklistTemplateForm({ template, onClose, onSaved }: Props) {
+export default function ChecklistTemplateForm({ template, duplicateSource, onClose, onSaved }: Props) {
   const { user, currentClient } = useAuth();
   const isEdit = !!template;
+  const isDuplicate = !isEdit && !!duplicateSource;
+  const canEditName = !isEdit || template?.status === 'draft';
+  const initializedDuplicateIdRef = useRef<string | null>(null);
 
   // Step 1: Metadata
-  const [description, setDescription] = useState(template?.description ?? '');
-  const [category, setCategory] = useState<TemplateCategory>(template?.vehicleCategory ?? 'Leve');
-  const [context, setContext] = useState<ChecklistContext>(template?.context ?? 'Rotina');
+  const [name, setName] = useState(isDuplicate ? buildDuplicateName(duplicateSource.name) : template?.name ?? '');
+  const [description, setDescription] = useState(template?.description ?? duplicateSource?.description ?? '');
+  const [category, setCategory] = useState<TemplateCategory>(template?.vehicleCategory ?? duplicateSource?.vehicleCategory ?? 'Leve');
+  const [context, setContext] = useState<ChecklistContext>(template?.context ?? duplicateSource?.context ?? 'Rotina');
 
   // Step 2: Items
   const [items, setItems] = useState<DraftItem[]>([]);
   const [suggestions, setSuggestions] = useState<ChecklistItemSuggestion[]>([]);
+  const [itemSource, setItemSource] = useState<'suggestions' | 'imported'>('suggestions');
+  const [importTemplates, setImportTemplates] = useState<ChecklistTemplate[]>([]);
+  const [selectedImportId, setSelectedImportId] = useState('');
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   const [step, setStep] = useState(1);
@@ -79,13 +89,53 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
       .select('*')
       .eq('vehicle_category', cat)
       .order('order_number');
-    setSuggestions((data ?? []).map(r => suggestionFromRow(r as SuggestionRow)));
+    const nextSuggestions = (data ?? []).map(r => suggestionFromRow(r as SuggestionRow));
+    setSuggestions(nextSuggestions);
     setLoadingSuggestions(false);
+    return nextSuggestions;
+  }, []);
+
+  const buildSuggestionItems = useCallback((sourceSuggestions: ChecklistItemSuggestion[]) => {
+    return sourceSuggestions.map((s, idx) => ({
+      title: s.title,
+      description: s.description ?? '',
+      isMandatory: s.isMandatory,
+      requirePhotoIfIssue: s.requirePhotoIfIssue,
+      canBlockVehicle: false,
+      defaultAction: s.defaultAction ?? '',
+      orderNumber: idx,
+      fromSuggestion: true,
+      enabled: s.isMandatory,
+    }));
   }, []);
 
   useEffect(() => {
     if (!isEdit) loadSuggestions(category);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (isEdit || !currentClient?.id) return;
+    (async () => {
+      const { data, error: importError } = await supabase
+        .from('checklist_templates')
+        .select('id, name, vehicle_category, context, current_version, status')
+        .eq('client_id', currentClient.id)
+        .order('created_at', { ascending: false });
+      if (importError) {
+        console.error('Erro ao carregar templates para importação:', importError);
+        setImportTemplates([]);
+        return;
+      }
+      setImportTemplates((data ?? []).map(row => templateFromRow({
+        ...row,
+        client_id: currentClient.id,
+        description: null,
+        created_by: null,
+        created_at: '',
+        updated_at: '',
+      })));
+    })();
+  }, [currentClient?.id, isEdit]);
 
   useEffect(() => {
     if (!isEdit || !template) return;
@@ -117,6 +167,33 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
     })();
   }, [isEdit, template]);
 
+  useEffect(() => {
+    if (!isDuplicate || !duplicateSource) return;
+    if (initializedDuplicateIdRef.current === duplicateSource.id) return;
+    initializedDuplicateIdRef.current = duplicateSource.id;
+    setName(buildDuplicateName(duplicateSource.name));
+    setDescription(duplicateSource.description ?? '');
+    setCategory(duplicateSource.vehicleCategory);
+    setContext(duplicateSource.context);
+  }, [duplicateSource, isDuplicate]);
+
+  useEffect(() => {
+    if (!isDuplicate || !duplicateSource) return;
+    (async () => {
+      const { data, error: duplicateError } = await supabase
+        .from('checklist_items')
+        .select('*')
+        .eq('template_id', duplicateSource.id)
+        .eq('version_number', duplicateSource.currentVersion)
+        .order('order_number');
+      if (duplicateError) {
+        setError('Não foi possível carregar os itens do template para duplicar.');
+        return;
+      }
+      setItems(mapItemRowsToDraftItems((data ?? []) as ChecklistItemRow[]));
+    })();
+  }, [duplicateSource, isDuplicate]);
+
   const handleCategoryChange = async (newCat: TemplateCategory) => {
     setCategory(newCat);
     if (isEdit) return;
@@ -127,19 +204,44 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
   const buildItemsFromSuggestions = () => {
     if (isEdit) return;
     if (isOdometerContext) return;
+    if (itemSource !== 'suggestions') return;
     if (items.length > 0) return;
-    const built: DraftItem[] = suggestions.map((s, idx) => ({
-      title: s.title,
-      description: s.description ?? '',
-      isMandatory: s.isMandatory,
-      requirePhotoIfIssue: s.requirePhotoIfIssue,
-      canBlockVehicle: false,
-      defaultAction: s.defaultAction ?? '',
-      orderNumber: idx,
-      fromSuggestion: true,
-      enabled: s.isMandatory,
-    }));
-    setItems(built);
+    setItems(buildSuggestionItems(suggestions));
+  };
+
+  const handleImportFromTemplate = async (selectedId: string): Promise<void> => {
+    setSelectedImportId(selectedId);
+    if (!selectedId) return;
+    const selectedTemplate = importTemplates.find(item => item.id === selectedId);
+    if (!selectedTemplate) return;
+    const { data, error: importError } = await supabase
+      .from('checklist_items')
+      .select('*')
+      .eq('template_id', selectedId)
+      .eq('version_number', selectedTemplate.currentVersion)
+      .order('order_number');
+    if (importError) {
+      setError('Não foi possível importar os itens do template selecionado. Tente novamente.');
+      return;
+    }
+    setError('');
+    setItems(mapItemRowsToDraftItems((data ?? []) as ChecklistItemRow[]));
+  };
+
+  const handleItemSourceChange = async (source: 'suggestions' | 'imported') => {
+    setError('');
+    setItemSource(source);
+    if (source === 'suggestions') {
+      const nextSuggestions = await loadSuggestions(category);
+      setItems([]);
+      setItems(buildSuggestionItems(nextSuggestions));
+      return;
+    }
+    if (selectedImportId) {
+      await handleImportFromTemplate(selectedImportId);
+      return;
+    }
+    setItems([]);
   };
 
   const addItem = () => {
@@ -195,7 +297,10 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
         const { error: upErr } = await supabase
           .from('checklist_templates')
           .update({
-            ...templateToRow({ description: description || undefined }),
+            ...templateToRow({
+              ...(template.status === 'draft' ? { name: resolveTemplateName(name, category, context) } : {}),
+              description: description || undefined,
+            }),
             updated_at: new Date().toISOString(),
           })
           .eq('id', template.id);
@@ -218,7 +323,7 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
             client_id: currentClient.id,
             vehicle_category: category,
             context,
-            name: `Checklist ${category} ${context}`,
+            name: resolveTemplateName(name, category, context),
             description: description.trim() || null,
             current_version: 1,
             status: 'draft',
@@ -370,6 +475,19 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
                 )}
               </div>
 
+              {canEditName && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700">Nome do template (opcional)</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder={`Checklist ${category} ${context}`}
+                    className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="mb-1 block text-sm font-medium text-zinc-700">Descrição (opcional)</label>
                 <textarea
@@ -386,6 +504,52 @@ export default function ChecklistTemplateForm({ template, onClose, onSaved }: Pr
           {/* ── Step 2: Items ─────────────────────────────────────────────────── */}
           {step === 2 && (
             <div className="space-y-3">
+              {!isEdit && !isOdometerContext && (
+                <div className="space-y-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <div>
+                    <p className="text-sm font-medium text-zinc-900">Origem dos itens</p>
+                    <p className="text-xs text-zinc-500">Escolha entre sugestões padrão da categoria ou importar os itens de um template existente.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleItemSourceChange('suggestions')}
+                      className={cn(
+                        'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        itemSource === 'suggestions' ? 'bg-orange-500 text-white' : 'bg-white text-zinc-600 hover:bg-zinc-100',
+                      )}
+                    >
+                      Sugestões padrão
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleItemSourceChange('imported')}
+                      className={cn(
+                        'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        itemSource === 'imported' ? 'bg-orange-500 text-white' : 'bg-white text-zinc-600 hover:bg-zinc-100',
+                      )}
+                    >
+                      Importar de template existente
+                    </button>
+                  </div>
+
+                  {itemSource === 'imported' && (
+                    <select
+                      value={selectedImportId}
+                      onChange={e => void handleImportFromTemplate(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+                    >
+                      <option value="">Selecione um template para importar</option>
+                      {importTemplates.map(importTemplate => (
+                        <option key={importTemplate.id} value={importTemplate.id}>
+                          {`${importTemplate.name} — ${importTemplate.vehicleCategory} / ${importTemplate.context}`}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
               {isSecurityContext && (
                 <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                   <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />

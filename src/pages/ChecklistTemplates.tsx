@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit2, CheckCircle, XCircle, RefreshCw, Trash2, FileStack } from 'lucide-react';
+import { Plus, Edit2, CheckCircle, XCircle, RefreshCw, Trash2, FileStack, Copy } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 
 import ChecklistTemplateForm from '../components/ChecklistTemplateForm';
@@ -46,6 +46,7 @@ export default function ChecklistTemplates() {
     const saved = sessionStorage.getItem('checklistTemplateFormEditing');
     return saved ? JSON.parse(saved) : null;
   });
+  const [duplicatingTemplate, setDuplicatingTemplate] = useState<ChecklistTemplate | null>(null);
 
   // Sincronizar estado do formulário com sessionStorage
   React.useEffect(() => {
@@ -206,7 +207,7 @@ export default function ChecklistTemplates() {
         </div>
         {canCreate && (
           <button
-            onClick={() => { setEditingTemplate(null); setShowForm(true); }}
+            onClick={() => { setEditingTemplate(null); setDuplicatingTemplate(null); setShowForm(true); }}
             className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
           >
             <Plus className="h-4 w-4" />
@@ -263,7 +264,7 @@ export default function ChecklistTemplates() {
             <p className="text-sm">Nenhum template encontrado.</p>
             {canCreate && (
               <button
-                onClick={() => { setEditingTemplate(null); setShowForm(true); }}
+                onClick={() => { setEditingTemplate(null); setDuplicatingTemplate(null); setShowForm(true); }}
                 className="mt-4 text-sm text-orange-500 hover:underline"
               >
                 Criar primeiro template
@@ -316,10 +317,20 @@ export default function ChecklistTemplates() {
                         {t.status === 'draft' && isManager && !blockWrite && (
                           <button
                             title="Editar"
-                            onClick={() => { setEditingTemplate(t); setShowForm(true); }}
+                            onClick={() => { setEditingTemplate(t); setDuplicatingTemplate(null); setShowForm(true); }}
                             className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100"
                           >
                             <Edit2 className="h-4 w-4" />
+                          </button>
+                        )}
+
+                        {t.status === 'published' && isManager && !blockWrite && (
+                          <button
+                            title="Duplicar"
+                            onClick={() => { setEditingTemplate(null); setDuplicatingTemplate(t); setShowForm(true); }}
+                            className="rounded p-1.5 text-orange-600 hover:bg-orange-50"
+                          >
+                            <Copy className="h-4 w-4" />
                           </button>
                         )}
 
@@ -379,16 +390,19 @@ export default function ChecklistTemplates() {
       {/* Forms/Modals */}
       {showForm && (
         <ChecklistTemplateForm
+          duplicateSource={duplicatingTemplate}
           template={editingTemplate}
           onClose={() => {
             setShowForm(false);
             setEditingTemplate(null);
+            setDuplicatingTemplate(null);
             sessionStorage.removeItem('checklistTemplateFormOpen');
             sessionStorage.removeItem('checklistTemplateFormEditing');
           }}
           onSaved={() => {
             setShowForm(false);
             setEditingTemplate(null);
+            setDuplicatingTemplate(null);
             sessionStorage.removeItem('checklistTemplateFormOpen');
             sessionStorage.removeItem('checklistTemplateFormEditing');
             queryClient.invalidateQueries({ queryKey: ['checklistTemplates', currentClient?.id] });
