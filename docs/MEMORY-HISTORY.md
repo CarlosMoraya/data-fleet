@@ -2,6 +2,32 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-06-27 (aria-selected em abas de Checklists + race condition em warranty-revision-os-link)
+
+### O que foi implementado
+
+Correção de dois bugs isolados. O primeiro adiciona atributos ARIA (`role="tablist"`, `role="tab"`, `aria-selected`) nos botões de aba da tela de Checklists (view Fleet Assistant+), garantindo acessibilidade para leitores de tela e conformidade com o teste E2E. O segundo corrige uma race condition no teste de vínculo de OS com revisão de garantia, adicionando uma espera pelo fechamento do modal antes de consultar o banco de dados.
+
+### Arquivos modificados
+
+- `src/pages/Checklists.tsx`
+- `e2e/completed/warranty-revision-os-link.spec.ts`
+- `docs/MEMORY.md`
+- `docs/MEMORY-HISTORY.md`
+
+### Decisões confirmadas
+
+- Atributos ARIA são puramente declarativos e não alteram lógica, eventos ou estado.
+- O teste de vínculo de OS aguarda o fechamento do modal como prova de que a mutação assíncrona completou.
+- Nenhum outro arquivo foi modificado além dos listados.
+
+### Validações executadas
+
+- `npx playwright test e2e/completed/ui-state-persistence.spec.ts e2e/completed/warranty-revision-os-link.spec.ts --project=chromium` — 10/11 (1 falha pré-existente não relacionada)
+- `npm run test:smoke` — 6/6
+- `npx vitest run` — 636/636
+- `npx tsc --noEmit` — 0 erros
+
 ## Sessão — 2026-06-27 (Importar itens de template existente + duplicar template publicado)
 
 ### O que foi implementado

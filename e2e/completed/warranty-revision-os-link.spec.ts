@@ -109,10 +109,11 @@ test.describe('Revisões de Garantia — vínculo de OS', () => {
       await page.locator('#entryDate').fill(new Date().toISOString().split('T')[0]);
 
       // O seletor de vínculo aparece e lista o evento pendente
-      await expect(page.locator('#warrantyRevisionEventId option', { hasText: '1ª revisão' })).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('#warrantyRevisionEventId option', { hasText: '1ª revisão' })).toHaveCount(1, { timeout: 10000 });
       await page.locator('#warrantyRevisionEventId').selectOption(eventId);
 
       await page.getByRole('button', { name: 'Criar Manutenção' }).click();
+      await expect(page.getByRole('heading', { name: /Nova Manutenção|Editar OS/ })).not.toBeVisible({ timeout: 15000 });
 
       // OS criada e vinculada:
       const os = await supabase.from('maintenance_orders')

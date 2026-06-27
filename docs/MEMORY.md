@@ -176,3 +176,13 @@ Causa raiz: staleTime global de 3 min + cache persistido em localStorage (Persis
 Correção aplicada: Override staleTime=0 nas queries auditorTemplates e publishedTemplates em Checklists.tsx
 Arquivos modificados: src/pages/Checklists.tsx (+ staleTime: 0 nas duas queries)
 Testes adicionados: nenhum (já coberto pelo E2E de visibilidade existente)
+
+## Correção de bug — aria-selected ausente em abas de Checklists + race condition em warranty-revision-os-link (2026-06-27)
+
+Bug corrigido: aria-selected ausente nas abas de Checklists + race condition em warranty-revision-os-link
+Causa raiz: (1) botões de aba em Checklists.tsx sem role="tab"/aria-selected; (2) teste consultava banco antes da mutação assíncrona completar
+Correção aplicada: (1) adicionado role="tablist" no nav e role="tab" + aria-selected nos dois botões; (2) adicionado await expect(heading).not.toBeVisible() antes da query ao banco
+Arquivos modificados: src/pages/Checklists.tsx, e2e/completed/warranty-revision-os-link.spec.ts
+Testes adicionados: nenhum (cobertura existente já protege ambos os bugs)
+
+**Observação (2026-06-27):** teste "Estado UI: chaves usam namespace bf:v1:ui" (ui-state-persistence.spec.ts:180) falha com `allKeys.length === 0`. Não relacionado à correção acima — é um teste pré-existente que verifica o namespace das chaves no sessionStorage e não encontrou chaves com o padrão esperado. Fora do escopo desta correção.

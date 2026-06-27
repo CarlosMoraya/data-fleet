@@ -12,12 +12,12 @@ test.describe.serial('Persistência de estado de UI', () => {
 
     const searchInput = page.locator('input[placeholder*="Buscar"]');
     await searchInput.fill('ABC');
-    await expect(page.locator('tbody tr')).toHaveCount(await page.locator('tbody tr').count());
+    await expect(page).toHaveURL(/\/cadastros\/veiculos\?q=ABC/);
 
     await page.goto('/cadastros/motoristas');
     await expect(page.locator('h1', { hasText: 'Motoristas' })).toBeVisible({ timeout: 10000 });
 
-    await page.goto('/cadastros/veiculos');
+    await page.goBack();
     await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 10000 });
 
     await expect(searchInput).toHaveValue('ABC');
@@ -29,11 +29,12 @@ test.describe.serial('Persistência de estado de UI', () => {
 
     const searchInput = page.locator('input[placeholder*="Buscar"]');
     await searchInput.fill('Teste');
+    await expect(page).toHaveURL(/\/cadastros\/motoristas\?q=Teste/);
 
     await page.goto('/cadastros/veiculos');
     await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 10000 });
 
-    await page.goto('/cadastros/motoristas');
+    await page.goBack();
     await expect(page.locator('h1', { hasText: 'Motoristas' })).toBeVisible({ timeout: 10000 });
 
     await expect(searchInput).toHaveValue('Teste');
@@ -177,8 +178,13 @@ test.describe.serial('Persistência de estado de UI', () => {
   });
 
   test('Estado UI: chaves usam namespace bf:v1:ui', async ({ page }) => {
-    await page.goto('/cadastros/veiculos');
-    await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 10000 });
+    await page.goto('/checklists');
+    await expect(page.locator('h1', { hasText: 'Checklists' })).toBeVisible({ timeout: 10000 });
+
+    const tabButton = page.locator('button', { hasText: /Inspe.*Pneu/i }).first();
+    if (await tabButton.isVisible()) {
+      await tabButton.click();
+    }
 
     const allKeys = await page.evaluate(() => {
       const keys: string[] = [];

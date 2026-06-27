@@ -11,9 +11,13 @@ import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePersistentTabState, usePersistentFilterState, useSessionUiState } from '../hooks/usePersistentUiState';
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
-import { supabase } from '../lib/supabase';
+import { getChecklistStartBlockMessage, getTireInspectionStartBlockMessage } from '../lib/checklistStartGuard';
 import { templateFromRow, type ChecklistTemplateRow } from '../lib/checklistTemplateMappers';
+import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
+import { supabase } from '../lib/supabase';
 import { tireInspectionFromRow, type TireInspectionRow } from '../lib/tireInspectionMappers';
+import { safeParseJson } from '../lib/uiStateStorage';
+import { cn } from '../lib/utils';
 import {
   validateTireInspectionEligibility,
   createTireInspection,
@@ -21,12 +25,7 @@ import {
 } from '../services/tireInspectionService';
 import { ODOMETER_UPDATE_CONTEXT } from '../types';
 
-import type { Checklist, ChecklistTemplate, TireInspection } from '../types';
-
-import { buildUiStateKey, safeParseJson } from '../lib/uiStateStorage';
-import { cn } from '../lib/utils';
-import { getChecklistStartBlockMessage, getTireInspectionStartBlockMessage } from '../lib/checklistStartGuard';
-import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
+import type { Checklist, ChecklistTemplate, TireInspection, AxleConfigEntry } from '../types';
 
 const STATUS_LABEL: Record<string, string> = { in_progress: 'Em andamento', completed: 'Concluído' };
 const STATUS_COLOR: Record<string, string> = {
@@ -94,6 +93,23 @@ export default function Checklists() {
   const [startError, setStartError] = useState<string | null>(null);
   const isOnline = useOnlineStatus();
 
+  type DriverRecord = { id: string; client_id: string };
+  type DriverVehicleRow = { id: string; license_plate: string | null; category: string | null };
+  type AuditorVehicleRow = {
+    id: string;
+    license_plate: string | null;
+    category: string | null;
+    drivers: Array<{ profiles: Array<{ name: string | null }> | null }> | null;
+  };
+  type IssueChecklistIdRow = { checklist_id: string };
+  type DayIntervalRow = { pneus_day_interval: number | null };
+  type TireInspectionVehicleConfigRow = {
+    axle_config: AxleConfigEntry[] | null;
+    steps_count: number | null;
+    type: string | null;
+  };
+  type StartedChecklistRow = { id: string };
+
   // ── Queries for Driver ────────────────────────────────────────────────────
   const { data: vehicleInfo, isLoading: loadingVehicleInfo } = useQuery({
     queryKey: ['driverVehicle', user?.id, currentClient?.id],
@@ -105,16 +121,18 @@ export default function Checklists() {
         .eq('client_id', currentClient!.id)
         .maybeSingle();
 
-      if (!driverRec) return null;
+      const driver = driverRec as DriverRecord | null;
+      if (!driver) return null;
 
       const { data: vehicleData } = await supabase
         .from('vehicles')
         .select('id, license_plate, category')
-        .eq('driver_id', driverRec.id)
-        .eq('client_id', driverRec.client_id)
+        .eq('driver_id', driver.id)
+        .eq('client_id', driver.client_id)
         .maybeSingle();
 
-      return vehicleData ? { id: vehicleData.id, plate: vehicleData.license_plate, category: vehicleData.category } : null;
+      const vehicle = vehicleData as DriverVehicleRow | null;
+      return vehicle ? { id: vehicle.id, plate: vehicle.license_plate, category: vehicle.category } : null;
     },
     enabled: isDriver && !!user?.id && !!currentClient?.id
   });
@@ -149,11 +167,12 @@ export default function Checklists() {
         .eq('client_id', currentClient!.id)
         .order('license_plate');
       
-      return (data ?? []).map((v: any) => ({
+      const rows = (data ?? []) as AuditorVehicleRow[];
+      return rows.map((v) => ({
         id: v.id,
         plate: v.license_plate,
         category: v.category,
-        driverName: v.drivers?.profiles?.name ?? null,
+        driverName: v.drivers?.[0]?.profiles?.[0]?.name ?? null,
       }));
     },
     enabled: isAuditor && !!currentClient?.id
@@ -187,7 +206,7 @@ export default function Checklists() {
   const { data: openChecklist } = useQuery({
     queryKey: ['openChecklist', user?.id, currentClient?.id],
     queryFn: async () => {
-      const { data } = await supabase
+      const response = await supabase
         .from('checklists')
         .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context)')
         .eq('client_id', currentClient!.id)
@@ -196,6 +215,7 @@ export default function Checklists() {
         .order('started_at', { ascending: false })
         .limit(1)
         .maybeSingle();
+      const data = response.data as ChecklistRow | null;
       return data ? checklistFromRow(data as ChecklistRow) : null;
     },
     enabled: isDriverOrAuditor && !!user?.id && !!currentClient?.id
@@ -237,7 +257,8 @@ export default function Checklists() {
         .in('checklist_id', ids)
         .eq('status', 'issue');
       
-      return (data ?? []).map((r: any) => r.checklist_id);
+      const rows = (data ?? []) as IssueChecklistIdRow[];
+      return rows.map((r) => r.checklist_id);
     },
     enabled: isAssistantPlus && checklists.length > 0
   });
@@ -273,7 +294,8 @@ export default function Checklists() {
         .select('pneus_day_interval')
         .eq('client_id', currentClient!.id)
         .maybeSingle();
-      return data?.pneus_day_interval ?? 7;
+      const interval = data as DayIntervalRow | null;
+      return interval?.pneus_day_interval ?? 7;
     },
     enabled: !!currentClient?.id,
   });
@@ -290,9 +312,10 @@ export default function Checklists() {
         .single();
       if (vehErr) throw vehErr;
 
-      const axleConfig = veh.axle_config ?? [];
-      const stepsCount = veh.steps_count ?? 0;
-      const vehicleType = veh.type ?? '';
+      const vehicle = veh as TireInspectionVehicleConfigRow;
+      const axleConfig = vehicle.axle_config ?? [];
+      const stepsCount = vehicle.steps_count ?? 0;
+      const vehicleType = vehicle.type ?? '';
 
       await validateTireInspectionEligibility(vehicleId, axleConfig, stepsCount, vehicleType, pneusDayInterval);
 
@@ -306,9 +329,9 @@ export default function Checklists() {
       });
     },
     onSuccess: (inspectionId) => {
-      queryClient.invalidateQueries({ queryKey: ['tireInspections', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['tireInspections', currentClient?.id] });
       setStartingTireInspection(false);
-      navigate(`/inspecao-pneus/${inspectionId}`);
+      void navigate(`/inspecao-pneus/${inspectionId}`);
     },
     onError: (e: Error) => {
       setTireInspectionError(e.message);
@@ -329,7 +352,7 @@ export default function Checklists() {
 
   const startMutation = useMutation({
     mutationFn: async ({ template, vehicleId }: { template: ChecklistTemplate; vehicleId: string }) => {
-      const { data, error } = await supabase
+      const response = await supabase
         .from('checklists')
         .insert({
           client_id: currentClient!.id,
@@ -342,14 +365,17 @@ export default function Checklists() {
         })
         .select()
         .single();
+      const data = response.data as StartedChecklistRow | null;
+      const error = response.error;
       if (error) throw error;
+      if (!data) throw new Error('Checklist não retornado após criação.');
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['openChecklist', user?.id, currentClient?.id] });
-      queryClient.invalidateQueries({ queryKey: ['checklists', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['openChecklist', user?.id, currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['checklists', currentClient?.id] });
       setStarting(null);
-      navigate(`/checklists/preencher/${data.id}`);
+      void navigate(`/checklists/preencher/${data.id}`);
     },
     onError: (err) => {
       console.error(err);
@@ -375,8 +401,8 @@ export default function Checklists() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['checklists', currentClient?.id] });
-      queryClient.invalidateQueries({ queryKey: ['openChecklist', user?.id, currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['checklists', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['openChecklist', user?.id, currentClient?.id] });
       setConfirmDelete(null);
     },
   });
@@ -453,7 +479,7 @@ export default function Checklists() {
                   Cancelar
                 </button>
                 <button
-                  onClick={() => navigate(`/checklists/preencher/${openChecklist.id}`)}
+                  onClick={() => { void navigate(`/checklists/preencher/${openChecklist.id}`); }}
                   className="flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
                 >
                   <Play className="h-4 w-4" />
@@ -546,7 +572,7 @@ export default function Checklists() {
                 </p>
               </div>
               <button
-                onClick={() => navigate(`/checklists/preencher/${openChecklist.id}`)}
+                onClick={() => { void navigate(`/checklists/preencher/${openChecklist.id}`); }}
                 className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
               >
                 <Play className="h-4 w-4" />
@@ -658,9 +684,11 @@ export default function Checklists() {
           {blockWrite && <SelectClientNotice />}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
           <div className="border-b border-zinc-200 px-4">
-            <nav className="-mb-px flex gap-1">
+            <nav role="tablist" className="-mb-px flex gap-1">
               <button
                 type="button"
+                role="tab"
+                aria-selected={activeTab === 'checklists'}
                 onClick={() => setActiveTab('checklists')}
                 className={cn(
                   activeTab === 'checklists'
@@ -673,6 +701,8 @@ export default function Checklists() {
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected={activeTab === 'tireInspections'}
                 onClick={() => setActiveTab('tireInspections')}
                 className={cn(
                   activeTab === 'tireInspections'
@@ -756,7 +786,9 @@ export default function Checklists() {
                           <td className="px-4 py-3 text-sm text-zinc-900">
                             <div className="flex items-center gap-1.5">
                               {issueChecklistIds.has(c.id) && (
-                                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 text-red-400" title="Contém inconformidades" />
+                                <span title="Contém inconformidades">
+                                  <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 text-red-400" />
+                                </span>
                               )}
                               {c.templateName ?? '—'}
                             </div>
@@ -876,7 +908,7 @@ export default function Checklists() {
           onClose={() => setCreatePlanChecklist(null)}
           onCreated={() => { 
             setCreatePlanChecklist(null);
-            queryClient.invalidateQueries({ queryKey: ['checklists', currentClient?.id] });
+            void queryClient.invalidateQueries({ queryKey: ['checklists', currentClient?.id] });
           }}
         />
       )}
