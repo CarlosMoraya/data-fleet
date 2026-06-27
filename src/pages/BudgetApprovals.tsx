@@ -217,7 +217,7 @@ export default function BudgetApprovals() {
 
   React.useEffect(() => {
     if (!user) return;
-    if (rank < 3) navigate('/', { replace: true });
+    if (rank < 3) void navigate('/', { replace: true });
   }, [user, rank, navigate]);
 
   const { currentClient } = useAuth();
@@ -245,7 +245,14 @@ export default function BudgetApprovals() {
       const { data, error } = await query;
       if (error) throw error;
 
-      return (data as any[]).map(row => ({
+      type OrderQueryRow = {
+        id: string; os_number: string; entry_date: string; workshop_os_number: string | null;
+        current_km: number | null; budget_pdf_url: string | null; created_at: string;
+        vehicles: { license_plate: string } | null;
+        workshops: { name: string } | null;
+        profiles: { name: string } | null;
+      };
+      return (data as unknown as OrderQueryRow[]).map((row) => ({
         id: row.id,
         os: row.os_number,
         licensePlate: row.vehicles?.license_plate ?? 'N/A',
@@ -298,8 +305,8 @@ export default function BudgetApprovals() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
-      queryClient.invalidateQueries({ queryKey: ['maintenanceOrders'] });
+      void queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
+      void queryClient.invalidateQueries({ queryKey: ['maintenanceOrders'] });
     },
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : 'Falha ao processar aprovação.';

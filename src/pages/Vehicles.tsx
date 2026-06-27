@@ -29,26 +29,10 @@ import {
 } from '../lib/vehicleFilters';
 import { vehicleFromRow, VehicleRow } from '../lib/vehicleMappers';
 import { saveVehicle, deleteVehicle } from '../services/vehicleService';
-import { Vehicle, VehicleFieldSettings } from '../types';
+import { Vehicle } from '../types';
 
 import type { VehicleFiles } from '../services/vehicleService';
 
-interface AvailableDriver {
-  id: string;
-  name: string;
-  cpf: string;
-}
-
-interface AvailableShipper {
-  id: string;
-  name: string;
-}
-
-interface AvailableOperationalUnit {
-  id: string;
-  name: string;
-  shipperId: string;
-}
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -62,8 +46,8 @@ export default function Vehicles() {
   const [searchParams, setSearchParams] = useSearchParams();
   const search = parseSearchFromParams(searchParams);
   const filters = useMemo(() => parseVehicleFiltersFromParams(searchParams), [searchParams]);
-  const [isFormOpen, setIsFormOpen, , formOpenKey] = useSessionUiState<boolean>('vehicles', 'modal', 'form-open', false, { legacyKeys: ['vehicleFormOpen'] });
-  const [editingVehicle, setEditingVehicle, , editingKey] = useSessionUiState<Vehicle | null>('vehicles', 'selection', 'editing', null, { legacyKeys: ['vehicleFormEditing'] });
+  const [isFormOpen, setIsFormOpen] = useSessionUiState<boolean>('vehicles', 'modal', 'form-open', false, { legacyKeys: ['vehicleFormOpen'] });
+  const [editingVehicle, setEditingVehicle] = useSessionUiState<Vehicle | null>('vehicles', 'selection', 'editing', null, { legacyKeys: ['vehicleFormEditing'] });
   const [restoredAfterReload] = useState(() => isFormOpen);
 
   const [viewingVehicle, setViewingVehicle] = useState<Vehicle | null>(null);
@@ -105,12 +89,13 @@ export default function Vehicles() {
     queryKey: ['vehicleFieldSettings', currentClient?.id],
     queryFn: async () => {
       if (!currentClient?.id) return defaultFieldSettings('');
-      const { data } = await supabase
+      const result = await supabase
         .from('vehicle_field_settings')
         .select('*')
         .eq('client_id', currentClient.id)
         .maybeSingle();
-      return data ? fieldSettingsFromRow(data as VehicleFieldSettingsRow) : defaultFieldSettings(currentClient.id);
+      const data = result.data as VehicleFieldSettingsRow | null;
+      return data ? fieldSettingsFromRow(data) : defaultFieldSettings(currentClient.id);
     },
     enabled: !!currentClient?.id,
   });
@@ -131,9 +116,10 @@ export default function Vehicles() {
         unitsQuery.order('name'),
       ]);
 
+      type UnitRow = { id: string; name: string; shipper_id: string };
       return {
         shippers: (shippersData ?? []),
-        units: (unitsData ?? []).map((u: any) => ({
+        units: (unitsData as UnitRow[] ?? []).map((u) => ({
           id: u.id,
           name: u.name,
           shipperId: u.shipper_id,
@@ -165,7 +151,8 @@ export default function Vehicles() {
           .filter((id: string) => id !== editingVehicle?.driverId)
       );
 
-      return (allDrivers ?? []).filter((d: any) => !usedIds.has(d.id));
+      type DriverRow = { id: string; name: string; cpf: string };
+      return (allDrivers as DriverRow[] ?? []).filter((d) => !usedIds.has(d.id));
     },
     enabled: isFormOpen && !!currentClient?.id,
   });
@@ -206,11 +193,12 @@ export default function Vehicles() {
   >({
     queryKey: ['vehicles-overdue-checklists', currentClient?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('dashboard_last_checklist_per_vehicle', {
+      const rpcResult = await supabase.rpc('dashboard_last_checklist_per_vehicle', {
         p_client_id: currentClient?.id ?? null,
       });
-      if (error) throw error;
-      return (data ?? []).map((row: Record<string, unknown>) => ({
+      if (rpcResult.error) throw rpcResult.error;
+      const rows = (rpcResult.data as Record<string, unknown>[] | null) ?? [];
+      return rows.map((row) => ({
         vehicle_id: row.vehicle_id as string,
         context: (row.context as string) ?? '',
         completed_at: row.completed_at as string,
@@ -292,7 +280,7 @@ export default function Vehicles() {
         { replace: true }
       );
     }
-  }, [searchParams]);
+  }, [searchParams, setSearchParams]);
 
   const availableShippers = logisticsData?.shippers ?? [];
   const availableOperationalUnits = logisticsData?.units ?? [];
@@ -306,8 +294,8 @@ export default function Vehicles() {
       return saveVehicle(currentClient.id, vehicle, files, editingVehicle?.id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vehicles', currentClient?.id] });
-      queryClient.invalidateQueries({ queryKey: ['availableDrivers'] });
+      void queryClient.invalidateQueries({ queryKey: ['vehicles', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['availableDrivers'] });
       setIsFormOpen(false);
       setEditingVehicle(null);
       clearVehicleDraft();
@@ -327,8 +315,8 @@ export default function Vehicles() {
       await deleteVehicle(vehicle);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vehicles', currentClient?.id] });
-      queryClient.invalidateQueries({ queryKey: ['availableDrivers'] });
+      void queryClient.invalidateQueries({ queryKey: ['vehicles', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['availableDrivers'] });
     },
     onError: (err) => {
       console.error('Erro ao excluir veículo:', err);
@@ -336,7 +324,7 @@ export default function Vehicles() {
     },
   });
 
-  const handleDelete = async (vehicle: Vehicle) => {
+  const handleDelete = (vehicle: Vehicle) => {
     if (!window.confirm(`Excluir o veículo ${vehicle.licensePlate}? Esta ação não pode ser desfeita.`)) return;
     deleteMutation.mutate(vehicle);
   };

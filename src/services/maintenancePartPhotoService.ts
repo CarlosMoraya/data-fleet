@@ -31,7 +31,7 @@ export async function addPartPhoto(params: {
   uploadedBy: string;
 }): Promise<MaintenancePartPhoto> {
   const url = await uploadMaintenancePartPhoto(params.clientId, params.orderId, params.file);
-  const { data, error } = await supabase
+  const insertResult = await supabase
     .from('maintenance_part_photos')
     .insert({
       maintenance_order_id: params.orderId,
@@ -44,8 +44,8 @@ export async function addPartPhoto(params: {
     })
     .select()
     .single();
-  if (error) throw error;
-  return partPhotoFromRow(data as MaintenancePartPhotoRow);
+  if (insertResult.error) throw insertResult.error;
+  return partPhotoFromRow(insertResult.data as MaintenancePartPhotoRow);
 }
 
 export async function deletePartPhoto(photo: { id: string; url: string }): Promise<void> {

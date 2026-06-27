@@ -6,7 +6,7 @@ import type { BudgetItem } from './maintenanceMappers';
 
 const DEBUG = import.meta.env.VITE_DEBUG_OCR === '1';
 const debug = (...args: unknown[]) => {
-  if (DEBUG) console.log('[BudgetOCR]', ...args);
+  if (DEBUG) console.info('[BudgetOCR]', ...args);
 };
 
 export interface BudgetExtractionResult {
@@ -61,8 +61,8 @@ function extractBudgetFromText(text: string): {
 
   // OS da oficina
   const osPatterns = [
-    /\bO\.?S\.?\s*[:#]?\s*(\w[\w\-\/]*)/i,
-    /Ordem\s+de\s+Servi[çc]o\s*[:#]?\s*(\w[\w\-\/]*)/i,
+    /\bO\.?S\.?\s*[:#]?\s*(\w[\w-/]*)/i,
+    /Ordem\s+de\s+Servi[çc]o\s*[:#]?\s*(\w[\w-/]*)/i,
   ];
   for (const pattern of osPatterns) {
     const m = text.match(pattern);
@@ -183,15 +183,18 @@ Regras:
 Retorne SOMENTE o JSON, sem markdown.`;
 
 async function extractBudgetViaIA(file: File): Promise<BudgetExtractionResult> {
-  const json = await performOcr(file, BUDGET_PROMPT);
+  type JsonVal = string | number | boolean | null | undefined;
+  type BudgetItemJson = { item_name?: JsonVal; system?: JsonVal; quantity?: JsonVal; value?: JsonVal };
+  type BudgetJson = { items?: BudgetItemJson[]; workshop_os?: JsonVal; current_km?: JsonVal };
+  const json = (await performOcr(file, BUDGET_PROMPT)) as BudgetJson;
 
-  const items: BudgetItem[] = (json.items ?? []).map((it: any, idx: number) => ({
-    itemName: String(it.item_name || ''),
-    system: normalizeBudgetSystem(String(it.system || '')),
+  const items: BudgetItem[] = (json.items ?? []).map((it, idx: number) => ({
+    itemName: String(it.item_name ?? ''),
+    system: normalizeBudgetSystem(String(it.system ?? '')),
     quantity: Number(it.quantity) || 1,
     value: Number(it.value) || 0,
     sortOrder: idx,
-  })).filter((it: BudgetItem) => it.itemName.length > 0);
+  })).filter((it) => it.itemName.length > 0);
 
   const workshopOs = json.workshop_os ? String(json.workshop_os) : undefined;
   const currentKm = json.current_km ? Math.round(Number(json.current_km)) : undefined;

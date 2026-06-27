@@ -107,11 +107,11 @@ function CorrectKmModal({
   const mutation = useMutation({
     mutationFn: createOdometerCorrection,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vehicle-odometer-history', vehicleId] });
-      queryClient.invalidateQueries({ queryKey: ['lastOdometerKm', vehicleId] });
-      queryClient.invalidateQueries({ queryKey: ['lastOdometerReadingAt', vehicleId] });
-      queryClient.invalidateQueries({ queryKey: ['warrantyOverview'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-vehicle-km'] });
+      void queryClient.invalidateQueries({ queryKey: ['vehicle-odometer-history', vehicleId] });
+      void queryClient.invalidateQueries({ queryKey: ['lastOdometerKm', vehicleId] });
+      void queryClient.invalidateQueries({ queryKey: ['lastOdometerReadingAt', vehicleId] });
+      void queryClient.invalidateQueries({ queryKey: ['warrantyOverview'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-vehicle-km'] });
       onClose();
     },
     onError: (err) => {

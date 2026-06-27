@@ -2,7 +2,7 @@ import { supabase } from '../supabase';
 
 export interface OcrCacheEntry {
   file_hash: string;
-  result: any;
+  result: unknown;
   model_used: string;
 }
 

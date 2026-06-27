@@ -5,15 +5,15 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
 import { supabase } from '../lib/supabase';
-import { workshopInvitationFromRow, workshopPartnershipFromRow } from '../lib/workshopAccountMappers';
-import { WorkshopInvitation, WorkshopPartnership } from '../types';
+import { workshopInvitationFromRow } from '../lib/workshopAccountMappers';
+import { WorkshopInvitation } from '../types';
 
 interface Props {
   onClose: () => void;
 }
 
 export default function InviteWorkshopModal({ onClose }: Props) {
-  const { currentClient, user } = useAuth();
+  const { currentClient } = useAuth();
   const queryClient = useQueryClient();
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
@@ -44,7 +44,8 @@ export default function InviteWorkshopModal({ onClose }: Props) {
         .eq('status', 'active')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data;
+      type PartnershipRow = { id: string; status: string; workshop_accounts: { name: string; address_city: string | null; address_state: string | null } | null };
+      return (data as PartnershipRow[]) ?? [];
     },
     enabled: !!currentClient?.id,
   });
@@ -55,7 +56,7 @@ export default function InviteWorkshopModal({ onClose }: Props) {
       return invokeEdgeFunction('workshop-invitation', { action: 'create', client_id: currentClient?.id });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workshopInvitations', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['workshopInvitations', currentClient?.id] });
     },
   });
 
@@ -65,7 +66,7 @@ export default function InviteWorkshopModal({ onClose }: Props) {
       return invokeEdgeFunction('workshop-invitation', { action: 'revoke', invitation_id: invitationId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workshopInvitations', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['workshopInvitations', currentClient?.id] });
     },
   });
 
@@ -75,7 +76,7 @@ export default function InviteWorkshopModal({ onClose }: Props) {
       return invokeEdgeFunction('workshop-partnership-manage', { action: 'deactivate', partnership_id: partnershipId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workshopPartnerships', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['workshopPartnerships', currentClient?.id] });
     },
   });
 
@@ -185,7 +186,7 @@ export default function InviteWorkshopModal({ onClose }: Props) {
 
           {createMutation.isError && (
             <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-              Erro ao gerar convite: {(createMutation.error as any)?.message}
+              Erro ao gerar convite: {(createMutation.error as { message?: string })?.message}
             </p>
           )}
 
@@ -210,7 +211,7 @@ export default function InviteWorkshopModal({ onClose }: Props) {
                         <p className="mt-0.5 text-xs text-zinc-400">Expira em {formatExpiry(inv.expiresAt)}</p>
                       </div>
                       <button
-                        onClick={() => handleCopy(url, inv.token)}
+                        onClick={() => { void handleCopy(url, inv.token); }}
                         className="flex-shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-orange-50 hover:text-orange-600"
                         title="Copiar link"
                       >
@@ -242,7 +243,7 @@ export default function InviteWorkshopModal({ onClose }: Props) {
                 Parcerias ativas ({partnerships.length})
               </h3>
               <div className="space-y-2">
-                {partnerships.map((p: any) => {
+                {partnerships.map((p) => {
                   const wa = p.workshop_accounts;
                   return (
                     <div key={p.id} className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3">

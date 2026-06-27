@@ -1,5 +1,5 @@
 import { X, FileText, ExternalLink, Loader2, UserPlus, Eye, EyeOff } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { extractCnhData, ExtractionStatus, ExtractionResult } from '../lib/documentOcr';
@@ -52,7 +52,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
     ? buildUiStateKey({ scope: 'draft', userId: user.id, clientId: currentClient?.id ?? 'no-client', module: 'drivers', stateKind: 'draft', name: 'form' })
     : '';
 
-  const defaultFormData = { ...driver };
+  const defaultFormData = useMemo(() => ({ ...driver }), [driver]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [formData, setFormData] = useState<Partial<Driver>>(() => {
@@ -87,7 +87,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
     if (!draftKey) return;
     const sanitized = sanitizeDraft('drivers', formData as Record<string, unknown>);
     writeUiState(window.sessionStorage, draftKey, sanitized as Partial<Driver>, defaultFormData, { removeLegacyKeys: ['driverFormData'] });
-  }, [formData, draftKey]);
+  }, [formData, draftKey, defaultFormData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -109,7 +109,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
         setError(null);
       } catch (err: unknown) {
         setter(null);
-        setError((err as Error).message);
+        setError(err instanceof Error ? err.message : 'Arquivo inválido.');
         e.target.value = '';
       }
     };
@@ -151,7 +151,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
       }
     } catch (err: unknown) {
       setSelectedCnhFile(null);
-      setError((err as Error).message);
+      setError(err instanceof Error ? err.message : 'Arquivo inválido.');
       e.target.value = '';
     }
   };
@@ -206,8 +206,8 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
           can_delete_vehicles: false,
           can_delete_drivers: false,
           can_delete_workshops: false,
-        });
-        profileId = (data as { profileId?: string })?.profileId;
+        }) as { profileId?: string };
+        profileId = data.profileId;
       }
 
       await onSave(
@@ -291,7 +291,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
             </div>
           )}
 
-          <form id="driver-form" onSubmit={handleSubmit} className="space-y-8">
+          <form id="driver-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-8">
             {/* Acesso ao Sistema — apenas na criação */}
             {isCreating && (
               <div>
@@ -465,7 +465,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="file"
                     name="cnhUpload"
                     accept="application/pdf,image/jpeg,image/png,image/webp"
-                    onChange={handleCnhFileChange}
+                    onChange={(e) => { void handleCnhFileChange(e); }}
                     className={fileInputClass}
                   />
                   <p className="mt-1 text-xs text-zinc-400">

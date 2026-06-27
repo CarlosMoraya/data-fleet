@@ -17,7 +17,7 @@ export class GeminiProvider implements OcrProvider {
     });
   }
 
-  async extract(file: File, prompt: string): Promise<any> {
+  async extract(file: File, prompt: string): Promise<unknown> {
     const { base64, mimeType } = await this.fileToBase64(file);
 
     // Obter sessão atual
@@ -32,7 +32,7 @@ export class GeminiProvider implements OcrProvider {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY as string,
       },
       body: JSON.stringify({
         file_base64: base64,
@@ -46,7 +46,7 @@ export class GeminiProvider implements OcrProvider {
       throw new Error(`gemini-ocr edge function error: ${res.status} ${errorText}`);
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as { result: unknown };
     return data.result;
   }
 }

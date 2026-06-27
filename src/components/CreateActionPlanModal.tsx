@@ -42,7 +42,7 @@ export default function CreateActionPlanModal({ checklist, onClose, onCreated }:
   const [error, setError] = useState('');
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       setLoadingItems(true);
 
       const [{ data: respData }, { data: profileData }] = await Promise.all([
@@ -114,7 +114,7 @@ export default function CreateActionPlanModal({ checklist, onClose, onCreated }:
       if (insErr) throw insErr;
       onCreated();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : (err as any)?.message ?? 'Erro ao criar planos de ação';
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message ?? 'Erro ao criar planos de ação';
       setError(msg);
     } finally {
       setSaving(false);
@@ -219,7 +219,7 @@ export default function CreateActionPlanModal({ checklist, onClose, onCreated }:
             Cancelar
           </button>
           <button
-            onClick={handleCreate}
+            onClick={() => { void handleCreate(); }}
             disabled={saving || loadingItems || issueItems.length === 0}
             className="flex items-center gap-2 rounded-lg bg-orange-500 px-5 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50"
           >

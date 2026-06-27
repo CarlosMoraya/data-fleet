@@ -87,8 +87,8 @@ function ClientFormModal({
     try {
       await onSave(form);
       onClose();
-    } catch (err: any) {
-      setError(err.message ?? 'Erro ao salvar.');
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message ?? 'Erro ao salvar.');
     } finally {
       setSaving(false);
     }
@@ -106,7 +106,7 @@ function ClientFormModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 p-6">
+        <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-5 p-6">
           <div>
             <label className="block text-sm font-medium text-zinc-700">Nome *</label>
             <input
@@ -158,7 +158,7 @@ function ClientFormModal({
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={handleFileChange}
+              onChange={(e) => { void handleFileChange(e); }}
             />
             <p className="mt-1.5 text-xs text-zinc-400">PNG, JPG, SVG ou WebP. Ou cole uma URL abaixo.</p>
             <input
@@ -207,7 +207,7 @@ export default function AdminClients() {
     return <Navigate to="/" replace />;
   }
 
-  const { data: clients = [], isLoading: loading } = useQuery({
+  const { data: clients = [], isLoading: loading } = useQuery<ClientRow[]>({
     queryKey: ['admin-clients'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -254,7 +254,7 @@ export default function AdminClients() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-clients'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin-clients'] });
     }
   });
 
@@ -268,10 +268,10 @@ export default function AdminClients() {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-clients'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin-clients'] });
     },
-    onError: (err: any) => {
-      alert(err.message || 'Erro ao deletar cliente.');
+    onError: (err: unknown) => {
+      alert((err as { message?: string })?.message ?? 'Erro ao deletar cliente.');
     }
   });
 

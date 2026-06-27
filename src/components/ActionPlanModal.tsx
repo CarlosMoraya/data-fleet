@@ -163,7 +163,7 @@ export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
             {plan.observedIssue && (
               <div>
                 <p className="text-xs tracking-wide text-zinc-400 uppercase">Observação</p>
-                <p className="mt-0.5 text-sm text-zinc-700 italic">"{plan.observedIssue}"</p>
+                <p className="mt-0.5 text-sm text-zinc-700 italic">&quot;{plan.observedIssue}&quot;</p>
               </div>
             )}
             <div>
@@ -242,7 +242,7 @@ export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
               <h3 className="text-xs font-semibold tracking-wider text-zinc-500 uppercase">Assumir ação</h3>
               <p className="text-sm text-zinc-600">Clique para atribuir esta ação ao seu perfil e iniciar a execução.</p>
               <button
-                onClick={handleClaim}
+                onClick={() => { void handleClaim(); }}
                 disabled={saving}
                 className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
@@ -311,7 +311,7 @@ export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
                 />
               </div>
               <button
-                onClick={handleSubmitConclusion}
+                onClick={() => { void handleSubmitConclusion(); }}
                 disabled={saving || uploading}
                 className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50"
               >
@@ -327,7 +327,7 @@ export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
               <h3 className="text-xs font-semibold tracking-wider text-zinc-500 uppercase">Análise da conclusão</h3>
               <div className="flex gap-3">
                 <button
-                  onClick={handleApprove}
+                  onClick={() => { void handleApprove(); }}
                   disabled={saving}
                   className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
                 >
@@ -335,7 +335,7 @@ export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
                   Aprovar conclusão
                 </button>
                 <button
-                  onClick={handleReject}
+                  onClick={() => { void handleReject(); }}
                   disabled={saving}
                   className="flex items-center gap-2 rounded-lg bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-300 disabled:opacity-50"
                 >

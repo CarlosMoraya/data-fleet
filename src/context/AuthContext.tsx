@@ -43,7 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .single();
 
     if (data && !error) {
-      const profile = data as any;
+      type ProfileRow = { id: string; name: string; role: string; client_id: string | null; can_delete_vehicles: boolean | null; can_delete_drivers: boolean | null; can_delete_workshops: boolean | null; budget_approval_limit: number | null; workshop_account_id: string | null };
+      const profile = data as ProfileRow;
 
       const userObj: User = {
         id: profile.id,
@@ -68,7 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .single();
 
           if (waData) {
-            const wa = waData as any;
+            type WaRow = { id: string; profile_id: string; name: string; cnpj: string; phone: string | null; email: string | null; contact_person: string | null; address_street: string | null; address_number: string | null; address_complement: string | null; address_neighborhood: string | null; address_city: string | null; address_state: string | null; address_zip: string | null; specialties: string[] | null; notes: string | null; active: boolean };
+            const wa = waData as WaRow;
             const account: WorkshopAccount = {
               id: wa.id,
               profileId: wa.profile_id,
@@ -98,14 +100,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .eq('status', 'active');
 
             if (partnershipsData && partnershipsData.length > 0) {
-              const partnerships: WorkshopPartnership[] = (partnershipsData as any[]).map((p) => ({
+              type PRow = { id: string; workshop_account_id: string; client_id: string; legacy_workshop_id: string | null; status: string; invited_at: string; accepted_at: string | null; clients: { id: string; name: string; logo_url: string | null } | null };
+              const partnerships: WorkshopPartnership[] = (partnershipsData as unknown as PRow[]).map((p) => ({
                 id: p.id,
                 workshopAccountId: p.workshop_account_id,
                 clientId: p.client_id,
                 clientName: p.clients?.name,
                 clientLogoUrl: p.clients?.logo_url ?? undefined,
                 legacyWorkshopId: p.legacy_workshop_id ?? undefined,
-                status: p.status,
+                status: p.status as 'active' | 'inactive',
                 invitedAt: p.invited_at,
                 acceptedAt: p.accepted_at ?? undefined,
               }));
@@ -145,7 +148,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single();
 
         if (workshopData) {
-          const wd = workshopData as any;
+          type WdRow = { id: string; client_id: string; clients: { id: string; name: string; logo_url: string | null } | null };
+          const wd = workshopData as unknown as WdRow;
           userObj.workshopId = wd.id;
           userObj.clientId = wd.client_id;
 
@@ -168,14 +172,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(userObj);
 
       // Se há client_id no profile, busca os dados do cliente
+      type ClientRow = { id: string; name: string; logo_url: string | null };
+
       if (profile.client_id) {
-        const { data: clientData } = await supabase
+        const clientResult = await supabase
           .from('clients')
           .select('id, name, logo_url')
           .eq('id', profile.client_id)
           .single();
 
-        if (clientData) {
+        if (clientResult.data) {
+          const clientData = clientResult.data as ClientRow;
           setCurrentClient({
             id: clientData.id,
             name: clientData.name,
@@ -189,12 +196,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (['Admin Master', 'Director', 'Manager', 'Coordinator'].includes(profile.role)) {
         const { data: clients } = await supabase.from('clients').select('id, name, logo_url');
         if (clients) {
-          const clientList = clients.map((c: any) => ({ id: c.id, name: c.name, logoUrl: c.logo_url ?? undefined }));
+          const typedClients = clients as ClientRow[];
+          const clientList = typedClients.map((c) => ({ id: c.id, name: c.name, logoUrl: c.logo_url ?? undefined }));
           setAllClients(clientList);
           if (profile.role === 'Admin Master') {
             const savedClientId = localStorage.getItem('adminMasterActiveClient');
             if (savedClientId) {
-              const savedClient = clients.find((c: any) => c.id === savedClientId);
+              const savedClient = typedClients.find((c) => c.id === savedClientId);
               if (savedClient) {
                 setCurrentClient({
                   id: savedClient.id,
@@ -210,9 +218,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    void supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        fetchProfile(session.user.id, session.user.email ?? '').finally(() =>
+        void fetchProfile(session.user.id, session.user.email ?? '').finally(() =>
           setLoading(false)
         );
       } else {
@@ -225,7 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         setLoading(true);
-        fetchProfile(session.user.id, session.user.email ?? '').finally(() => setLoading(false));
+        void fetchProfile(session.user.id, session.user.email ?? '').finally(() => setLoading(false));
       } else if (event === 'SIGNED_OUT') {
         const userId = user?.id;
         setUser(null);
@@ -245,7 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [user?.id]);
 
   const login = async (
     email: string,

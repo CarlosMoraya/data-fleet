@@ -52,7 +52,7 @@ export default function OperationalUnitForm({ unit, availableShippers, onClose, 
   const [formData, setFormData] = useState<Partial<OperationalUnit>>(() => {
     try {
       const saved = sessionStorage.getItem('operationalUnitFormData');
-      return saved ? JSON.parse(saved) : {};
+      return saved ? JSON.parse(saved) as Partial<OperationalUnit> : {};
     } catch {
       return {};
     }
@@ -101,12 +101,12 @@ export default function OperationalUnitForm({ unit, availableShippers, onClose, 
     setError(null);
     try {
       await onSave(formData);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const pgError = err as { code?: string; message?: string };
       if (pgError?.code === '23505') {
         setError('Este código já está cadastrado para este cliente.');
       } else {
-        setError(err?.message ?? 'Erro ao salvar unidade operacional. Tente novamente.');
+        setError(pgError?.message ?? 'Erro ao salvar unidade operacional. Tente novamente.');
       }
     } finally {
       setSaving(false);
@@ -133,7 +133,7 @@ export default function OperationalUnitForm({ unit, availableShippers, onClose, 
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          <form id="operational-unit-form" onSubmit={handleSubmit} className="space-y-8 p-6">
+          <form id="operational-unit-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-8 p-6">
 
             {/* Seção 1: Dados da Unidade */}
             <div>

@@ -2,7 +2,6 @@ import { X, Package } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import { filterText, filterCNPJ, filterPhone } from '../lib/inputHelpers';
-import { shipperToRow } from '../lib/shipperMappers';
 import { Shipper } from '../types';
 
 // ─── Estilos ─────────────────────────────────────────────────────────────────
@@ -46,7 +45,7 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
   const [formData, setFormData] = useState<Partial<Shipper>>(() => {
     try {
       const saved = sessionStorage.getItem('shipperFormData');
-      return saved ? JSON.parse(saved) : {};
+      return saved ? JSON.parse(saved) as Partial<Shipper> : {};
     } catch {
       return {};
     }
@@ -92,12 +91,12 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
     setError(null);
     try {
       await onSave(formData);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const pgError = err as { code?: string; message?: string };
       if (pgError?.code === '23505') {
         setError('Este CNPJ já está cadastrado para este cliente.');
       } else {
-        setError(err?.message ?? 'Erro ao salvar embarcador. Tente novamente.');
+        setError(pgError?.message ?? 'Erro ao salvar embarcador. Tente novamente.');
       }
     } finally {
       setSaving(false);
@@ -124,7 +123,7 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          <form id="shipper-form" onSubmit={handleSubmit} className="space-y-8 p-6">
+          <form id="shipper-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-8 p-6">
 
             {/* Seção 1: Dados do Embarcador */}
             <div>

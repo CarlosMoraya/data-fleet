@@ -136,8 +136,8 @@ const MODULE_ALLOWLISTS: Record<string, Set<string>> = {
     'brand', 'model', 'size', 'dot', 'purchaseDate', 'active',
     'position', 'vehicleId', 'tireType', 'notes',
   ]),
-  checklists: new Set([]),
-  dashboard: new Set([]),
+  checklists: new Set<string>([]),
+  dashboard: new Set<string>([]),
   workshops: new Set([
     'name', 'cnpj', 'phone', 'email', 'address', 'active', 'specialties',
     'notes',

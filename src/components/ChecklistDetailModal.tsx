@@ -38,7 +38,7 @@ export default function ChecklistDetailModal({ checklist, onClose }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       const { data } = await supabase
         .from('checklist_responses')
         .select('*, checklist_items(title)')

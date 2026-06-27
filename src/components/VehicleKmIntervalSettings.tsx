@@ -55,7 +55,7 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
     setBulkKm('');
   }, [clientId]);
 
-  const vehiclesQuery = useQuery({
+  const vehiclesQuery = useQuery<VehicleRow[]>({
     queryKey: ['vehiclesForKmIntervals', clientId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -64,12 +64,12 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
         .eq('client_id', clientId)
         .order('license_plate');
       if (error) throw error;
-      return data;
+      return (data ?? []) as VehicleRow[];
     },
     enabled: !!clientId,
   });
 
-  const intervalsQuery = useQuery({
+  const intervalsQuery = useQuery<IntervalRow[]>({
     queryKey: ['vehicleKmIntervals', clientId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -77,7 +77,7 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
         .select('id, vehicle_id, km_interval')
         .eq('client_id', clientId);
       if (error) throw error;
-      return data;
+      return (data ?? []) as IntervalRow[];
     },
     enabled: !!clientId,
   });
@@ -166,7 +166,7 @@ export default function VehicleKmIntervalSettings({ clientId, userId }: Props) {
       setDirty({});
       setSaveSuccess(true);
       setSaveError(null);
-      queryClient.invalidateQueries({ queryKey: ['vehicleKmIntervals', clientId] });
+      void queryClient.invalidateQueries({ queryKey: ['vehicleKmIntervals', clientId] });
     },
     onError: (err: Error) => {
       setSaveError(err.message ?? 'Erro ao salvar configurações.');

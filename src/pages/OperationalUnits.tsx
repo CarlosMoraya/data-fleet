@@ -30,7 +30,7 @@ export default function OperationalUnits() {
   const [editingUnit, setEditingUnit] = useState<OperationalUnit | null>(() => {
     try {
       const saved = sessionStorage.getItem('operationalUnitFormEditing');
-      return saved ? JSON.parse(saved) : null;
+      return saved ? JSON.parse(saved) as OperationalUnit : null;
     } catch {
       return null;
     }
@@ -96,14 +96,14 @@ export default function OperationalUnits() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['operationalUnits', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['operationalUnits', currentClient?.id] });
       setIsFormOpen(false);
       setEditingUnit(null);
       sessionStorage.removeItem('operationalUnitFormOpen');
       sessionStorage.removeItem('operationalUnitFormEditing');
       sessionStorage.removeItem('operationalUnitFormData');
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       console.error('Erro ao salvar unidade operacional:', err);
     }
   });
@@ -121,10 +121,11 @@ export default function OperationalUnits() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['operationalUnits', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['operationalUnits', currentClient?.id] });
     },
-    onError: (err: any) => {
-      if (err.code === '23503') {
+    onError: (err: unknown) => {
+      const pgErr = err as { code?: string };
+      if (pgErr.code === '23503') {
         alert('Esta unidade está vinculada a veículos. Desvincule os veículos antes de excluir.');
       } else {
         alert('Erro ao excluir unidade. Tente novamente.');
@@ -132,7 +133,7 @@ export default function OperationalUnits() {
     }
   });
 
-  const handleDelete = async (unit: OperationalUnit) => {
+  const handleDelete = (unit: OperationalUnit) => {
     if (!window.confirm(`Excluir a unidade "${unit.name}"? Esta ação não pode ser desfeita.`)) return;
     deleteMutation.mutate(unit.id);
   };
@@ -278,7 +279,7 @@ export default function OperationalUnits() {
                         )}
                         {canDelete && (
                           <button
-                            onClick={() => handleDelete(unit)}
+                            onClick={() => { handleDelete(unit); }}
                             className="text-zinc-400 transition-colors hover:text-red-600"
                           >
                             <Trash2 className="h-5 w-5" />

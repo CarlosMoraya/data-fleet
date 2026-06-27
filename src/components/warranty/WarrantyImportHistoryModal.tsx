@@ -107,9 +107,9 @@ export default function WarrantyImportHistoryModal({ eventId, vehicleId, clientI
         evidenceUrl,
       });
       onSaved();
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Em falha de Storage, o evento permanece pending/presumed (não marcamos completed)
-      setError(err?.message ?? 'Falha ao importar histórico.');
+      setError(err instanceof Error ? err.message : 'Falha ao importar histórico.');
     } finally {
       setSaving(false);
     }
@@ -132,7 +132,7 @@ export default function WarrantyImportHistoryModal({ eventId, vehicleId, clientI
         )}
 
         <div className="flex-1 overflow-y-auto p-6">
-          <form id="warranty-import-form" onSubmit={handleSubmit} className="space-y-4">
+          <form id="warranty-import-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className={labelClass} htmlFor="imp_km">KM executado</label>

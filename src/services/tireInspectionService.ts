@@ -18,13 +18,13 @@ const OTHER_OPTION = 'Outros / Não é possível identificar';
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 
 export async function fetchTireInspection(inspectionId: string): Promise<TireInspection> {
-  const { data, error } = await supabase
+  const result = await supabase
     .from('tire_inspections')
     .select('*, vehicles(license_plate), profiles(name)')
     .eq('id', inspectionId)
     .single();
-  if (error) throw error;
-  return tireInspectionFromRow(data as TireInspectionRow);
+  if (result.error) throw result.error;
+  return tireInspectionFromRow(result.data as TireInspectionRow);
 }
 
 export async function fetchTireInspections(clientId: string): Promise<TireInspection[]> {
@@ -64,7 +64,7 @@ export async function findOpenTireInspection(vehicleId: string): Promise<string 
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  return data?.id ?? null;
+  return (data as { id: string } | null)?.id ?? null;
 }
 
 export interface PositionComparison {
@@ -87,13 +87,15 @@ export async function fetchTireInspectionComparison(
   const effectiveDate = (inspection: { started_at: string; completed_at: string | null }) =>
     inspection.completed_at ?? inspection.started_at;
 
-  const { data: inspections, error: inspectionsError } = await supabase
+  const inspResult = await supabase
     .from('tire_inspections')
     .select('id, started_at, completed_at')
     .eq('vehicle_id', vehicleId);
-  if (inspectionsError) throw inspectionsError;
+  if (inspResult.error) throw inspResult.error;
 
-  const sorted = (inspections ?? [])
+  type InspRow = { id: string; started_at: string; completed_at: string | null };
+  const inspections = (inspResult.data as InspRow[] | null) ?? [];
+  const sorted = inspections
     .slice()
     .sort((a, b) => effectiveDate(b).localeCompare(effectiveDate(a)));
   const idx = sorted.findIndex((inspection) => inspection.id === currentInspection.id);
@@ -218,9 +220,10 @@ async function validateInspectionInterval(vehicleId: string, intervalDays: numbe
     .limit(1)
     .single();
 
-  if (!data?.completed_at) return;
+  const inspData = data as { completed_at: string | null } | null;
+  if (!inspData?.completed_at) return;
 
-  const lastDate = new Date(data.completed_at);
+  const lastDate = new Date(inspData.completed_at);
   const diffDays = (Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
 
   if (diffDays < intervalDays) {
@@ -262,7 +265,7 @@ export async function createTireInspection(payload: CreateInspectionPayload): Pr
     .single();
 
   if (error) throw error;
-  return data.id;
+  return (data as { id: string }).id;
 }
 
 // ─── Save response ────────────────────────────────────────────────────────────
@@ -286,14 +289,14 @@ export async function saveInspectionResponse(payload: SaveInspectionResponsePayl
 
   const row = tireInspectionResponseToRow({ ...response, photoUrl });
 
-  const { data, error } = await supabase
+  const upsertResult = await supabase
     .from('tire_inspection_responses')
     .upsert({ ...row, inspection_id: inspectionId }, { onConflict: 'inspection_id,position_code' })
     .select()
     .single();
 
-  if (error) throw error;
-  return tireInspectionResponseFromRow(data as TireInspectionResponseRow);
+  if (upsertResult.error) throw upsertResult.error;
+  return tireInspectionResponseFromRow(upsertResult.data as TireInspectionResponseRow);
 }
 
 async function uploadInspectionPhoto(

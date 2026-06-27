@@ -1,4 +1,4 @@
-import { offlineDb, type VehicleDraftFileEntry } from './offlineDb';
+import { offlineDb } from './offlineDb';
 
 export type VehicleDraftFileKey =
   | 'crlv' | 'sanitaryInspection' | 'gr' | 'insurancePolicy' | 'maintenanceContract';

@@ -6,10 +6,6 @@ export const CACHE_TTL = {
 };
 
 export const PERSIST_ALLOWLIST: Record<string, number> = {
-  vehicleFieldSettings: CACHE_TTL.reference,
-  vehicleSettings: CACHE_TTL.reference,
-  driverFieldSettings: CACHE_TTL.reference,
-  driverSettings: CACHE_TTL.reference,
   checklistDayIntervals: CACHE_TTL.reference,
   vehicleKmIntervals: CACHE_TTL.reference,
   warrantyVehicleCurrentKm: CACHE_TTL.reference,

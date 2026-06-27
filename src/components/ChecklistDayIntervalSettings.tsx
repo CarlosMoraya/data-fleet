@@ -9,15 +9,6 @@ interface Props {
   userId: string;
 }
 
-interface IntervalRow {
-  id: string;
-  client_id: string;
-  rotina_day_interval: number | null;
-  seguranca_day_interval: number | null;
-  pneus_day_interval: number | null;
-  odometer_update_day_interval: number | null;
-  odometer_km_tolerance_per_day: number | null;
-}
 
 export default function ChecklistDayIntervalSettings({ clientId, userId }: Props) {
   const queryClient = useQueryClient();
@@ -101,7 +92,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
       setIsDirty(false);
       setSaveSuccess(true);
       setSaveError(null);
-      queryClient.invalidateQueries({ queryKey: ['checklistDayIntervals', clientId] });
+      void queryClient.invalidateQueries({ queryKey: ['checklistDayIntervals', clientId] });
     },
     onError: (err: Error) => {
       setSaveError(err.message ?? 'Erro ao salvar configurações.');

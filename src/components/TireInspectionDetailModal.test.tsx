@@ -17,7 +17,8 @@ vi.mock('../services/tireInspectionService', () => ({
   fetchTireInspectionResponses,
 }));
 
-let container: HTMLDivElement;
+type ReactContainer = HTMLDivElement & { __reactRoot?: ReturnType<typeof createRoot> };
+let container: ReactContainer;
 let queryClient: QueryClient;
 
 const photoUrl = 'https://storage.example.com/tire-photo.jpg';
@@ -85,7 +86,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  const root = (container as any).__reactRoot;
+  const root = container.__reactRoot;
   if (root) {
     act(() => {
       root.unmount();
@@ -98,9 +99,9 @@ afterEach(() => {
 
 async function renderModal() {
   const root = createRoot(container);
-  (container as any).__reactRoot = root;
+  container.__reactRoot = root;
 
-  await act(async () => {
+  act(() => {
     root.render(
       <QueryClientProvider client={queryClient}>
         <TireInspectionDetailModal inspection={inspection} onClose={() => {}} />
@@ -154,7 +155,7 @@ describe('TireInspectionDetailModal', () => {
 
     const photo = container.querySelector(`img[src="${photoUrl}"]`);
 
-    await act(async () => {
+    act(() => {
       photo.closest('button').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
@@ -163,7 +164,7 @@ describe('TireInspectionDetailModal', () => {
     const overlay = container.querySelector('.z-\\[60\\]');
     expect(overlay).not.toBeNull();
 
-    await act(async () => {
+    act(() => {
       overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 

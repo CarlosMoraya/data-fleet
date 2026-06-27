@@ -18,7 +18,7 @@ import type { Vehicle, Driver } from '../types';
 // ─────────────────────────────────────────────────────────────
 const DEBUG = import.meta.env.VITE_DEBUG_OCR === '1';
 const ocrDebug = (...args: unknown[]) => {
-  if (DEBUG) console.log('[OCR]', ...args);
+  if (DEBUG) console.info('[OCR]', ...args);
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ async function extractPdfText(file: File): Promise<string> {
   return fullText;
 }
 
-async function fileToBase64(file: File): Promise<string> {
+async function _fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -98,22 +98,22 @@ function extractCrlvFromText(text: string): Partial<Vehicle> {
   };
 
   // Aceita formato Mercosul (ABC1D23) E formato antigo (ABC1234)
-  const plate = tryMatch(/PLACA\s*[:\-]?\s*([A-Z]{3}(?:\d[A-Z0-9]\d{2}|\d{4}))/)
+  const plate = tryMatch(/PLACA\s*[:-]?\s*([A-Z]{3}(?:\d[A-Z0-9]\d{2}|\d{4}))/)
     ?? tryMatch(/\b([A-Z]{3}(?:\d[A-Z0-9]\d{2}|\d{4}))\b/);
   if (plate) result.licensePlate = filterPlate(plate);
 
   // Renavam
-  const renavam = tryMatch(/(?:C[OÓ]D(?:IGO)?\.?\s*RENAVAM|RENAVAM)\s*[:\-]?\s*(\d{9,11})/)
+  const renavam = tryMatch(/(?:C[OÓ]D(?:IGO)?\.?\s*RENAVAM|RENAVAM)\s*[:-]?\s*(\d{9,11})/)
     ?? tryMatch(/\b(\d{9,11})\s+[A-Z]{3}(?:\d[A-Z0-9]\d{2}|\d{4})\b/);
   if (renavam) result.renavam = filterDigitsOnly(renavam);
 
   // Exercício CRLV
-  const exercicio = tryMatch(/EXERC[IÍ]CIO\s*[:\-]?\s*(\d{4})/)
+  const exercicio = tryMatch(/EXERC[IÍ]CIO\s*[:-]?\s*(\d{4})/)
     ?? (plate ? tryMatch(new RegExp(`\\b${plate}\\b\\s+(\\d{4})`)) : null);
   if (exercicio) result.crlvYear = exercicio;
 
   // Ano de fabricação
-  const ano = tryMatch(/ANO\s*(?:DE\s*)?FABRICA[CÇ][AÃ]O\s*[:\-]?\s*(\d{4})/)
+  const ano = tryMatch(/ANO\s*(?:DE\s*)?FABRICA[CÇ][AÃ]O\s*[:-]?\s*(\d{4})/)
     ?? (plate ? tryMatch(new RegExp(`\\b${plate}\\b\\s+\\d{4}\\s+(\\d{4})`)) : null);
   if (ano) {
     const yr = parseInt(ano, 10);
@@ -121,7 +121,7 @@ function extractCrlvFromText(text: string): Partial<Vehicle> {
   }
 
   // Marca / Modelo / Versão — vem junto no mesmo campo
-  const marcaModelo = tryMatch(/MARCA\s*[/\\]\s*MODELO\s*[/\\]\s*VERS[AÃ]O\s*[:\-]?\s*([^\n]+)/);
+  const marcaModelo = tryMatch(/MARCA\s*[/\\]\s*MODELO\s*[/\\]\s*VERS[AÃ]O\s*[:-]?\s*([^\n]+)/);
   if (marcaModelo) {
     const parts = marcaModelo.split('/').map(s => s.trim()).filter(Boolean);
     if (parts[0]) result.brand = normalizeUpper(parts[0]);
@@ -135,17 +135,17 @@ function extractCrlvFromText(text: string): Partial<Vehicle> {
   }
 
   // Chassi (17 chars alfanuméricos)
-  const chassi = tryMatch(/CHASSI\s*[:\-]?\s*([A-Z0-9]{17})/)
+  const chassi = tryMatch(/CHASSI\s*[:-]?\s*([A-Z0-9]{17})/)
     ?? tryMatch(/\b([A-HJ-NPR-Z0-9]{17})\b/);
   if (chassi) result.chassi = filterAlphanumeric(chassi, 17);
 
   // Cor predominante
-  const cor = tryMatch(/COR\s*PREDOMINANTE\s*[:\-]?\s*([A-ZÀ-Ú\s]{3,20})/)
+  const cor = tryMatch(/COR\s*PREDOMINANTE\s*[:-]?\s*([A-ZÀ-Ú\s]{3,20})/)
     ?? (chassi ? tryMatch(new RegExp(`\\b${chassi}\\b\\s+([A-ZÀ-Ú]{3,20})\\s+`)) : null);
   if (cor) result.color = capitalizeWords(cor.replace(/\s+/g, ' ').trim());
 
   // PBT
-  const pbt = tryMatch(/(?:PESO\s*BRUTO\s*TOTAL|PBT)\s*[:\-]?\s*([\d.,]+)/)
+  const pbt = tryMatch(/(?:PESO\s*BRUTO\s*TOTAL|PBT)\s*[:-]?\s*([\d.,]+)/)
     ?? tryMatch(/\b\d+\s*CV\s*\/\s*\d+\s+([\d.,]+)\s+[A-Z0-9]{10,}/);
   if (pbt) {
     const n = parseFloat(pbt.replace(',', '.'));
@@ -153,7 +153,7 @@ function extractCrlvFromText(text: string): Partial<Vehicle> {
   }
 
   // CMT
-  const cmt = tryMatch(/CMT\s*[:\-]?\s*([\d.,]+)/)
+  const cmt = tryMatch(/CMT\s*[:-]?\s*([\d.,]+)/)
     ?? tryMatch(/\b[A-Z0-9]{10,}\s+([\d.,]+)\s+\d{1,2}\s+\d{2}P\b/);
   if (cmt) {
     const n = parseFloat(cmt.replace(',', '.'));
@@ -161,7 +161,7 @@ function extractCrlvFromText(text: string): Partial<Vehicle> {
   }
 
   // Eixos
-  const eixos = tryMatch(/EIXOS?\s*[:\-]?\s*(\d{1,2})/)
+  const eixos = tryMatch(/EIXOS?\s*[:-]?\s*(\d{1,2})/)
     ?? tryMatch(/\b[A-Z0-9]{10,}\s+[\d.,]+\s+(\d{1,2})\s+\d{2}P\b/);
   if (eixos) {
     const n = parseInt(eixos, 10);
@@ -169,7 +169,7 @@ function extractCrlvFromText(text: string): Partial<Vehicle> {
   }
 
   // Detran UF — captura apenas a sigla de 2 letras no campo LOCAL
-  const local = tryMatch(/LOCAL\s*[:\-]?\s*(?:[A-Z\s]*?\s)?([A-Z]{2})(?:\s|$)/)
+  const local = tryMatch(/LOCAL\s*[:-]?\s*(?:[A-Z\s]*?\s)?([A-Z]{2})(?:\s|$)/)
     ?? tryMatch(/\b[A-ZÀ-Ú\s]+?\s+([A-Z]{2})\s+\d{2}\/\d{2}\/\d{4}\b/);
   if (local) result.detranUF = filterAlpha(local, 2);
 
@@ -205,31 +205,31 @@ function extractCnhFromText(text: string): Partial<Driver> {
   };
 
   // Nome (preservar capitalização original)
-  const nome = tryMatch(/NOME\s*(?:E\s*SOBRENOME)?\s*[:\-]?\s*([A-ZÀ-Ú\s]{3,60})/, true);
+  const nome = tryMatch(/NOME\s*(?:E\s*SOBRENOME)?\s*[:-]?\s*([A-ZÀ-Ú\s]{3,60})/, true);
   if (nome) result.name = capitalizeWords(nome);
 
   // CPF (aceita pontos e traços)
-  const cpf = tryMatch(/CPF\s*[:\-]?\s*([\d.–\-\s]{11,14})/);
+  const cpf = tryMatch(/CPF\s*[:-]?\s*([\d.–-\s]{11,14})/);
   if (cpf) result.cpf = filterCPF(cpf);
 
   // Data de emissão
-  const emissao = tryMatch(/(?:DATA\s*(?:DE\s*)?EMISS[AÃ]O|1ª\s*EMISS[AÃ]O)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/);
+  const emissao = tryMatch(/(?:DATA\s*(?:DE\s*)?EMISS[AÃ]O|1ª\s*EMISS[AÃ]O)\s*[:-]?\s*(\d{2}\/\d{2}\/\d{4})/);
   if (emissao) result.issueDate = brDateToIso(emissao);
 
   // Validade
-  const validade = tryMatch(/VALIDADE\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/);
+  const validade = tryMatch(/VALIDADE\s*[:-]?\s*(\d{2}\/\d{2}\/\d{4})/);
   if (validade) result.expirationDate = brDateToIso(validade);
 
   // Nº de Registro
-  const registro = tryMatch(/(?:N[°º]\s*REGISTRO|REGISTRO)\s*[:\-]?\s*(\d{8,11})/);
+  const registro = tryMatch(/(?:N[°º]\s*REGISTRO|REGISTRO)\s*[:-]?\s*(\d{8,11})/);
   if (registro) result.registrationNumber = filterDigitsOnly(registro);
 
   // Categoria HAB
-  const categoria = tryMatch(/CAT(?:EGORIA)?\s*(?:HAB(?:ILITA[ÇC][ÃA]O)?)?\s*[:\-]?\s*([A-Ea-e]{1,5})/);
+  const categoria = tryMatch(/CAT(?:EGORIA)?\s*(?:HAB(?:ILITA[ÇC][ÃA]O)?)?\s*[:-]?\s*([A-Ea-e]{1,5})/);
   if (categoria) result.category = filterCNHCategory(categoria);
 
   // Renach — número alfanumérico
-  const renach = tryMatch(/RENACH\s*[:\-]?\s*([A-Z0-9]{8,20})/);
+  const renach = tryMatch(/RENACH\s*[:-]?\s*([A-Z0-9]{8,20})/);
   if (renach) result.renach = filterAlphanumeric(renach);
 
   ocrDebug('CNH regex resultado:', {
@@ -275,7 +275,9 @@ Regras:
 - Não inclua campos extras. Retorne SOMENTE o JSON, sem markdown.`;
 
 async function extractCrlvViaIA(file: File): Promise<Partial<Vehicle>> {
-  const json = await performOcr(file, CRLV_PROMPT);
+  type JsonVal = string | number | boolean | null | undefined;
+  type CrlvJson = { placa?: JsonVal; renavam?: JsonVal; exercicio?: JsonVal; anoFabricacao?: JsonVal; marca?: JsonVal; modelo?: JsonVal; chassi?: JsonVal; cor?: JsonVal; pbt?: JsonVal; cmt?: JsonVal; eixos?: JsonVal; localUF?: JsonVal };
+  const json = (await performOcr(file, CRLV_PROMPT)) as CrlvJson;
 
   const result: Partial<Vehicle> = {};
   if (json.placa) result.licensePlate = filterPlate(String(json.placa));
@@ -331,7 +333,9 @@ Regras:
 - Não inclua campos extras. Retorne SOMENTE o JSON, sem markdown.`;
 
 async function extractCnhViaIA(file: File): Promise<Partial<Driver>> {
-  const json = await performOcr(file, CNH_PROMPT);
+  type JsonVal = string | number | boolean | null | undefined;
+  type CnhJson = { nome?: JsonVal; cpf?: JsonVal; dataEmissao?: JsonVal; validade?: JsonVal; registro?: JsonVal; categoria?: JsonVal; renach?: JsonVal };
+  const json = (await performOcr(file, CNH_PROMPT)) as CnhJson;
 
   const result: Partial<Driver> = {};
   if (json.nome) result.name = capitalizeWords(String(json.nome));

@@ -18,7 +18,7 @@ export default function ResetPassword() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    void supabase.auth.getSession().then(({ data }) => {
       if (data.session) setReady(true);
       setCheckingSession(false);
     });
@@ -49,7 +49,7 @@ export default function ResetPassword() {
     }
 
     await logout();
-    navigate('/login?reset=success');
+    void navigate('/login?reset=success');
   };
 
   return (
@@ -88,7 +88,7 @@ export default function ResetPassword() {
               </Link>
             </div>
           ) : (
-            <form className="space-y-6" onSubmit={handleSubmit}>
+            <form className="space-y-6" onSubmit={(e) => { void handleSubmit(e); }}>
               <PasswordField
                 id="password"
                 label="Nova senha"

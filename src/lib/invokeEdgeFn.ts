@@ -6,7 +6,7 @@ import { supabase } from './supabase';
  * @param body - The JSON body to send
  * @returns Parsed JSON response from the edge function
  */
-export async function invokeEdgeFunction(fnName: string, body: object): Promise<any> {
+export async function invokeEdgeFunction(fnName: string, body: object): Promise<unknown> {
   // Force a session refresh to avoid stale/expired tokens
   const { data: { session } } = await supabase.auth.refreshSession();
   if (!session) throw new Error('Sessão expirada. Faça login novamente.');
@@ -17,7 +17,7 @@ export async function invokeEdgeFunction(fnName: string, body: object): Promise<
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${session.access_token}`,
-      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY as string,
     },
     body: JSON.stringify(body),
   });

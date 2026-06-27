@@ -41,7 +41,7 @@ export function TireInspectionForm({
   const [brand, setBrand] = useState(existing?.brand ?? '');
   const [status, setStatus] = useState<TireInspectionResponseStatus>(existing?.status ?? 'conforme');
   const [observation, setObservation] = useState(existing?.observation ?? '');
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [_photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>(existing?.photoUrl ?? '');
   const [showCamera, setShowCamera] = useState(false);
@@ -100,7 +100,7 @@ export function TireInspectionForm({
   if (showCamera) {
     return (
       <CameraCapture
-        onCapture={handleCapture}
+        onCapture={(f) => { void handleCapture(f); }}
         onClose={() => setShowCamera(false)}
       />
     );
@@ -223,7 +223,7 @@ export function TireInspectionForm({
           {/* Salvar */}
           <button
             type="button"
-            onClick={handleSave}
+            onClick={() => { void handleSave(); }}
             disabled={!canSave || saving}
             className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >

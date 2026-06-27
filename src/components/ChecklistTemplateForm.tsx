@@ -3,6 +3,11 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import {
+  buildDuplicateName,
+  mapItemRowsToDraftItems,
+  resolveTemplateName,
+} from '../lib/checklistTemplateImport';
+import {
   templateFromRow,
   templateToRow,
   checklistItemToRow,
@@ -10,8 +15,8 @@ import {
   suggestionFromRow,
   type SuggestionRow,
   type ChecklistItemRow,
+  type ChecklistTemplateRow,
 } from '../lib/checklistTemplateMappers';
-import { buildDuplicateName, mapItemRowsToDraftItems, resolveTemplateName } from '../lib/checklistTemplateImport';
 import { canSaveTemplateWithoutItems } from '../lib/checklistTemplateRules';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
@@ -110,12 +115,14 @@ export default function ChecklistTemplateForm({ template, duplicateSource, onClo
   }, []);
 
   useEffect(() => {
-    if (!isEdit) loadSuggestions(category);
+    if (!isEdit) {
+      void loadSuggestions(category);
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isEdit || !currentClient?.id) return;
-    (async () => {
+    void (async () => {
       const { data, error: importError } = await supabase
         .from('checklist_templates')
         .select('id, name, vehicle_category, context, current_version, status')
@@ -126,7 +133,7 @@ export default function ChecklistTemplateForm({ template, duplicateSource, onClo
         setImportTemplates([]);
         return;
       }
-      setImportTemplates((data ?? []).map(row => templateFromRow({
+      setImportTemplates(((data ?? []) as ChecklistTemplateRow[]).map(row => templateFromRow({
         ...row,
         client_id: currentClient.id,
         description: null,
@@ -139,7 +146,7 @@ export default function ChecklistTemplateForm({ template, duplicateSource, onClo
 
   useEffect(() => {
     if (!isEdit || !template) return;
-    (async () => {
+    void (async () => {
       const { data } = await supabase
         .from('checklist_items')
         .select('*')
@@ -179,7 +186,7 @@ export default function ChecklistTemplateForm({ template, duplicateSource, onClo
 
   useEffect(() => {
     if (!isDuplicate || !duplicateSource) return;
-    (async () => {
+    void (async () => {
       const { data, error: duplicateError } = await supabase
         .from('checklist_items')
         .select('*')
@@ -317,7 +324,7 @@ export default function ChecklistTemplateForm({ template, duplicateSource, onClo
           }
         }
       } else {
-        const { data: newTemplate, error: tplErr } = await supabase
+        const response = await supabase
           .from('checklist_templates')
           .insert({
             client_id: currentClient.id,
@@ -331,7 +338,11 @@ export default function ChecklistTemplateForm({ template, duplicateSource, onClo
           })
           .select()
           .single();
+        const newTemplateData = response.data as { id: string } | null;
+        const tplErr = response.error;
         if (tplErr) throw tplErr;
+        if (!newTemplateData) throw new Error('Template não retornado após criação.');
+        const newTemplate = newTemplateData;
 
         const itemsToInsert = enabledItems.map((it, i) => checklistItemToRow({
           templateId: newTemplate.id,
@@ -429,7 +440,7 @@ export default function ChecklistTemplateForm({ template, duplicateSource, onClo
                         name="category"
                         value={cat.value}
                         checked={category === cat.value}
-                        onChange={() => !isEdit && handleCategoryChange(cat.value)}
+                        onChange={() => { if (!isEdit) { void handleCategoryChange(cat.value); } }}
                         disabled={isEdit}
                         className="accent-orange-500"
                       />
@@ -553,7 +564,7 @@ export default function ChecklistTemplateForm({ template, duplicateSource, onClo
               {isSecurityContext && (
                 <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                   <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                  <span>Template de <strong>Segurança</strong>: ative "Bloqueia veículo" nos itens críticos. Quando implementado, veículos serão alertados visualmente.</span>
+                  <span>Template de <strong>Segurança</strong>: ative &quot;Bloqueia veículo&quot; nos itens críticos. Quando implementado, veículos serão alertados visualmente.</span>
                 </div>
               )}
 
@@ -603,7 +614,11 @@ export default function ChecklistTemplateForm({ template, duplicateSource, onClo
                         </button>
                       )}
 
-                      {isLocked && <Lock className="h-4 w-4 flex-shrink-0 text-zinc-400" title="Item obrigatório do sistema" />}
+                      {isLocked && (
+                        <span title="Item obrigatório do sistema">
+                          <Lock className="h-4 w-4 flex-shrink-0 text-zinc-400" />
+                        </span>
+                      )}
 
                       <input
                         type="text"
@@ -729,7 +744,7 @@ export default function ChecklistTemplateForm({ template, duplicateSource, onClo
             </button>
           ) : (
             <button
-              onClick={handleSave}
+              onClick={() => { void handleSave(); }}
               disabled={saving}
               className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50"
             >

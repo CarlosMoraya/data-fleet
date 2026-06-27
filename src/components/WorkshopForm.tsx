@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { isValidCNPJ } from '../lib/cnpjValidator';
 import { filterText, filterCNPJ, filterPhone, filterCEP, filterAlpha } from '../lib/inputHelpers';
 import { supabase } from '../lib/supabase';
-import { workshopToRow, WORKSHOP_SPECIALTIES } from '../lib/workshopMappers';
+import { WORKSHOP_SPECIALTIES } from '../lib/workshopMappers';
 import { Workshop } from '../types';
 
 // ─── Estilos ─────────────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
   const [formData, setFormData] = useState<Partial<Workshop>>(() => {
     try {
       const saved = sessionStorage.getItem('workshopFormData');
-      return saved ? JSON.parse(saved) : {};
+      return saved ? JSON.parse(saved) as Partial<Workshop> : {};
     } catch {
       return {};
     }
@@ -124,12 +124,12 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
     setError(null);
     try {
       await onSave(formData);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const pgError = err as { code?: string; message?: string };
       if (pgError?.code === '23505') {
         setError('Este CNPJ já está cadastrado para este cliente.');
       } else {
-        setError(err?.message ?? 'Erro ao salvar oficina. Tente novamente.');
+        setError(pgError?.message ?? 'Erro ao salvar oficina. Tente novamente.');
       }
     } finally {
       setSaving(false);
@@ -156,7 +156,7 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          <form id="workshop-form" onSubmit={handleSubmit} className="space-y-8 p-6">
+          <form id="workshop-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-8 p-6">
 
             {/* Seção 1: Dados da Oficina */}
             <div>

@@ -79,7 +79,7 @@ export async function saveMaintenanceOrder(
       .select('id')
       .single();
     if (error) throw error;
-    orderId = inserted.id;
+    orderId = (inserted as { id: string }).id;
   }
 
   // Upload do PDF de orçamento

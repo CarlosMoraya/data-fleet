@@ -15,13 +15,12 @@ import { checklistItemFromRow, type ChecklistItemRow } from '../lib/checklistTem
 import { evaluateOdometerTolerance } from '../lib/odometerToleranceValidation';
 import { enqueueOperation, enqueuePhoto } from '../lib/offline/syncService';
 import { applyOfflineKm, applyOfflineWorkshop, upsertResponse } from '../lib/offlineCacheUpdates';
+import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import { autoCompleteWorkshopSchedule, autoRetireVehicleFromWorkshop } from '../lib/workshopScheduleUtils';
 import { ODOMETER_UPDATE_CONTEXT, WORKSHOP_CONTEXTS } from '../types';
 
-import type { Checklist, ChecklistItem, ChecklistContext, ResponseStatus } from '../types';
-
-import { supabase } from '../lib/supabase';
+import type { Checklist, ChecklistItem, ResponseStatus } from '../types';
 
 interface ItemState {
   item: ChecklistItem;
@@ -38,6 +37,21 @@ interface WorkshopOption {
   id: string;
   name: string;
 }
+
+type ChecklistResponseRow = {
+  item_id: string;
+  status: ResponseStatus | null;
+  observation: string | null;
+  photo_url: string | null;
+  responded_at?: string | null;
+  checklist_id?: string;
+};
+
+type VehicleInitialKmRow = { initial_km: number | null };
+type OdometerIntervalSettingsRow = {
+  odometer_km_tolerance_per_day: number | null;
+  odometer_update_day_interval: number | null;
+};
 
 export default function ChecklistFill() {
   const { checklistId } = useParams<{ checklistId: string }>();
@@ -68,12 +82,15 @@ export default function ChecklistFill() {
   const { data: checklist, isLoading: isLoadingChecklist } = useQuery({
     queryKey: ['checklist', checklistId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const response = await supabase
         .from('checklists')
         .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context), workshops(name)')
         .eq('id', checklistId)
         .single();
+      const data = response.data as ChecklistRow | null;
+      const error = response.error;
       if (error) throw error;
+      if (!data) throw new Error('Checklist não encontrado.');
       return checklistFromRow(data as ChecklistRow);
     },
     enabled: !!checklistId,
@@ -106,7 +123,7 @@ export default function ChecklistFill() {
         .select('*')
         .eq('checklist_id', checklistId);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as ChecklistResponseRow[];
     },
     enabled: !!checklistId,
     gcTime: Infinity,
@@ -117,7 +134,6 @@ export default function ChecklistFill() {
   const isOdometerContext = templateContext === ODOMETER_UPDATE_CONTEXT;
   const needsWorkshop = templateContext !== null && WORKSHOP_CONTEXTS.includes(templateContext);
   // Use workshop from checklist record or selected via local UI
-  const effectiveWorkshopId = checklist?.workshopId || selectedWorkshopId;
   const workshopSaved = !!checklist?.workshopId;
   const workshopReady = !needsWorkshop || workshopSaved;
   const canShowItems = workshopReady && kmConfirmed && !isOdometerContext;
@@ -131,7 +147,8 @@ export default function ChecklistFill() {
         .select('initial_km')
         .eq('id', checklist.vehicleId)
         .single();
-      return (data)?.initial_km ?? null;
+      const vehicle = data as VehicleInitialKmRow | null;
+      return vehicle?.initial_km ?? null;
     },
     enabled: !!checklist?.vehicleId,
     gcTime: Infinity,
@@ -144,11 +161,13 @@ export default function ChecklistFill() {
   const { data: lastOdometerKm = null } = useQuery({
     queryKey: ['lastOdometerKm', checklist?.vehicleId],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_vehicle_max_effective_km', {
+      const response = await supabase.rpc('get_vehicle_max_effective_km', {
         p_vehicle_id: checklist.vehicleId,
       });
+      const data = response.data as number | null;
+      const error = response.error;
       if (error) throw error;
-      return (data as number | null) ?? null;
+      return data ?? null;
     },
     enabled: !!checklist?.vehicleId,
     gcTime: Infinity,
@@ -158,11 +177,13 @@ export default function ChecklistFill() {
   const { data: lastReadingAt = null } = useQuery({
     queryKey: ['lastOdometerReadingAt', checklist?.vehicleId],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_vehicle_last_odometer_reading_at', {
+      const response = await supabase.rpc('get_vehicle_last_odometer_reading_at', {
         p_vehicle_id: checklist.vehicleId,
       });
+      const data = response.data as string | null;
+      const error = response.error;
       if (error) throw error;
-      return (data as string | null) ?? null;
+      return data ?? null;
     },
     enabled: isOdometerContext && !!checklist?.vehicleId,
     gcTime: Infinity,
@@ -178,7 +199,7 @@ export default function ChecklistFill() {
         .eq('client_id', currentClient!.id)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as OdometerIntervalSettingsRow | null;
     },
     enabled: isOdometerContext && !!currentClient?.id,
     gcTime: Infinity,
@@ -195,7 +216,7 @@ export default function ChecklistFill() {
         .eq('active', true)
         .order('name');
       if (error) throw error;
-      return (data ?? []);
+      return (data ?? []) as WorkshopOption[];
     },
     enabled: needsWorkshop && !!currentClient?.id,
     gcTime: 30 * 60 * 1000,
@@ -248,7 +269,7 @@ export default function ChecklistFill() {
           { type: 'save_response', itemId, status, observation, photoUrl, respondedAt },
           checklistId,
         );
-        queryClient.setQueryData(['checklistResponses', checklistId], (old: any[] | undefined) => upsertResponse(old, {
+        queryClient.setQueryData(['checklistResponses', checklistId], (old: ChecklistResponseRow[] | undefined) => upsertResponse(old, {
           checklist_id: checklistId,
           item_id: itemId,
           status,
@@ -270,7 +291,7 @@ export default function ChecklistFill() {
     },
     onSuccess: () => {
       if (navigator.onLine) {
-        queryClient.invalidateQueries({ queryKey: ['checklistResponses', checklistId] });
+        void queryClient.invalidateQueries({ queryKey: ['checklistResponses', checklistId] });
       }
     }
   });
@@ -291,7 +312,7 @@ export default function ChecklistFill() {
     },
     onSuccess: () => {
       if (navigator.onLine) {
-        queryClient.invalidateQueries({ queryKey: ['checklist', checklistId] });
+        void queryClient.invalidateQueries({ queryKey: ['checklist', checklistId] });
       }
     },
   });
@@ -346,7 +367,7 @@ export default function ChecklistFill() {
     },
     onSuccess: () => {
       if (navigator.onLine) {
-        queryClient.invalidateQueries({ queryKey: ['checklist', checklistId] });
+        void queryClient.invalidateQueries({ queryKey: ['checklist', checklistId] });
       }
     }
   });
@@ -401,13 +422,13 @@ export default function ChecklistFill() {
     },
     onSuccess: () => {
       if (!navigator.onLine) {
-        navigate('/checklists');
+        void navigate('/checklists');
         return;
       }
       // Remove o checklist aberto do cache imediatamente para evitar flash
       queryClient.setQueriesData({ queryKey: ['openChecklist'] }, null);
-      queryClient.invalidateQueries({ queryKey: ['checklists'] });
-      navigate('/checklists');
+      void queryClient.invalidateQueries({ queryKey: ['checklists'] });
+      void navigate('/checklists');
     },
     onError: (err: Error) => {
       setError(err.message);
@@ -461,7 +482,7 @@ export default function ChecklistFill() {
         },
         checklistId,
       );
-      queryClient.setQueryData(['checklistResponses', checklistId], (old: any[] | undefined) => upsertResponse(old, {
+      queryClient.setQueryData(['checklistResponses', checklistId], (old: ChecklistResponseRow[] | undefined) => upsertResponse(old, {
         checklist_id: checklistId,
         item_id: itemId,
         status: currentState.status,
@@ -547,7 +568,7 @@ export default function ChecklistFill() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-zinc-50">
         <p className="text-red-600">{error}</p>
-        <button onClick={() => navigate('/checklists')} className="text-sm text-orange-500 hover:underline">Voltar</button>
+        <button onClick={() => { void navigate('/checklists'); }} className="text-sm text-orange-500 hover:underline">Voltar</button>
       </div>
     );
   }
@@ -558,7 +579,7 @@ export default function ChecklistFill() {
       <div className="z-10 flex-shrink-0 border-b border-zinc-200 bg-white px-4 py-3">
         <div className="mx-auto max-w-2xl">
           <div className="mb-2 flex items-center gap-3">
-            <button onClick={() => navigate('/checklists')} className="rounded-lg p-1.5 hover:bg-zinc-100">
+            <button onClick={() => { void navigate('/checklists'); }} className="rounded-lg p-1.5 hover:bg-zinc-100">
               <ChevronLeft className="h-5 w-5 text-zinc-500" />
             </button>
             <div className="min-w-0 flex-1">
@@ -608,7 +629,7 @@ export default function ChecklistFill() {
                   </select>
                   <button
                     disabled={!selectedWorkshopId}
-                    onClick={() => confirmWorkshopMutation.mutate(selectedWorkshopId)}
+                    onClick={() => { confirmWorkshopMutation.mutate(selectedWorkshopId); }}
                     className="w-full rounded-lg bg-orange-500 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-40"
                   >
                     Confirmar oficina
@@ -722,7 +743,9 @@ export default function ChecklistFill() {
                     <p className="text-sm font-medium text-zinc-900">
                       {idx + 1}. {s.item.title}
                       {s.item.isMandatory && (
-                        <Lock className="ml-1 inline h-3 w-3 text-zinc-400" title="Obrigatório" />
+                        <span title="Obrigatório">
+                          <Lock className="ml-1 inline h-3 w-3 text-zinc-400" />
+                        </span>
                       )}
                       {s.item.canBlockVehicle && (
                         <span className="ml-1.5 inline rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">⚠ Bloqueio</span>
@@ -838,13 +861,13 @@ export default function ChecklistFill() {
       {cameraItemIdx !== null && (
         <CameraCapture
           onClose={() => setCameraItemIdx(null)}
-          onCapture={(file, lat, lng) => handlePhotoCapture(cameraItemIdx, file, lat, lng)}
+          onCapture={(file, lat, lng) => { void handlePhotoCapture(cameraItemIdx, file, lat, lng); }}
         />
       )}
       {odometerCameraOpen && (
         <CameraCapture
           onClose={() => setOdometerCameraOpen(false)}
-          onCapture={(file) => handleOdometerPhotoCapture(file)}
+          onCapture={(file) => { void handleOdometerPhotoCapture(file); }}
         />
       )}
     </div>

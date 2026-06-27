@@ -59,8 +59,15 @@ export default function ActionPlans() {
       if (fetchError) throw fetchError;
 
       // Handle profiles where PostgREST join might fail (Edge cases/Legacy data)
+      type APQueryRow = Record<string, unknown> & {
+        claimed_by: string | null;
+        claimed_by_profile: { name: string } | null;
+        completed_by: string | null;
+        completed_by_profile: { name: string } | null;
+      };
+      const typedData = (data as APQueryRow[] | null) ?? [];
       const missingIds = new Set<string>();
-      (data ?? []).forEach((r: any) => {
+      typedData.forEach((r) => {
         if (r.claimed_by && !r.claimed_by_profile) missingIds.add(r.claimed_by);
         if (r.completed_by && !r.completed_by_profile) missingIds.add(r.completed_by);
       });
@@ -74,15 +81,15 @@ export default function ActionPlans() {
         (profiles ?? []).forEach((p: { id: string; name: string }) => { profileMap[p.id] = p.name; });
       }
 
-      return (data ?? []).map(r => {
-        const row = { ...r };
+      return typedData.map((r) => {
+        const row: APQueryRow = { ...r };
         if (row.claimed_by && !row.claimed_by_profile && profileMap[row.claimed_by]) {
           row.claimed_by_profile = { name: profileMap[row.claimed_by] };
         }
         if (row.completed_by && !row.completed_by_profile && profileMap[row.completed_by]) {
           row.completed_by_profile = { name: profileMap[row.completed_by] };
         }
-        return actionPlanFromRow(row as ActionPlanRow);
+        return actionPlanFromRow(row as unknown as ActionPlanRow);
       });
     },
     enabled: showsAggregatedData(user?.role, currentClient?.id)
@@ -268,7 +275,7 @@ export default function ActionPlans() {
           onClose={() => setSelectedPlan(null)}
           onSaved={() => { 
             setSelectedPlan(null); 
-            queryClient.invalidateQueries({ queryKey: ['actionPlans', currentClient?.id] });
+            void queryClient.invalidateQueries({ queryKey: ['actionPlans', currentClient?.id] });
           }}
         />
       )}

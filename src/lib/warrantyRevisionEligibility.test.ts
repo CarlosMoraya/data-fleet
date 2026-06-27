@@ -32,7 +32,7 @@ function makeVehicle(over: Partial<Vehicle> & { id: string }): Vehicle {
   };
 }
 
-const base: Vehicle = makeVehicle({ id: 'v1' });
+const _base: Vehicle = makeVehicle({ id: 'v1' });
 
 describe('filterEligibleVehicles', () => {
   it('filtra por marca', () => {

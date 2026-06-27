@@ -41,7 +41,7 @@ export default function ScheduleForm({ schedule, onClose, onSave }: ScheduleForm
   const [formData, setFormData] = useState<Partial<WorkshopSchedule>>(() => {
     try {
       const saved = sessionStorage.getItem('scheduleFormData');
-      return saved ? JSON.parse(saved) : {};
+      return saved ? JSON.parse(saved) as Partial<WorkshopSchedule> : {};
     } catch {
       return {};
     }
@@ -82,7 +82,7 @@ export default function ScheduleForm({ schedule, onClose, onSave }: ScheduleForm
     setLoadingOptions(false);
   }, [currentClient?.id]);
 
-  useEffect(() => { fetchOptions(); }, [fetchOptions]);
+  useEffect(() => { void fetchOptions(); }, [fetchOptions]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -146,7 +146,7 @@ export default function ScheduleForm({ schedule, onClose, onSave }: ScheduleForm
               <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
             </div>
           ) : (
-            <form id="schedule-form" onSubmit={handleSubmit} className="space-y-6 p-6">
+            <form id="schedule-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-6 p-6">
 
               {/* Veículo */}
               <div>

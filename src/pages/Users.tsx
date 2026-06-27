@@ -8,7 +8,6 @@ import { capitalizeWords } from '../lib/inputHelpers';
 import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
 import {
   filterOperationalUnitsByShippers,
-  hasOperationsManagerScopeChanged,
   normalizeOperationsManagerScope,
   validateOperationsManagerScope,
 } from '../lib/operationsManagerScope';
@@ -172,7 +171,8 @@ function useOperationsManagerOptions(enabled: boolean, clientId?: string | null)
 
       if (error) throw error;
 
-      return (data ?? []).map((row: any) => ({
+      type ShipperRow = { id: string; client_id: string; name: string; cnpj: string | null; phone: string | null; email: string | null; contact_person: string | null; notes: string | null; active: boolean };
+      return (data as ShipperRow[] ?? []).map((row) => ({
         id: row.id,
         clientId: row.client_id,
         name: row.name,
@@ -199,7 +199,8 @@ function useOperationsManagerOptions(enabled: boolean, clientId?: string | null)
 
       if (error) throw error;
 
-      return (data ?? []).map((row: any) => ({
+      type UnitRow = { id: string; client_id: string; shipper_id: string; name: string; code: string | null; city: string | null; state: string | null; notes: string | null; active: boolean };
+      return (data as UnitRow[] ?? []).map((row) => ({
         id: row.id,
         clientId: row.client_id,
         shipperId: row.shipper_id,
@@ -234,8 +235,8 @@ function useOperationsManagerScope(profileId: string | null, enabled: boolean) {
       if (unitError) throw unitError;
 
       return normalizeOperationsManagerScope({
-        shipperIds: (shipperRows ?? []).map((row: any) => row.shipper_id),
-        operationalUnitIds: (unitRows ?? []).map((row: any) => row.operational_unit_id),
+        shipperIds: (shipperRows as { shipper_id: string }[] ?? []).map((row) => row.shipper_id),
+        operationalUnitIds: (unitRows as { operational_unit_id: string }[] ?? []).map((row) => row.operational_unit_id),
       });
     },
   });
@@ -305,12 +306,12 @@ export function CreateUserModal({
       await invokeEdgeFunction('create-user', payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['users', currentClient?.id] });
       onCreated();
       onClose();
     },
-    onError: (err: any) => {
-      setError(err.message ?? 'Erro ao criar usuário.');
+    onError: (err: unknown) => {
+      setError((err as { message?: string }).message ?? 'Erro ao criar usuário.');
     },
   });
 
@@ -330,7 +331,7 @@ export function CreateUserModal({
       operationalUnitIds: [],
     });
     setError('');
-  }, [open, currentUserRole]);
+  }, [open, currentUserRole, availableRoles]);
 
   useEffect(() => {
     if (!isOperationsRole) return;
@@ -378,7 +379,7 @@ export function CreateUserModal({
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     createMutation.mutate();
@@ -642,8 +643,8 @@ function EditUserModal({
       onSaved();
       onClose();
     },
-    onError: (err: any) => {
-      setError(err.message ?? 'Erro ao salvar.');
+    onError: (err: unknown) => {
+      setError((err as { message?: string }).message ?? 'Erro ao salvar.');
     },
   });
 
@@ -704,7 +705,7 @@ function EditUserModal({
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     editMutation.mutate();
@@ -868,7 +869,7 @@ export default function Users() {
   const myRank = getRoleRank(user.role);
   const availableRoles = useMemo(() => getCreateUserRoleOptions(user.role), [user.role]);
 
-  const { data: users = [], isLoading: loading } = useQuery({
+  const { data: users = [], isLoading: loading } = useQuery<UserRow[]>({
     queryKey: ['users', currentClient?.id],
     queryFn: async () => {
       let query = supabase
@@ -881,7 +882,7 @@ export default function Users() {
 
       const { data, error } = await query.order('name');
       if (error) throw error;
-      return data;
+      return (data ?? []) as UserRow[];
     },
     enabled: !!currentClient?.id || !currentClient,
   });
@@ -901,10 +902,10 @@ export default function Users() {
       await invokeEdgeFunction('create-user', { action: 'delete', user_id: userId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['users', currentClient?.id] });
     },
-    onError: (err: any) => {
-      alert(err.message || 'Erro ao deletar usuário.');
+    onError: (err: unknown) => {
+      alert((err as { message?: string }).message || 'Erro ao deletar usuário.');
     },
   });
 

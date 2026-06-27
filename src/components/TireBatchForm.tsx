@@ -7,6 +7,8 @@ import { cn } from '../lib/utils';
 import { safeRandomUUID } from '../lib/uuid';
 import { TireVisualClassification, VehicleTireConfig, AxleConfigEntry } from '../types';
 
+import type { TirePosition } from '../lib/tirePositions';
+
 interface TireBatchFormProps {
   clientId: string;
   userId: string;
@@ -83,11 +85,36 @@ export default function TireBatchForm({
       .eq('client_id', clientId)
       .order('model')
       .then(({ data }) => {
-        const unique = [...new Set((data ?? []).map((v: any) => v.model as string))].sort();
+        const unique = [...new Set((data as Array<{ model: string }> ?? []).map((v) => v.model))].sort();
         setModels(unique);
         setModelsLoading(false);
       });
   }, [clientId]);
+
+  const getConfigForType = React.useCallback(
+    (vehicleType: string): VehicleTireConfig | undefined => tireConfigs.find(c => c.vehicleType === vehicleType),
+    [tireConfigs],
+  );
+
+  const getPositionSignature = React.useCallback((v: VehicleSimple): string => {
+    if (v.axleConfig && v.axleConfig.length > 0) {
+      return JSON.stringify(generatePositionsFromConfig(v.axleConfig, v.stepsCount ?? 0, v.type).map(p => p.code));
+    }
+    const config = getConfigForType(v.type);
+    if (!config) return '[]';
+    return JSON.stringify(generatePositions(v.eixos ?? config.defaultAxles, config.dualAxles, config.defaultSpareCount, v.type).map(p => p.code));
+  }, [getConfigForType]);
+
+  const countTiresForVehicle = React.useCallback((v: VehicleSimple): number => {
+    if (v.axleConfig && v.axleConfig.length > 0) {
+      return generatePositionsFromConfig(v.axleConfig, v.stepsCount ?? 0, v.type).length;
+    }
+    const config = getConfigForType(v.type);
+    if (!config) return 0;
+    const axleCount = v.eixos ?? config.defaultAxles;
+    const positions = generatePositions(axleCount, config.dualAxles, config.defaultSpareCount, v.type);
+    return positions.length;
+  }, [getConfigForType]);
 
   // Step 2: carregar veículos elegíveis do modelo selecionado
   React.useEffect(() => {
@@ -107,20 +134,22 @@ export default function TireBatchForm({
         }
 
         // Veículos que já têm qualquer pneu cadastrado (ativo ou inativo)
-        const vIds = vehicles.map((v: any) => v.id);
+        type VehicleQueryRow = { id: string; license_plate: string; brand: string | null; model: string; type: string; eixos: number | null; axle_config: AxleConfigEntry[] | null; steps_count: number | null };
+        const typedVehicles = (vehicles as VehicleQueryRow[]);
+        const vIds = typedVehicles.map((v) => v.id);
         const { data: existingTires } = await supabase
           .from('tires')
           .select('vehicle_id')
           .eq('client_id', clientId)
           .in('vehicle_id', vIds);
 
-        const vehiclesWithTires = new Set((existingTires ?? []).map((t: any) => t.vehicle_id));
-        const eligible = (vehicles as any[])
+        const vehiclesWithTires = new Set((existingTires as Array<{ vehicle_id: string }> ?? []).map((t) => t.vehicle_id));
+        const eligible = typedVehicles
           .filter(v => !vehiclesWithTires.has(v.id))
           .map(v => ({
             id: v.id,
             licensePlate: v.license_plate,
-            brand: v.brand,
+            brand: v.brand ?? '',
             model: v.model,
             type: v.type,
             eixos: v.eixos ?? undefined,
@@ -135,36 +164,11 @@ export default function TireBatchForm({
         setEligibleVehicles(eligible);
         setVehiclesLoading(false);
       });
-  }, [step, selectedModel, clientId]);
-
-  function getConfigForType(vehicleType: string): VehicleTireConfig | undefined {
-    return tireConfigs.find(c => c.vehicleType === vehicleType);
-  }
-
-  function getPositionSignature(v: VehicleSimple): string {
-    if (v.axleConfig && v.axleConfig.length > 0) {
-      return JSON.stringify(generatePositionsFromConfig(v.axleConfig, v.stepsCount ?? 0, v.type).map(p => p.code));
-    }
-    const config = getConfigForType(v.type);
-    if (!config) return '[]';
-    return JSON.stringify(generatePositions(v.eixos ?? config.defaultAxles, config.dualAxles, config.defaultSpareCount, v.type).map(p => p.code));
-  }
-
-  function countTiresForVehicle(v: VehicleSimple): number {
-    if (v.axleConfig && v.axleConfig.length > 0) {
-      return generatePositionsFromConfig(v.axleConfig, v.stepsCount ?? 0, v.type).length;
-    }
-    const config = getConfigForType(v.type);
-    if (!config) return 0;
-    const axleCount = v.eixos ?? config.defaultAxles;
-    const positions = generatePositions(axleCount, config.dualAxles, config.defaultSpareCount, v.type);
-    return positions.length;
-  }
+  }, [step, selectedModel, clientId, getPositionSignature]);
 
   const totalTires = React.useMemo(
     () => eligibleVehicles.reduce((acc, v) => acc + countTiresForVehicle(v), 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [eligibleVehicles, tireConfigs],
+    [eligibleVehicles, countTiresForVehicle],
   );
 
   async function handleConfirm() {
@@ -173,10 +177,10 @@ export default function TireBatchForm({
     setSaveError(null);
 
     try {
-      const rows: any[] = [];
+      const rows: Record<string, unknown>[] = [];
 
       for (const vehicle of eligibleVehicles) {
-        let positions;
+        let positions: TirePosition[];
         if (vehicle.axleConfig && vehicle.axleConfig.length > 0) {
           positions = generatePositionsFromConfig(vehicle.axleConfig, vehicle.stepsCount ?? 0, vehicle.type);
         } else {
@@ -225,7 +229,8 @@ export default function TireBatchForm({
         .eq('active', true);
 
       if (inserted && inserted.length > 0) {
-        const historyRows = (inserted as any[]).map(t => ({
+        type InsertedTire = { id: string; vehicle_id: string; current_position: string | null };
+        const historyRows = (inserted as InsertedTire[]).map(t => ({
           client_id: clientId,
           tire_id: t.id,
           vehicle_id: t.vehicle_id,
@@ -242,8 +247,8 @@ export default function TireBatchForm({
 
       setSaveSuccess(true);
       setTimeout(() => onSuccess(), 1500);
-    } catch (err: any) {
-      setSaveError(err?.message ?? 'Erro ao cadastrar pneus em lote.');
+    } catch (err: unknown) {
+      setSaveError((err as { message?: string })?.message ?? 'Erro ao cadastrar pneus em lote.');
     } finally {
       setIsSaving(false);
     }
@@ -546,7 +551,7 @@ export default function TireBatchForm({
               </button>
             ) : (
               <button
-                onClick={handleConfirm}
+                onClick={() => { void handleConfirm(); }}
                 disabled={isSaving}
                 className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
               >

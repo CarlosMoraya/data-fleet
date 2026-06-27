@@ -63,7 +63,7 @@ export default function ChangePassword() {
       </div>
 
       <div className="max-w-xl rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <form className="space-y-6" onSubmit={handleSubmit}>
+        <form className="space-y-6" onSubmit={(e) => { void handleSubmit(e); }}>
           <PasswordField
             id="current-password"
             label="Senha atual"

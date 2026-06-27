@@ -5,8 +5,7 @@
  * Verifies that the editable table renders Sistema as a select dropdown
  * and the readOnly table renders system as plain text.
  */
-import React from 'react';
-import { act } from 'react';
+import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
@@ -16,7 +15,8 @@ import BudgetItemsTable from './BudgetItemsTable';
 
 import type { BudgetItem } from '../lib/maintenanceMappers';
 
-let container: HTMLDivElement;
+type ReactContainer = HTMLDivElement & { __reactRoot?: ReturnType<typeof createRoot> };
+let container: ReactContainer;
 
 beforeEach(() => {
   container = document.createElement('div');
@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  const root = (container as any).__reactRoot;
+  const root = container.__reactRoot;
   if (root) {
     act(() => { root.unmount(); });
   }
@@ -33,7 +33,7 @@ afterEach(() => {
 
 function renderWithAct(ui: React.ReactElement) {
   const root = createRoot(container);
-  (container as any).__reactRoot = root;
+  container.__reactRoot = root;
   act(() => { root.render(ui); });
   return root;
 }

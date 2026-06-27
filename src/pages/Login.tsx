@@ -30,7 +30,7 @@ export default function Login() {
     if (loginError) {
       setError(loginError);
     } else {
-      navigate('/');
+      void navigate('/');
     }
   };
 
@@ -82,7 +82,7 @@ export default function Login() {
         </h2>
 
         <div className="rounded-2xl border border-white/20 bg-white/95 px-4 py-8 shadow-xl backdrop-blur-sm sm:px-10">
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <form className="space-y-6" onSubmit={(e) => { void handleSubmit(e); }}>
             {resetSuccess && (
               <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                 Senha redefinida com sucesso. Faça login com a nova senha.

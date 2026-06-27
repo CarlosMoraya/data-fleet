@@ -38,7 +38,7 @@ export default function Workshops() {
   const [editingWorkshop, setEditingWorkshop] = useState<Workshop | null>(() => {
     try {
       const saved = sessionStorage.getItem('workshopFormEditing');
-      return saved ? JSON.parse(saved) : null;
+      return saved ? JSON.parse(saved) as Workshop : null;
     } catch {
       return null;
     }
@@ -78,7 +78,7 @@ export default function Workshops() {
         .eq('status', 'active');
       if (error) throw error;
       return new Set(
-        (data ?? []).map((p: any) => p.legacy_workshop_id).filter(Boolean) as string[]
+        (data ?? []).map((p: { legacy_workshop_id: string | null }) => p.legacy_workshop_id).filter(Boolean) as string[]
       );
     },
     enabled: !!currentClient?.id,
@@ -107,7 +107,7 @@ export default function Workshops() {
           .eq('cnpj', row.cnpj)
           .maybeSingle();
         if (existing) {
-          throw { code: '23505', message: 'Este CNPJ já está cadastrado para este cliente.' };
+          throw new Error('Este CNPJ já está cadastrado para este cliente.');
         }
         const { error: insertError } = await supabase
           .from('workshops')
@@ -116,7 +116,7 @@ export default function Workshops() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workshops', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['workshops', currentClient?.id] });
       setIsFormOpen(false);
       setEditingWorkshop(null);
       sessionStorage.removeItem('workshopFormOpen');
@@ -138,14 +138,14 @@ export default function Workshops() {
       if (deleteError) throw deleteError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workshops', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['workshops', currentClient?.id] });
     },
     onError: () => {
       alert('Erro ao excluir oficina. Tente novamente.');
     },
   });
 
-  const handleDelete = async (workshop: Workshop) => {
+  const handleDelete = (workshop: Workshop) => {
     if (!window.confirm(`Excluir a oficina "${workshop.name}"? Esta ação não pode ser desfeita.`)) return;
     deleteMutation.mutate(workshop);
   };

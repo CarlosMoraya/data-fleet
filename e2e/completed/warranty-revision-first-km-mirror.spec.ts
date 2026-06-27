@@ -66,9 +66,11 @@ test.describe('Revisões de Garantia — espelho do KM da 1ª revisão', () => {
       await page.getByRole('button', { name: 'Salvar programação' }).click();
       await expect(page.getByRole('heading', { name: 'Revisões de Garantia' })).toBeVisible({ timeout: 15000 });
 
-      // Depois: espelho não-destrutivo atualizou para 15000
-      const after = await supabase.from('vehicles').select('first_revision_max_km').eq('id', vehicleId).single();
-      expect(after.data?.first_revision_max_km).toBe(15000);
+      // Depois: o espelho pode persistir alguns ciclos após o retorno para a listagem.
+      await expect.poll(async () => {
+        const after = await supabase.from('vehicles').select('first_revision_max_km').eq('id', vehicleId).single();
+        return after.data?.first_revision_max_km ?? null;
+      }, { timeout: 5000 }).toBe(15000);
     } finally {
       await supabase.from('vehicle_warranty_revision_events').delete().eq('vehicle_id', vehicleId);
       await supabase.from('vehicle_warranty_revision_assignments').delete().eq('vehicle_id', vehicleId);

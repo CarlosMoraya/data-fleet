@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 
 import { safeRandomUUID, uuidV4Regex } from './uuid';
 
@@ -25,18 +25,17 @@ describe('safeRandomUUID', () => {
   });
 
   it('returns a valid UUID v4 when crypto.randomUUID is unavailable but getRandomValues exists (non-secure context)', () => {
-    const originalRandomUUID = globalThis.crypto?.randomUUID;
     // Remove randomUUID to simulate non-secure context
     Object.defineProperty(globalThis, 'crypto', {
       value: {
         ...globalThis.crypto,
-        getRandomValues: globalThis.crypto.getRandomValues.bind(globalThis.crypto),
+        getRandomValues: globalThis.crypto.getRandomValues.bind(globalThis.crypto) as typeof globalThis.crypto.getRandomValues,
       },
       writable: true,
       configurable: true,
     });
     // Ensure randomUUID is gone
-    expect(typeof (globalThis.crypto as any).randomUUID).toBe('undefined');
+    expect(typeof (globalThis.crypto as { randomUUID?: unknown }).randomUUID).toBe('undefined');
 
     const result = safeRandomUUID();
     expect(result).toMatch(uuidV4Regex);

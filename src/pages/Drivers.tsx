@@ -6,10 +6,10 @@ import { Navigate, useSearchParams } from 'react-router-dom';
 import DriverActiveFilterBanner from '../components/DriverActiveFilterBanner';
 import DriverDetailModal from '../components/DriverDetailModal';
 import DriverForm from '../components/DriverForm';
-import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { useSessionUiState } from '../hooks/usePersistentUiState';
+import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { driverFieldSettingsFromRow, defaultDriverFieldSettings, DriverFieldSettingsRow } from '../lib/driverFieldSettingsMappers';
 import {
   DRIVER_PENDENCY_LABELS,
@@ -28,7 +28,7 @@ import { driverFromRow, DriverRow } from '../lib/driverMappers';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import { saveDriver, deleteDriver } from '../services/driverService';
-import { Driver, DriverFieldSettings } from '../types';
+import { Driver } from '../types';
 
 import type { DriverFiles } from '../services/driverService';
 
@@ -87,12 +87,13 @@ export default function Drivers() {
     queryKey: ['driverFieldSettings', currentClient?.id],
     queryFn: async () => {
       if (!currentClient?.id) return null;
-      const { data } = await supabase
+      const result = await supabase
         .from('driver_field_settings')
         .select('*')
         .eq('client_id', currentClient.id)
         .maybeSingle();
-      return data ? driverFieldSettingsFromRow(data as DriverFieldSettingsRow) : defaultDriverFieldSettings(currentClient.id);
+      const data = result.data as DriverFieldSettingsRow | null;
+      return data ? driverFieldSettingsFromRow(data) : defaultDriverFieldSettings(currentClient.id);
     },
     enabled: !!currentClient?.id
   });
@@ -213,7 +214,7 @@ export default function Drivers() {
         { replace: true }
       );
     }
-  }, [searchParams]);
+  }, [searchParams, setSearchParams]);
 
   // Redirect Drivers and Yard Auditors
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
@@ -242,8 +243,8 @@ export default function Drivers() {
 
     try {
       await deleteDriver(driver);
-      queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] });
-      queryClient.invalidateQueries({ queryKey: ['driverVehicleInfo', currentClient?.id ?? 'all-clients'] });
+      void queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['driverVehicleInfo', currentClient?.id ?? 'all-clients'] });
     } catch (err) {
       console.error('Erro ao excluir motorista:', err);
       alert('Erro ao excluir motorista. Tente novamente.');
@@ -444,7 +445,7 @@ export default function Drivers() {
                         )}
                         {canDelete && (
                           <button
-                            onClick={() => handleDelete(driver)}
+                            onClick={() => { void handleDelete(driver); }}
                             className="text-zinc-400 transition-colors hover:text-red-600"
                           >
                             <Trash2 className="h-5 w-5" />

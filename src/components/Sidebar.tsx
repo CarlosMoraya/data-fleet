@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  Truck,
   FolderOpen,
   ClipboardCheck,
   Settings,
@@ -15,6 +14,7 @@ import {
   KeyRound,
   ShieldCheck,
 } from 'lucide-react';
+import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
@@ -27,7 +27,7 @@ import type { Role } from '../types';
 interface NavItem {
   name: string;
   to: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   roles: Role[];
 }
 
@@ -55,12 +55,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    void navigate('/login');
   };
 
-  const visibleNavItems = isOperationsManager(user?.role)
+  const userRole = user?.role;
+
+  const visibleNavItems = isOperationsManager(userRole)
     ? NAV_ITEMS.filter((item) => item.to === '/agendamentos' || item.to === '/manutencao')
-    : NAV_ITEMS.filter((item) => item.roles.includes(user?.role || ''));
+    : NAV_ITEMS.filter((item) => (userRole ? item.roles.includes(userRole) : false));
 
   return (
     <>
@@ -175,7 +177,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             Alterar senha
           </NavLink>
           <button
-            onClick={handleLogout}
+            onClick={() => { void handleLogout(); }}
             className="group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium text-blue-200 transition-colors hover:bg-blue-800 hover:text-white"
           >
             <LogOut className="mr-3 h-5 w-5 text-blue-300 group-hover:text-blue-200" aria-hidden="true" />

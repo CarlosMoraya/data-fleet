@@ -15,7 +15,7 @@ const { mockFrom, mockStorage } = vi.hoisted(() => {
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
-    from: (...args: unknown[]) => mockFrom(...args),
+    from: (...args: unknown[]): unknown => mockFrom(...args),
     storage: mockStorage,
   },
 }));
@@ -39,7 +39,7 @@ const simpleAxleConfig: AxleConfigEntry[] = [
   { order: 2, type: 'simples', rodagem: 'simples', physicalAxles: 1 },
 ];
 
-function makeChain(returnValue: unknown) {
+function _makeChain(returnValue: unknown) {
   const chain = {
     select: vi.fn().mockReturnThis(),
     insert: vi.fn().mockReturnThis(),
@@ -57,7 +57,7 @@ function makeChain(returnValue: unknown) {
   return { ...chain, resolvedValue: returnValue };
 }
 
-function makeSelectChain(returnValue: unknown) {
+function _makeSelectChain(returnValue: unknown) {
   const chain = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),

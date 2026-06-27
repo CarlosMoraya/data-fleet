@@ -108,7 +108,7 @@ export default function AxleConfigEditor({
 
       <div className="space-y-3">
         {rows.map(({ entry, idx, slotsBefore, isFirst }) => {
-          const slotsRemaining = targetAxles - slotsBefore - entry.physicalAxles + entry.physicalAxles;
+          const _slotsRemaining = targetAxles - slotsBefore - entry.physicalAxles + entry.physicalAxles;
           const availableTypes = getAvailableAxleTypes(
             targetAxles - slotsBefore, // remaining before this entry
             isFirst,

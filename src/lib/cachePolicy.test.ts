@@ -11,7 +11,14 @@ describe('shouldPersistQuery', () => {
   });
 
   it('returns true for a reference query inside its TTL', () => {
-    expect(shouldPersistQuery(['vehicleSettings', 'c1'], now - 10 * HOUR, now)).toBe(true);
+    expect(shouldPersistQuery(['checklistDayIntervals', 'c1'], now - 10 * HOUR, now)).toBe(true);
+  });
+
+  it('does not persist settings field queries to avoid stale reloads', () => {
+    expect(shouldPersistQuery(['vehicleSettings', 'c1'], now - 10 * HOUR, now)).toBe(false);
+    expect(shouldPersistQuery(['vehicleFieldSettings', 'c1'], now - 10 * HOUR, now)).toBe(false);
+    expect(shouldPersistQuery(['driverSettings', 'c1'], now - 10 * HOUR, now)).toBe(false);
+    expect(shouldPersistQuery(['driverFieldSettings', 'c1'], now - 10 * HOUR, now)).toBe(false);
   });
 
   it('rejects PII queries', () => {

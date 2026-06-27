@@ -1,5 +1,7 @@
 import { generatePositions, generatePositionsFromConfig, validatePositionAssignment } from './tirePositions';
 
+import type { Tire } from '../types';
+
 describe('generatePositions', () => {
   it('gera posições para moto', () => {
     const positions = generatePositions(1, [], 0, 'Moto');
@@ -78,8 +80,8 @@ describe('generatePositionsFromConfig', () => {
 });
 
 describe('validatePositionAssignment', () => {
-  const makeTire = (id: string, pos: string, active: boolean) =>
-    ({ id, currentPosition: pos, active, tireCode: 'TIRE-' + id } as any);
+  const makeTire = (id: string, pos: string, active: boolean): Tire =>
+    ({ id, currentPosition: pos, active, tireCode: 'TIRE-' + id } as unknown as Tire);
 
   it('retorna null quando posição está livre', () => {
     const tires = [makeTire('1', 'E1', true)];

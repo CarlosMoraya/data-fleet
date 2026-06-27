@@ -13,7 +13,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
 
   const [preview, setPreview] = useState<string | null>(null);
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
-  const [error, setError] = useState('');
+  const [error] = useState('');
   const [useFileInput, setUseFileInput] = useState(false);
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
 
@@ -40,7 +40,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        void videoRef.current.play();
       }
     } catch {
       setUseFileInput(true);
@@ -53,7 +53,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
   }, []);
 
   useEffect(() => {
-    startCamera();
+    void startCamera();
     return () => stopCamera();
   }, [startCamera, stopCamera]);
 
@@ -92,7 +92,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
   const retake = () => {
     setPreview(null);
     setCapturedFile(null);
-    startCamera();
+    void startCamera();
   };
 
   const confirm = () => {

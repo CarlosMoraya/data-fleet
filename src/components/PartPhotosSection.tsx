@@ -349,7 +349,7 @@ export default function PartPhotosSection({
   }, [canManage, captionInputs, draftPreviewUrls, drafts, mode, openFilePicker, persistedPhotos, removeDraft, removePersisted, setCaptionInput, updateDraftCaption, uploadingType]);
 
   if (cameraType) {
-    return <CameraCapture onCapture={handleCapture} onClose={() => setCameraType(null)} />;
+    return <CameraCapture onCapture={(f) => { void handleCapture(f); }} onClose={() => setCameraType(null)} />;
   }
 
   return (

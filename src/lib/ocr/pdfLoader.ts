@@ -1,7 +1,7 @@
 let pdfjsPromise: Promise<typeof import('pdfjs-dist')> | null = null;
 
 export function loadPdfjs(): Promise<typeof import('pdfjs-dist')> {
-  if (!pdfjsPromise) {
+  if (pdfjsPromise === null) {
     pdfjsPromise = (async () => {
       const pdfjsLib = await import('pdfjs-dist');
       const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;

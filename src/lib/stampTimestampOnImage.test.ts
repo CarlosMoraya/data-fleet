@@ -73,6 +73,7 @@ describe('stampTimestampOnImage', () => {
     const blob = new Blob(['fake-jpeg'], { type: 'image/jpeg' });
     await stampTimestampOnImage(blob, 'foto.jpg');
 
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.mocked wraps the method ref; binding context is irrelevant in this test-only call
     const createElement = vi.mocked(document.createElement);
     const canvas = createElement.mock.results.find(r => r.type === 'return')?.value as HTMLCanvasElement;
     const ctx = canvas?.getContext('2d') as CanvasRenderingContext2D & { drawImage: ReturnType<typeof vi.fn> };

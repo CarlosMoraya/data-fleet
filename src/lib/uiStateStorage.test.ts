@@ -9,7 +9,7 @@ import {
   removeUiStateByPrefix,
   sanitizeDraft,
   clearCurrentUserUiState,
-  type BuildKeyParams,
+
 } from './uiStateStorage';
 
 const mockStorage = (): Storage => {

@@ -141,8 +141,8 @@ export default function WarrantyPlanByPlateModal({ prefillVehicleId, onClose, on
       }
 
       onSaved();
-    } catch (err: any) {
-      setError(err?.message ?? 'Falha ao salvar a programação.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Falha ao salvar a programação.');
     } finally {
       setSaving(false);
     }
@@ -158,13 +158,13 @@ export default function WarrantyPlanByPlateModal({ prefillVehicleId, onClose, on
             </div>
             <h2 className="text-base font-semibold text-zinc-900">Cadastrar revisão por placa</h2>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
+          <button onClick={() => { onClose(); }} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          <form id="warranty-plate-form" onSubmit={handleSubmit} className="space-y-6">
+          <form id="warranty-plate-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className={labelClass} htmlFor="wr_vehicle">Veículo (Placa) *</label>

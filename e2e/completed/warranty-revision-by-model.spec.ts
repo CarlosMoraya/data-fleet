@@ -86,10 +86,11 @@ test.describe('Revisões de Garantia — cadastro por modelo', () => {
       await page.locator('#m_lbl_0').fill('1ª revisão');
       await page.locator('#m_km_0').fill('10000');
 
-      // Prévia de elegibilidade: ambos aparecem; o veículo sem garantia destaca "Sem garantia (ajuste)"
-      await expect(page.locator('table').getByText(plateA)).toBeVisible({ timeout: 15000 });
-      await expect(page.locator('table').getByText(plateB)).toBeVisible();
-      await expect(page.locator('table').getByText('Sem garantia (ajuste)')).toBeVisible();
+      // Prévia de elegibilidade: ambos aparecem no modal; o veículo sem garantia destaca "Sem garantia (ajuste)"
+      const previewTable = page.getByRole('dialog').locator('table');
+      await expect(previewTable.getByText(plateA)).toBeVisible({ timeout: 15000 });
+      await expect(previewTable.getByText(plateB)).toBeVisible();
+      await expect(previewTable.getByText('Sem garantia (ajuste)')).toBeVisible();
 
       // Selecionar todos + marcar como em garantia ao aplicar
       await page.getByLabel('Selecionar todos').check();
@@ -103,17 +104,26 @@ test.describe('Revisões de Garantia — cadastro por modelo', () => {
       await expect(page.getByRole('heading', { name: 'Revisões de Garantia' })).toBeVisible({ timeout: 15000 });
 
       // Validação: ambos com assignment ativo; veículo B agora com warranty=true
-      const a = await supabase.from('vehicle_warranty_revision_assignments').select('id, status').eq('vehicle_id', idA).maybeSingle();
-      const b = await supabase.from('vehicle_warranty_revision_assignments').select('id, status').eq('vehicle_id', idB).maybeSingle();
-      expect(a.data?.status).toBe('active');
-      expect(b.data?.status).toBe('active');
+      await expect.poll(async () => {
+        const a = await supabase.from('vehicle_warranty_revision_assignments').select('status').eq('vehicle_id', idA).maybeSingle();
+        return a.data?.status ?? null;
+      }, { timeout: 5000 }).toBe('active');
 
-      const vB = await supabase.from('vehicles').select('warranty').eq('id', idB).single();
-      expect(vB.data?.warranty).toBe(true);
+      await expect.poll(async () => {
+        const b = await supabase.from('vehicle_warranty_revision_assignments').select('status').eq('vehicle_id', idB).maybeSingle();
+        return b.data?.status ?? null;
+      }, { timeout: 5000 }).toBe('active');
+
+      await expect.poll(async () => {
+        const vB = await supabase.from('vehicles').select('warranty').eq('id', idB).single();
+        return vB.data?.warranty ?? null;
+      }, { timeout: 5000 }).toBe(true);
 
       // veículo A continua com warranty true (não foi alterado para false)
-      const vA = await supabase.from('vehicles').select('warranty').eq('id', idA).single();
-      expect(vA.data?.warranty).toBe(true);
+      await expect.poll(async () => {
+        const vA = await supabase.from('vehicles').select('warranty').eq('id', idA).single();
+        return vA.data?.warranty ?? null;
+      }, { timeout: 5000 }).toBe(true);
     } finally {
       for (const vid of createdVehicleIds) {
         await supabase.from('vehicle_warranty_revision_events').delete().eq('vehicle_id', vid);

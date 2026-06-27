@@ -8,11 +8,14 @@ import MaintenanceForm from '../components/MaintenanceForm';
 import MultiSelectDropdown from '../components/MultiSelectDropdown';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
+import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection } from '../lib/clientScope';
-import { canWorkshopFillOrder } from '../lib/maintenanceWorkshop';
+import { buildMaintenanceFilterOptions, applyMaintenanceListFilters } from '../lib/maintenanceFilters';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
+import { canWorkshopFillOrder } from '../lib/maintenanceWorkshop';
 import { canEditWorkshopOrder, isOperationsManager } from '../lib/rolePermissions';
 import { supabase } from '../lib/supabase';
+import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import { cn } from '../lib/utils';
 import { savePendingPartPhotos, type PartPhotoDraft } from '../services/maintenancePartPhotoService';
 import {
@@ -23,10 +26,6 @@ import {
 
 import type { Role } from '../types';
 import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus } from '../types/maintenance';
-
-import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
-import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
-import { buildMaintenanceFilterOptions, applyMaintenanceListFilters } from '../lib/maintenanceFilters';
 
 // Re-export para compatibilidade com componentes que importam daqui
 export type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus };
@@ -178,7 +177,7 @@ export default function Maintenance() {
   const [isFormOpen, setIsFormOpen] = useSessionUiState<boolean>('maintenance', 'modal', 'form-open', false, { legacyKeys: ['maintenanceFormOpen'] });
   const [orderToEdit, setOrderToEdit] = useSessionUiState<MaintenanceOrder | null>('maintenance', 'selection', 'editing', null, { legacyKeys: ['maintenanceFormEditing'] });
   const [prefillData, setPrefillData] = React.useState<Partial<MaintenanceOrder> | undefined>(
-    () => (operationsManager ? undefined : (location.state)?.prefillMaintenance ?? undefined)
+    () => (operationsManager ? undefined : (location.state as { prefillMaintenance?: Partial<MaintenanceOrder> } | null)?.prefillMaintenance ?? undefined)
   );
   const [orderToCancel, setOrderToCancel] = React.useState<MaintenanceOrder | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = React.useState(false);
@@ -198,7 +197,7 @@ export default function Maintenance() {
       setIsFormOpen(true);
       window.history.replaceState({}, document.title);
     }
-  }, [prefillData, operationsManager]);
+  }, [prefillData, operationsManager, setIsFormOpen, setOrderToEdit]);
 
   const { activeWorkshopId, workshopPartnerships } = useAuth();
   const isMultiWorkshop = isWorkshopUser && workshopPartnerships.length > 1;
@@ -253,7 +252,7 @@ export default function Maintenance() {
       await updateMaintenanceStatus(id, status);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
     },
   });
 
@@ -262,8 +261,8 @@ export default function Maintenance() {
       await cancelMaintenanceOrder(order.id, profile?.id ?? null);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
-      queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
+      void queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
       setOrderToCancel(null);
     },
   });
@@ -301,9 +300,9 @@ export default function Maintenance() {
       return orderId;
     },
     onSuccess: (orderId) => {
-      queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
-      queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
-      queryClient.invalidateQueries({ queryKey: ['partPhotos', orderId] });
+      void queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
+      void queryClient.invalidateQueries({ queryKey: ['partPhotos', orderId] });
       setIsFormOpen(false);
       setOrderToEdit(null);
       clearMaintenanceDraft();

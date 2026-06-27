@@ -9,15 +9,19 @@ import {
   Label,
 } from 'recharts';
 
+import type { MaintenanceType } from '../../types/maintenance';
+import type { Props as RechartsLabelProps } from 'recharts/types/component/Label';
+
+
 interface MaintenanceTypeDonutChartProps {
-  data: { name: string; value: number }[];
-  activeFilter: string | null;
-  onFilterChange: (type: string | null) => void;
+  data: { name: MaintenanceType; value: number }[];
+  activeFilter: MaintenanceType | null;
+  onFilterChange: (type: MaintenanceType | null) => void;
   title: string;
   valueFormatter?: (v: number) => string;
 }
 
-const COLORS: Record<string, string> = {
+const COLORS: Record<MaintenanceType, string> = {
   Corretiva: '#ef4444',
   Preventiva: '#3b82f6',
   Preditiva: '#8b5cf6',
@@ -31,7 +35,7 @@ export interface DonutDisplayState {
 }
 
 export function deriveDonutState(
-  data: { name: string; value: number }[]
+  data: { name: MaintenanceType; value: number }[]
 ): DonutDisplayState {
   return {
     total: data.reduce((sum, entry) => sum + entry.value, 0),
@@ -49,13 +53,13 @@ export default function MaintenanceTypeDonutChart({
 }: MaintenanceTypeDonutChartProps) {
   const { total, isEmpty, isFilterable } = deriveDonutState(data);
 
-  const renderCenterTotal = ({
-    viewBox,
-  }: {
-    viewBox?: { cx?: number; cy?: number };
-  }): React.ReactElement | null => {
-    const cx = viewBox?.cx;
-    const cy = viewBox?.cy;
+  const renderCenterTotal = ({ viewBox }: RechartsLabelProps): React.ReactElement | null => {
+    if (!viewBox || !('cx' in viewBox) || !('cy' in viewBox)) {
+      return null;
+    }
+
+    const cx = viewBox.cx;
+    const cy = viewBox.cy;
 
     if (cx === undefined || cy === undefined) {
       return null;
@@ -81,7 +85,7 @@ export default function MaintenanceTypeDonutChart({
 
   const handleClick = (entry: unknown) => {
     if (!isFilterable) return;
-    const name = String((entry as { name?: string | number })?.name ?? '');
+    const name = (entry as { name?: MaintenanceType })?.name;
     if (!name) return;
     if (activeFilter === name) {
       onFilterChange(null);

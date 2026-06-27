@@ -36,7 +36,7 @@ export default function Shippers() {
   const [editingShipper, setEditingShipper] = useState<Shipper | null>(() => {
     try {
       const saved = sessionStorage.getItem('shipperFormEditing');
-      return saved ? JSON.parse(saved) : null;
+      return saved ? JSON.parse(saved) as Shipper : null;
     } catch {
       return null;
     }
@@ -85,17 +85,16 @@ export default function Shippers() {
         if (error) throw error;
       }
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['shippers', currentClient?.id] });
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['shippers', currentClient?.id] });
       setIsFormOpen(false);
       setEditingShipper(null);
       sessionStorage.removeItem('shipperFormOpen');
       sessionStorage.removeItem('shipperFormEditing');
       sessionStorage.removeItem('shipperFormData');
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       console.error('Erro ao salvar embarcador:', err);
-      // Let ShipperForm handle the error display
     }
   });
 
@@ -112,10 +111,11 @@ export default function Shippers() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shippers', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['shippers', currentClient?.id] });
     },
-    onError: (err: any) => {
-      if (err.code === '23503') {
+    onError: (err: unknown) => {
+      const pgErr = err as { code?: string };
+      if (pgErr.code === '23503') {
         alert('Este embarcador possui unidades operacionais vinculadas. Exclua as unidades antes de excluir o embarcador.');
       } else {
         alert('Erro ao excluir embarcador. Tente novamente.');
@@ -123,7 +123,7 @@ export default function Shippers() {
     }
   });
 
-  const handleDelete = async (shipper: Shipper) => {
+  const handleDelete = (shipper: Shipper) => {
     if (!window.confirm(`Excluir o embarcador "${shipper.name}"? Esta ação não pode ser desfeita.`)) return;
     deleteMutation.mutate(shipper.id);
   };
@@ -257,7 +257,7 @@ export default function Shippers() {
                         )}
                         {canDelete && (
                           <button
-                            onClick={() => handleDelete(shipper)}
+                            onClick={() => { handleDelete(shipper); }}
                             className="text-zinc-400 transition-colors hover:text-red-600"
                           >
                             <Trash2 className="h-5 w-5" />

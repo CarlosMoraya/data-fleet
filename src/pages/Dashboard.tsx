@@ -97,6 +97,17 @@ const DEFAULT_COST_FILTERS: CostDashboardFilters = {
   maintenanceType: null,
 };
 
+type DashboardChecklistRpcRow = {
+  vehicle_id: string;
+  context: string | null;
+  completed_at: string;
+};
+
+type DashboardVehicleKmRpcRow = {
+  vehicle_id: string;
+  km_driven: number | string | null;
+};
+
 export default function Dashboard() {
   const { currentClient, user } = useAuth();
   const navigate = useNavigate();
@@ -353,14 +364,17 @@ export default function Dashboard() {
   >({
     queryKey: ['dashboard-last-checklists', currentClient?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('dashboard_last_checklist_per_vehicle', {
+      const response = await supabase.rpc('dashboard_last_checklist_per_vehicle', {
         p_client_id: currentClient?.id ?? null,
       });
+      const data = response.data as DashboardChecklistRpcRow[] | null;
+      const error = response.error;
       if (error) throw error;
-      return (data ?? []).map((row: Record<string, unknown>) => ({
-        vehicle_id: row.vehicle_id as string,
-        context: (row.context as string) ?? '',
-        completed_at: row.completed_at as string,
+      const rows = (data ?? []) as DashboardChecklistRpcRow[];
+      return rows.map((row) => ({
+        vehicle_id: row.vehicle_id,
+        context: row.context ?? '',
+        completed_at: row.completed_at,
       }));
     },
     enabled: !!user,
@@ -398,14 +412,17 @@ export default function Dashboard() {
   >({
     queryKey: ['dashboard-vehicle-km', currentClient?.id, dateRange.from, dateRange.to],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('dashboard_vehicle_km_in_period', {
+      const response = await supabase.rpc('dashboard_vehicle_km_in_period', {
         p_client_id: currentClient?.id ?? null,
         p_from: dateRange.from,
         p_to: dateRange.to,
       });
+      const data = response.data as DashboardVehicleKmRpcRow[] | null;
+      const error = response.error;
       if (error) throw error;
-      return (data ?? []).map((row: Record<string, unknown>) => ({
-        vehicle_id: row.vehicle_id as string,
+      const rows = (data ?? []) as DashboardVehicleKmRpcRow[];
+      return rows.map((row) => ({
+        vehicle_id: row.vehicle_id,
         km_driven: Number(row.km_driven ?? 0),
       }));
     },
@@ -811,15 +828,15 @@ export default function Dashboard() {
   );
 
   const handleOperationalActionClick = (category: OperationalActionCategory) => {
-    navigate(OPERATIONAL_QUEUE_ROUTES[category]);
+    void navigate(OPERATIONAL_QUEUE_ROUTES[category]);
   };
 
   const handleComplianceActionClick = (category: ComplianceActionCategory) => {
-    navigate(COMPLIANCE_ACTION_ROUTES[category]);
+    void navigate(COMPLIANCE_ACTION_ROUTES[category]);
   };
 
   const handleViewVehicleHistory = (plate: string) => {
-    navigate(`/manutencao?placa=${encodeURIComponent(plate)}`);
+    void navigate(`/manutencao?placa=${encodeURIComponent(plate)}`);
   };
 
   // ── Loading state ─────────────────────────────────────────────────────────

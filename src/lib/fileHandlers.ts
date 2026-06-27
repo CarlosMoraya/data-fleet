@@ -6,19 +6,19 @@
  * @returns Object with handlers: handleFileSelect, handleRemoveFile
  */
 export function makeFileHandler(
-  setFormData: (value: any) => void,
+  setFormData: (updater: (prev: Record<string, unknown>) => Record<string, unknown>) => void,
   fieldKey: string,
   validateFile?: (file: File) => void,
 ) {
-  const handleFileSelect = async (e: any) => {
+  const handleFileSelect = (e: { target: { files?: FileList | null } }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (validateFile) {
       try {
         validateFile(file);
-      } catch (err: any) {
-        alert(err.message);
+      } catch (err: unknown) {
+        alert((err as { message?: string }).message);
         return;
       }
     }
@@ -36,9 +36,10 @@ export function makeFileHandler(
     setFormData((prev) => {
       const next = { ...prev };
       // Clean up preview URL
-      if (next[`${fieldKey}Preview`]) {
-        URL.revokeObjectURL(next[`${fieldKey}Preview`]);
-        delete next[`${fieldKey}Preview`];
+      const previewKey = `${fieldKey}Preview`;
+      if (next[previewKey]) {
+        URL.revokeObjectURL(next[previewKey] as string);
+        delete next[previewKey];
       }
       delete next[fieldKey];
       return next;

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Circle, Search, Plus, Eye, Pencil, ToggleLeft, ToggleRight, History, Loader2, Trash2, AlertTriangle, Ban } from 'lucide-react';
+import { Circle, Search, Plus, Pencil, ToggleLeft, ToggleRight, History, Loader2, Trash2, AlertTriangle, Ban } from 'lucide-react';
 import React from 'react';
 
 import SelectClientNotice from '../components/SelectClientNotice';
@@ -10,14 +10,12 @@ import { useAuth } from '../context/AuthContext';
 import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { supabase } from '../lib/supabase';
-import { cn } from '../lib/utils';
-
-
-import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
-import { saveTire, toggleTireActive, deleteTire } from '../services/tireService';
-import { Tire, VehicleTireConfig, AxleConfigEntry } from '../types';
 import { TireRow, tireFromRow, vehicleTireConfigFromRow, VehicleTireConfigRow } from '../lib/tireMappers';
 import { generatePositions, generatePositionsFromConfig } from '../lib/tirePositions';
+import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
+import { cn } from '../lib/utils';
+import { saveTire, toggleTireActive, deleteTire } from '../services/tireService';
+import { Tire, VehicleTireConfig, AxleConfigEntry } from '../types';
 
 const ROLES_CAN_VIEW_TIRES = [
   'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager',
@@ -234,6 +232,16 @@ type VehicleSimpleForPicker = {
   eixos?: number; axleConfig?: AxleConfigEntry[]; stepsCount?: number;
 };
 
+type VehicleSimpleRow = {
+  id: string;
+  license_plate: string;
+  model: string;
+  type: string;
+  eixos: number | null;
+  axle_config: AxleConfigEntry[] | null;
+  steps_count: number | null;
+};
+
 function VehiclePickerModal({
   vehicles,
   onSelect,
@@ -376,7 +384,8 @@ export default function Tires() {
       if (currentClient?.id) query = query.eq('client_id', currentClient.id);
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []).map((v: any) => ({
+      const rows = (data ?? []) as VehicleSimpleRow[];
+      return rows.map((v) => ({
         id: v.id,
         licensePlate: v.license_plate,
         model: v.model,
@@ -396,7 +405,7 @@ export default function Tires() {
       await toggleTireActive({ tire, profileId: profile.id });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tires', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['tires', currentClient?.id] });
       setToggleTire(null);
     },
   });
@@ -407,7 +416,7 @@ export default function Tires() {
       await deleteTire(tire.id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tires', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['tires', currentClient?.id] });
       setTireToDelete(null);
     },
   });
@@ -433,7 +442,7 @@ export default function Tires() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tires', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['tires', currentClient?.id] });
       setTireFormOpen(false);
       setEditingTire(null);
       setSelectedVehicle(null);
@@ -737,7 +746,7 @@ export default function Tires() {
           tireConfigs={tireConfigs}
           onClose={() => setBatchFormOpen(false)}
           onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['tires', currentClient?.id] });
+            void queryClient.invalidateQueries({ queryKey: ['tires', currentClient?.id] });
             setBatchFormOpen(false);
           }}
         />
@@ -753,7 +762,7 @@ export default function Tires() {
       {toggleTire && (
         <ToggleConfirmModal
           tire={toggleTire}
-          onConfirm={() => toggleMutation.mutate(toggleTire)}
+          onConfirm={() => { toggleMutation.mutate(toggleTire); }}
           onClose={() => setToggleTire(null)}
           isLoading={toggleMutation.isPending}
         />
@@ -762,7 +771,7 @@ export default function Tires() {
       {tireToDelete && (
         <DeleteConfirmModal
           tire={tireToDelete}
-          onConfirm={() => deleteMutation.mutate(tireToDelete)}
+          onConfirm={() => { deleteMutation.mutate(tireToDelete); }}
           onClose={() => setTireToDelete(null)}
           isLoading={deleteMutation.isPending}
         />

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   EMPTY_STRUCTURED_FILTERS,
   LEGACY_VEHICLE_ISSUE_VALUES,
-  SEARCH_PARAM,
+
   applyVehicleFilters,
   hasActiveStructuredFilters,
   hasLegacyVehicleParams,

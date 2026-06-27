@@ -5,7 +5,7 @@ export interface OcrProvider {
    * @param prompt O prompt de sistema com as regras de extração.
    * @returns O objeto JSON retornado pela IA.
    */
-  extract(file: File, prompt: string): Promise<any>;
+  extract(file: File, prompt: string): Promise<unknown>;
 
   /**
    * Identificador do provedor para registro no cache.

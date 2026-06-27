@@ -873,7 +873,7 @@ export function sumApprovedCostByMonthKeys(
   orders: Pick<MaintenanceOrderDashboard, 'entry_date' | 'approved_cost'>[],
   monthKeys: string[]
 ): number[] {
-  const totals = new Array(monthKeys.length).fill(0);
+  const totals: number[] = new Array<number>(monthKeys.length).fill(0);
   const indexByKey = new Map(monthKeys.map((key, i) => [key, i]));
 
   for (const order of orders) {

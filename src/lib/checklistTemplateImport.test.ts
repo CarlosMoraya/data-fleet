@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildDuplicateName, mapItemRowsToDraftItems, resolveTemplateName } from './checklistTemplateImport';
+
 import type { ChecklistItemRow } from './checklistTemplateMappers';
 
 const baseRow = (overrides: Partial<ChecklistItemRow>): ChecklistItemRow => ({

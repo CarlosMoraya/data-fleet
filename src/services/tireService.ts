@@ -92,7 +92,8 @@ async function saveTireBatch(
   if (error) throw error;
 
   if (inserted && inserted.length > 0) {
-    const historyRows = (inserted as any[]).map(t => ({
+    type InsertedTire = { id: string; vehicle_id: string; current_position: string | null };
+    const historyRows = (inserted as InsertedTire[]).map(t => ({
       client_id: currentClientId,
       tire_id: t.id,
       vehicle_id: t.vehicle_id,
@@ -155,7 +156,7 @@ async function saveTireIndividual(
       .select('id')
       .single();
     if (error) throw error;
-    tireId = data.id;
+    tireId = (data as { id: string }).id;
   }
 
   // Registrar histórico se a posição mudou

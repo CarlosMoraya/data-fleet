@@ -13,7 +13,7 @@ import {
   ChevronUp,
   ClipboardList,
 } from 'lucide-react';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 import ScheduleForm from '../components/ScheduleForm';
@@ -108,37 +108,42 @@ async function hydrateWorkshopScheduleRows(rows: WorkshopScheduleRow[]): Promise
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const vehicleMap = new Map(
-    ((vehiclesResult.data as any[]) ?? []).map((vehicle) => [vehicle.id, vehicle])
+  type VehicleRow = { id: string; license_plate: string };
+  type WorkshopRow = { id: string; name: string; address_street: string; address_number: string; address_complement: string; address_neighborhood: string; address_city: string; address_state: string; address_zip: string };
+  type ProfileRow = { id: string; name: string };
+
+  const vehicleMap = new Map<string, VehicleRow>(
+    ((vehiclesResult.data as VehicleRow[]) ?? []).map((v) => [v.id, v])
   );
-  const workshopMap = new Map(
-    ((workshopsResult.data as any[]) ?? []).map((workshop) => [workshop.id, workshop])
+  const workshopMap = new Map<string, WorkshopRow>(
+    ((workshopsResult.data as WorkshopRow[]) ?? []).map((w) => [w.id, w])
   );
-  const profileMap = new Map(
-    ((profilesResult.data as any[]) ?? []).map((profile) => [profile.id, profile])
+  const profileMap = new Map<string, ProfileRow>(
+    ((profilesResult.data as ProfileRow[]) ?? []).map((p) => [p.id, p])
   );
 
-  return rows.map((row) => ({
-    ...row,
-    vehicles: vehicleMap.get(row.vehicle_id)
-      ? { license_plate: vehicleMap.get(row.vehicle_id).license_plate }
-      : null,
-    workshops: workshopMap.get(row.workshop_id)
-      ? {
-          name: workshopMap.get(row.workshop_id).name,
-          address_street: workshopMap.get(row.workshop_id).address_street,
-          address_number: workshopMap.get(row.workshop_id).address_number,
-          address_complement: workshopMap.get(row.workshop_id).address_complement,
-          address_neighborhood: workshopMap.get(row.workshop_id).address_neighborhood,
-          address_city: workshopMap.get(row.workshop_id).address_city,
-          address_state: workshopMap.get(row.workshop_id).address_state,
-          address_zip: workshopMap.get(row.workshop_id).address_zip,
-        }
-      : null,
-    profiles: profileMap.get(row.created_by)
-      ? { name: profileMap.get(row.created_by).name }
-      : null,
-  }));
+  return rows.map((row) => {
+    const vehicle = vehicleMap.get(row.vehicle_id);
+    const workshop = workshopMap.get(row.workshop_id);
+    const prof = profileMap.get(row.created_by);
+    return {
+      ...row,
+      vehicles: vehicle ? { license_plate: vehicle.license_plate } : null,
+      workshops: workshop
+        ? {
+            name: workshop.name,
+            address_street: workshop.address_street,
+            address_number: workshop.address_number,
+            address_complement: workshop.address_complement,
+            address_neighborhood: workshop.address_neighborhood,
+            address_city: workshop.address_city,
+            address_state: workshop.address_state,
+            address_zip: workshop.address_zip,
+          }
+        : null,
+      profiles: prof ? { name: prof.name } : null,
+    };
+  });
 }
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
@@ -164,7 +169,6 @@ export default function WorkshopSchedules() {
 
 function DriverView() {
   const { user, currentClient } = useAuth();
-  const queryClient = useQueryClient();
   const [showHistory, setShowHistory] = useState(false);
   const [diagnosticError, setDiagnosticError] = useState<string | null>(null);
 
@@ -225,8 +229,8 @@ function DriverView() {
         }
 
         setDiagnosticError(null);
-        return vehicleData.id;
-      } catch (err) {
+        return (vehicleData as { id: string }).id;
+      } catch {
         setDiagnosticError('Erro inesperado ao carregar dados.');
         return null;
       }
@@ -382,7 +386,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
 
   const handleGenerateMaintenance = (schedule: WorkshopSchedule) => {
     if (!canWriteSchedules) return;
-    navigate('/manutencao', {
+    void navigate('/manutencao', {
       state: {
         prefillMaintenance: {
           vehicleId: schedule.vehicleId,
@@ -403,7 +407,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
     if (operationsManager) return null;
     try {
       const saved = sessionStorage.getItem('scheduleFormEditing');
-      return saved ? JSON.parse(saved) : null;
+      return saved ? JSON.parse(saved) as WorkshopSchedule : null;
     } catch { return null; }
   });
 
@@ -455,7 +459,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
       sessionStorage.removeItem('scheduleFormData');
       setIsFormOpen(false);
       setEditingSchedule(null);
-      queryClient.invalidateQueries({ queryKey: ['workshopSchedules'] });
+      void queryClient.invalidateQueries({ queryKey: ['workshopSchedules'] });
     }
   });
 
@@ -468,7 +472,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
       if (err) throw err;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workshopSchedules'] });
+      void queryClient.invalidateQueries({ queryKey: ['workshopSchedules'] });
     }
   });
 
@@ -481,7 +485,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
       if (err) throw err;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workshopSchedules'] });
+      void queryClient.invalidateQueries({ queryKey: ['workshopSchedules'] });
     }
   });
 
@@ -589,7 +593,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
             {search || statusFilter !== 'all' ? 'Nenhum agendamento encontrado' : 'Nenhum agendamento cadastrado'}
           </p>
           {!search && statusFilter === 'all' && canWriteSchedules && (
-            <p className="mt-1 text-xs text-zinc-400">Clique em "Novo Agendamento" para começar.</p>
+            <p className="mt-1 text-xs text-zinc-400">Clique em &quot;Novo Agendamento&quot; para começar.</p>
           )}
         </div>
       ) : (

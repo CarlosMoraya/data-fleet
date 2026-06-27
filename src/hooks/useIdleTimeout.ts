@@ -10,7 +10,7 @@ export function useIdleTimeout(timeoutMs: number = DEFAULT_TIMEOUT) {
 
   const handleLogout = useCallback(async () => {
     if (user) {
-      console.log('Sessão encerrada por inatividade.');
+      console.info('Sessão encerrada por inatividade.');
       await logout();
     }
   }, [logout, user]);
@@ -21,7 +21,7 @@ export function useIdleTimeout(timeoutMs: number = DEFAULT_TIMEOUT) {
     }
     
     if (user) {
-      timeoutRef.current = setTimeout(handleLogout, timeoutMs);
+      timeoutRef.current = setTimeout(() => { void handleLogout(); }, timeoutMs);
     }
   }, [handleLogout, timeoutMs, user]);
 

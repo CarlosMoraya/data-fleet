@@ -1,8 +1,7 @@
 import { X, FileText, ExternalLink, Loader2 , CalendarClock } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 import { useAuth } from '../context/AuthContext';
-import { getPhysicalAxles } from '../lib/axleConfigUtils';
 import { extractCrlvData, ExtractionStatus, ExtractionResult } from '../lib/documentOcr';
 import { isFieldRequired } from '../lib/fieldSettingsMappers';
 import {
@@ -65,6 +64,8 @@ interface VehicleFormProps {
   onSave: (vehicle: Partial<Vehicle>, files: VehicleFormFiles) => Promise<void>;
 }
 
+type VehicleCategory = NonNullable<Vehicle['category']>;
+
 const formatCPF = (cpf: string) =>
   cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
 
@@ -118,7 +119,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     ? buildUiStateKey({ scope: 'draft', userId: user.id, clientId: currentClient?.id ?? 'no-client', module: 'vehicles', stateKind: 'draft', name: 'form' })
     : '';
 
-  const defaultFormData = {
+  const defaultFormData = useMemo(() => ({
     type: 'Passeio',
     energySource: 'Combustão',
     coolingEquipment: false,
@@ -129,7 +130,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     hasInsurance: false,
     hasMaintenanceContract: false,
     ...vehicle,
-  };
+  }), [vehicle]);
 
   const [formData, setFormData] = useState<Partial<Vehicle>>(() => {
     if (!draftKey) return defaultFormData;
@@ -165,12 +166,12 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     if (!draftKey) return;
     const sanitized = sanitizeDraft('vehicles', formData as Record<string, unknown>);
     writeUiState(window.sessionStorage, draftKey, sanitized as Partial<Vehicle>, defaultFormData, { removeLegacyKeys: ['vehicleFormData'] });
-  }, [formData, draftKey]);
+  }, [formData, draftKey, defaultFormData]);
 
   useEffect(() => {
     if (!restoreFiles) return;
     let cancelled = false;
-    loadVehicleDraftFiles().then(files => {
+    void loadVehicleDraftFiles().then(files => {
       if (cancelled) return;
       if (files.crlv) setSelectedCrlvFile(files.crlv);
       if (files.sanitaryInspection) setSelectedSanitaryFile(files.sanitaryInspection);
@@ -197,7 +198,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     }
   }, [formData.eixos, formData.type]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const CATEGORY_TYPES_MAP = {
+  const CATEGORY_TYPES_MAP: Record<VehicleCategory, readonly Vehicle['type'][]> = {
     'Leve': ['Moto', 'Passeio', 'Utilitário'],
     'Médio': ['Van', 'Vuc', 'Toco'],
     'Pesado': ['Truck', 'Cavalo'],
@@ -233,15 +234,15 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
       // Reset axle config when eixos changes
       setFormData(prev => ({ ...prev, eixos: filtered ? parseInt(filtered, 10) : undefined, axleConfig: undefined, stepsCount: undefined }));
     } else if (name === 'category') {
-      const newCategory = value as keyof typeof CATEGORY_TYPES_MAP | '';
+      const newCategory = value as VehicleCategory | '';
       setFormData(prev => {
-        const newData = { ...prev, [name]: value };
+        const newData: Partial<Vehicle> = { ...prev, category: newCategory || undefined };
         // Se mudou para uma categoria que tem tipos definidos e o tipo atual não é compatível,
         // seleciona o primeiro tipo da nova categoria.
         if (newCategory && CATEGORY_TYPES_MAP[newCategory]) {
           const allowedTypes = CATEGORY_TYPES_MAP[newCategory];
-          if (!prev.type || !(allowedTypes as readonly string[]).includes(prev.type)) {
-            newData.type = allowedTypes[0] as any;
+          if (!prev.type || !allowedTypes.includes(prev.type)) {
+            newData.type = allowedTypes[0];
           }
         }
         return newData;
@@ -441,7 +442,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
             </div>
           )}
 
-          <form id="vehicle-form" onSubmit={handleSubmit} className="space-y-8">
+          <form id="vehicle-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-8">
             {/* Basic Info */}
             <div>
               <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Informações Básicas</h3>
@@ -554,7 +555,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                     type="file"
                     name="crlvUpload"
                     accept="application/pdf,image/jpeg,image/png,image/webp"
-                    onChange={handleCrlvFileChange}
+                    onChange={(e) => { void handleCrlvFileChange(e); }}
                     className={fileInputClass}
                   />
                   <p className="mt-1 text-xs text-zinc-400">
@@ -887,7 +888,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                       ))}
                   </select>
                   <p className="mt-1 text-xs text-zinc-400">
-                    Apenas motoristas sem veículo atribuído são listados. Selecione "Nenhum motorista" para desassociar.
+                    Apenas motoristas sem veículo atribuído são listados. Selecione &quot;Nenhum motorista&quot; para desassociar.
                   </p>
                 </div>
               </div>

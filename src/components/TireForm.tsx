@@ -188,7 +188,7 @@ export default function TireForm({
         </div>
 
         {/* Conteúdo */}
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <form onSubmit={(e) => { void handleSubmit(e); }} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 space-y-5 overflow-y-auto px-6 py-4">
 
             {/* Fallback: todas as posições ocupadas */}

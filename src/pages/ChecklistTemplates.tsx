@@ -12,6 +12,9 @@ import { cn } from '../lib/utils';
 
 import type { ChecklistTemplate, TemplateCategory, TemplateStatus, ChecklistContext } from '../types';
 
+type TemplateActionError = { code?: string; message?: string };
+type ChecklistItemInsertCloneRow = Omit<Record<string, unknown>, 'id'> & { version_number: number };
+
 
 const STATUS_LABEL: Record<TemplateStatus, string> = {
   draft: 'Rascunho',
@@ -44,7 +47,7 @@ export default function ChecklistTemplates() {
   );
   const [editingTemplate, setEditingTemplate] = useState<ChecklistTemplate | null>(() => {
     const saved = sessionStorage.getItem('checklistTemplateFormEditing');
-    return saved ? JSON.parse(saved) : null;
+    return saved ? (JSON.parse(saved) as ChecklistTemplate) : null;
   });
   const [duplicatingTemplate, setDuplicatingTemplate] = useState<ChecklistTemplate | null>(null);
 
@@ -130,9 +133,12 @@ export default function ChecklistTemplates() {
           .eq('version_number', t.currentVersion);
 
         if (oldItems && oldItems.length > 0) {
-          await supabase.from('checklist_items').insert(
-            oldItems.map(({ id: _id, ...rest }: Record<string, unknown>) => ({ ...rest, version_number: newVersion })),
-          );
+          const sourceItems = oldItems as Array<Record<string, unknown>>;
+          const rowsToInsert = sourceItems.map(({ id: _id, ...rest }) => ({
+            ...rest,
+            version_number: newVersion,
+          })) as unknown as ChecklistItemInsertCloneRow[];
+          await supabase.from('checklist_items').insert(rowsToInsert);
         }
       } else if (type === 'delete') {
         const { error } = await supabase.from('checklist_templates').delete().eq('id', t.id);
@@ -140,10 +146,10 @@ export default function ChecklistTemplates() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['checklistTemplates', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['checklistTemplates', currentClient?.id] });
       setConfirmAction(null);
     },
-    onError: (err: any) => {
+    onError: (err: TemplateActionError) => {
       console.error(err);
       if (err.code === '23503') {
         alert('Não é possível excluir este template pois existem relatórios/checklists preenchidos vinculados a ele.\n\nExclua primeiro o histórico de checklists deste modelo na aba Checklists.');
@@ -405,7 +411,7 @@ export default function ChecklistTemplates() {
             setDuplicatingTemplate(null);
             sessionStorage.removeItem('checklistTemplateFormOpen');
             sessionStorage.removeItem('checklistTemplateFormEditing');
-            queryClient.invalidateQueries({ queryKey: ['checklistTemplates', currentClient?.id] });
+            void queryClient.invalidateQueries({ queryKey: ['checklistTemplates', currentClient?.id] });
           }}
         />
       )}

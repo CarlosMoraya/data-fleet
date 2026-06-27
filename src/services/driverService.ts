@@ -75,7 +75,7 @@ export async function saveDriver(
       .select('id')
       .single();
     if (error) throw error;
-    savedId = data.id;
+    savedId = (data as { id: string }).id;
   }
 
   if (savedId) {

@@ -136,13 +136,14 @@ async function getMaxEffectiveKmForVehicles(vehicleIds: string[]): Promise<Map<s
   const map = new Map<string, number>();
   if (vehicleIds.length === 0) return map;
 
-  const { data, error } = await supabase.rpc('get_vehicle_odometer_readings_batch', {
+  const rpcResult = await supabase.rpc('get_vehicle_odometer_readings_batch', {
     p_vehicle_ids: vehicleIds,
   });
 
-  if (error) throw error;
+  if (rpcResult.error) throw rpcResult.error;
 
-  for (const row of (data ?? []) as Array<{ vehicle_id: string; effective_km: number }>) {
+  type KmRow = { vehicle_id: string; effective_km: number };
+  for (const row of (rpcResult.data as KmRow[] | null) ?? []) {
     const current = map.get(row.vehicle_id);
     if (current == null || row.effective_km > current) {
       map.set(row.vehicle_id, row.effective_km);
@@ -174,7 +175,7 @@ export async function listWarrantyOverview(clientId: string): Promise<WarrantyOv
       .eq('status', 'active')
       .then(({ data, error }) => {
         if (error) throw error;
-        return (data ?? []);
+        return (data ?? []) as Array<{ id: string; vehicle_id: string; plan_id: string }>;
       }),
     supabase
       .from('vehicle_km_intervals')
@@ -182,7 +183,7 @@ export async function listWarrantyOverview(clientId: string): Promise<WarrantyOv
       .eq('client_id', clientId)
       .then(({ data, error }) => {
         if (error) throw error;
-        return (data ?? []);
+        return (data ?? []) as Array<{ vehicle_id: string; km_interval: number | null }>;
       }),
   ]);
 
@@ -255,7 +256,7 @@ export async function createPlanWithItems(input: CreatePlanInput): Promise<{ pla
     .single();
   if (planErr) throw planErr;
 
-  const planId = plan.id;
+  const planId = (plan as { id: string }).id;
 
   if (input.items.length > 0) {
     const itemRows = input.items.map((it) => ({
@@ -351,10 +352,11 @@ export async function assignPlanToVehicles(
       throw new Error(`Falha ao aplicar a ${vehicleIds.length} veículos: ${aErr.message}`);
     }
 
-    createdAssignments.push(assignment.id);
+    const assignmentId = (assignment as { id: string }).id;
+    createdAssignments.push(assignmentId);
 
     const eventRows = payload.events.map((ev) => ({
-      assignment_id: assignment.id,
+      assignment_id: assignmentId,
       client_id: options.clientId,
       vehicle_id: vehicle.id,
       plan_item_id: items.find((it) => it.sequence === ev.sequence)?.id ?? null,

@@ -35,7 +35,7 @@ interface TireMapEntry {
 
 export default function TireInspectionFill() {
   const { inspectionId } = useParams<{ inspectionId: string }>();
-  const { currentClient, profile } = useAuth();
+  const { currentClient } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
@@ -127,7 +127,7 @@ export default function TireInspectionFill() {
     if (inspection?.odometerKm && kmInput === '') {
       setKmInput(String(inspection.odometerKm));
     }
-  }, [inspection?.odometerKm]);
+  }, [inspection?.odometerKm, kmInput]);
 
   // ── KM confirmation ───────────────────────────────────────────────────────
 
@@ -150,7 +150,7 @@ export default function TireInspectionFill() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tireInspection', inspectionId] });
+      void queryClient.invalidateQueries({ queryKey: ['tireInspection', inspectionId] });
       setKmConfirmed(true);
     },
   });
@@ -203,7 +203,7 @@ export default function TireInspectionFill() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tireInspectionResponses', inspectionId] });
+      void queryClient.invalidateQueries({ queryKey: ['tireInspectionResponses', inspectionId] });
       setSelectedPosition(null);
     },
   });
@@ -226,8 +226,8 @@ export default function TireInspectionFill() {
       await completeTireInspection(inspectionId, inspection.odometerKm ?? 0);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tireInspection', inspectionId] });
-      navigate('/checklists');
+      void queryClient.invalidateQueries({ queryKey: ['tireInspection', inspectionId] });
+      void navigate('/checklists');
     },
     onError: (e: Error) => setFinishError(e.message),
   });
@@ -255,7 +255,7 @@ export default function TireInspectionFill() {
 
       {/* Header */}
       <div className="flex items-center gap-3 border-b bg-white px-4 py-3">
-        <button type="button" onClick={() => navigate('/checklists')} className="text-gray-400 hover:text-gray-600">
+        <button type="button" onClick={() => { void navigate('/checklists'); }} className="text-gray-400 hover:text-gray-600">
           <ChevronLeft size={24} />
         </button>
         <div className="min-w-0 flex-1">

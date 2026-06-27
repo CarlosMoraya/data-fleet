@@ -1,18 +1,22 @@
 import React, { act } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, type Root } from 'react-dom/client';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import OverviewPanel from './OverviewPanel';
 
-let container: HTMLDivElement;
+interface RootedDiv extends HTMLDivElement {
+  __reactRoot?: Root;
+}
+
+let container: RootedDiv;
 
 beforeEach(() => {
-  container = document.createElement('div');
+  container = document.createElement('div') as RootedDiv;
   document.body.appendChild(container);
 });
 
 afterEach(() => {
-  const root = (container as any).__reactRoot;
+  const root = container.__reactRoot;
   if (root) {
     act(() => { root.unmount(); });
   }
@@ -21,7 +25,7 @@ afterEach(() => {
 
 function renderWithAct(ui: React.ReactElement) {
   const root = createRoot(container);
-  (container as any).__reactRoot = root;
+  container.__reactRoot = root;
   act(() => { root.render(ui); });
   return root;
 }

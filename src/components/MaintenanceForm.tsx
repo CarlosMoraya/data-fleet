@@ -1,21 +1,20 @@
 import { X, Wrench, Loader2, FileText, ExternalLink, AlertTriangle } from 'lucide-react';
-import React, { useState, useEffect, useCallback } from 'react';
-
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { extractBudgetData } from '../lib/budgetOcr';
 import { isKnownBudgetSystem } from '../lib/budgetSystems';
 import { validateMaintenanceCurrentKm } from '../lib/maintenanceKmValidation';
-import { budgetItemFromRow, type MaintenanceBudgetItemRow , BudgetItem } from '../lib/maintenanceMappers';
+import { budgetItemFromRow, type MaintenanceBudgetItemRow, BudgetItem } from '../lib/maintenanceMappers';
 import { validateFile } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
-import type { PartPhotoDraft } from '../services/maintenancePartPhotoService';
 import { listPendingEventsForVehicle } from '../services/warrantyRevisionService';
 
 import BudgetItemsTable from './BudgetItemsTable';
 import PartPhotosSection from './PartPhotosSection';
 
+import type { PartPhotoDraft } from '../services/maintenancePartPhotoService';
 import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType } from '../types/maintenance';
 
 const inputClass =
@@ -44,6 +43,7 @@ interface MaintenanceFormProps {
 interface VehicleOption { id: string; licensePlate: string; initialKm: number | null; }
 interface WorkshopOption { id: string; name: string; }
 interface WarrantyEventOption { id: string; sequence: number; label: string; targetKm: number; }
+type VehicleMaxKmRpcResult = number | null;
 
 export default function MaintenanceForm({ order, prefill, mode = 'default', onClose, onSave }: MaintenanceFormProps) {
   const { user, currentClient } = useAuth();
@@ -53,14 +53,17 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
     ? buildUiStateKey({ scope: 'draft', userId: user.id, clientId: currentClient?.id ?? 'no-client', module: 'maintenance', stateKind: 'draft', name: 'form' })
     : '';
 
-  const defaultFormData: Partial<MaintenanceOrder> = order
-    ? { ...order }
-    : {
-      type: 'Preventiva',
-      status: 'Aguardando orçamento',
-      estimatedCost: 0,
-      ...prefill,
-    };
+  const defaultFormData = useMemo<Partial<MaintenanceOrder>>(
+    () => (order
+      ? { ...order }
+      : {
+        type: 'Preventiva',
+        status: 'Aguardando orçamento',
+        estimatedCost: 0,
+        ...prefill,
+      }),
+    [order, prefill],
+  );
 
   const [formData, setFormData] = useState<Partial<MaintenanceOrder>>(() => {
     if (!draftKey) return defaultFormData;
@@ -103,13 +106,13 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
     if (!draftKey) return;
     const sanitized = sanitizeDraft('maintenance', formData as Record<string, unknown>);
     writeUiState(window.sessionStorage, draftKey, sanitized as Partial<MaintenanceOrder>, defaultFormData, { removeLegacyKeys: ['maintenanceFormData'] });
-  }, [formData, draftKey]);
+  }, [formData, draftKey, defaultFormData]);
 
   // Carrega itens de orçamento existentes (modo edição)
   useEffect(() => {
     if (!order?.id) return;
     setExistingBudgetPdfUrl(order.budgetPdfUrl);
-    supabase
+    void supabase
       .from('maintenance_budget_items')
       .select('*')
       .eq('maintenance_order_id', order.id)
@@ -144,7 +147,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
     setLoadingOptions(false);
   }, [currentClient?.id, isWorkshopMode]);
 
-  useEffect(() => { fetchOptions(); }, [fetchOptions]);
+  useEffect(() => { void fetchOptions(); }, [fetchOptions]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -167,10 +170,11 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
         if (!active) return;
         setWarrantyEvents(events);
         // Limpa vínculo se o evento selecionado não pertence mais a este veículo
-        const current = formData.warrantyRevisionEventId;
-        if (current && !events.some((e) => e.id === current)) {
-          setFormData((prev) => ({ ...prev, warrantyRevisionEventId: undefined }));
-        }
+        setFormData((prev) => (
+          prev.warrantyRevisionEventId && !events.some((e) => e.id === prev.warrantyRevisionEventId)
+            ? { ...prev, warrantyRevisionEventId: undefined }
+            : prev
+        ));
       })
       .catch(() => { if (active) setWarrantyEvents([]); });
     return () => { active = false; };
@@ -186,7 +190,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
       .then(({ data, error }) => {
         if (!active) return;
         if (error) { setReferenceKm(fallbackInitialKm); return; }
-        const maxKm = (data as number | null) ?? null;
+        const maxKm = (data as VehicleMaxKmRpcResult) ?? null;
         setReferenceKm(maxKm ?? fallbackInitialKm);
       });
     return () => { active = false; };
@@ -198,8 +202,8 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
     setExtractionWarning(null);
     try {
       validateFile(file);
-    } catch (err: any) {
-      setExtractionWarning(err?.message ?? 'Arquivo inválido.');
+    } catch (err: unknown) {
+      setExtractionWarning(err instanceof Error ? err.message : 'Arquivo inválido.');
       return;
     }
     setBudgetFile(file);
@@ -270,8 +274,8 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
     try {
       await onSave(formData, budgetItems, budgetFile, partPhotoDrafts);
       handleClose();
-    } catch (err: any) {
-      setError(err?.message ?? 'Erro ao salvar. Tente novamente.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro ao salvar. Tente novamente.');
       setSaving(false);
     }
   };
@@ -303,7 +307,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
               <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
             </div>
           ) : (
-            <form id="maintenance-form" onSubmit={handleSubmit} className="space-y-6">
+            <form id="maintenance-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-6">
 
               {isWorkshopMode ? (
                 /* ── MODO WORKSHOP: apenas 5 campos obrigatórios ── */
@@ -380,7 +384,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
                         id="budgetPdf"
                         type="file"
                         accept="application/pdf,image/*"
-                        onChange={handleBudgetUpload}
+                        onChange={(e) => { void handleBudgetUpload(e); }}
                         className="mt-1 block w-full cursor-pointer text-sm text-zinc-500 transition-colors file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100"
                       />
                       {existingBudgetPdfUrl && !budgetFile && (
@@ -603,7 +607,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
                         id="budgetPdf"
                         type="file"
                         accept="application/pdf,image/*"
-                        onChange={handleBudgetUpload}
+                        onChange={(e) => { void handleBudgetUpload(e); }}
                         className="mt-1 block w-full cursor-pointer text-sm text-zinc-500 transition-colors file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100"
                       />
                       {existingBudgetPdfUrl && !budgetFile && (

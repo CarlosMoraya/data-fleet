@@ -25,7 +25,7 @@ import DashboardKpiCard from './DashboardKpiCard';
 import VehicleFinancialRanking from './VehicleFinancialRanking';
 
 import type { VehicleRow } from './OperationalPanel';
-import type { MaintenanceOrderDashboard } from '../../types/maintenance';
+import type { MaintenanceOrderDashboard, MaintenanceType } from '../../types/maintenance';
 
 
 
@@ -268,7 +268,7 @@ export default function CostPanel({
           <MaintenanceTypeDonutChart
             data={costByMaintenanceTypeData}
             activeFilter={filters.maintenanceType}
-            onFilterChange={(t) =>
+            onFilterChange={(t: MaintenanceType | null) =>
               onFiltersChange({ ...filters, maintenanceType: t })
             }
             title="Custo por Tipo de Manutenção"

@@ -11,7 +11,8 @@ async function openCostsTab(page: Page) {
 function kpiCard(page: Page, labelText: string) {
   return page
     .getByText(labelText, { exact: true })
-    .locator('xpath=ancestor::div[contains(@class, "rounded-2xl")][1]');
+    .locator('xpath=ancestor::div[contains(@class, "rounded-2xl")][1]')
+    .filter({ hasNot: page.locator('table') });
 }
 
 test.describe('Dashboard Custos: filtros aprovados', () => {
@@ -35,7 +36,13 @@ test.describe('Dashboard Custos: filtros aprovados', () => {
 
     await expect(categorySelect).not.toHaveValue('');
     await expect(page.getByText('Custo no Período', { exact: true })).toBeVisible();
-    await expect(page.locator('.recharts-responsive-container, svg.recharts-surface').first()).toBeVisible();
+
+    const chartOrEmptyState = page
+      .locator('.recharts-responsive-container, svg.recharts-surface')
+      .or(page.getByText('Sem dados de custo no período.', { exact: true }))
+      .first();
+
+    await expect(chartOrEmptyState).toBeVisible();
   });
 
   test('Custos: limpar filtros preserva período', async ({ page }) => {

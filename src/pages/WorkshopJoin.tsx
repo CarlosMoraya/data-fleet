@@ -20,6 +20,8 @@ interface TokenInfo {
 }
 
 type FlowStep = 'validating' | 'invalid' | 'choose' | 'register' | 'login' | 'success';
+type AcceptInvitationResponse = { error?: string; message?: string };
+type AcceptInvitationPayload = Record<string, unknown>;
 
 export default function WorkshopJoin() {
   const [searchParams] = useSearchParams();
@@ -52,30 +54,31 @@ export default function WorkshopJoin() {
       return;
     }
 
-    supabase.rpc('validate_workshop_token', { p_token: token })
+    void supabase.rpc('validate_workshop_token', { p_token: token })
       .then(({ data, error: rpcError }) => {
-        if (rpcError || !data) {
+        const tokenData = data as TokenInfo | null;
+        if (rpcError || !tokenData) {
           setTokenInfo({ valid: false, reason: 'Erro ao validar convite' });
           setStep('invalid');
           return;
         }
-        setTokenInfo(data as TokenInfo);
-        setStep(data.valid ? 'choose' : 'invalid');
+        setTokenInfo(tokenData);
+        setStep(tokenData.valid ? 'choose' : 'invalid');
       });
   }, [token]);
 
-  const callAcceptInvitation = async (body: object, authToken?: string) => {
+  const callAcceptInvitation = async (body: AcceptInvitationPayload, authToken?: string) => {
     const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/workshop-accept-invitation`;
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken ?? import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY as string,
       },
       body: JSON.stringify(body),
     });
-    const json = await res.json().catch(() => null);
+    const json = (await res.json().catch(() => null)) as AcceptInvitationResponse | null;
     if (!res.ok) throw new Error(json?.error ?? json?.message ?? `HTTP ${res.status}`);
     return json;
   };
@@ -96,8 +99,8 @@ export default function WorkshopJoin() {
       // Login automático após registro
       await supabase.auth.signInWithPassword({ email: regEmail, password: regPassword });
       setStep('success');
-    } catch (err: any) {
-      setError(err?.message ?? 'Erro ao criar conta. Tente novamente.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro ao criar conta. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -121,15 +124,15 @@ export default function WorkshopJoin() {
       await callAcceptInvitation({ token }, authData.session.access_token);
 
       setStep('success');
-    } catch (err: any) {
-      setError(err?.message ?? 'Erro ao aceitar convite. Tente novamente.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro ao aceitar convite. Tente novamente.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoToSystem = () => {
-    navigate('/manutencao', { replace: true });
+    void navigate('/manutencao', { replace: true });
   };
 
   // ── Tela: validando token ──────────────────────────────────
@@ -239,7 +242,7 @@ export default function WorkshopJoin() {
 
           {/* Registro de nova conta */}
           {step === 'register' && (
-            <form onSubmit={handleRegister} className="space-y-4 p-8">
+            <form onSubmit={(e) => { void handleRegister(e); }} className="space-y-4 p-8">
               <button
                 type="button"
                 onClick={() => { setStep('choose'); setError(null); }}
@@ -314,7 +317,7 @@ export default function WorkshopJoin() {
 
           {/* Login com conta existente */}
           {step === 'login' && (
-            <form onSubmit={handleLogin} className="space-y-4 p-8">
+            <form onSubmit={(e) => { void handleLogin(e); }} className="space-y-4 p-8">
               <button
                 type="button"
                 onClick={() => { setStep('choose'); setError(null); }}

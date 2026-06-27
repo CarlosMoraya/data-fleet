@@ -7,9 +7,6 @@ import type {
   VehicleWarrantyAssignmentRow,
   WarrantyRevisionEvent,
   WarrantyRevisionEventRow,
-  AssignmentStatus,
-  AssignmentFinishReason,
-  WarrantyRevisionEventStatus,
 } from '../types/warrantyRevision';
 
 export function planFromRow(row: WarrantyRevisionPlanRow): WarrantyRevisionPlan {

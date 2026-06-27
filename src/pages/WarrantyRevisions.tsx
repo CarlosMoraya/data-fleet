@@ -128,7 +128,7 @@ export default function WarrantyRevisions() {
   };
 
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['warrantyOverview', currentClient?.id] });
+    void queryClient.invalidateQueries({ queryKey: ['warrantyOverview', currentClient?.id] });
   };
 
   return (

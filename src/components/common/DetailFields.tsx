@@ -1,5 +1,7 @@
 import { ExternalLink } from 'lucide-react';
 
+import type { ReactNode } from 'react';
+
 interface DetailFieldProps {
   label: string;
   value: string | number | null | undefined;
@@ -40,7 +42,7 @@ export function FileField({ label, url, labelLink }: FileFieldProps) {
 }
 
 interface SectionTitleProps {
-  children: unknown;
+  children: ReactNode;
 }
 
 export function SectionTitle({ children }: SectionTitleProps) {

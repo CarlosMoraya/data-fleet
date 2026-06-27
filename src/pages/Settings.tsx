@@ -28,6 +28,7 @@ const ROLES_CAN_MANAGE_FIELDS = ['Manager', 'Coordinator', 'Director', 'Admin Ma
 const ROLES_CAN_ACCESS_SETTINGS = ['Coordinator', 'Manager', 'Director', 'Admin Master'];
 
 type TabType = 'vehicles' | 'drivers' | 'revisoes' | 'checklists';
+type TabDefinition = { id: TabType; name: string; icon: React.ComponentType<{ className?: string }> };
 
 export default function Settings() {
   const { currentClient, user } = useAuth();
@@ -56,14 +57,14 @@ export default function Settings() {
   const vehicleSettingsQuery = useQuery({
     queryKey: ['vehicleSettings', currentClient?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const result = await supabase
         .from('vehicle_field_settings')
         .select('*')
         .eq('client_id', currentClient?.id)
         .maybeSingle();
 
-      if (error) throw error;
-      return data as VehicleFieldSettingsRow | null;
+      if (result.error) throw result.error;
+      return result.data as VehicleFieldSettingsRow | null;
     },
     enabled: !!currentClient?.id
   });
@@ -71,14 +72,14 @@ export default function Settings() {
   const driverSettingsQuery = useQuery({
     queryKey: ['driverSettings', currentClient?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const result = await supabase
         .from('driver_field_settings')
         .select('*')
         .eq('client_id', currentClient?.id)
         .maybeSingle();
 
-      if (error) throw error;
-      return data as DriverFieldSettingsRow | null;
+      if (result.error) throw result.error;
+      return result.data as DriverFieldSettingsRow | null;
     },
     enabled: !!currentClient?.id
   });
@@ -172,8 +173,8 @@ export default function Settings() {
     onSuccess: () => {
       setIsNew(false);
       setSuccess(true);
-      queryClient.invalidateQueries({ queryKey: ['vehicleSettings', currentClient?.id] });
-      queryClient.invalidateQueries({ queryKey: ['vehicleFieldSettings', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['vehicleSettings', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['vehicleFieldSettings', currentClient?.id] });
     },
     onError: (mutationError) => {
       setError(mutationError.message || 'Erro ao salvar configurações.');
@@ -213,7 +214,7 @@ export default function Settings() {
     onSuccess: () => {
       setIsDriverNew(false);
       setDriverSuccess(true);
-      queryClient.invalidateQueries({ queryKey: ['driverSettings', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['driverSettings', currentClient?.id] });
     },
     onError: (mutationError: Error) => {
       setDriverError(mutationError.message || 'Erro ao salvar configurações.');
@@ -248,14 +249,17 @@ export default function Settings() {
     return acc;
   }, {} as Record<string, typeof DRIVER_CONFIGURABLE_FIELDS>);
 
-  const tabs = [
-    ...(canManageFields ? [
-      { id: 'vehicles', name: 'Veículos', icon: Truck },
-      { id: 'drivers', name: 'Motoristas', icon: UserCircle },
-    ] : []),
-    { id: 'revisoes', name: 'Revisões', icon: Gauge },
-  { id: 'checklists', name: 'Checklists', icon: CalendarDays },
-  ];
+  const tabs: TabDefinition[] = canManageFields
+    ? [
+        { id: 'vehicles', name: 'Veículos', icon: Truck },
+        { id: 'drivers', name: 'Motoristas', icon: UserCircle },
+        { id: 'revisoes', name: 'Revisões', icon: Gauge },
+        { id: 'checklists', name: 'Checklists', icon: CalendarDays },
+      ]
+    : [
+        { id: 'revisoes', name: 'Revisões', icon: Gauge },
+        { id: 'checklists', name: 'Checklists', icon: CalendarDays },
+      ];
 
   return (
     <div className="flex h-full max-w-3xl flex-col gap-6">

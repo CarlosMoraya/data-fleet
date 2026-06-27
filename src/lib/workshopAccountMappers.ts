@@ -1,4 +1,4 @@
-import { WorkshopAccount, WorkshopPartnership, WorkshopInvitation } from '../types';
+import { WorkshopPartnership, WorkshopInvitation } from '../types';
 
 // ─── Tipos espelho do banco (snake_case) ─────────────────────────────────────
 

@@ -46,7 +46,7 @@ export async function autoCompleteWorkshopSchedule(
 export async function autoRetireVehicleFromWorkshop(
   vehicleId: string,
   workshopId: string,
-  checklistId: string,
+  _checklistId: string,
 ): Promise<void> {
   const { data: matchingOrder } = await supabase
     .from('maintenance_orders')

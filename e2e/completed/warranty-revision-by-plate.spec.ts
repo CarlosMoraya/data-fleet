@@ -84,30 +84,35 @@ test.describe('Revisões de Garantia — cadastro por placa', () => {
       // A placa aparece na tabela
       await expect(page.locator('table').getByText(plate)).toBeVisible({ timeout: 15000 });
 
-      // Validação no banco: assignment ativo + evento pendente
-      const assignment = await supabase
-        .from('vehicle_warranty_revision_assignments')
-        .select('id, status')
-        .eq('vehicle_id', vehicleId)
-        .eq('status', 'active')
-        .maybeSingle();
-      expect(assignment.data).toBeTruthy();
+      // Validação no banco: a gravação pode fechar alguns ciclos após o redirect da UI.
+      await expect.poll(async () => {
+        const assignment = await supabase
+          .from('vehicle_warranty_revision_assignments')
+          .select('status')
+          .eq('vehicle_id', vehicleId)
+          .eq('status', 'active')
+          .maybeSingle();
+        return assignment.data?.status ?? null;
+      }, { timeout: 5000 }).toBe('active');
 
-      const events = await supabase
-        .from('vehicle_warranty_revision_events')
-        .select('id, status, target_km')
-        .eq('vehicle_id', vehicleId);
-      expect(events.data?.length).toBeGreaterThanOrEqual(1);
-      expect(events.data?.[0].status).toBe('pending');
-      expect(events.data?.[0].target_km).toBe(10000);
+      await expect.poll(async () => {
+        const events = await supabase
+          .from('vehicle_warranty_revision_events')
+          .select('status, target_km')
+          .eq('vehicle_id', vehicleId)
+          .limit(1);
+        return events.data?.[0] ?? null;
+      }, { timeout: 5000 }).toEqual({ status: 'pending', target_km: 10000 });
 
       // Espelho não-destrutivo
-      const v = await supabase.from('vehicles').select('first_revision_max_km').eq('id', vehicleId).single();
-      expect(v.data?.first_revision_max_km).toBe(10000);
+      await expect.poll(async () => {
+        const v = await supabase.from('vehicles').select('first_revision_max_km').eq('id', vehicleId).single();
+        return v.data?.first_revision_max_km ?? null;
+      }, { timeout: 5000 }).toBe(10000);
     } finally {
       await supabase.from('vehicle_warranty_revision_events').delete().eq('vehicle_id', vehicleId);
       await supabase.from('vehicle_warranty_revision_assignments').delete().eq('vehicle_id', vehicleId);
-      const planRows = await supabase.from('vehicle_warranty_revision_plans').select('id').eq('client_id', manager.client_id).eq('is_adhoc', true);
+      const planRows = await supabase.from('warranty_revision_plans').select('id').eq('client_id', manager.client_id).eq('is_adhoc', true);
       if (planRows.data) {
         await supabase.from('warranty_revision_plans').delete().in('id', planRows.data.map((p) => p.id));
       }

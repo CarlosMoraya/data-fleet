@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react';
+
 interface FormLabelProps {
-  children: unknown;
+  children: ReactNode;
   required?: boolean;
   optional?: boolean;
   htmlFor?: string;

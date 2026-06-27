@@ -40,6 +40,18 @@ interface Props {
   onSaved: () => void;
 }
 
+type WarrantyPlanVehicleRow = {
+  id: string;
+  license_plate: string;
+  brand: string;
+  model: string;
+  year: number;
+  category: Vehicle['category'];
+  operational_unit_id: string | null;
+  acquisition_date: string | null;
+  warranty: boolean | null;
+};
+
 export default function WarrantyPlanByModelModal({ onClose, onSaved }: Props) {
   const { currentClient, user } = useAuth();
   const [name, setName] = useState('');
@@ -69,7 +81,34 @@ export default function WarrantyPlanByModelModal({ onClose, onSaved }: Props) {
       .order('license_plate')
       .then(({ data, error: e }) => {
         if (e) return;
-        setVehicles((data ?? []));
+        const rows = (data ?? []) as WarrantyPlanVehicleRow[];
+        setVehicles(
+          rows.map((row) => ({
+            id: row.id,
+            clientId: currentClient.id,
+            type: 'Passeio',
+            energySource: 'Combustão',
+            coolingEquipment: false,
+            licensePlate: row.license_plate,
+            renavam: '',
+            chassi: '',
+            detranUF: '',
+            brand: row.brand,
+            model: row.model,
+            year: row.year,
+            color: '',
+            acquisition: 'Owned',
+            fipePrice: 0,
+            tracker: '',
+            antt: '',
+            owner: '',
+            autonomy: 0,
+            category: row.category ?? undefined,
+            operationalUnitId: row.operational_unit_id ?? undefined,
+            acquisitionDate: row.acquisition_date ?? undefined,
+            warranty: row.warranty ?? undefined,
+          })),
+        );
       });
     supabase
       .from('vehicle_warranty_revision_assignments')
@@ -209,8 +248,8 @@ export default function WarrantyPlanByModelModal({ onClose, onSaved }: Props) {
       }
 
       onSaved();
-    } catch (err: any) {
-      setError(err?.message ?? 'Falha ao aplicar a programação.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Falha ao aplicar a programação.');
     } finally {
       setSaving(false);
     }
@@ -316,7 +355,7 @@ export default function WarrantyPlanByModelModal({ onClose, onSaved }: Props) {
                 </div>
               ))}
             </div>
-            <button type="button" onClick={addItem} className="mt-3 inline-flex items-center rounded-xl border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
+            <button type="button" onClick={() => { addItem(); }} className="mt-3 inline-flex items-center rounded-xl border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
               <Plus className="mr-2 h-4 w-4" /> Adicionar etapa
             </button>
           </div>
@@ -399,10 +438,10 @@ export default function WarrantyPlanByModelModal({ onClose, onSaved }: Props) {
             <p className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
           )}
           <div className="flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
+            <button type="button" onClick={() => { onClose(); }} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
               Cancelar
             </button>
-            <button type="button" onClick={handleApply} disabled={saving} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60">
+            <button type="button" onClick={() => { void handleApply(); }} disabled={saving} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60">
               {saving ? 'Aplicando...' : `Aplicar a ${selected.size} veículo(s)`}
             </button>
           </div>

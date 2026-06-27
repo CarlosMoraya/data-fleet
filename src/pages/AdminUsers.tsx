@@ -72,22 +72,21 @@ function CreateUserModal({
   onCreated: () => void;
 }) {
   const [form, setForm] = useState<CreateForm>(emptyCreate);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload: object) => {
       await invokeEdgeFunction('create-user', payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       onCreated();
       onClose();
     },
-    onError: (err: any) => {
-      setError(err.message ?? 'Erro ao criar usuário.');
+    onError: (err: unknown) => {
+      setError((err as { message?: string })?.message ?? 'Erro ao criar usuário.');
     }
   });
 
@@ -97,7 +96,7 @@ function CreateUserModal({
 
   if (!open) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     createMutation.mutate({
@@ -122,7 +121,7 @@ function CreateUserModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 p-6">
+        <form onSubmit={(e) => { handleSubmit(e); }} className="space-y-4 p-6">
           <div>
             <label className="block text-sm font-medium text-zinc-700">Nome *</label>
             <input
@@ -217,12 +216,11 @@ function EditUserModal({
   onSaved: () => void;
 }) {
   const [form, setForm] = useState<EditForm>({ name: '', role: 'Driver', client_id: '' });
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
   const editMutation = useMutation({
-    mutationFn: async (updates: any) => {
+    mutationFn: async (updates: object) => {
       if (!user) return;
       await supabase.auth.refreshSession();
       const { error: dbError } = await supabase
@@ -232,12 +230,12 @@ function EditUserModal({
       if (dbError) throw new Error(dbError.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       onSaved();
       onClose();
     },
-    onError: (err: any) => {
-      setError(err.message ?? 'Erro ao salvar.');
+    onError: (err: unknown) => {
+      setError((err as { message?: string })?.message ?? 'Erro ao salvar.');
     }
   });
 
@@ -248,7 +246,7 @@ function EditUserModal({
 
   if (!open || !user) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     editMutation.mutate({
@@ -271,7 +269,7 @@ function EditUserModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 p-6">
+        <form onSubmit={(e) => { handleSubmit(e); }} className="space-y-4 p-6">
           <div>
             <label className="block text-sm font-medium text-zinc-700">Nome *</label>
             <input
@@ -327,7 +325,7 @@ function EditUserModal({
 // ─── Página principal ──────────────────────────────────────────────────────
 
 export default function AdminUsers() {
-  const { user, currentClient, switchClient } = useAuth();
+  const { user, currentClient } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
@@ -343,7 +341,8 @@ export default function AdminUsers() {
         .select('id, name, role, client_id, created_at, clients(name)')
         .order('name');
       if (error) throw error;
-      return (data || []).map((p: any) => ({
+      type ProfileQueryRow = { id: string; name: string; role: string; client_id: string; created_at: string; clients: { name: string } | { name: string }[] | null };
+      return (data || []).map((p: ProfileQueryRow) => ({
         id: p.id,
         name: p.name,
         role: p.role as Role,
@@ -376,10 +375,10 @@ export default function AdminUsers() {
       await invokeEdgeFunction('create-user', { action: 'delete', user_id: userId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin-users'] });
     },
-    onError: (err: any) => {
-      alert(err.message || 'Erro ao deletar usuário.');
+    onError: (err: unknown) => {
+      alert((err as { message?: string })?.message ?? 'Erro ao deletar usuário.');
     }
   });
 

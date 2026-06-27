@@ -23,7 +23,7 @@ export default function MultiSelectDropdown({
 
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target)) {
+      if (ref.current && e.target instanceof Node && !ref.current.contains(e.target)) {
         setIsOpen(false);
       }
     };
