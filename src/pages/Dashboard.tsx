@@ -893,14 +893,9 @@ export default function Dashboard() {
         {activeTab === 'geral' && (
           <OverviewPanel
             vehicles={vehicles}
-            totalVehicles={vehicles.length}
-            availableVehicles={availableVehicles}
-            unavailableVehicles={unavailableVehicles}
-            availabilityRate={availabilityRate}
-            totalApprovedCost={totalApprovedCost}
-            complianceRate={complianceRate}
-            trackerCoverageRate={trackerCoverageRate}
-            insuranceCoverageRate={insuranceCoverageRate}
+            activeMaintenanceOrders={activeMaintenanceOrders}
+            currentMonthOrders={currentMonthOrders}
+            overdueChecklistVehicleIds={overdueChecklistVehicleIds}
             isLoading={isPanelLoading}
           />
         )}

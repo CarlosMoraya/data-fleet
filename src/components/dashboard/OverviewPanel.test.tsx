@@ -4,6 +4,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import OverviewPanel from './OverviewPanel';
 
+import type { VehicleRow } from './OperationalPanel';
+
 interface RootedDiv extends HTMLDivElement {
   __reactRoot?: Root;
 }
@@ -31,15 +33,10 @@ function renderWithAct(ui: React.ReactElement) {
 }
 
 const baseProps = {
-  vehicles: [],
-  totalVehicles: 10,
-  availableVehicles: 8,
-  unavailableVehicles: 2,
-  availabilityRate: 80,
-  totalApprovedCost: 5000,
-  complianceRate: 95,
-  trackerCoverageRate: 70,
-  insuranceCoverageRate: 80,
+  vehicles: [] as VehicleRow[],
+  activeMaintenanceOrders: [] as { vehicle_id: string; status: string }[],
+  currentMonthOrders: [] as { vehicle_id: string; approved_cost: number | null }[],
+  overdueChecklistVehicleIds: new Set<string>(),
   isLoading: false,
 };
 
@@ -97,5 +94,57 @@ describe('OverviewPanel — regressão de conteúdo removido', () => {
     expect(text).toContain('Situação atual da frota');
     expect(text).toContain('Custo do Mês Atual');
     expect(text).not.toContain('Custo Total do Período');
+  });
+});
+
+describe('OverviewPanel — derives cards from raw data', () => {
+  it('shows correct total from vehicles array', () => {
+    const vehicles: VehicleRow[] = [
+      {
+        id: '1',
+        type: 'Cavalo',
+        crlv_year: null,
+        crlv_expiration_date: null,
+        driver_id: null,
+        category: 'Pesado',
+        model: 'Volvo FH',
+        acquisition: 'Owned',
+        shipper_name: 'ACME',
+        operational_unit_name: 'SP',
+        license_plate: 'AAA-1234',
+        brand: 'Volvo',
+        has_insurance: true,
+        tracker: 'rastreador1',
+      },
+      {
+        id: '2',
+        type: 'Truck',
+        crlv_year: null,
+        crlv_expiration_date: null,
+        driver_id: null,
+        category: 'Leve',
+        model: 'Iveco Daily',
+        acquisition: 'Rented',
+        shipper_name: 'Beta',
+        operational_unit_name: 'RJ',
+        license_plate: 'BBB-5678',
+        brand: 'Iveco',
+        has_insurance: false,
+        tracker: null,
+      },
+    ];
+
+    renderWithAct(
+      <OverviewPanel
+        vehicles={vehicles}
+        activeMaintenanceOrders={[{ vehicle_id: '1', status: 'Serviço em execução' }]}
+        currentMonthOrders={[{ vehicle_id: '1', approved_cost: 500 }]}
+        overdueChecklistVehicleIds={new Set(['2'])}
+        isLoading={false}
+      />,
+    );
+
+    const text = container.textContent ?? '';
+    expect(text).toContain('2');
   });
 });

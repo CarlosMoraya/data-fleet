@@ -2,6 +2,45 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-06-28 (Visão Geral com cross-filter, multi-seleção e long-press)
+
+### O que foi implementado
+
+A aba `Visão Geral` do Dashboard passou a operar como linked view. Os 6 gráficos de barra do bloco `Mapa da Frota` agora filtram dinamicamente os 8 cards executivos e cruzam o filtro entre si com auto-exclusão da própria dimensão. Clique simples aplica seleção exclusiva por barra; `Ctrl/Cmd+clique` acumula no desktop; `long-press` de 600 ms acumula em mouse/touch. Foi adicionada uma barra de `Filtros ativos` com chips removíveis e ação `Limpar tudo`. O filtro é efêmero e não persiste em storage nem na URL.
+
+### Arquivos criados
+
+- `src/lib/overviewFleetFilters.ts`
+- `src/lib/overviewFleetFilters.test.ts`
+- `src/components/dashboard/VehicleTypeBarChart.multiselect.test.tsx`
+
+### Arquivos modificados
+
+- `src/components/dashboard/OverviewPanel.tsx`
+- `src/components/dashboard/OverviewPanel.test.tsx`
+- `src/components/dashboard/VehicleTypeBarChart.tsx`
+- `src/pages/Dashboard.tsx`
+- `docs/MEMORY.md`
+- `docs/MEMORY-HISTORY.md`
+
+### Decisões confirmadas
+
+- A fonte de verdade do filtro da Visão Geral é o módulo puro `overviewFleetFilters.ts`, com registro config-driven das 6 dimensões (`category`, `type`, `model`, `acquisition`, `operationalUnit`, `shipper`).
+- `OverviewPanel` passou a derivar os 8 cards a partir de dados crus já carregados em `Dashboard.tsx`, eliminando divergência entre baseline e subconjunto filtrado.
+- O gráfico da própria dimensão nunca filtra a si mesmo; ele sempre recalcula com `filtersExcept(...)` para preservar multi-seleção usável.
+- `VehicleTypeBarChart` ganhou props opcionais aditivas (`selectedValues`, `onSelect`, `onClearAll`, `multiSelectHint`) e manteve 100% do contrato single-select legado (`activeFilter`/`onFilterChange`) usado pela aba `Custos`.
+- O estado do filtro é intencionalmente efêmero em `useState`; não usa `usePersistentUiState`, `sessionStorage`, `localStorage` nem query params.
+
+### Validações executadas
+
+- `npm run lint` — exit 0, apenas warnings preexistentes fora do escopo
+- `npm run test:unit` — 679/679
+- validação manual da interação na aba `Visão Geral` — aprovada pelo usuário
+
+### Observações
+
+- `npm run test:smoke` não foi executado nesta sessão.
+
 ## Sessão — 2026-06-27 (aria-selected em abas de Checklists + race condition em warranty-revision-os-link)
 
 ### O que foi implementado

@@ -9,89 +9,114 @@ import {
   ShieldCheck,
   Loader2,
 } from 'lucide-react';
-import React, { lazy, Suspense, useMemo } from 'react';
+import React, { lazy, Suspense, useMemo, useState } from 'react';
 
 import {
   buildFleetCountByKey,
   buildTopFleetModels,
+  calculateFleetAvailability,
+  calculateChecklistComplianceRate,
+  calculateInsuranceCoverageRate,
+  calculateTrackerCoverageRate,
 } from '../../lib/dashboardKpi';
+import {
+  OVERVIEW_DIMENSIONS,
+  EMPTY_OVERVIEW_FILTERS,
+  applyOverviewFleetFilter,
+  filtersExcept,
+  toggleDimensionValue,
+  clearDimension,
+  removeDimensionValue,
+  isFiltersEmpty,
+  countActiveMaintenanceVehiclesByIds,
+  sumApprovedCostByVehicleIds,
+  countOverdueChecklistByIds,
+  type OverviewFleetFilters,
+  type OverviewFilterKey,
+} from '../../lib/overviewFleetFilters';
 import RouteFallback from '../RouteFallback';
 
 import DashboardKpiCard from './DashboardKpiCard';
 
-
 import type { VehicleRow } from './OperationalPanel';
-
 
 const VehicleTypeBarChart = lazy(() => import('./VehicleTypeBarChart'));
 
 const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-
-const ACQUISITION_LABELS: Record<string, string> = {
-  Owned: 'Próprio',
-  Rented: 'Alugado',
-  Agregado: 'Agregado',
+const FILTER_LABELS: Record<OverviewFilterKey, string> = {
+  category: 'Categoria',
+  type: 'Tipo',
+  model: 'Modelo',
+  acquisition: 'Aquisição',
+  operationalUnit: 'Unidade Operacional',
+  shipper: 'Embarcador',
 };
-
-function mapAcquisitionLabel(value: string | null | undefined): string | null {
-  if (value == null) return null;
-  return ACQUISITION_LABELS[value] ?? null;
-}
 
 interface OverviewPanelProps {
   vehicles: VehicleRow[];
-  totalVehicles: number;
-  availableVehicles: number;
-  unavailableVehicles: number;
-  availabilityRate: number;
-  totalApprovedCost: number;
-  complianceRate: number;
-  trackerCoverageRate: number;
-  insuranceCoverageRate: number;
+  activeMaintenanceOrders: { vehicle_id: string; status: string }[];
+  currentMonthOrders: { vehicle_id: string; approved_cost: number | null }[];
+  overdueChecklistVehicleIds: Set<string>;
   isLoading?: boolean;
 }
 
 export default function OverviewPanel({
   vehicles,
-  totalVehicles,
-  availableVehicles,
-  unavailableVehicles,
-  availabilityRate,
-  totalApprovedCost,
-  complianceRate,
-  trackerCoverageRate,
-  insuranceCoverageRate,
+  activeMaintenanceOrders,
+  currentMonthOrders,
+  overdueChecklistVehicleIds,
   isLoading = false,
 }: OverviewPanelProps) {
-  const fleetByCategoryData = useMemo(
-    () => buildFleetCountByKey(vehicles, (vehicle) => vehicle.category, 'Sem Categoria'),
-    [vehicles]
+  const [filters, setFilters] = useState<OverviewFleetFilters>(EMPTY_OVERVIEW_FILTERS);
+
+  const filteredVehicles = useMemo(
+    () => applyOverviewFleetFilter(vehicles, filters),
+    [vehicles, filters],
   );
 
-  const fleetByTypeData = useMemo(
-    () => buildFleetCountByKey(vehicles, (vehicle) => vehicle.type, 'Sem Tipo'),
-    [vehicles]
+  const filteredIds = useMemo(
+    () => new Set(filteredVehicles.map((v) => v.id)),
+    [filteredVehicles],
   );
 
-  const topFleetModelsData = useMemo(
-    () => buildTopFleetModels(vehicles, 10, 'Sem Modelo'),
-    [vehicles]
+  const totalVehicles = filteredVehicles.length;
+
+  const unavailableVehicles = useMemo(
+    () => countActiveMaintenanceVehiclesByIds(activeMaintenanceOrders, filteredIds),
+    [activeMaintenanceOrders, filteredIds],
   );
 
-  const fleetByAcquisitionData = useMemo(
-    () => buildFleetCountByKey(vehicles, (vehicle) => mapAcquisitionLabel(vehicle.acquisition), 'Não Informado'),
-    [vehicles]
+  const availableVehicles = Math.max(0, totalVehicles - unavailableVehicles);
+  const availabilityRate = calculateFleetAvailability(totalVehicles, unavailableVehicles);
+
+  const totalApprovedCost = useMemo(
+    () => sumApprovedCostByVehicleIds(currentMonthOrders, filteredIds),
+    [currentMonthOrders, filteredIds],
   );
 
-  const fleetByOperationalUnitData = useMemo(
-    () => buildFleetCountByKey(vehicles, (vehicle) => vehicle.operational_unit_name, 'Sem Unidade'),
-    [vehicles]
+  const overdueCount = useMemo(
+    () => countOverdueChecklistByIds(overdueChecklistVehicleIds, filteredIds),
+    [overdueChecklistVehicleIds, filteredIds],
   );
 
-  const fleetByShipperData = useMemo(
-    () => buildFleetCountByKey(vehicles, (vehicle) => vehicle.shipper_name, 'Sem Embarcador'),
-    [vehicles]
-  );
+  const complianceRate = calculateChecklistComplianceRate(totalVehicles, overdueCount);
+  const trackerCoverageRate = calculateTrackerCoverageRate(filteredVehicles);
+  const insuranceCoverageRate = calculateInsuranceCoverageRate(filteredVehicles);
+
+  const chartDataByDimension = useMemo(() => {
+    const result = {} as Record<OverviewFilterKey, { name: string; value: number }[]>;
+    for (const dimension of OVERVIEW_DIMENSIONS) {
+      const baseVehicles = applyOverviewFleetFilter(vehicles, filtersExcept(filters, dimension.key));
+      if (dimension.key === 'model') {
+        result[dimension.key] = buildTopFleetModels(baseVehicles, 10, dimension.fallbackLabel);
+      } else {
+        result[dimension.key] = buildFleetCountByKey(baseVehicles, dimension.accessor, dimension.fallbackLabel);
+      }
+    }
+    return result;
+  }, [vehicles, filters]);
+
+  const filtersActive = !isFiltersEmpty(filters);
 
   if (isLoading) {
     return (
@@ -107,6 +132,38 @@ export default function OverviewPanel({
         <h3 className="text-base font-semibold text-zinc-900">Situação atual da frota</h3>
         <p className="text-sm text-zinc-500">Retrato de agora — não depende do período</p>
       </div>
+
+      {filtersActive && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+          <span className="text-xs font-medium text-zinc-500">Filtros ativos:</span>
+          {OVERVIEW_DIMENSIONS.map((dimension) =>
+            filters[dimension.key].map((value) => (
+              <span
+                key={`${dimension.key}:${value}`}
+                className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-blue-600"
+              >
+                {FILTER_LABELS[dimension.key]}: {value}
+                <button
+                  type="button"
+                  onClick={() => setFilters((prev) => removeDimensionValue(prev, dimension.key, value))}
+                  className="ml-0.5 text-zinc-400 hover:text-zinc-600"
+                  aria-label={`Remover filtro ${value}`}
+                >
+                  ×
+                </button>
+              </span>
+            )),
+          )}
+          <button
+            type="button"
+            onClick={() => setFilters(EMPTY_OVERVIEW_FILTERS)}
+            className="ml-1 text-xs text-zinc-400 underline hover:text-zinc-600"
+          >
+            Limpar tudo
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         <DashboardKpiCard
           icon={Truck}
@@ -177,42 +234,19 @@ export default function OverviewPanel({
         </div>
         <Suspense fallback={<RouteFallback />}>
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <VehicleTypeBarChart
-              title="Frota por Categoria"
-              data={fleetByCategoryData}
-              activeFilter={null}
-              onFilterChange={() => {}}
-            />
-            <VehicleTypeBarChart
-              title="Frota por Tipo"
-              data={fleetByTypeData}
-              activeFilter={null}
-              onFilterChange={() => {}}
-            />
-            <VehicleTypeBarChart
-              title="Top Modelos da Frota"
-              data={topFleetModelsData}
-              activeFilter={null}
-              onFilterChange={() => {}}
-            />
-            <VehicleTypeBarChart
-              title="Próprios x Alugados x Agregados"
-              data={fleetByAcquisitionData}
-              activeFilter={null}
-              onFilterChange={() => {}}
-            />
-            <VehicleTypeBarChart
-              title="Frota por Unidade Operacional"
-              data={fleetByOperationalUnitData}
-              activeFilter={null}
-              onFilterChange={() => {}}
-            />
-            <VehicleTypeBarChart
-              title="Frota por Embarcador"
-              data={fleetByShipperData}
-              activeFilter={null}
-              onFilterChange={() => {}}
-            />
+            {OVERVIEW_DIMENSIONS.map((dimension) => (
+              <VehicleTypeBarChart
+                key={dimension.key}
+                title={dimension.title}
+                data={chartDataByDimension[dimension.key]}
+                selectedValues={filters[dimension.key]}
+                onSelect={(name, additive) =>
+                  setFilters((prev) => toggleDimensionValue(prev, dimension.key, name, additive))
+                }
+                onClearAll={() => setFilters((prev) => clearDimension(prev, dimension.key))}
+                multiSelectHint
+              />
+            ))}
           </div>
         </Suspense>
       </div>
