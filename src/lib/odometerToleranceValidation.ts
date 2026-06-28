@@ -8,6 +8,11 @@ export interface OdometerToleranceInput {
   tolerancePerDay: number | null;
   dayInterval: number | null;
   now?: Date;
+  /**
+   * Forwarded to `validateChecklistOdometerKm`. When true, equal values are
+   * rejected (checklist context). Default `false` keeps existing behavior.
+   */
+  mustExceed?: boolean;
 }
 
 export type OdometerToleranceResult =
@@ -20,6 +25,7 @@ export function evaluateOdometerTolerance(input: OdometerToleranceInput): Odomet
   const validation = validateChecklistOdometerKm({
     rawValue: input.rawValue,
     referenceKm: input.lastValidKm ?? input.initialKm ?? null,
+    mustExceed: input.mustExceed,
   });
 
   if (!validation.ok) {

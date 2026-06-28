@@ -186,3 +186,11 @@ Arquivos modificados: src/pages/Checklists.tsx, e2e/completed/warranty-revision-
 Testes adicionados: nenhum (cobertura existente já protege ambos os bugs)
 
 **Observação (2026-06-27):** teste "Estado UI: chaves usam namespace bf:v1:ui" (ui-state-persistence.spec.ts:180) falha com `allKeys.length === 0`. Não relacionado à correção acima — é um teste pré-existente que verifica o namespace das chaves no sessionStorage e não encontrou chaves com o padrão esperado. Fora do escopo desta correção.
+
+## Correção de bug — checklist aceitava hodômetro igual e exibia "Último Km registrado" obsoleto (2026-06-28)
+
+Bug corrigido: checklist aceitava hodômetro igual ao último registrado e exibia "Último Km registrado" obsoleto após concluir um checklist.
+Causa raiz: (1) comparação `<` aceitava igual em validateChecklistOdometerKm; (2) queries de referência (lastOdometerKm/lastReadingAt/vehicleInitialKm) chaveadas por vehicleId nunca invalidadas após finishChecklistMutation (staleTime 3min + gcTime Infinity).
+Correção aplicada: flag opcional `mustExceed` (default false) — só checklists exigem estritamente maior; invalidação das queries de referência no onSuccess online do finish. Manutenção inalterada.
+Arquivos modificados: src/lib/checklistKmValidation.ts, src/lib/odometerToleranceValidation.ts, src/pages/ChecklistFill.tsx
+Testes adicionados: checklistKmValidation.test.ts (casos mustExceed), odometerToleranceValidation.test.ts (igual barrado)

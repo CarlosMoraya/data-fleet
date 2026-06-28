@@ -40,6 +40,30 @@ describe('validateChecklistOdometerKm', () => {
     });
   });
 
+  describe('mustExceed (contexto de checklist)', () => {
+    it('bloqueia KM igual ao ultimo registrado quando mustExceed: true', () => {
+      const result = validateChecklistOdometerKm({ rawValue: '1200', referenceKm: 1200, mustExceed: true });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.message).toContain('deve ser maior que o último registrado');
+      }
+    });
+
+    it('aceita KM maior que o ultimo registrado quando mustExceed: true', () => {
+      expect(validateChecklistOdometerKm({ rawValue: '1300', referenceKm: 1200, mustExceed: true })).toEqual({
+        ok: true,
+        value: 1300,
+      });
+    });
+
+    it('mantem KM igual aceito por default (regressao de Manutenção)', () => {
+      expect(validateChecklistOdometerKm({ rawValue: '1200', referenceKm: 1200 })).toEqual({
+        ok: true,
+        value: 1200,
+      });
+    });
+  });
+
   it('bloqueia novo KM abaixo da referencia corrigida', () => {
     const result = validateChecklistOdometerKm({ rawValue: '9000', referenceKm: 10000 });
     expect(result.ok).toBe(false);

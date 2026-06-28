@@ -327,6 +327,7 @@ export default function ChecklistFill() {
         initialKm: vehicleInitialKm,
         tolerancePerDay: odometerIntervalSettings?.odometer_km_tolerance_per_day ?? null,
         dayInterval: odometerIntervalSettings?.odometer_update_day_interval ?? null,
+        mustExceed: true,
       });
       if (validation.ok === false) {
         setKmError(validation.message);
@@ -343,7 +344,7 @@ export default function ChecklistFill() {
       return;
     }
 
-    const validation = validateChecklistOdometerKm({ rawValue: kmInput, referenceKm });
+    const validation = validateChecklistOdometerKm({ rawValue: kmInput, referenceKm, mustExceed: true });
     if (!validation.ok) {
       setKmError(validation.message);
       return;
@@ -427,6 +428,13 @@ export default function ChecklistFill() {
       }
       // Remove o checklist aberto do cache imediatamente para evitar flash
       queryClient.setQueriesData({ queryKey: ['openChecklist'] }, null);
+      // Invalida as queries de referência de hodômetro do veículo para que o
+      // próximo checklist exija um valor estritamente maior que o recém-registrado.
+      if (checklist?.vehicleId) {
+        void queryClient.invalidateQueries({ queryKey: ['lastOdometerKm', checklist.vehicleId] });
+        void queryClient.invalidateQueries({ queryKey: ['lastOdometerReadingAt', checklist.vehicleId] });
+        void queryClient.invalidateQueries({ queryKey: ['vehicleInitialKm', checklist.vehicleId] });
+      }
       void queryClient.invalidateQueries({ queryKey: ['checklists'] });
       void navigate('/checklists');
     },

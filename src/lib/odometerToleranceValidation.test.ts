@@ -107,4 +107,31 @@ describe('evaluateOdometerTolerance', () => {
       exceededBy: 1,
     });
   });
+
+  it('bloqueia KM igual ao ultimo registrado quando mustExceed: true', () => {
+    const result = evaluateOdometerTolerance({
+      rawValue: '20000',
+      lastValidKm: 20000,
+      lastReadingAt: '2026-06-21T12:00:00Z',
+      initialKm: null,
+      tolerancePerDay: 300,
+      dayInterval: 1,
+      now: new Date('2026-06-22T12:00:00Z'),
+      mustExceed: true,
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('mantem KM igual aceito por default (regressao de Manutenção)', () => {
+    const result = evaluateOdometerTolerance({
+      rawValue: '20000',
+      lastValidKm: 20000,
+      lastReadingAt: '2026-06-21T12:00:00Z',
+      initialKm: null,
+      tolerancePerDay: 300,
+      dayInterval: 1,
+      now: new Date('2026-06-22T12:00:00Z'),
+    });
+    expect(result.ok).toBe(true);
+  });
 });
