@@ -42,13 +42,16 @@ npm run dev &
 VITE_SUPABASE_URL=https://seu-projeto.supabase.co
 VITE_SUPABASE_ANON_KEY=sua-chave-anonima
 
-# Credenciais dos usuários de teste (6 perfis)
+# Credenciais dos usuários de teste (9 perfis)
 TEST_ADMIN_EMAIL=...        TEST_ADMIN_PASSWORD=...
 TEST_ANALYST_EMAIL=...      TEST_ANALYST_PASSWORD=...
 TEST_ASSISTANT_EMAIL=...    TEST_ASSISTANT_PASSWORD=...
 TEST_MANAGER_EMAIL=...      TEST_MANAGER_PASSWORD=...
 TEST_AUDITOR_EMAIL=...      TEST_AUDITOR_PASSWORD=...
 TEST_DRIVER_EMAIL=...       TEST_DRIVER_PASSWORD=...
+TEST_DIRECTOR_EMAIL=...     TEST_DIRECTOR_PASSWORD=...
+TEST_GESTOROP_EMAIL=...     TEST_GESTOROP_PASSWORD=...
+TEST_WORKSHOP_EMAIL=...     TEST_WORKSHOP_PASSWORD=...
 ```
 
 ### 2.3 Arquivos de Autenticação (`.auth/`)
@@ -62,6 +65,9 @@ e2e/.auth/pedro.json      # Fleet Assistant
 e2e/.auth/alexandre.json  # Manager
 e2e/.auth/carlos.json     # Auditor
 e2e/.auth/jorge.json      # Driver
+e2e/.auth/director.json   # Director
+e2e/.auth/gestorop.json   # Operations Manager
+e2e/.auth/workshop.json   # Workshop
 ```
 
 Se não existirem, rodar os setups primeiro:
@@ -72,6 +78,9 @@ npx playwright test --project=setup-pedro
 npx playwright test --project=setup-alexandre
 npx playwright test --project=setup-carlos
 npx playwright test --project=setup-jorge
+npx playwright test --project=setup-director
+npx playwright test --project=setup-gestorop
+npx playwright test --project=setup-workshop
 ```
 
 ---
@@ -86,6 +95,9 @@ npx playwright test --project=setup-jorge
 | Alexandre | Manager | TEST_MANAGER_* | alexandre.json | alexandre.setup.ts |
 | Carlos | Auditor | TEST_AUDITOR_* | carlos.json | carlos.setup.ts |
 | Jorge | Driver | TEST_DRIVER_* | jorge.json | jorge.setup.ts |
+| Director | Director | TEST_DIRECTOR_* | director.json | director.setup.ts |
+| Operations Manager | Operations Manager | TEST_GESTOROP_* | gestorop.json | gestorop.setup.ts |
+| Workshop | Workshop | TEST_WORKSHOP_* | workshop.json | workshop.setup.ts |
 
 ---
 
@@ -99,7 +111,11 @@ npx playwright test --project=setup-jorge
 | `assistant-actions` | pedro.json | `tenant-users-assistant-actions` | — |
 | `manager` | alexandre.json | `tenant-users-manager*`, `audit-admin-tenant` | `seed` |
 | `auditor` | carlos.json | `auditor-flow` | — |
-| `driver` | jorge.json | `driver-flow` | — |
+| `driver` | jorge.json | `driver-flow`, `driver-schedules-cache` | — |
+| `director` | director.json | `role-director` | pending |
+| `operations-manager` | gestorop.json | `role-operations-manager` | pending |
+| `workshop` | workshop.json | `role-workshop` | pending |
+| `visual` | admin.json | `visual-regression` (testDir `e2e/visual/`) | — |
 
 ---
 
@@ -142,6 +158,12 @@ npx playwright test --project=setup-jorge
 | 33 | Partnership Oficinas | tenant-users-manager-workshop-partnership.spec.ts | 14 | manager | Partnership |
 | 34 | Oficinas (Manager) | tenant-users-manager-workshops.spec.ts | 6 | manager | CRUD |
 | 35 | Usuários (Manager) | tenant-users-manager.spec.ts | 6 | manager | CRUD |
+| 36 | **[NOVO] Director** | **role-director.spec.ts** | **6** | **director** | **Permissões** |
+| 37 | **[NOVO] Operations Manager** | **role-operations-manager.spec.ts** | **7** | **operations-manager** | **Read-only** |
+| 38 | **[NOVO] Workshop** | **role-workshop.spec.ts** | **5** | **workshop** | **Permissões** |
+| 39 | **[NOVO] RLS cross-tenant** | **rls-cross-tenant.spec.ts** | **5** | **chromium** | **Segurança** |
+| 40 | **[NOVO] Acessibilidade** | **a11y-core-screens.spec.ts** | **4** | **chromium** | **a11y (axe)** |
+| 41 | **[NOVO] Regressão visual** | **visual-regression.spec.ts** | **3** | **visual** | **Snapshot** |
 
 **TOTAL: ~197 testes em 35 arquivos spec**
 
@@ -579,9 +601,42 @@ e2e/
 │   # ── Testes novos (criados por este guia) ──
 ├── tenant-users-assistant-tires.spec.ts      # [NOVO] Pneus — permissões Assistant
 ├── tenant-users-manager-axle-config.spec.ts  # [NOVO] Configuração de Eixos
-└── tenant-users-manager-tires.spec.ts        # [NOVO] Pneus — CRUD Manager
+├── tenant-users-manager-tires.spec.ts        # [NOVO] Pneus — CRUD Manager
+├── role-director.spec.ts                     # [NOVO] Director — permissões
+├── role-operations-manager.spec.ts           # [NOVO] Operations Manager — read-only
+├── role-workshop.spec.ts                     # [NOVO] Workshop — permissões
+├── rls-cross-tenant.spec.ts                  # [NOVO] RLS cross-tenant (segurança)
+├── a11y-core-screens.spec.ts                 # [NOVO] Acessibilidade (axe-core)
+│
+├── visual/                                    # [NOVO] Regressão visual (projeto dedicado)
+│   ├── visual-regression.spec.ts
+│   └── visual-regression.spec.ts-snapshots/  # baselines versionadas (Linux)
+└── TEST_EXECUTION_GUIDE.md     # Este arquivo
 ```
 
 ---
 
 *Documento criado em 2026-04-05. Manter atualizado ao criar novos specs.*
+
+---
+
+## 12. Acessibilidade (axe-core) e Regressão Visual
+
+### 12.1 Acessibilidade — `a11y-core-screens.spec.ts` (projeto `chromium`)
+
+- Usa `@axe-core/playwright` com tags `wcag2a` / `wcag2aa`.
+- **Gate:** violações `critical` + `serious` => reprova. `moderate`/`minor` apenas reportados.
+- Cobertura: Login (anônimo), Dashboard, Checklists, Cadastros/Veículos.
+- Relatório: `.claude/reports/a11y-core-screens-report.md` (inclui id da regra axe, impacto e seletor do 1º nó).
+- **Não corrige a UI nesta sessão:** violações reveladas são registradas em `docs/MEMORY.md` como observação datada.
+
+### 12.2 Regressão Visual — `e2e/visual/visual-regression.spec.ts` (projeto `visual`)
+
+- Projeto dedicado (`testDir: ./e2e/visual/`), **fora da suíte padrão** (não capturado pelo `testMatch` global).
+- Usa `toHaveScreenshot()` com `maxDiffPixelRatio: 0.01` e `animations: 'disabled'`; regiões voláteis mascaradas via `mask`.
+- Baselines versionadas em `e2e/visual/visual-regression.spec.ts-snapshots/` (geradas em Linux).
+- Scripts:
+  - `npm run test:e2e:visual` — compara com as baselines.
+  - `npm run test:e2e:visual:update` — regenera as baselines (usar ao alterar UI intencionalmente ou em outro SO).
+- Cobertura: `login.png`, `dashboard.png`, `checklist-fill.png` (skip se não houver checklist).
+- Relatório: `.claude/reports/visual-regression-report.md`.

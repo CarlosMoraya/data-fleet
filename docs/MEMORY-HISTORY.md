@@ -1784,3 +1784,45 @@ Em vez de usar ORMs complexos no frontend, utilizamos funções de mapeamento pu
   git add docs/MEMORY.md docs/MEMORY-HISTORY.md supabase/migrations/20260623010000_km_effective_initial_km_fallback.sql e2e/completed/warranty-revision-initial-km-fallback.spec.ts
   git commit -m "feat: usa Km Inicial como KM atual na fonte única quando veículo não tem checklist"
   ```
+
+---
+
+### 29/06/2026 — Overwrite do `.env.local` para resolver conflito VS Code / agente anterior
+- **Contexto:** ao tentar salvar o arquivo `.env.local` no VS Code, o editor exibia a mensagem "Use the actions in the editor tool bar to either undo your changes or overwrite the content of the file with your changes". O conflito ocorria porque o arquivo havia sido modificado externamente por um agente em sessão anterior.
+- **Causa raiz:** o relatório `.claude/reports/e2e-baseline-triage-2026-06-03.md` registrava que o teste `new-roles-audit.spec.ts` falhava por falta das variáveis `TEST_COORDINATOR_EMAIL`, `TEST_COORDINATOR_PASSWORD`, `TEST_SUPERVISOR_EMAIL` e `TEST_SUPERVISOR_PASSWORD`. Um agente anterior havia adicionado essas e outras credenciais (Workshop, GestorOP) ao `.env.local` para permitir a execução dos testes E2E, mas o VS Code — que já tinha o arquivo aberto — detectou a divergência entre o buffer do editor e o conteúdo no disco.
+- **Decisão:** reescrever o `.env.local` com o mesmo conteúdo atual do disco (overwrite), preservando todas as credenciais adicionadas pelo agente anterior. Nenhuma credencial foi removida ou alterada.
+- **Credenciais envolvidas (adicionadas pelo agente anterior):** `TEST_COORDINATOR_EMAIL/PASSWORD`, `TEST_SUPERVISOR_EMAIL/PASSWORD`, `TEST_WORKSHOP_EMAIL/PASSWORD`, `TEST_GESTOROP_EMAIL/PASSWORD`.
+- **Arquivo afetado:** `.env.local` (não versionado pelo Git, ignorado via `.gitignore`).
+- **Verificação:** todas as 38 variáveis `TEST_*` confirmadas presentes no disco antes e depois do overwrite.
+
+---
+
+### 30/06/2026 — Cobertura E2E: Director / Operations Manager / Workshop + RLS cross-tenant + a11y (axe-core) + regressão visual
+
+- **Contexto:** sessão de Tipo 1 (adição sem impacto em código de produção) para fechar 4 lacunas críticas da estratégia de testes E2E, conforme `IMPLEMENTATION.md` (2026-06-30).
+- **Guardrail:** não alterar `src/`, não corrigir falhas de produto reveladas pelos novos testes (registrar no `MEMORY.md` e continuar).
+- **Entregas:**
+  - **Dependência:** `@axe-core/playwright` instalada como devDependency.
+  - **Setups (3):** `e2e/setup/director.setup.ts`, `gestorop.setup.ts`, `workshop.setup.ts` — espelham `alexandre.setup.ts` com guards de env var (`TEST_DIRECTOR_*`, `TEST_GESTOROP_*`, `TEST_WORKSHOP_*`); geram `e2e/.auth/{director,gestorop,workshop}.json`. Redirects esperados: `/`, `/agendamentos`, `/manutencao` (derivados de `getDefaultRouteForRole`).
+  - **Projetos Playwright (7 novos):** `setup-director`, `setup-gestorop`, `setup-workshop`, `director`, `operations-manager`, `workshop`, `visual`. `chromium.testIgnore` atualizado para ignorar `role-director/role-operations-manager/role-workshop` (evitar dupla execução); `rls-cross-tenant` e `a11y-core-screens` permanecem sob `chromium`; `visual` em `testDir: ./e2e/visual/` (fora da suíte padrão).
+  - **Specs de papel (3, em `e2e/completed/`):** `role-director.spec.ts` (6 testes — login/dashboard, sidebar completa, Cadastros, criar, excluir, Manutenção), `role-operations-manager.spec.ts` (7 testes — redirect `/agendamentos`, sidebar restrita, 3 rotas proibidas, Agendamentos/Manutenção read-only), `role-workshop.spec.ts` (5 testes — redirect `/manutencao`, sem Cadastros, lista OS, editar OS, fotos de peças). Todos com `rec()/writeReport()` (§6.3); skips condicionais por dado ausente. Expectativas derivadas de `src/lib/rolePermissions.ts`.
+  - **RLS cross-tenant:** `e2e/completed/rls-cross-tenant.spec.ts` (6 testes seriais) — replica utilitários de `odometer-correction-rls.spec.ts` (`getEnv`/`adminClient`/`anonClient`/`signIn`/`profileByEmail`) + `createProbeVehicle`; descobre 2º tenant via service role (skip se único); cria veículo-isca no tenant B; prova negação de SELECT/INSERT/UPDATE/DELETE cross-tenant com sessão do Manager (tenant A); valida não-exposição via UI; limpa isca no `afterAll`. 6/6 passando.
+  - **Acessibilidade:** `e2e/completed/a11y-core-screens.spec.ts` (4 telas) — `AxeBuilder` com tags `wcag2a`/`wcag2aa`, gate critical+serious, Login em contexto anônimo. **Revelou violações reais** (registradas em `docs/MEMORY.md` — Observações): `color-contrast` (serious) em Login/Dashboard/Checklists/Cadastros e `select-name` (critical) em `<select>` de filtros (Dashboard/Checklists/Cadastros). Não corrigidas (guardrail).
+  - **Regressão visual:** `e2e/visual/visual-regression.spec.ts` (3 telas — login/dashboard/checklist-fill) com `toHaveScreenshot` (`maxDiffPixelRatio: 0.01`, `animations: 'disabled'`, `mask` em `.recharts-wrapper`/`<time>`). Baselines versionadas em `e2e/visual/visual-regression.spec.ts-snapshots/` (Linux). Scripts `test:e2e:visual` e `test:e2e:visual:update`. 4/4 passando (baselines geradas e 2ª execução sem diffs).
+  - **Docs:** `e2e/TEST_EXECUTION_GUIDE.md` atualizado (§2.2 9 perfis, §2.3 9 auth files, §3 tabela de perfis, §4 projetos, §5 6 specs novos, §11 árvore, novo §12 a11y + visual).
+- **Decisões técnicas da sessão (não previstas no plano, necessárias para robustez):**
+  - `rec.fail()` em todos os specs novos trata `test.skip()` (mensagem `Test is skipped: ...`) como PULADO, não FALHOU — o `test.skip()` do Playwright lança um erro que o `try/catch` capturava como falha, mascarando skips no relatório.
+  - Specs `a11y-core-screens` e `visual-regression` usam persistência de resultados via sidecar JSON (`.claude/reports/<nome>.json`) + `writeReport()` agregadora, em vez do `Map` em memória. Motivo: o split por `test.use` (login anônimo vs telas autenticadas) causa re-import do módulo por grupo de fixtures, zerando o `Map`; além disso, falhas independentes não devem mascarar resultados de outras telas (o `test.describe.serial` do Playwright 1.58 pula testes subsequentes após uma falha — indesejado quando cada falha é um achado valioso). O sidecar JSON é robusto a ambos. O padrão `rec()/writeReport()` (§6.3) é preservado na forma.
+- **Validação final:** `npm run lint` 0 erros (92 warnings pré-existentes); `npm run test:unit` 679/679; `npm run test:smoke` 6/6; setups 3/3; `director` 5 passou/2 skip; `operations-manager` 8/8; `workshop` 6/6; RLS 6/6; a11y 0 passou/4 falhou (violências reais — esperado); visual 4/4. Suíte `completed/` sob `chromium` sem regressão real: as 9 falhas observadas na execução completa foram todas por `.auth` expirados de perfis existentes (mariana/pedro/carlos/jorge) — passaram após regenerar setups — e 1 teste data-dependente pré-existente (`tire-inspection-assistant` B.1, depende de seed de inspeções de pneus). Minhas mudanças são puramente aditivas (novos arquivos + `testIgnore` que só exclui specs), não podem causar regressões.
+- **`IMPLEMENTATION.md` não entra no commit** (artefato de sessão transitório).
+- **Sugestão de commit:**
+  ```
+  git add docs/MEMORY.md docs/MEMORY-HISTORY.md \
+    playwright.config.ts package.json package-lock.json \
+    e2e/setup/director.setup.ts e2e/setup/gestorop.setup.ts e2e/setup/workshop.setup.ts \
+    e2e/completed/role-director.spec.ts e2e/completed/role-operations-manager.spec.ts e2e/completed/role-workshop.spec.ts \
+    e2e/completed/rls-cross-tenant.spec.ts e2e/completed/a11y-core-screens.spec.ts \
+    e2e/visual/visual-regression.spec.ts "e2e/visual/visual-regression.spec.ts-snapshots/" \
+    e2e/TEST_EXECUTION_GUIDE.md
+  git commit -m "test(e2e): cobertura de Director/Operations Manager/Workshop, RLS cross-tenant, a11y (axe) e regressão visual"
+  ```

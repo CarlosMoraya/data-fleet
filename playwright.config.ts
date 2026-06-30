@@ -48,13 +48,71 @@ export default defineConfig({
       testMatch: /jorge\.setup\.ts/,
     },
     {
+      name: 'setup-director',
+      testMatch: /director\.setup\.ts/,
+    },
+    {
+      name: 'setup-gestorop',
+      testMatch: /gestorop\.setup\.ts/,
+    },
+    {
+      name: 'setup-workshop',
+      testMatch: /workshop\.setup\.ts/,
+    },
+    {
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'e2e/.auth/admin.json',
       },
       dependencies: ['setup'],
-      testIgnore: [/tenant-users/, ...pendingIgnore],
+      testIgnore: [
+        /tenant-users/,
+        /role-director/,
+        /role-operations-manager/,
+        /role-workshop/,
+        ...pendingIgnore,
+      ],
+    },
+    {
+      name: 'director',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/director.json',
+      },
+      dependencies: ['setup-director'],
+      testMatch: /role-director\.spec\.ts/,
+      testIgnore: pendingIgnore,
+    },
+    {
+      name: 'operations-manager',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/gestorop.json',
+      },
+      dependencies: ['setup-gestorop'],
+      testMatch: /role-operations-manager\.spec\.ts/,
+      testIgnore: pendingIgnore,
+    },
+    {
+      name: 'workshop',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/workshop.json',
+      },
+      dependencies: ['setup-workshop'],
+      testMatch: /role-workshop\.spec\.ts/,
+      testIgnore: pendingIgnore,
+    },
+    {
+      name: 'visual',
+      testDir: './e2e/visual',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/admin.json',
+      },
+      dependencies: ['setup'],
+      testMatch: /visual-regression\.spec\.ts/,
     },
     {
       name: 'analyst',
