@@ -1,27 +1,30 @@
 # Model Cache
 Atualizado em: 2026-07-01
-Fonte: https://artificialanalysis.ai/leaderboards/models
+Fontes: Artificial Analysis (artificialanalysis.ai) + Vellum AI (vellum.ai)
+Próxima atualização obrigatória: 2026-08-01
 
-| Rank | Modelo | Provedor | Índice Qualidade | Input $/M (blended) | Velocidade (t/s) | Contexto | Licença |
-|------|--------|----------|-----------------|---------------------|------------------|----------|---------|
-| 1  | Claude Fable 5 (with fallback) | Anthropic | 60 | $7.70 | —   | 1M   | Fechado |
-| 2  | Claude Opus 4.8 (max)          | Anthropic | 56 | $3.85 | 62  | 1M   | Fechado |
-| 3  | GPT-5.5 (xhigh)                | OpenAI    | 55 | $4.35 | 79  | 922k | Fechado |
-| 4  | Claude Opus 4.7 (max)          | Anthropic | 54 | $3.85 | 51  | 1M   | Fechado |
-| 5  | Claude Sonnet 5 (max)          | Anthropic | 53 | $2.31 | 79  | 1M   | Fechado |
-| 6  | GPT-5.5 (high)                 | OpenAI    | 53 | $4.35 | 67  | 922k | Fechado |
-| 7  | GLM-5.2 (max)                  | Z AI      | 51 | $0.90 | 173 | 1M   | Aberto  |
-| 8  | GPT-5.5 (medium)               | OpenAI    | 50 | $4.35 | 67  | 922k | Fechado |
-| 9  | Gemini 3.5 Flash               | Google    | 50 | $1.31 | 163 | 1M   | Fechado |
-| 10 | Claude Sonnet 4.6 (max)        | Anthropic | 47 | $2.31 | 51  | 1M   | Fechado |
-| 11 | Gemini 3.1 Pro Preview         | Google    | 46 | $1.74 | 135 | 1M   | Fechado |
-| 12 | Qwen3.7 Max                    | Alibaba   | 46 | $1.43 | 198 | 1M   | Fechado |
-| 13 | Gemini 3.5 Flash (medium)      | Google    | 45 | $1.31 | 168 | 1M   | Fechado |
-| 14 | MiniMax-M3                     | MiniMax   | 44 | $0.22 | 102 | 1M   | Aberto  |
-| 15 | DeepSeek V4 Pro (Max)          | DeepSeek  | 44 | $0.18 | 90  | 1M   | Aberto  |
-| 16 | GPT-5.3 Codex (xhigh)          | OpenAI    | 44 | $1.87 | 92  | 400k | Fechado |
-| 17 | Kimi K2.6                      | Kimi      | 43 | $0.70 | 51  | 256k | Aberto  |
-| 18 | Qwen3.6 Plus                   | Alibaba   | — | $0.33 | —   | 1M   | Fechado |
+| Modelo | Provedor | Qualidade (AA) | SWE-Bench | GPQA | Input $/M | Output $/M | Velocidade (t/s) | Contexto | Licença |
+|--------|----------|---------------|-----------|------|-----------|------------|------------------|----------|---------|
+| Claude Fable 5         | Anthropic | 60 | —     | —     | $10.00 | $50.00 | —   | 1M   | Fechado |
+| Claude Opus 4.8        | Anthropic | 56 | 88.6% | 93.6% | $5.00  | $25.00 | 65  | 1M   | Fechado |
+| GPT-5.5                | OpenAI    | 55 | —     | —     | $5.00  | $30.00 | 79  | 922k | Fechado |
+| Claude Opus 4.7        | Anthropic | 54 | —     | —     | $5.00  | $25.00 | 51  | 1M   | Fechado |
+| Claude Sonnet 5        | Anthropic | 53 | 85.2% | 96.2% | $3.00  | $15.00 | 56  | 1M   | Fechado |
+| GLM-5.2                | Zhipu     | 51 | —     | —     | $0.95  | $3.00  | 347 | 1M   | Aberto  |
+| Kimi K2.6              | Moonshot  | 43 | —     | —     | $0.95  | $4.00  | 343 | 256k | Aberto  |
+| Gemini 3.5 Flash       | Google    | 50 | —     | —     | $1.31  | —      | 163 | 1M   | Fechado |
+| Gemini 3.1 Pro Preview | Google    | 46 | —     | 94.3% | $2.00  | $12.00 | 136 | 1M   | Fechado |
+| Qwen3.7 Max            | Alibaba   | 46 | —     | —     | $1.43  | —      | 198 | 1M   | Fechado |
+| Claude Sonnet 4.6      | Anthropic | 47 | —     | —     | $3.00  | $15.00 | 51  | 1M   | Fechado |
+| MiniMax-M3             | MiniMax   | 44 | —     | —     | $0.22  | —      | 102 | 1M   | Aberto  |
+| DeepSeek V4 Pro        | DeepSeek  | 44 | —     | —     | $0.435 | $0.87  | 175 | 1M   | Aberto  |
+| DeepSeek V4 Flash      | DeepSeek  | —  | —     | —     | $0.14  | $0.28  | 108 | 1M   | Aberto  |
+| GPT-5.3 Codex          | OpenAI    | 44 | —     | —     | $1.87  | —      | 92  | 400k | Fechado |
 
-**Nota:** preço "blended" usa ponderação 7:2:1 (cache/input/output). Velocidade em tokens/seg de saída.
-Próxima atualização obrigatória: 2026-08-01 (ou sob instrução explícita do usuário).
+**Legenda:**
+- Qualidade (AA): Intelligence Index do Artificial Analysis (maior = melhor, escala ~40–60)
+- SWE-Bench: % de issues reais de GitHub resolvidos — benchmark de coding (fonte: Vellum AI)
+- GPQA: % em perguntas de doutorado — raciocínio científico profundo (fonte: Vellum AI)
+- Input/Output $/M: preços separados por milhão de tokens (fonte: Vellum AI; mais precisos que blended)
+- "—" = dado não disponível na fonte no momento da coleta
+- Velocidade em tokens/seg de output
