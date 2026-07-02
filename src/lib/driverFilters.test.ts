@@ -30,6 +30,7 @@ function driver(overrides: Partial<Driver>): Driver {
   return {
     id: 'd1',
     clientId: 'c1',
+    active: true,
     name: 'Maria da Silva',
     cpf: '12345678901',
     ...overrides,

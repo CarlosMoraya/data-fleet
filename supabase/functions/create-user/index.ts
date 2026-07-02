@@ -221,6 +221,28 @@ serve(async (req: Request) => {
       return json({ success: true, user_id }, 200);
     }
 
+    if (body.action === "block" || body.action === "unblock") {
+      const { user_id } = body;
+      if (!user_id) return json({ error: "user_id é obrigatório." }, 400);
+
+      const { data: targetProfile } = await supabaseAdmin
+        .from("profiles").select("role, client_id").eq("id", user_id).single();
+      if (!targetProfile) return json({ error: "Usuário não encontrado." }, 404);
+
+      const targetRank = ROLE_RANK[targetProfile.role] ?? 0;
+      if (callerRank <= targetRank) {
+        return json({ error: "Você não tem permissão para bloquear este usuário." }, 403);
+      }
+      if (callerProfile.role !== "Admin Master" && targetProfile.client_id !== callerProfile.client_id) {
+        return json({ error: "Você não tem permissão para bloquear usuários de outro cliente." }, 403);
+      }
+
+      const ban_duration = body.action === "block" ? "87600h" : "none";
+      const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(user_id, { ban_duration });
+      if (banError) return json({ error: banError.message }, 500);
+      return json({ success: true, user_id, action: body.action }, 200);
+    }
+
     if (body.action === "sync_operations_scope") {
       const { target_user_id, shipper_ids = [], operational_unit_ids = [] } = body;
 
@@ -271,9 +293,6 @@ serve(async (req: Request) => {
       name,
       role,
       client_id,
-      can_delete_vehicles,
-      can_delete_drivers,
-      can_delete_workshops,
       budget_approval_limit,
       shipper_ids = [],
       operational_unit_ids = [],
@@ -340,9 +359,6 @@ serve(async (req: Request) => {
         name,
         role,
         client_id: targetClientId,
-        can_delete_vehicles: isOperationsManager(role) ? false : can_delete_vehicles ?? false,
-        can_delete_drivers: isOperationsManager(role) ? false : can_delete_drivers ?? false,
-        can_delete_workshops: isOperationsManager(role) ? false : can_delete_workshops ?? false,
         budget_approval_limit: isOperationsManager(role) ? 0 : budget_approval_limit ?? 0,
       });
 

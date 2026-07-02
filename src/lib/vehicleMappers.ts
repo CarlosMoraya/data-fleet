@@ -11,6 +11,8 @@ import {
 export interface VehicleRow {
   id: string;
   client_id: string;
+  active?: boolean | null;
+  inactivated_at?: string | null;
   type: string;
   energy_source: string;
   cooling_equipment: boolean;
@@ -76,6 +78,8 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
   return {
     id: row.id,
     clientId: row.client_id,
+    active: row.active ?? true,
+    inactivatedAt: row.inactivated_at ?? null,
     type: row.type as Vehicle['type'],
     energySource: row.energy_source as Vehicle['energySource'],
     coolingEquipment: row.cooling_equipment,

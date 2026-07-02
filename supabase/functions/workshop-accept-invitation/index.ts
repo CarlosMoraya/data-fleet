@@ -122,9 +122,6 @@ serve(async (req: Request) => {
             name,
             role: "Workshop",
             client_id: null,
-            can_delete_vehicles: false,
-            can_delete_drivers: false,
-            can_delete_workshops: false,
           });
 
         if (profileError) {

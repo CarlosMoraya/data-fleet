@@ -85,6 +85,26 @@ export async function saveDriver(
   return savedId;
 }
 
+export async function toggleDriverActive(driver: Driver, profileId: string): Promise<void> {
+  const nextActive = !driver.active;
+  const { error } = await supabase
+    .from('drivers')
+    .update({
+      active: nextActive,
+      inactivated_at: nextActive ? null : new Date().toISOString(),
+      inactivated_by: nextActive ? null : profileId,
+    })
+    .eq('id', driver.id);
+  if (error) throw error;
+
+  if (driver.profileId) {
+    await invokeEdgeFunction('create-user', {
+      action: nextActive ? 'unblock' : 'block',
+      user_id: driver.profileId,
+    });
+  }
+}
+
 /**
  * Deleta um motorista, seus documentos e sua conta de usuário (se existir).
  */
@@ -123,7 +143,7 @@ async function uploadDriverFiles(
 
     const existingUrl = driver[DOC_FIELD_MAP[key]];
     if (existingUrl) {
-      await deleteDriverDocument(existingUrl);
+      await deleteDriverDocument(String(existingUrl));
     }
 
     urlUpdates[DB_COLUMN_MAP[key]] = await uploadDriverDocument(

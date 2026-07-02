@@ -10,6 +10,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
   {
     id: 'v1',
     clientId: 'client_1',
+    active: true,
     type: 'Truck',
     energySource: 'Combustão',
     coolingEquipment: false,
@@ -35,6 +36,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
   {
     id: 'v2',
     clientId: 'client_1',
+    active: true,
     type: 'Utilitário',
     energySource: 'Elétrico',
     coolingEquipment: true,
@@ -58,6 +60,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
   {
     id: 'v3',
     clientId: 'client_2',
+    active: true,
     type: 'Cavalo',
     energySource: 'Combustão',
     coolingEquipment: false,

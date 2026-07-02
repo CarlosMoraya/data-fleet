@@ -5,6 +5,8 @@ import type { AxleConfigEntry } from './tire';
 export interface Vehicle {
   id: string;
   clientId: string;
+  active: boolean;
+  inactivatedAt?: string | null;
   type: 'Passeio' | 'Utilitário' | 'Van' | 'Moto' | 'Vuc' | 'Toco' | 'Truck' | 'Cavalo';
   energySource: 'Combustão' | 'Elétrico' | 'Híbrido';
   coolingEquipment: boolean;

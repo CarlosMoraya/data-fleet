@@ -27,9 +27,6 @@ export interface UserRow {
   id: string;
   name: string;
   role: Role;
-  can_delete_vehicles: boolean;
-  can_delete_drivers: boolean;
-  can_delete_workshops: boolean;
   budget_approval_limit: number;
   created_at: string;
 }
@@ -48,9 +45,6 @@ interface CreateForm {
   email: string;
   password: string;
   role: Role;
-  canDeleteVehicles: boolean;
-  canDeleteDrivers: boolean;
-  canDeleteWorkshops: boolean;
   budgetLimit: string;
   shipperIds: string[];
   operationalUnitIds: string[];
@@ -262,9 +256,6 @@ export function CreateUserModal({
     email: '',
     password: '',
     role: defaultRole,
-    canDeleteVehicles: false,
-    canDeleteDrivers: false,
-    canDeleteWorkshops: false,
     budgetLimit: '',
     shipperIds: [],
     operationalUnitIds: [],
@@ -295,9 +286,6 @@ export function CreateUserModal({
         name: capitalizeWords(form.name),
         role: form.role,
         client_id: currentClient?.id,
-        can_delete_vehicles: isOperationsRole ? false : form.canDeleteVehicles,
-        can_delete_drivers: isOperationsRole ? false : form.canDeleteDrivers,
-        can_delete_workshops: isOperationsRole ? false : form.canDeleteWorkshops,
         budget_approval_limit: isOperationsRole ? 0 : canManagePermissions ? (parseFloat(form.budgetLimit) || 0) : 0,
         shipper_ids: isOperationsRole ? form.shipperIds : undefined,
         operational_unit_ids: isOperationsRole ? form.operationalUnitIds : undefined,
@@ -323,9 +311,6 @@ export function CreateUserModal({
       email: '',
       password: '',
       role: availableRoles[availableRoles.length - 1] ?? 'Driver',
-      canDeleteVehicles: false,
-      canDeleteDrivers: false,
-      canDeleteWorkshops: false,
       budgetLimit: '',
       shipperIds: [],
       operationalUnitIds: [],
@@ -338,9 +323,6 @@ export function CreateUserModal({
 
     setForm((previous) => ({
       ...previous,
-      canDeleteVehicles: false,
-      canDeleteDrivers: false,
-      canDeleteWorkshops: false,
       budgetLimit: '0',
       operationalUnitIds: filterOperationalUnitsByShippers(
         previous.operationalUnitIds,
@@ -478,62 +460,6 @@ export function CreateUserModal({
           )}
 
           {canManagePermissions && !isOperationsRole && (
-            <div className="space-y-2">
-              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                <input
-                  id="create-can-delete-vehicles"
-                  type="checkbox"
-                  checked={form.canDeleteVehicles}
-                  onChange={(e) => setForm((previous) => ({ ...previous, canDeleteVehicles: e.target.checked }))}
-                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-                />
-                <div>
-                  <label htmlFor="create-can-delete-vehicles" className="block cursor-pointer text-sm font-medium text-zinc-700">
-                    Pode excluir veículos
-                  </label>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    Permite que este usuário exclua cadastros de veículos da frota.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                <input
-                  id="create-can-delete-drivers"
-                  type="checkbox"
-                  checked={form.canDeleteDrivers}
-                  onChange={(e) => setForm((previous) => ({ ...previous, canDeleteDrivers: e.target.checked }))}
-                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-                />
-                <div>
-                  <label htmlFor="create-can-delete-drivers" className="block cursor-pointer text-sm font-medium text-zinc-700">
-                    Pode excluir motoristas
-                  </label>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    Permite que este usuário exclua cadastros de motoristas da frota.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                <input
-                  id="create-can-delete-workshops"
-                  type="checkbox"
-                  checked={form.canDeleteWorkshops}
-                  onChange={(e) => setForm((previous) => ({ ...previous, canDeleteWorkshops: e.target.checked }))}
-                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-                />
-                <div>
-                  <label htmlFor="create-can-delete-workshops" className="block cursor-pointer text-sm font-medium text-zinc-700">
-                    Pode excluir oficinas
-                  </label>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    Permite que este usuário exclua cadastros de oficinas parceiras.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {canManagePermissions && !isOperationsRole && (
             <div>
               <label className="block text-sm font-medium text-zinc-700">Limite de Aprovação de Orçamentos</label>
               <input
@@ -594,9 +520,6 @@ function EditUserModal({
   const queryClient = useQueryClient();
   const canManagePermissions = CAN_MANAGE_PERMISSIONS.includes(currentUserRole);
   const [name, setName] = useState('');
-  const [canDeleteVehicles, setCanDeleteVehicles] = useState(false);
-  const [canDeleteDrivers, setCanDeleteDrivers] = useState(false);
-  const [canDeleteWorkshops, setCanDeleteWorkshops] = useState(false);
   const [budgetLimit, setBudgetLimit] = useState('');
   const [scope, setScope] = useState<OperationsManagerScope>({ shipperIds: [], operationalUnitIds: [] });
   const [error, setError] = useState('');
@@ -614,9 +537,6 @@ function EditUserModal({
 
       const updates: Record<string, unknown> = { name: capitalizeWords(name) };
       if (canManagePermissions && !isOperationsRole) {
-        updates.can_delete_vehicles = canDeleteVehicles;
-        updates.can_delete_drivers = canDeleteDrivers;
-        updates.can_delete_workshops = canDeleteWorkshops;
         updates.budget_approval_limit = parseFloat(budgetLimit) || 0;
       }
 
@@ -652,9 +572,6 @@ function EditUserModal({
     if (!user) return;
 
     setName(user.name);
-    setCanDeleteVehicles(user.can_delete_vehicles);
-    setCanDeleteDrivers(user.can_delete_drivers);
-    setCanDeleteWorkshops(user.can_delete_workshops);
     setBudgetLimit(user.budget_approval_limit ? user.budget_approval_limit.toString() : '');
     setError('');
   }, [user, open]);
@@ -758,62 +675,6 @@ function EditUserModal({
           )}
 
           {canManagePermissions && !isOperationsRole && (
-            <div className="space-y-2">
-              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                <input
-                  id="edit-can-delete-vehicles"
-                  type="checkbox"
-                  checked={canDeleteVehicles}
-                  onChange={(e) => setCanDeleteVehicles(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-                />
-                <div>
-                  <label htmlFor="edit-can-delete-vehicles" className="block cursor-pointer text-sm font-medium text-zinc-700">
-                    Pode excluir veículos
-                  </label>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    Permite que este usuário exclua cadastros de veículos da frota.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                <input
-                  id="edit-can-delete-drivers"
-                  type="checkbox"
-                  checked={canDeleteDrivers}
-                  onChange={(e) => setCanDeleteDrivers(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-                />
-                <div>
-                  <label htmlFor="edit-can-delete-drivers" className="block cursor-pointer text-sm font-medium text-zinc-700">
-                    Pode excluir motoristas
-                  </label>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    Permite que este usuário exclua cadastros de motoristas da frota.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                <input
-                  id="edit-can-delete-workshops"
-                  type="checkbox"
-                  checked={canDeleteWorkshops}
-                  onChange={(e) => setCanDeleteWorkshops(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-                />
-                <div>
-                  <label htmlFor="edit-can-delete-workshops" className="block cursor-pointer text-sm font-medium text-zinc-700">
-                    Pode excluir oficinas
-                  </label>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    Permite que este usuário exclua cadastros de oficinas parceiras.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {canManagePermissions && !isOperationsRole && (
             <div>
               <label className="block text-sm font-medium text-zinc-700">Limite de Aprovação de Orçamentos</label>
               <input
@@ -874,7 +735,7 @@ export default function Users() {
     queryFn: async () => {
       let query = supabase
         .from('profiles')
-        .select('id, name, role, can_delete_vehicles, can_delete_drivers, can_delete_workshops, budget_approval_limit, created_at');
+        .select('id, name, role, budget_approval_limit, created_at');
 
       if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);

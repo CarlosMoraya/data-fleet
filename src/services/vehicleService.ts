@@ -84,6 +84,19 @@ export async function saveVehicle(
   return savedId;
 }
 
+export async function toggleVehicleActive(vehicle: Vehicle, profileId: string): Promise<void> {
+  const nextActive = !vehicle.active;
+  const { error } = await supabase
+    .from('vehicles')
+    .update({
+      active: nextActive,
+      inactivated_at: nextActive ? null : new Date().toISOString(),
+      inactivated_by: nextActive ? null : profileId,
+    })
+    .eq('id', vehicle.id);
+  if (error) throw error;
+}
+
 /**
  * Deleta um veículo e todos os seus documentos no Storage.
  */
@@ -112,9 +125,9 @@ async function uploadVehicleFiles(
     const file = files[key];
     if (!file) continue;
 
-    const existingUrl = vehicle[DOC_FIELD_MAP[key]] as string | undefined;
+    const existingUrl = vehicle[DOC_FIELD_MAP[key]];
     if (existingUrl) {
-      await deleteVehicleDocument(existingUrl);
+      await deleteVehicleDocument(String(existingUrl));
     }
 
     urlUpdates[DB_COLUMN_MAP[key]] = await uploadVehicleDocument(

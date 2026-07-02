@@ -43,6 +43,8 @@ describe('driverFromRow', () => {
     const row = {
       id: 'd1',
       client_id: 'c1',
+      active: null,
+      inactivated_at: null,
       name: 'João Silva',
       cpf: '12345678901',
       category: 'AB',
@@ -56,6 +58,8 @@ describe('driverFromRow', () => {
     expect(driver.cpf).toBe('12345678901');
     expect(driver.category).toBe('AB');
     expect(driver.expirationDate).toBe('2030-12-31');
+    expect(driver.active).toBe(true);
+    expect(driver.inactivatedAt).toBeNull();
   });
 
   it('mapeia phone corretamente', () => {

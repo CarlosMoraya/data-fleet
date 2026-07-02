@@ -11,9 +11,6 @@ export interface User {
   email: string;
   role: Role;
   clientId: string | null; // null para Workshop no novo modelo (multi-transportadora)
-  canDeleteVehicles: boolean;
-  canDeleteDrivers: boolean;
-  canDeleteWorkshops: boolean;
   budgetApprovalLimit: number;
   workshopId?: string; // Populado quando role = 'Workshop' (modelo legado)
   workshopAccountId?: string; // Populado quando role = 'Workshop' (novo modelo)

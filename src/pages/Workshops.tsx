@@ -15,7 +15,7 @@ import { Workshop } from '../types';
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_EDIT = ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
-const ROLES_CAN_ALWAYS_DELETE = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_HARD_DELETE = ['Admin Master'];
 
 function formatPhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -49,9 +49,7 @@ export default function Workshops() {
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '');
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '');
-  const canDelete =
-    ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') ||
-    ((user?.role === 'Fleet Analyst' || user?.role === 'Supervisor') && user?.canDeleteWorkshops === true);
+  const canDelete = ROLES_CAN_HARD_DELETE.includes(user?.role || '');
 
   // Queries
   const { data: workshops = [], isLoading: loadingWorkshops, isError: workshopsError } = useQuery({

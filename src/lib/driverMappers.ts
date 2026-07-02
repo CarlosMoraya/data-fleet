@@ -11,6 +11,8 @@ import {
 export interface DriverRow {
   id: string;
   client_id: string;
+  active?: boolean | null;
+  inactivated_at?: string | null;
   profile_id?: string | null;
   name: string;
   cpf: string;
@@ -36,6 +38,8 @@ export function driverFromRow(row: DriverRow): Driver {
   return {
     id: row.id,
     clientId: row.client_id,
+    active: row.active ?? true,
+    inactivatedAt: row.inactivated_at ?? null,
     profileId: row.profile_id ?? undefined,
     name: row.name,
     cpf: row.cpf,

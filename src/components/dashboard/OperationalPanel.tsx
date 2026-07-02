@@ -8,6 +8,7 @@ import type { OperationalActionCategory, OperationalActionItem } from '../../lib
 
 export interface VehicleRow {
   id: string;
+  active?: boolean;
   type: string;
   crlv_year: string | null;
   crlv_expiration_date: string | null;

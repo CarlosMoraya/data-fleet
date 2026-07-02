@@ -38,12 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (userId: string, email: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, name, role, client_id, can_delete_vehicles, can_delete_drivers, can_delete_workshops, budget_approval_limit, workshop_account_id')
+      .select('id, name, role, client_id, budget_approval_limit, workshop_account_id')
       .eq('id', userId)
       .single();
 
     if (data && !error) {
-      type ProfileRow = { id: string; name: string; role: string; client_id: string | null; can_delete_vehicles: boolean | null; can_delete_drivers: boolean | null; can_delete_workshops: boolean | null; budget_approval_limit: number | null; workshop_account_id: string | null };
+      type ProfileRow = { id: string; name: string; role: string; client_id: string | null; budget_approval_limit: number | null; workshop_account_id: string | null };
       const profile = data as ProfileRow;
 
       const userObj: User = {
@@ -52,9 +52,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         role: profile.role as Role,
         clientId: profile.client_id,
-        canDeleteVehicles: profile.can_delete_vehicles ?? false,
-        canDeleteDrivers: profile.can_delete_drivers ?? false,
-        canDeleteWorkshops: profile.can_delete_workshops ?? false,
         budgetApprovalLimit: profile.budget_approval_limit ?? 0,
         workshopAccountId: profile.workshop_account_id ?? undefined,
       };

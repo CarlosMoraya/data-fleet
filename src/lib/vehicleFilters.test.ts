@@ -28,6 +28,7 @@ function vehicle(overrides: Partial<Vehicle>): Vehicle {
   return {
     id: 'v1',
     clientId: 'c1',
+    active: true,
     type: 'Truck',
     energySource: 'Combustão',
     coolingEquipment: false,

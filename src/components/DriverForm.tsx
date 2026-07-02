@@ -203,9 +203,6 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
           name: formData.name ?? '',
           role: 'Driver',
           client_id: clientId,
-          can_delete_vehicles: false,
-          can_delete_drivers: false,
-          can_delete_workshops: false,
         }) as { profileId?: string };
         profileId = data.profileId;
       }

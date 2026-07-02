@@ -137,7 +137,7 @@ export default function Dashboard() {
     queryFn: async () => {
       let query = supabase
         .from('vehicles')
-        .select('id, type, crlv_year, crlv_expiration_date, driver_id, license_plate, gr_expiration_date, client_id, category, brand, model, acquisition, crlv_upload, gr_upload, insurance_policy_upload, has_insurance, has_maintenance_contract, maintenance_contract_upload, tracker, shippers(name), operational_units(name)');
+        .select('id, active, type, crlv_year, crlv_expiration_date, driver_id, license_plate, gr_expiration_date, client_id, category, brand, model, acquisition, crlv_upload, gr_upload, insurance_policy_upload, has_insurance, has_maintenance_contract, maintenance_contract_upload, tracker, shippers(name), operational_units(name)');
       if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
       }
@@ -145,6 +145,7 @@ export default function Dashboard() {
       if (error) throw error;
       return (data ?? []).map((row: Record<string, unknown>) => ({
         id: row.id as string,
+        active: row.active != null ? Boolean(row.active) : true,
         type: row.type as string,
         crlv_year: row.crlv_year as string | null,
         crlv_expiration_date: row.crlv_expiration_date != null ? (row.crlv_expiration_date as string) : null,
@@ -523,27 +524,29 @@ export default function Dashboard() {
 
   // ── Computed values ───────────────────────────────────────────────────────
 
+  const activeVehicles = useMemo(() => vehicles.filter((vehicle) => vehicle.active !== false), [vehicles]);
+
   const overdueChecklistVehicleIds = useMemo(
     () =>
       computeOverdueChecklistVehicleIds({
-        vehicles,
+        vehicles: activeVehicles,
         checklistRows,
         intervalsByClient,
         today: new Date(),
       }),
-    [vehicles, checklistRows, intervalsByClient]
+    [activeVehicles, checklistRows, intervalsByClient]
   );
 
   const currentYear = today.slice(0, 4);
 
   const driverIdsWithVehicle = useMemo(
-    () => new Set(vehicles.filter((vehicle) => vehicle.driver_id).map((vehicle) => vehicle.driver_id)),
-    [vehicles]
+    () => new Set(activeVehicles.filter((vehicle) => vehicle.driver_id).map((vehicle) => vehicle.driver_id)),
+    [activeVehicles]
   );
 
   const crlvExpired = useMemo(
-    () => getExpiredCrlvPlates(vehicles, currentYear, today),
-    [vehicles, currentYear, today]
+    () => getExpiredCrlvPlates(activeVehicles, currentYear, today),
+    [activeVehicles, currentYear, today]
   );
 
   const cnhExpired = useMemo(
@@ -552,8 +555,8 @@ export default function Dashboard() {
   );
 
   const grVehicleExpired = useMemo(
-    () => getExpiredGrVehiclePlates(vehicles, today),
-    [vehicles, today]
+    () => getExpiredGrVehiclePlates(activeVehicles, today),
+    [activeVehicles, today]
   );
 
   const grDriverExpired = useMemo(
@@ -562,8 +565,8 @@ export default function Dashboard() {
   );
 
   const crlvExpiring = useMemo(
-    () => getExpiringSoonCrlvPlates(vehicles, today, EXPIRING_SOON_WINDOW_DAYS),
-    [vehicles, today]
+    () => getExpiringSoonCrlvPlates(activeVehicles, today, EXPIRING_SOON_WINDOW_DAYS),
+    [activeVehicles, today]
   );
 
   const cnhExpiring = useMemo(
@@ -572,8 +575,8 @@ export default function Dashboard() {
   );
 
   const grVehicleExpiring = useMemo(
-    () => getExpiringSoonGrPlates(vehicles, today, EXPIRING_SOON_WINDOW_DAYS),
-    [vehicles, today]
+    () => getExpiringSoonGrPlates(activeVehicles, today, EXPIRING_SOON_WINDOW_DAYS),
+    [activeVehicles, today]
   );
 
   const grDriverExpiring = useMemo(
@@ -582,8 +585,8 @@ export default function Dashboard() {
   );
 
   const crlvMissing = useMemo(
-    () => getVehiclesMissingCrlvUploadPlates(vehicles),
-    [vehicles]
+    () => getVehiclesMissingCrlvUploadPlates(activeVehicles),
+    [activeVehicles]
   );
 
   const cnhMissing = useMemo(
@@ -592,8 +595,8 @@ export default function Dashboard() {
   );
 
   const grVehicleMissing = useMemo(
-    () => getVehiclesMissingGrPlates(vehicles),
-    [vehicles]
+    () => getVehiclesMissingGrPlates(activeVehicles),
+    [activeVehicles]
   );
 
   const grDriverMissing = useMemo(
@@ -602,13 +605,13 @@ export default function Dashboard() {
   );
 
   const insuranceMissing = useMemo(
-    () => getVehiclesMissingInsurancePlates(vehicles),
-    [vehicles]
+    () => getVehiclesMissingInsurancePlates(activeVehicles),
+    [activeVehicles]
   );
 
   const maintenanceContractMissing = useMemo(
-    () => getVehiclesMissingMaintenanceContractPlates(vehicles),
-    [vehicles]
+    () => getVehiclesMissingMaintenanceContractPlates(activeVehicles),
+    [activeVehicles]
   );
 
   const complianceActionItems = useMemo<ComplianceActionItem[]>(
@@ -667,8 +670,8 @@ export default function Dashboard() {
   );
 
   const irregularVehiclesCount = useMemo(
-    () => countIrregularVehicles(vehicles, currentYear, today, EXPIRING_SOON_WINDOW_DAYS),
-    [vehicles, currentYear, today]
+    () => countIrregularVehicles(activeVehicles, currentYear, today, EXPIRING_SOON_WINDOW_DAYS),
+    [activeVehicles, currentYear, today]
   );
 
   const irregularDriversCount = useMemo(
@@ -677,27 +680,27 @@ export default function Dashboard() {
   );
 
   const documentaryComplianceRate = useMemo(
-    () => calculateDocumentaryComplianceRate(vehicles.length + drivers.length, irregularVehiclesCount + irregularDriversCount),
-    [vehicles.length, drivers.length, irregularVehiclesCount, irregularDriversCount]
+    () => calculateDocumentaryComplianceRate(activeVehicles.length + drivers.length, irregularVehiclesCount + irregularDriversCount),
+    [activeVehicles.length, drivers.length, irregularVehiclesCount, irregularDriversCount]
   );
 
   // ── Executive KPIs (Visão Geral) ─────────────────────────────────────────
 
   const vehiclesInMaintenance = useMemo(
-    () => countVehiclesInMaintenance(activeMaintenanceOrders, null, vehicles),
-    [activeMaintenanceOrders, vehicles]
+    () => countVehiclesInMaintenance(activeMaintenanceOrders, null, activeVehicles),
+    [activeMaintenanceOrders, activeVehicles]
   );
 
   const availabilityRate = useMemo(
-    () => calculateFleetAvailability(vehicles.length, vehiclesInMaintenance),
-    [vehicles.length, vehiclesInMaintenance]
+    () => calculateFleetAvailability(activeVehicles.length, vehiclesInMaintenance),
+    [activeVehicles.length, vehiclesInMaintenance]
   );
 
   const unavailableVehicles = vehiclesInMaintenance;
 
   const availableVehicles = useMemo(
-    () => Math.max(0, vehicles.length - vehiclesInMaintenance),
-    [vehicles.length, vehiclesInMaintenance]
+    () => Math.max(0, activeVehicles.length - vehiclesInMaintenance),
+    [activeVehicles.length, vehiclesInMaintenance]
   );
 
   const overdueOrdersCount = useMemo(
@@ -706,13 +709,13 @@ export default function Dashboard() {
   );
 
   const insuranceCoverageRate = useMemo(
-    () => calculateInsuranceCoverageRate(vehicles),
-    [vehicles]
+    () => calculateInsuranceCoverageRate(activeVehicles),
+    [activeVehicles]
   );
 
   const trackerCoverageRate = useMemo(
-    () => calculateTrackerCoverageRate(vehicles),
-    [vehicles]
+    () => calculateTrackerCoverageRate(activeVehicles),
+    [activeVehicles]
   );
 
   const totalApprovedCost = useMemo(
@@ -724,8 +727,8 @@ export default function Dashboard() {
   );
 
   const complianceRate = useMemo(
-    () => calculateChecklistComplianceRate(vehicles.length, overdueChecklistVehicleIds.size),
-    [vehicles.length, overdueChecklistVehicleIds.size]
+    () => calculateChecklistComplianceRate(activeVehicles.length, overdueChecklistVehicleIds.size),
+    [activeVehicles.length, overdueChecklistVehicleIds.size]
   );
 
   const plateByVehicleId = useMemo(
@@ -764,8 +767,8 @@ export default function Dashboard() {
   const endOfWeekIso = useMemo(() => getEndOfWeekIso(today), [today]);
 
   const vehiclesWithoutDriverCount = useMemo(
-    () => countVehiclesWithoutDriver(vehicles),
-    [vehicles]
+    () => countVehiclesWithoutDriver(activeVehicles),
+    [activeVehicles]
   );
 
   const openOrdersCount = useMemo(
@@ -792,7 +795,7 @@ export default function Dashboard() {
     () =>
       buildOperationalActionQueue({
         vehiclesUnavailable: unavailableVehiclePlates,
-        vehiclesNoDriver: getVehiclesWithoutDriverPlates(vehicles),
+        vehiclesNoDriver: getVehiclesWithoutDriverPlates(activeVehicles),
         osOverdue: overdueOrderPlates,
         checklistOverdue: mapVehicleIdsToPlates([...overdueChecklistVehicleIds], plateByVehicleId),
         osExitThisWeek: mapVehicleIdsToPlates(
@@ -823,7 +826,7 @@ export default function Dashboard() {
       plateByVehicleId,
       today,
       unavailableVehiclePlates,
-      vehicles,
+      activeVehicles,
     ]
   );
 
@@ -892,7 +895,7 @@ export default function Dashboard() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         {activeTab === 'geral' && (
           <OverviewPanel
-            vehicles={vehicles}
+            vehicles={activeVehicles}
             activeMaintenanceOrders={activeMaintenanceOrders}
             currentMonthOrders={currentMonthOrders}
             overdueChecklistVehicleIds={overdueChecklistVehicleIds}

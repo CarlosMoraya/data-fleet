@@ -1,18 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit2, Trash2, Truck, User, Eye } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Truck, User, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import SelectClientNotice from '../components/SelectClientNotice';
 import VehicleActiveFilterBanner from '../components/VehicleActiveFilterBanner';
 import VehicleDetailModal from '../components/VehicleDetailModal';
 import VehicleForm from '../components/VehicleForm';
 import { useAuth } from '../context/AuthContext';
-import { useSessionUiState } from '../hooks/usePersistentUiState';
+import { usePersistentUiState, useSessionUiState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection } from '../lib/clientScope';
 import { computeOverdueChecklistVehicleIds } from '../lib/dashboardKpi';
 import { fieldSettingsFromRow, defaultFieldSettings, VehicleFieldSettingsRow } from '../lib/fieldSettingsMappers';
 import { clearVehicleDraftFiles } from '../lib/offline/vehicleDraftFiles';
+import { filterByActive } from '../lib/registryActiveFilter';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import {
@@ -28,7 +30,7 @@ import {
   type VehicleStructuredFilters,
 } from '../lib/vehicleFilters';
 import { vehicleFromRow, VehicleRow } from '../lib/vehicleMappers';
-import { saveVehicle, deleteVehicle } from '../services/vehicleService';
+import { saveVehicle, deleteVehicle, toggleVehicleActive } from '../services/vehicleService';
 import { Vehicle } from '../types';
 
 import type { VehicleFiles } from '../services/vehicleService';
@@ -37,7 +39,7 @@ import type { VehicleFiles } from '../services/vehicleService';
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_EDIT = ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
-const ROLES_CAN_ALWAYS_DELETE = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_HARD_DELETE = ['Admin Master'];
 
 export default function Vehicles() {
   const { currentClient, user, clients } = useAuth();
@@ -48,9 +50,17 @@ export default function Vehicles() {
   const filters = useMemo(() => parseVehicleFiltersFromParams(searchParams), [searchParams]);
   const [isFormOpen, setIsFormOpen] = useSessionUiState<boolean>('vehicles', 'modal', 'form-open', false, { legacyKeys: ['vehicleFormOpen'] });
   const [editingVehicle, setEditingVehicle] = useSessionUiState<Vehicle | null>('vehicles', 'selection', 'editing', null, { legacyKeys: ['vehicleFormEditing'] });
+  const [showInactive, setShowInactive] = usePersistentUiState<boolean>({
+    module: 'vehicles',
+    stateKind: 'filter',
+    name: 'show-inactive',
+    scope: 'preference',
+    defaultValue: false,
+  });
   const [restoredAfterReload] = useState(() => isFormOpen);
 
   const [viewingVehicle, setViewingVehicle] = useState<Vehicle | null>(null);
+  const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
 
   const clearVehicleDraft = () => {
     if (user?.id) {
@@ -62,7 +72,8 @@ export default function Vehicles() {
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '') && !blockWrite;
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '') && !blockWrite;
-  const canDelete = (ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') || (user?.canDeleteVehicles === true)) && !blockWrite;
+  const canHardDelete = user?.role === 'Admin Master' && !blockWrite;
+  const canToggleActive = ROLES_CAN_EDIT.includes(user?.role || '') && !blockWrite;
 
   // Redirect Drivers and Yard Auditors
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
@@ -295,6 +306,7 @@ export default function Vehicles() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['vehicles', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-vehicles', currentClient?.id] });
       void queryClient.invalidateQueries({ queryKey: ['availableDrivers'] });
       setIsFormOpen(false);
       setEditingVehicle(null);
@@ -316,23 +328,71 @@ export default function Vehicles() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['vehicles', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-vehicles', currentClient?.id] });
       void queryClient.invalidateQueries({ queryKey: ['availableDrivers'] });
+      setVehicleToDelete(null);
     },
-    onError: (err) => {
+    onError: (err: unknown) => {
       console.error('Erro ao excluir veículo:', err);
+      const pgError = err as { code?: string };
+      if (pgError.code === '23503') {
+        alert('Não é possível excluir: existem registros vinculados. Inative o cadastro para remover do dia a dia.');
+        return;
+      }
       alert('Erro ao excluir veículo. Tente novamente.');
     },
   });
 
-  const handleDelete = (vehicle: Vehicle) => {
-    if (!window.confirm(`Excluir o veículo ${vehicle.licensePlate}? Esta ação não pode ser desfeita.`)) return;
-    deleteMutation.mutate(vehicle);
-  };
+  const toggleActiveMutation = useMutation({
+    mutationFn: async (vehicle: Vehicle) => {
+      if (!user?.id) throw new Error('Sessão inválida');
+      await toggleVehicleActive(vehicle, user.id);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['vehicles', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-vehicles', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['availableDrivers'] });
+    },
+    onError: (err: unknown) => {
+      console.error('Erro ao alterar status do veículo:', err);
+      alert('Erro ao alterar status do veículo. Tente novamente.');
+    },
+  });
 
-  const filteredVehicles = useMemo(
-    () => applyVehicleFilters(vehicles, search, filters, pendencyCtx),
-    [vehicles, search, filters, pendencyCtx]
-  );
+  const { data: vehicleDeleteLinks } = useQuery({
+    queryKey: ['vehicle-delete-links', vehicleToDelete?.id],
+    queryFn: async () => {
+      if (!vehicleToDelete?.id) return null;
+
+      const vehicleId = vehicleToDelete.id;
+      const counts = await Promise.all([
+        supabase.from('maintenance_orders').select('*', { count: 'exact', head: true }).eq('vehicle_id', vehicleId),
+        supabase.from('tires').select('*', { count: 'exact', head: true }).eq('vehicle_id', vehicleId),
+        supabase.from('tire_inspections').select('*', { count: 'exact', head: true }).eq('vehicle_id', vehicleId),
+        supabase.from('vehicle_odometer_corrections').select('*', { count: 'exact', head: true }).eq('vehicle_id', vehicleId),
+        supabase.from('vehicle_km_intervals').select('*', { count: 'exact', head: true }).eq('vehicle_id', vehicleId),
+        supabase.from('vehicle_warranty_revision_assignments').select('*', { count: 'exact', head: true }).eq('vehicle_id', vehicleId),
+      ]);
+
+      const total = counts.reduce((sum, result) => sum + (result.count ?? 0), 0);
+      return total;
+    },
+    enabled: !!vehicleToDelete,
+  });
+
+  const filteredVehicles = useMemo(() => {
+    const list = applyVehicleFilters(vehicles, search, filters, pendencyCtx);
+    return filterByActive(list, showInactive);
+  }, [vehicles, search, filters, pendencyCtx, showInactive]);
+
+  const vehicleDeleteBlockedReason = useMemo(() => {
+    if (!vehicleToDelete) return null;
+    const total = vehicleDeleteLinks ?? 0;
+    if (total > 0 || vehicleToDelete.active !== false) {
+      return `Não é possível excluir: existem ${total} registros vinculados. Inative o cadastro para remover do dia a dia.`;
+    }
+    return null;
+  }, [vehicleDeleteLinks, vehicleToDelete]);
 
   const clientNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -422,6 +482,15 @@ export default function Vehicles() {
             Limpar filtros
           </button>
         )}
+        {canToggleActive && (
+          <button
+            type="button"
+            onClick={() => setShowInactive((previous) => !previous)}
+            className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
+          >
+            {showInactive ? 'Ocultar inativos' : 'Mostrar inativos'}
+          </button>
+        )}
       </div>
 
       <VehicleActiveFilterBanner
@@ -454,6 +523,7 @@ export default function Vehicles() {
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Motorista</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Embarcador / Unid. Op.</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Finalidade</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Status</th>
                   <th scope="col" className="relative py-3.5 pr-4 pl-3 sm:pr-6">
                     <span className="sr-only">Ações</span>
                   </th>
@@ -461,7 +531,10 @@ export default function Vehicles() {
               </thead>
               <tbody className="divide-y divide-zinc-200 bg-white">
                 {filteredVehicles.map((vehicle) => (
-                  <tr key={vehicle.id} className="transition-colors hover:bg-zinc-50">
+                  <tr
+                    key={vehicle.id}
+                    className={`transition-colors hover:bg-zinc-50 ${vehicle.active === false ? 'opacity-50' : ''}`}
+                  >
                     {blockWrite && (
                       <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-600">
                         <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
@@ -523,6 +596,17 @@ export default function Vehicles() {
                         <span className="text-zinc-400 italic">—</span>
                       )}
                     </td>
+                    <td className="px-3 py-4 text-sm whitespace-nowrap">
+                      {vehicle.active === false ? (
+                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
+                          Inativo
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                          Ativo
+                        </span>
+                      )}
+                    </td>
                     <td className="relative py-4 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-6">
                       <div className="flex items-center justify-end gap-3">
                         <button
@@ -547,9 +631,19 @@ export default function Vehicles() {
                             <span className="sr-only">Edit</span>
                           </button>
                         )}
-                        {canDelete && (
+                        {canToggleActive && (
                           <button
-                            onClick={() => handleDelete(vehicle)}
+                            onClick={() => toggleActiveMutation.mutate(vehicle)}
+                            title={vehicle.active === false ? 'Reativar' : 'Inativar'}
+                            className="text-zinc-400 transition-colors hover:text-zinc-900"
+                          >
+                            {vehicle.active === false ? <ToggleLeft className="h-5 w-5" /> : <ToggleRight className="h-5 w-5" />}
+                            <span className="sr-only">{vehicle.active === false ? 'Reativar' : 'Inativar'}</span>
+                          </button>
+                        )}
+                        {canHardDelete && (
+                          <button
+                            onClick={() => setVehicleToDelete(vehicle)}
                             className="text-zinc-400 transition-colors hover:text-red-600"
                           >
                             <Trash2 className="h-5 w-5" />
@@ -562,7 +656,7 @@ export default function Vehicles() {
                 ))}
                 {filteredVehicles.length === 0 && (
                   <tr>
-                    <td colSpan={blockWrite ? 8 : 7} className="py-10 text-center text-sm text-zinc-500">
+                    <td colSpan={blockWrite ? 9 : 8} className="py-10 text-center text-sm text-zinc-500">
                       {(search || hasActiveStructuredFilters(filters)) ? 'Nenhum veículo encontrado para os filtros aplicados.' : blockWrite ? 'Nenhum veículo cadastrado em nenhum cliente.' : 'Nenhum veículo cadastrado para este cliente.'}
                     </td>
                   </tr>
@@ -595,6 +689,22 @@ export default function Vehicles() {
           onSave={handleSave}
         />
       )}
+
+      <ConfirmDeleteModal
+        open={!!vehicleToDelete}
+        title="Excluir veículo definitivamente"
+        description="Essa ação remove o cadastro de forma permanente."
+        confirmLabel="Excluir definitivamente"
+        expectedText={vehicleToDelete?.licensePlate ?? ''}
+        blockedReason={vehicleDeleteBlockedReason}
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (vehicleToDelete) {
+            deleteMutation.mutate(vehicleToDelete);
+          }
+        }}
+        onClose={() => setVehicleToDelete(null)}
+      />
     </div>
   );
 }

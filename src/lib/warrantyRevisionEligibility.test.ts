@@ -8,6 +8,7 @@ function makeVehicle(over: Partial<Vehicle> & { id: string }): Vehicle {
   return {
     id: over.id,
     clientId: over.clientId ?? 'cli-1',
+    active: over.active ?? true,
     type: over.type ?? 'Passeio',
     energySource: over.energySource ?? 'Combustão',
     coolingEquipment: over.coolingEquipment ?? false,

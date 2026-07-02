@@ -3,6 +3,8 @@
 export interface Driver {
   id: string;
   clientId: string;
+  active: boolean;
+  inactivatedAt?: string | null;
   profileId?: string; // FK → profiles.id — todo motorista é um usuário do sistema
 
   // Core identity (sempre obrigatórios)

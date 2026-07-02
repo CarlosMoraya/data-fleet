@@ -1,14 +1,15 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit2, Trash2, UserCircle, Truck, Eye } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Edit2, Trash2, UserCircle, Truck, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import DriverActiveFilterBanner from '../components/DriverActiveFilterBanner';
 import DriverDetailModal from '../components/DriverDetailModal';
 import DriverForm from '../components/DriverForm';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
-import { useSessionUiState } from '../hooks/usePersistentUiState';
+import { usePersistentUiState, useSessionUiState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { driverFieldSettingsFromRow, defaultDriverFieldSettings, DriverFieldSettingsRow } from '../lib/driverFieldSettingsMappers';
 import {
@@ -25,9 +26,10 @@ import {
   type DriverVehicleLink,
 } from '../lib/driverFilters';
 import { driverFromRow, DriverRow } from '../lib/driverMappers';
+import { filterByActive } from '../lib/registryActiveFilter';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
-import { saveDriver, deleteDriver } from '../services/driverService';
+import { saveDriver, deleteDriver, toggleDriverActive } from '../services/driverService';
 import { Driver } from '../types';
 
 import type { DriverFiles } from '../services/driverService';
@@ -35,7 +37,7 @@ import type { DriverFiles } from '../services/driverService';
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_CREATE = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_EDIT = ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
-const ROLES_CAN_ALWAYS_DELETE = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
+const ROLES_CAN_HARD_DELETE = ['Admin Master'];
 
 function formatCPF(cpf: string): string {
   const digits = cpf.replace(/\D/g, '');
@@ -52,7 +54,15 @@ export default function Drivers() {
   const filters = useMemo(() => parseDriverFiltersFromParams(searchParams), [searchParams]);
   const [isFormOpen, setIsFormOpen] = useSessionUiState<boolean>('drivers', 'modal', 'form-open', false, { legacyKeys: ['driverFormOpen'] });
   const [editingDriver, setEditingDriver] = useSessionUiState<Driver | null>('drivers', 'selection', 'editing', null, { legacyKeys: ['driverFormEditing'] });
+  const [showInactive, setShowInactive] = usePersistentUiState<boolean>({
+    module: 'drivers',
+    stateKind: 'filter',
+    name: 'show-inactive',
+    scope: 'preference',
+    defaultValue: false,
+  });
   const [viewingDriver, setViewingDriver] = useState<Driver | null>(null);
+  const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
 
   const clearDriverDraft = () => {
     if (user?.id) {
@@ -66,7 +76,8 @@ export default function Drivers() {
 
   const canCreate = ROLES_CAN_CREATE.includes(user?.role || '') && !blockWrite;
   const canEdit = ROLES_CAN_EDIT.includes(user?.role || '') && !blockWrite;
-  const canDelete = (ROLES_CAN_ALWAYS_DELETE.includes(user?.role || '') || ((user?.role === 'Fleet Analyst' || user?.role === 'Supervisor') && user?.canDeleteDrivers === true)) && !blockWrite;
+  const canHardDelete = user?.role === 'Admin Master' && !blockWrite;
+  const canToggleActive = ROLES_CAN_EDIT.includes(user?.role || '') && !blockWrite;
 
   // Queries
   const { data: drivers = [], isLoading: loadingDrivers, isError: driversError } = useQuery({
@@ -221,40 +232,100 @@ export default function Drivers() {
     return <Navigate to="/checklists" replace />;
   }
 
+  const saveMutation = useMutation({
+    mutationFn: async ({ driver, files }: { driver: Partial<Driver>; files: DriverFiles }) => {
+      if (!currentClient?.id) {
+        throw new Error('Selecione um cliente ativo antes de salvar motoristas.');
+      }
+      await saveDriver(currentClient.id, driver, files, editingDriver?.id);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-drivers', currentClient?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['driverVehicleInfo', currentClient?.id ?? 'all-clients'] }),
+      ]);
+      setIsFormOpen(false);
+      setEditingDriver(null);
+      clearDriverDraft();
+    },
+  });
+
   const handleSave = async (
     driver: Partial<Driver>,
     files: DriverFiles
   ): Promise<void> => {
-    if (!currentClient?.id) {
-      throw new Error('Selecione um cliente ativo antes de salvar motoristas.');
-    }
-    await saveDriver(currentClient.id, driver, files, editingDriver?.id);
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['driverVehicleInfo', currentClient?.id ?? 'all-clients'] }),
-    ]);
-    setIsFormOpen(false);
-    setEditingDriver(null);
-    clearDriverDraft();
+    await saveMutation.mutateAsync({ driver, files });
   };
 
-  const handleDelete = async (driver: Driver) => {
-    if (!window.confirm(`Excluir o motorista ${driver.name}? Esta ação não pode ser desfeita.`)) return;
-
-    try {
+  const deleteMutation = useMutation({
+    mutationFn: async (driver: Driver) => {
       await deleteDriver(driver);
+    },
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-drivers', currentClient?.id] });
       void queryClient.invalidateQueries({ queryKey: ['driverVehicleInfo', currentClient?.id ?? 'all-clients'] });
-    } catch (err) {
+      setDriverToDelete(null);
+    },
+    onError: (err: unknown) => {
       console.error('Erro ao excluir motorista:', err);
       alert('Erro ao excluir motorista. Tente novamente.');
-    }
-  };
+    },
+  });
 
-  const filteredDrivers = useMemo(
-    () => applyDriverFilters(drivers, search, filters, filterCtx),
-    [drivers, search, filters, filterCtx]
-  );
+  const toggleActiveMutation = useMutation({
+    mutationFn: async (driver: Driver) => {
+      if (!user?.id) throw new Error('Sessão inválida');
+      await toggleDriverActive(driver, user.id);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-drivers', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['driverVehicleInfo', currentClient?.id ?? 'all-clients'] });
+    },
+    onError: (err: unknown) => {
+      console.error('Erro ao alterar status do motorista:', err);
+      alert('Erro ao alterar status do motorista. Tente novamente.');
+    },
+  });
+
+  const { data: driverDeleteLinks } = useQuery({
+    queryKey: ['driver-delete-links', driverToDelete?.id, driverToDelete?.profileId],
+    queryFn: async () => {
+      if (!driverToDelete) return null;
+
+      const vehicleQuery = supabase
+        .from('vehicles')
+        .select('*', { count: 'exact', head: true })
+        .eq('driver_id', driverToDelete.id);
+      const checklistQuery = driverToDelete.profileId
+        ? supabase
+            .from('checklists')
+            .select('*', { count: 'exact', head: true })
+            .eq('filled_by', driverToDelete.profileId)
+            .not('completed_at', 'is', null)
+        : Promise.resolve({ count: 0 });
+
+      const [vehicleResult, checklistResult] = await Promise.all([vehicleQuery, checklistQuery]);
+      return (vehicleResult.count ?? 0) + (checklistResult.count ?? 0);
+    },
+    enabled: !!driverToDelete,
+  });
+
+  const filteredDrivers = useMemo(() => {
+    const list = applyDriverFilters(drivers, search, filters, filterCtx);
+    return filterByActive(list, showInactive);
+  }, [drivers, search, filters, filterCtx, showInactive]);
+
+  const driverDeleteBlockedReason = useMemo(() => {
+    if (!driverToDelete) return null;
+    const total = driverDeleteLinks ?? 0;
+    if (total > 0 || driverToDelete.active !== false) {
+      return `Não é possível excluir: existem ${total} registros vinculados. Inative o cadastro para remover do dia a dia.`;
+    }
+    return null;
+  }, [driverDeleteLinks, driverToDelete]);
 
   const clientNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -342,6 +413,15 @@ export default function Drivers() {
             Limpar filtros
           </button>
         )}
+        {canToggleActive && (
+          <button
+            type="button"
+            onClick={() => setShowInactive((previous) => !previous)}
+            className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
+          >
+            {showInactive ? 'Ocultar inativos' : 'Mostrar inativos'}
+          </button>
+        )}
       </div>
 
       <DriverActiveFilterBanner
@@ -373,6 +453,7 @@ export default function Drivers() {
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Categoria CNH</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Validade CNH</th>
                   <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Veículo</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Status</th>
                   <th scope="col" className="relative py-3.5 pr-4 pl-3 sm:pr-6">
                     <span className="sr-only">Ações</span>
                   </th>
@@ -380,7 +461,10 @@ export default function Drivers() {
               </thead>
               <tbody className="divide-y divide-zinc-200 bg-white">
                 {filteredDrivers.map((driver) => (
-                  <tr key={driver.id} className="transition-colors hover:bg-zinc-50">
+                  <tr
+                    key={driver.id}
+                    className={`transition-colors hover:bg-zinc-50 ${driver.active === false ? 'opacity-50' : ''}`}
+                  >
                     {blockWrite && (
                       <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-600">
                         <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
@@ -420,6 +504,17 @@ export default function Drivers() {
                         <span className="text-zinc-400 italic">Sem veículo</span>
                       )}
                     </td>
+                    <td className="px-3 py-4 text-sm whitespace-nowrap">
+                      {driver.active === false ? (
+                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
+                          Inativo
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                          Ativo
+                        </span>
+                      )}
+                    </td>
                     <td className="relative py-4 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-6">
                       <div className="flex items-center justify-end gap-3">
                         <button
@@ -443,9 +538,19 @@ export default function Drivers() {
                             <span className="sr-only">Editar</span>
                           </button>
                         )}
-                        {canDelete && (
+                        {canToggleActive && (
                           <button
-                            onClick={() => { void handleDelete(driver); }}
+                            onClick={() => toggleActiveMutation.mutate(driver)}
+                            title={driver.active === false ? 'Reativar' : 'Inativar'}
+                            className="text-zinc-400 transition-colors hover:text-zinc-900"
+                          >
+                            {driver.active === false ? <ToggleLeft className="h-5 w-5" /> : <ToggleRight className="h-5 w-5" />}
+                            <span className="sr-only">{driver.active === false ? 'Reativar' : 'Inativar'}</span>
+                          </button>
+                        )}
+                        {canHardDelete && (
+                          <button
+                            onClick={() => setDriverToDelete(driver)}
                             className="text-zinc-400 transition-colors hover:text-red-600"
                           >
                             <Trash2 className="h-5 w-5" />
@@ -458,7 +563,7 @@ export default function Drivers() {
                 ))}
                 {filteredDrivers.length === 0 && (
                   <tr>
-                    <td colSpan={blockWrite ? 7 : 6} className="py-10 text-center text-sm text-zinc-500">
+                    <td colSpan={blockWrite ? 8 : 7} className="py-10 text-center text-sm text-zinc-500">
                       {search || hasActiveDriverFilters(filters) ? 'Nenhum motorista encontrado para os filtros aplicados.' : blockWrite ? 'Nenhum motorista cadastrado em nenhum cliente.' : 'Nenhum motorista cadastrado para este cliente.'}
                     </td>
                   </tr>
@@ -489,6 +594,22 @@ export default function Drivers() {
           onSave={handleSave}
         />
       )}
+
+      <ConfirmDeleteModal
+        open={!!driverToDelete}
+        title="Excluir motorista definitivamente"
+        description="Essa ação remove o cadastro de forma permanente."
+        confirmLabel="Excluir definitivamente"
+        expectedText={driverToDelete?.name ?? ''}
+        blockedReason={driverDeleteBlockedReason}
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (driverToDelete) {
+            deleteMutation.mutate(driverToDelete);
+          }
+        }}
+        onClose={() => setDriverToDelete(null)}
+      />
     </div>
   );
 }

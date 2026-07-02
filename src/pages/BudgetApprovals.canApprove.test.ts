@@ -13,9 +13,6 @@ describe('canApprove', () => {
     email: 'test@test.com',
     role,
     clientId: 'c1',
-    canDeleteVehicles: false,
-    canDeleteDrivers: false,
-    canDeleteWorkshops: false,
     budgetApprovalLimit: limit,
   });
 

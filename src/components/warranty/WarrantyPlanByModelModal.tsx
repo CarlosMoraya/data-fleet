@@ -86,6 +86,7 @@ export default function WarrantyPlanByModelModal({ onClose, onSaved }: Props) {
           rows.map((row) => ({
             id: row.id,
             clientId: currentClient.id,
+            active: true,
             type: 'Passeio',
             energySource: 'Combustão',
             coolingEquipment: false,

@@ -39,6 +39,8 @@ describe('vehicleFromRow', () => {
   it('converte snake_case → camelCase', () => {
     const row: Partial<VehicleRow> = {
       id: 'v1',
+      active: null,
+      inactivated_at: null,
       license_plate: 'ABC1D23',
       brand: 'FIAT',
       model: 'STRADA',
@@ -56,6 +58,8 @@ describe('vehicleFromRow', () => {
     expect(vehicle.brand).toBe('FIAT');
     expect(vehicle.year).toBe(2024);
     expect(vehicle.coolingEquipment).toBe(false);
+    expect(vehicle.active).toBe(true);
+    expect(vehicle.inactivatedAt).toBeNull();
   });
 
   it('handle joins (driverName, shipperName)', () => {
