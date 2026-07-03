@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { buildMaintenanceFilterOptions, applyMaintenanceListFilters } from './maintenanceFilters';
+import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch } from './maintenanceFilters';
 
 import type { MaintenanceOrder } from '../types/maintenance';
 
@@ -131,5 +131,48 @@ describe('applyMaintenanceListFilters', () => {
   it('order with empty workshop does not pass when workshop filter is active', () => {
     const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: [], operationalUnits: [], workshops: ['Oficina A'] });
     expect(result.find(o => o.id === '4')).toBeUndefined();
+  });
+});
+
+describe('matchesMaintenanceSearch', () => {
+  function makeSearchOrder(
+    overrides: Partial<Pick<MaintenanceOrder, 'licensePlate' | 'os' | 'description'>> = {},
+  ): Pick<MaintenanceOrder, 'licensePlate' | 'os' | 'description'> {
+    return {
+      licensePlate: 'ABC1D23',
+      os: 'OS-0001',
+      description: 'Troca de óleo do motor',
+      ...overrides,
+    };
+  }
+
+  it('matches by licensePlate (case-insensitive)', () => {
+    expect(matchesMaintenanceSearch(makeSearchOrder(), 'abc1d23')).toBe(true);
+  });
+
+  it('matches by os', () => {
+    expect(matchesMaintenanceSearch(makeSearchOrder(), 'OS-0001')).toBe(true);
+  });
+
+  it('matches by description (case-insensitive)', () => {
+    expect(matchesMaintenanceSearch(makeSearchOrder(), 'óleo')).toBe(true);
+  });
+
+  it('empty term matches all', () => {
+    expect(matchesMaintenanceSearch(makeSearchOrder(), '')).toBe(true);
+  });
+
+  it('whitespace-only term matches all', () => {
+    expect(matchesMaintenanceSearch(makeSearchOrder(), '   ')).toBe(true);
+  });
+
+  it('term with no correspondence in any field returns false', () => {
+    expect(matchesMaintenanceSearch(makeSearchOrder(), 'XYZ999')).toBe(false);
+  });
+
+  it('undefined description does not throw and does not match description-only term', () => {
+    const order = makeSearchOrder({ description: undefined });
+    expect(() => matchesMaintenanceSearch(order, 'óleo')).not.toThrow();
+    expect(matchesMaintenanceSearch(order, 'óleo')).toBe(false);
   });
 });

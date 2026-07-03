@@ -10,7 +10,7 @@ import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection } from '../lib/clientScope';
-import { buildMaintenanceFilterOptions, applyMaintenanceListFilters } from '../lib/maintenanceFilters';
+import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch } from '../lib/maintenanceFilters';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
 import { canWorkshopFillOrder } from '../lib/maintenanceWorkshop';
 import { canEditWorkshopOrder, isOperationsManager } from '../lib/rolePermissions';
@@ -314,11 +314,7 @@ export default function Maintenance() {
   const counts = React.useMemo(() => computeMaintenanceCounts(orders), [orders]);
 
   const filtered = React.useMemo(() => {
-    const bySearch = orders.filter(o =>
-      !search ||
-      o.licensePlate.toLowerCase().includes(search.toLowerCase()) ||
-      o.os.toLowerCase().includes(search.toLowerCase()),
-    );
+    const bySearch = orders.filter(o => matchesMaintenanceSearch(o, search));
     return applyMaintenanceListFilters(bySearch, {
       statuses: statusFilter,
       shippers: shipperFilter,
@@ -454,7 +450,7 @@ export default function Maintenance() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por placa..."
+            placeholder="Buscar por placa, OS ou descrição..."
             className="w-full rounded-lg border border-zinc-300 py-2 pr-3 pl-8 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
           />
         </div>
@@ -494,13 +490,11 @@ export default function Maintenance() {
                 <tr>
                   {[
                     ...(blockWrite ? ['Cliente'] : []),
-                    isWorkshopUser ? 'OS da Oficina' : 'OS',
-                    'Placa',
-                    isWorkshopUser ? 'Cliente' : 'Oficina',
+                    isWorkshopUser ? 'OS da Oficina / Tipo' : 'OS / Tipo',
+                    'Placa / Status',
+                    isWorkshopUser ? 'Cliente / Problema' : 'Oficina / Problema',
                     'Dias',
                     'Previsão de Saída',
-                    'Tipo',
-                    'Status',
                     'Orçamento',
                     '',
                   ].map(h => (
@@ -522,14 +516,37 @@ export default function Maintenance() {
                           </span>
                         </td>
                       )}
-                      <td className="px-4 py-3 font-mono text-sm font-medium whitespace-nowrap text-zinc-900">
-                        {isWorkshopUser ? (o.workshopOs || o.os) : o.os}
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-mono text-sm font-medium text-zinc-900">
+                            {isWorkshopUser ? (o.workshopOs || o.os) : o.os}
+                          </span>
+                          <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', typeColor(o.type))}>
+                            {o.type}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-sm font-semibold whitespace-nowrap text-zinc-900">
-                        {o.licensePlate}
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-semibold text-zinc-900">
+                            {o.licensePlate}
+                          </span>
+                          <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', statusColor(o.status))}>
+                            {o.status}
+                          </span>
+                        </div>
                       </td>
-                      <td className="max-w-[140px] truncate px-4 py-3 text-sm text-zinc-600">
-                        {isWorkshopUser ? (o.clientName ?? o.workshop) : o.workshop}
+                      <td className="max-w-[240px] px-4 py-3">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-sm text-zinc-600">
+                            {isWorkshopUser ? (o.clientName ?? o.workshop) : o.workshop}
+                          </span>
+                          {o.description && (
+                            <span className="max-w-[220px] truncate text-xs text-zinc-400" title={o.description}>
+                              {o.description}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={cn(
@@ -541,16 +558,6 @@ export default function Maintenance() {
                       </td>
                       <td className="px-4 py-3 text-sm whitespace-nowrap text-zinc-600">
                         {formatDate(o.expectedExitDate)}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', typeColor(o.type))}>
-                          {o.type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', statusColor(o.status))}>
-                          {o.status}
-                        </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {budgetStatusBadge(o.budgetStatus, o.budgetPdfUrl)}

@@ -2,6 +2,45 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-02 (Refinamento visual da tabela de Manutenção + busca por descrição)
+
+### O que foi implementado
+
+Reorganização puramente visual da tabela da tela `/manutencao` para leitura rápida e aparência mais compacta/premium, sem qualquer mudança em banco, backend, RLS, mappers, tipos ou query. (1) **Empilhamento de células**: a coluna 1 passou a empilhar o **badge de Tipo** sob o número da **OS**; a coluna 2 empilha o **badge de Status** sob a **Placa**; a coluna 3 mostra **Oficina/Cliente** com a **descrição/problema truncada** como texto secundário (`text-xs text-zinc-400`, `truncate max-w-[220px]`, `title={o.description}` para tooltip), renderizada apenas quando `o.description` é não-vazio. As colunas independentes `Tipo` e `Status` foram removidas do `<thead>` e do `<tbody>`. Colunas `Dias`, `Previsão de Saída`, `Orçamento` (com link do PDF), `Cliente` (condicional `blockWrite`) e a coluna de `Ações` foram preservadas intactas. (2) **Busca por descrição**: a lógica de busca da lista foi extraída para a função pura `matchesMaintenanceSearch` em `src/lib/maintenanceFilters.ts`, que casa **placa**, **OS** e **descrição** (case-insensitive, termo vazio/whitespace casa tudo, `description` ausente tratado como `''` sem lançar); o `useMemo` `filtered` de `Maintenance.tsx` passou a chamá-la no lugar do `.filter` inline e o placeholder do input mudou para "Buscar por placa, OS ou descrição...".
+
+### Arquivos criados
+
+- nenhum
+
+### Arquivos modificados
+
+- `src/lib/maintenanceFilters.ts` — adição da função exportada `matchesMaintenanceSearch` (funções existentes intocadas)
+- `src/lib/maintenanceFilters.test.ts` — novo bloco `describe('matchesMaintenanceSearch')` com 7 cenários (placa, OS, descrição, termo vazio, whitespace, sem correspondência, `description` undefined)
+- `src/pages/Maintenance.tsx` — import de `matchesMaintenanceSearch`, troca do `.filter` inline de busca no `useMemo` `filtered` pela chamada da função, atualização do placeholder, reescrita do `<thead>` (rótulos `OS / Tipo`, `Placa / Status`, `Oficina / Problema` + remoção de `Tipo`/`Status`) e reorganização das células 1/2/3 do `<tbody>` (wrappers `flex flex-col`, badges reutilizando `typeColor`/`statusColor`, descrição truncada com `title`)
+- `docs/MEMORY.md`
+- `docs/MEMORY-HISTORY.md`
+
+### Decisões confirmadas
+
+- A descrição/problema vai como 2ª linha da coluna 3 (Oficina / Problema), não sob a OS nem sob a Placa — layout definido pelo usuário via esboço.
+- As colunas `Dias`, `Previsão de Saída` e `Orçamento` são mantidas (o esboço não as mostrava; o usuário confirmou mantê-las explicitamente).
+- As colunas independentes `Tipo` e `Status` foram removidas e viraram linhas empilhadas para ganhar compacidade (objetivo de UX da sessão).
+- A busca passa a considerar a descrição para consistência entre listagem e busca (decisão de produto).
+- Padrão "Stacked cell / secondary text" aplicado para densidade visual; padrão "Pure Function / Separation of Concerns" aplicado à extração da busca para `maintenanceFilters.ts` (coerência com `buildMaintenanceFilterOptions`/`applyMaintenanceListFilters` já existentes).
+- Segurança XSS: a descrição é texto livre do usuário, renderizada exclusivamente como conteúdo de texto React (`{o.description}`) e atributo `title`, ambos escapados por padrão pelo React; `dangerouslySetInnerHTML` proibido (resolvido por construção).
+
+### Validações executadas
+
+- `npm run lint` — 0 erros, 104 warnings (baseline 104, sem regressão)
+- `npm run test:unit` — 698/698 (691 base + 7 novos de `matchesMaintenanceSearch`), 0 falhas
+- `npm run test:smoke` — 6/6
+- `npm run build` — concluído sem erro
+
+### Observações
+
+- Não existe teste de componente para `Maintenance.tsx` (dependências de `AuthContext` + React Query). Débito técnico: avaliar um harness de render para a tabela de Manutenção no futuro, o que permitiria cobrir regressões de layout/estado. A mudança de comportamento (busca por descrição) está coberta pelo teste unitário da Etapa 1; o empilhamento visual é validado por `test:smoke` + conferência visual manual do usuário.
+- A tela de Manutenção não possui baseline de regressão visual em `e2e/visual/` (só login/dashboard/checklist). Se a densidade visual passar a ser requisito monitorado, considerar adicionar um snapshot dedicado.
+
 ## Sessão — 2026-06-28 (Visão Geral com cross-filter, multi-seleção e long-press)
 
 ### O que foi implementado

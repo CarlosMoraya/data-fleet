@@ -35,6 +35,19 @@ export function buildMaintenanceFilterOptions(
   };
 }
 
+export function matchesMaintenanceSearch(
+  order: Pick<MaintenanceOrder, 'licensePlate' | 'os' | 'description'>,
+  term: string,
+): boolean {
+  const trimmed = term.trim();
+  if (!trimmed) return true;
+  const needle = trimmed.toLowerCase();
+  const plate = (order.licensePlate ?? '').toLowerCase();
+  const os = (order.os ?? '').toLowerCase();
+  const description = (order.description ?? '').toLowerCase();
+  return plate.includes(needle) || os.includes(needle) || description.includes(needle);
+}
+
 export function applyMaintenanceListFilters<
   T extends Pick<MaintenanceOrder, 'status' | 'shipperName' | 'operationalUnitName' | 'workshop'>
 >(
