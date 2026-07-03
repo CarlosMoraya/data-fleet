@@ -60,6 +60,31 @@ async function insertIfMissing(table, filters, payload) {
   return data;
 }
 
+// Deterministic upsert: when the row exists, refresh mutable fields so seeded
+// data stays valid relative to "now" (e.g. entry_date inside the current month).
+// Used for the maintenance order that feeds the Costs dashboard, where
+// insertIfMissing would leave a stale entry_date outside the default period.
+async function upsertByKey(table, filters, payload) {
+  const existing = await selectOne(table, filters);
+  if (existing) {
+    const { data, error } = await supabase
+      .from(table)
+      .update(payload)
+      .eq('id', existing.id)
+      .select('*')
+      .single();
+    if (error) throw new Error(`${table} update: ${error.message}`);
+    return data;
+  }
+  const { data, error } = await supabase
+    .from(table)
+    .insert(payload)
+    .select('*')
+    .single();
+  if (error) throw new Error(`${table} insert: ${error.message}`);
+  return data;
+}
+
 async function allAuthUsers() {
   const users = [];
   let page = 1;
@@ -99,16 +124,12 @@ async function ensureUser(users, { email, password, name, role, clientId, worksh
     if (error) throw new Error(`auth.updateUser ${email}: ${error.message}`);
   }
 
-  const canDelete = ['Manager', 'Coordinator', 'Director', 'Admin Master'].includes(role);
   const { error: profileError } = await supabase.from('profiles').upsert({
     id: userId,
     name,
     role,
     client_id: clientId,
     workshop_account_id: workshopAccountId,
-    can_delete_vehicles: canDelete,
-    can_delete_drivers: canDelete,
-    can_delete_workshops: canDelete,
     budget_approval_limit: ['Coordinator', 'Director', 'Admin Master'].includes(role) ? 10000 : 0,
   });
 
@@ -508,22 +529,23 @@ async function main() {
     assigned_by: ids.coordinator,
   });
 
-  await insertIfMissing('maintenance_orders', { client_id: primaryClient.id, os_number: 'DEV-OS-001' }, {
+  await upsertByKey('maintenance_orders', { client_id: primaryClient.id, os_number: 'DEV-OS-001' }, {
     client_id: primaryClient.id,
     vehicle_id: maintenanceVehicle.id,
     workshop_id: workshop.id,
     os_number: 'DEV-OS-001',
     workshop_os_number: 'OF-001',
-    entry_date: todayIso(-1),
+    entry_date: todayIso(0),
     expected_exit_date: todayIso(3),
     type: 'Preventiva',
-    status: 'Aguardando orçamento',
+    status: 'Orçamento aprovado',
     description: 'Revisao preventiva criada pelo seed de desenvolvimento.',
     mechanic_name: 'Roberto Alves',
     estimated_cost: 1800,
+    approved_cost: 1800,
     created_by_id: ids.coordinator,
     current_km: 88500,
-    budget_status: 'pendente',
+    budget_status: 'aprovado',
   });
 
   const tire = await insertIfMissing('tires', { client_id: primaryClient.id, tire_code: 'PNEU-DEV-001' }, {

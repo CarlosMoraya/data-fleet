@@ -879,7 +879,7 @@ export default function Dashboard() {
                 className={cn(
                   'flex items-center gap-2 border-b-2 px-4 py-3 text-sm transition-colors',
                   isActive
-                    ? 'border-orange-500 font-medium text-orange-600'
+                    ? 'border-orange-500 font-medium text-orange-700'
                     : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
                 )}
               >

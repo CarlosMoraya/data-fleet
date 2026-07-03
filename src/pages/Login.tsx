@@ -144,7 +144,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex w-full justify-center rounded-xl border border-transparent bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex w-full justify-center rounded-xl border border-transparent bg-orange-600 px-4 py-2.5 text-xl font-bold text-white shadow-sm transition-colors hover:bg-orange-700 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting ? 'Entrando...' : 'Entrar'}
               </button>

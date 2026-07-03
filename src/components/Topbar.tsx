@@ -48,6 +48,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
             )}
             <div className="relative">
               <select
+                aria-label="Selecionar transportadora"
                 value={currentClient?.id ?? ''}
                 onChange={(e) => switchClient(e.target.value)}
                 className="cursor-pointer appearance-none rounded-lg border border-zinc-200 bg-transparent py-1.5 pr-8 pl-3 text-sm font-medium text-zinc-900 hover:bg-zinc-50 focus:ring-0 focus:outline-none"

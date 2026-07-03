@@ -576,7 +576,7 @@ export default function Vehicles() {
                           </div>
                         );
                       })() : (
-                        <span className="text-zinc-400 italic">Sem motorista</span>
+                        <span className="text-zinc-500 italic">Sem motorista</span>
                       )}
                     </td>
                     <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">

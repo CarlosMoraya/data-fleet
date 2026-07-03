@@ -121,7 +121,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {user?.role === 'Admin Master' && (
           <div className="border-t border-blue-800 px-3 py-4">
-            <p className="mb-1 px-3 text-xs font-semibold tracking-wider text-blue-400 uppercase">Admin</p>
+            <p className="mb-1 px-3 text-xs font-semibold tracking-wider text-blue-300 uppercase">Admin</p>
             <NavLink
               to="/admin/clients"
               onClick={onClose}
