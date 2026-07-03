@@ -163,7 +163,7 @@ export default function Checklists() {
     queryFn: async () => {
       const { data } = await supabase
         .from('vehicles')
-        .select('id, license_plate, category, driver_id, drivers(profiles(name))')
+        .select('id, license_plate, category, driver_id, drivers(profiles!profile_id(name))')
         .eq('client_id', currentClient!.id)
         .order('license_plate');
       
@@ -680,90 +680,174 @@ export default function Checklists() {
 
       {/* ── Fleet Assistant+ view ─────────────────────────────── */}
       {isAssistantPlus && (
-        <div className="flex flex-col gap-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
           {blockWrite && <SelectClientNotice />}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-          <div className="border-b border-zinc-200 px-4">
-            <nav role="tablist" className="-mb-px flex gap-1">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'checklists'}
-                onClick={() => setActiveTab('checklists')}
-                className={cn(
-                  activeTab === 'checklists'
-                    ? 'border-orange-500 font-medium text-orange-600'
-                    : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700',
-                  'flex items-center border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors',
-                )}
-              >
-                Checklists
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'tireInspections'}
-                onClick={() => setActiveTab('tireInspections')}
-                className={cn(
-                  activeTab === 'tireInspections'
-                    ? 'border-orange-500 font-medium text-orange-600'
-                    : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700',
-                  'flex items-center border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors',
-                )}
-              >
-                Inspeções de Pneus
-              </button>
-            </nav>
-          </div>
+            <div className="border-b border-zinc-200 px-4">
+              <nav role="tablist" className="-mb-px flex gap-1">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'checklists'}
+                  onClick={() => setActiveTab('checklists')}
+                  className={cn(
+                    activeTab === 'checklists'
+                      ? 'border-orange-500 font-medium text-orange-700'
+                      : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700',
+                    'flex items-center border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors',
+                  )}
+                >
+                  Checklists
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'tireInspections'}
+                  onClick={() => setActiveTab('tireInspections')}
+                  className={cn(
+                    activeTab === 'tireInspections'
+                      ? 'border-orange-500 font-medium text-orange-700'
+                      : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700',
+                    'flex items-center border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors',
+                  )}
+                >
+                  Inspeções de Pneus
+                </button>
+              </nav>
+            </div>
 
-          {activeTab === 'checklists' && (
-            <>
-              <div className="flex items-center gap-2 border-b border-zinc-100 px-4 py-3">
-                <button
-                  onClick={() => setOnlyWithIssues(false)}
-                  className={cn(
-                    'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                    !onlyWithIssues ? 'bg-zinc-700 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
-                  )}
-                >
-                  Todos
-                </button>
-                <button
-                  onClick={() => setOnlyWithIssues(true)}
-                  className={cn(
-                    'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                    onlyWithIssues ? 'bg-red-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
-                  )}
-                >
-                  <AlertCircle className="h-3 w-3" />
-                  Com inconformidades
-                  {issueChecklistIds.size > 0 && (
-                    <span className="opacity-70">({issueChecklistIds.size})</span>
-                  )}
-                </button>
-                <button
-                  onClick={() => setOnlyOdometer(v => !v)}
-                  className={cn(
-                    'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                    onlyOdometer ? 'bg-sky-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
-                  )}
-                >
-                  <Gauge className="h-3 w-3" />
-                  Hodômetro
-                </button>
-              </div>
+            {activeTab === 'checklists' && (
+              <>
+                <div className="flex items-center gap-2 border-b border-zinc-100 px-4 py-3">
+                  <button
+                    onClick={() => setOnlyWithIssues(false)}
+                    className={cn(
+                      'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                      !onlyWithIssues ? 'bg-zinc-700 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
+                    )}
+                  >
+                    Todos
+                  </button>
+                  <button
+                    onClick={() => setOnlyWithIssues(true)}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                      onlyWithIssues ? 'bg-red-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
+                    )}
+                  >
+                    <AlertCircle className="h-3 w-3" />
+                    Com inconformidades
+                    {issueChecklistIds.size > 0 && (
+                      <span>({issueChecklistIds.size})</span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setOnlyOdometer(v => !v)}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                      onlyOdometer ? 'bg-sky-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
+                    )}
+                  >
+                    <Gauge className="h-3 w-3" />
+                    Hodômetro
+                  </button>
+                </div>
 
-              {checklists.length === 0 ? (
+                {checklists.length === 0 ? (
+                  <div className="py-16 text-center text-zinc-400">
+                    <ClipboardCheck className="mx-auto mb-3 h-12 w-12 opacity-30" />
+                    <p className="text-sm">{blockWrite ? 'Nenhum checklist realizado em nenhum cliente.' : 'Nenhum checklist realizado neste tenant.'}</p>
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-auto">
+                    <table className="min-w-full divide-y divide-zinc-100">
+                      <thead className="sticky top-0 z-10 bg-zinc-50">
+                        <tr>
+                          {[...(blockWrite ? ['Cliente'] : []), 'Template', 'Contexto', 'Veículo', 'Preenchido por', 'Data', 'Status', 'Ações'].map(h => (
+                            <th key={h} className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-50">
+                        {checklists
+                          .filter(c => !onlyWithIssues || issueChecklistIds.has(c.id))
+                          .filter(c => !onlyOdometer || isOdometerUpdateChecklist(c))
+                          .map(c => (
+                            <tr key={c.id} className="hover:bg-zinc-50">
+                              {blockWrite && (
+                                <td className="px-4 py-3 text-sm text-zinc-600">
+                                  <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                                    {c.clientId ? (clientNameMap.get(c.clientId) ?? '—') : '—'}
+                                  </span>
+                                </td>
+                              )}
+                              <td className="px-4 py-3 text-sm text-zinc-900">
+                                <div className="flex items-center gap-1.5">
+                                  {issueChecklistIds.has(c.id) && (
+                                    <span title="Contém inconformidades">
+                                      <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 text-red-400" />
+                                    </span>
+                                  )}
+                                  {c.templateName ?? '—'}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-zinc-500">{c.templateContext ?? '—'}</td>
+                              <td className="px-4 py-3 text-sm text-zinc-600">{c.vehicleLicensePlate ?? '—'}</td>
+                              <td className="px-4 py-3 text-sm text-zinc-600">{c.filledByName ?? '—'}</td>
+                              <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(c.startedAt)}</td>
+                              <td className="px-4 py-3">
+                                <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[c.status])}>
+                                  {STATUS_LABEL[c.status]}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => setViewChecklist(c)} className="rounded p-1.5 hover:bg-zinc-100" title="Visualizar">
+                                    <Eye className="h-4 w-4 text-zinc-400" />
+                                  </button>
+                                  {isAnalystPlus && c.status === 'completed' && issueChecklistIds.has(c.id) && !blockWrite && (
+                                    <button
+                                      onClick={() => setCreatePlanChecklist(c)}
+                                      className="rounded p-1.5 text-orange-400 hover:bg-orange-50"
+                                      title="Criar Plano de Ação"
+                                    >
+                                      <ClipboardList className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                  {isAdminMaster && (
+                                    <button
+                                      onClick={() => setConfirmDelete(c)}
+                                      className="rounded p-1.5 text-red-400 hover:bg-red-50"
+                                      title="Excluir (Admin Master)"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTab === 'tireInspections' && (
+              tireInspections.length === 0 ? (
                 <div className="py-16 text-center text-zinc-400">
-                  <ClipboardCheck className="mx-auto mb-3 h-12 w-12 opacity-30" />
-                  <p className="text-sm">{blockWrite ? 'Nenhum checklist realizado em nenhum cliente.' : 'Nenhum checklist realizado neste tenant.'}</p>
+                  <Disc className="mx-auto mb-3 h-12 w-12 opacity-30" />
+                  <p className="text-sm">{blockWrite ? 'Nenhuma inspeção de pneus registrada em nenhum cliente.' : 'Nenhuma inspeção de pneus registrada neste tenant.'}</p>
                 </div>
               ) : (
                 <div className="flex-1 overflow-auto">
                   <table className="min-w-full divide-y divide-zinc-100">
-                    <thead className="sticky top-0 z-10">
-                      <tr className="bg-zinc-50">
-                        {[...(blockWrite ? ['Cliente'] : []), 'Template', 'Contexto', 'Veículo', 'Preenchido por', 'Data', 'Status', 'Ações'].map(h => (
+                    <thead className="sticky top-0 z-10 bg-zinc-50">
+                      <tr>
+                        {[...(blockWrite ? ['Cliente'] : []), 'Veículo', 'Inspetor', 'Início', 'Conclusão', 'Status', 'Ações'].map(h => (
                           <th key={h} className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">
                             {h}
                           </th>
@@ -771,124 +855,40 @@ export default function Checklists() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-50">
-                      {checklists
-                        .filter(c => !onlyWithIssues || issueChecklistIds.has(c.id))
-                        .filter(c => !onlyOdometer || isOdometerUpdateChecklist(c))
-                        .map(c => (
-                        <tr key={c.id} className="hover:bg-zinc-50">
+                      {tireInspections.map(ti => (
+                        <tr key={ti.id} className="hover:bg-zinc-50">
                           {blockWrite && (
                             <td className="px-4 py-3 text-sm text-zinc-600">
                               <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
-                                {c.clientId ? (clientNameMap.get(c.clientId) ?? '—') : '—'}
+                                {ti.clientId ? (clientNameMap.get(ti.clientId) ?? '—') : '—'}
                               </span>
                             </td>
                           )}
                           <td className="px-4 py-3 text-sm text-zinc-900">
                             <div className="flex items-center gap-1.5">
-                              {issueChecklistIds.has(c.id) && (
-                                <span title="Contém inconformidades">
-                                  <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 text-red-400" />
-                                </span>
-                              )}
-                              {c.templateName ?? '—'}
+                              <Disc className="h-3.5 w-3.5 flex-shrink-0 text-blue-400" />
+                              {ti.vehicleLicensePlate ?? '—'}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-xs text-zinc-500">{c.templateContext ?? '—'}</td>
-                          <td className="px-4 py-3 text-sm text-zinc-600">{c.vehicleLicensePlate ?? '—'}</td>
-                          <td className="px-4 py-3 text-sm text-zinc-600">{c.filledByName ?? '—'}</td>
-                          <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(c.startedAt)}</td>
+                          <td className="px-4 py-3 text-sm text-zinc-600">{ti.filledByName ?? '—'}</td>
+                          <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(ti.startedAt)}</td>
+                          <td className="px-4 py-3 text-xs text-zinc-500">{ti.completedAt ? formatDate(ti.completedAt) : '—'}</td>
                           <td className="px-4 py-3">
-                            <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[c.status])}>
-                              {STATUS_LABEL[c.status]}
+                            <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[ti.status])}>
+                              {STATUS_LABEL[ti.status]}
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-1">
-                              <button onClick={() => setViewChecklist(c)} className="rounded p-1.5 hover:bg-zinc-100" title="Visualizar">
-                                <Eye className="h-4 w-4 text-zinc-400" />
-                              </button>
-                              {isAnalystPlus && c.status === 'completed' && issueChecklistIds.has(c.id) && !blockWrite && (
-                                <button
-                                  onClick={() => setCreatePlanChecklist(c)}
-                                  className="rounded p-1.5 text-orange-400 hover:bg-orange-50"
-                                  title="Criar Plano de Ação"
-                                >
-                                  <ClipboardList className="h-4 w-4" />
-                                </button>
-                              )}
-                              {isAdminMaster && (
-                                <button
-                                  onClick={() => setConfirmDelete(c)}
-                                  className="rounded p-1.5 text-red-400 hover:bg-red-50"
-                                  title="Excluir (Admin Master)"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              )}
-                            </div>
+                            <button onClick={() => setViewTireInspection(ti)} className="rounded p-1.5 hover:bg-zinc-100" title="Visualizar">
+                              <Eye className="h-4 w-4 text-zinc-400" />
+                            </button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )}
-            </>
-          )}
-
-          {activeTab === 'tireInspections' && (
-            tireInspections.length === 0 ? (
-              <div className="py-16 text-center text-zinc-400">
-                <Disc className="mx-auto mb-3 h-12 w-12 opacity-30" />
-                <p className="text-sm">{blockWrite ? 'Nenhuma inspeção de pneus registrada em nenhum cliente.' : 'Nenhuma inspeção de pneus registrada neste tenant.'}</p>
-              </div>
-            ) : (
-              <div className="flex-1 overflow-auto">
-                <table className="min-w-full divide-y divide-zinc-100">
-                  <thead className="sticky top-0 z-10">
-                    <tr className="bg-zinc-50">
-                      {[...(blockWrite ? ['Cliente'] : []), 'Veículo', 'Inspetor', 'Início', 'Conclusão', 'Status', 'Ações'].map(h => (
-                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-50">
-                    {tireInspections.map(ti => (
-                      <tr key={ti.id} className="hover:bg-zinc-50">
-                        {blockWrite && (
-                          <td className="px-4 py-3 text-sm text-zinc-600">
-                            <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
-                              {ti.clientId ? (clientNameMap.get(ti.clientId) ?? '—') : '—'}
-                            </span>
-                          </td>
-                        )}
-                        <td className="px-4 py-3 text-sm text-zinc-900">
-                          <div className="flex items-center gap-1.5">
-                            <Disc className="h-3.5 w-3.5 flex-shrink-0 text-blue-400" />
-                            {ti.vehicleLicensePlate ?? '—'}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-zinc-600">{ti.filledByName ?? '—'}</td>
-                        <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(ti.startedAt)}</td>
-                        <td className="px-4 py-3 text-xs text-zinc-500">{ti.completedAt ? formatDate(ti.completedAt) : '—'}</td>
-                        <td className="px-4 py-3">
-                          <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[ti.status])}>
-                            {STATUS_LABEL[ti.status]}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button onClick={() => setViewTireInspection(ti)} className="rounded p-1.5 hover:bg-zinc-100" title="Visualizar">
-                            <Eye className="h-4 w-4 text-zinc-400" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )
+              )
             )}
           </div>
         </div>
