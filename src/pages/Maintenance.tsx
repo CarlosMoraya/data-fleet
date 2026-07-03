@@ -490,8 +490,8 @@ export default function Maintenance() {
         ) : (
           <div className="flex-1 overflow-auto">
             <table className="min-w-full divide-y divide-zinc-100">
-              <thead className="sticky top-0 z-10">
-                <tr className="bg-zinc-50">
+              <thead className="sticky top-0 z-10 bg-zinc-50">
+                <tr>
                   {[
                     ...(blockWrite ? ['Cliente'] : []),
                     isWorkshopUser ? 'OS da Oficina' : 'OS',

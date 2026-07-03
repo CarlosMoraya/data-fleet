@@ -515,7 +515,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
   const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
 
   return (
-    <div className="space-y-6">
+    <div className="flex h-full flex-col gap-6">
       {blockWrite && <SelectClientNotice />}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Agendamentos</h1>
@@ -597,45 +597,47 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
           )}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-200 bg-zinc-50">
-                {blockWrite && (
-                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Cliente</th>
-                )}
-                <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Veículo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Oficina</th>
-                <th className="hidden px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase sm:table-cell">Data</th>
-                <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Status</th>
-                <th className="hidden px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase md:table-cell">Criado por</th>
-                <th className="px-4 py-3 text-right text-xs font-medium tracking-wider text-zinc-500 uppercase">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {filtered.map((s) => (
-                <ScheduleRow
-                  key={s.id}
-                  schedule={s}
-                  canDelete={canDelete}
-                  canWriteSchedules={canWriteSchedules}
-                  blockWrite={blockWrite}
-                  clientName={s.clientId ? (clientNameMap.get(s.clientId) ?? undefined) : undefined}
-                  onEdit={canWriteSchedules ? () => {
-                    sessionStorage.setItem('scheduleFormEditing', JSON.stringify(s));
-                    sessionStorage.setItem('scheduleFormOpen', 'true');
-                    sessionStorage.setItem('scheduleFormData', JSON.stringify(s));
-                    setEditingSchedule(s);
-                    setIsFormOpen(true);
-                  } : undefined}
-                  onComplete={canWriteSchedules ? () => updateStatusMutation.mutate({ id: s.id, status: 'completed', completedAt: new Date().toISOString() }) : undefined}
-                  onCancel={canWriteSchedules ? () => updateStatusMutation.mutate({ id: s.id, status: 'cancelled' }) : undefined}
-                  onDelete={canWriteSchedules && canDelete ? () => deleteMutation.mutate(s.id) : undefined}
-                  onGenerateMaintenance={canWriteSchedules ? () => handleGenerateMaintenance(s) : undefined}
-                />
-              ))}
-            </tbody>
-          </table>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+          <div className="flex-1 overflow-auto">
+            <table className="min-w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-zinc-50">
+                <tr className="border-b border-zinc-200">
+                  {blockWrite && (
+                    <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Cliente</th>
+                  )}
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Veículo</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Oficina</th>
+                  <th className="hidden px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase sm:table-cell">Data</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Status</th>
+                  <th className="hidden px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase md:table-cell">Criado por</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium tracking-wider text-zinc-500 uppercase">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {filtered.map((s) => (
+                  <ScheduleRow
+                    key={s.id}
+                    schedule={s}
+                    canDelete={canDelete}
+                    canWriteSchedules={canWriteSchedules}
+                    blockWrite={blockWrite}
+                    clientName={s.clientId ? (clientNameMap.get(s.clientId) ?? undefined) : undefined}
+                    onEdit={canWriteSchedules ? () => {
+                      sessionStorage.setItem('scheduleFormEditing', JSON.stringify(s));
+                      sessionStorage.setItem('scheduleFormOpen', 'true');
+                      sessionStorage.setItem('scheduleFormData', JSON.stringify(s));
+                      setEditingSchedule(s);
+                      setIsFormOpen(true);
+                    } : undefined}
+                    onComplete={canWriteSchedules ? () => updateStatusMutation.mutate({ id: s.id, status: 'completed', completedAt: new Date().toISOString() }) : undefined}
+                    onCancel={canWriteSchedules ? () => updateStatusMutation.mutate({ id: s.id, status: 'cancelled' }) : undefined}
+                    onDelete={canWriteSchedules && canDelete ? () => deleteMutation.mutate(s.id) : undefined}
+                    onGenerateMaintenance={canWriteSchedules ? () => handleGenerateMaintenance(s) : undefined}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

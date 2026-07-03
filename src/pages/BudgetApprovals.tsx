@@ -336,44 +336,46 @@ export default function BudgetApprovals() {
       )}
 
       {/* Table */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
-      {isLoading ? (
-        <p className="text-sm text-zinc-500">Carregando orçamentos...</p>
-      ) : orders.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-20 text-zinc-400">
-          <CheckCircle2 className="h-10 w-10 text-green-400" />
-          <p className="text-sm font-medium">Nenhum orçamento pendente de aprovação.</p>
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-zinc-200">
-          <table className="min-w-full text-sm">
-            <thead className="sticky top-0 z-10">
-              <tr className="border-b border-zinc-200 bg-zinc-50">
-                <th className="w-6 px-4 py-3" />
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">OS Interna</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Placa</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Oficina</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Entrada</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Subtotal</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">PDF</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Ação</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100 bg-white">
-              {orders.map(order => (
-                <OrderRow
-                  key={order.id}
-                  order={order}
-                  user={user}
-                  approving={processingId === order.id}
-                  onApprove={id => reviewMutation.mutate({ id, approve: true })}
-                  onReject={id => reviewMutation.mutate({ id, approve: false })}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-orange-500" />
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-20 text-zinc-400">
+            <CheckCircle2 className="h-10 w-10 text-green-400" />
+            <p className="text-sm font-medium">Nenhum orçamento pendente de aprovação.</p>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto">
+            <table className="min-w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-zinc-50">
+                <tr className="border-b border-zinc-200">
+                  <th className="w-6 px-4 py-3" />
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">OS Interna</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Placa</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Oficina</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Entrada</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Subtotal</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">PDF</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 bg-white">
+                {orders.map(order => (
+                  <OrderRow
+                    key={order.id}
+                    order={order}
+                    user={user}
+                    approving={processingId === order.id}
+                    onApprove={id => reviewMutation.mutate({ id, approve: true })}
+                    onReject={id => reviewMutation.mutate({ id, approve: false })}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
