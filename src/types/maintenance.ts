@@ -8,6 +8,7 @@ export interface MaintenanceOrder {
   id: string;
   os: string;
   licensePlate: string;
+  vehicleModel?: string;
   workshop: string;
   vehicleId: string;
   workshopId: string;
@@ -81,7 +82,7 @@ export interface MaintenanceOrderRow {
   updated_at: string;
 
   // Joins
-  vehicles?: { license_plate: string; shippers?: { name: string } | null; operational_units?: { name: string } | null };
+  vehicles?: { license_plate: string; model?: string | null; shippers?: { name: string } | null; operational_units?: { name: string } | null };
   workshops?: { name: string };
   profiles?: { name: string };
   budget_reviewer?: { name: string };

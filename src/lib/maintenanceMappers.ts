@@ -49,11 +49,17 @@ export function calcBudgetSubtotal(items: BudgetItem[]): number {
   return items.reduce((sum, i) => sum + i.quantity * i.value, 0);
 }
 
+export function buildVehicleModelLabel(model?: string | null): string | undefined {
+  const label = model?.trim();
+  return label || undefined;
+}
+
 export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
   return {
     id: row.id,
     os: row.os_number,
     licensePlate: row.vehicles?.license_plate || 'N/A',
+    vehicleModel: buildVehicleModelLabel(row.vehicles?.model),
     workshop: row.workshops?.name || 'Oficina não identificada',
     vehicleId: row.vehicle_id,
     workshopId: row.workshop_id,

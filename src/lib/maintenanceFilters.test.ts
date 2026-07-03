@@ -136,12 +136,13 @@ describe('applyMaintenanceListFilters', () => {
 
 describe('matchesMaintenanceSearch', () => {
   function makeSearchOrder(
-    overrides: Partial<Pick<MaintenanceOrder, 'licensePlate' | 'os' | 'description'>> = {},
-  ): Pick<MaintenanceOrder, 'licensePlate' | 'os' | 'description'> {
+    overrides: Partial<Pick<MaintenanceOrder, 'licensePlate' | 'os' | 'description' | 'vehicleModel'>> = {},
+  ): Pick<MaintenanceOrder, 'licensePlate' | 'os' | 'description' | 'vehicleModel'> {
     return {
       licensePlate: 'ABC1D23',
       os: 'OS-0001',
       description: 'Troca de óleo do motor',
+      vehicleModel: undefined,
       ...overrides,
     };
   }
@@ -174,5 +175,25 @@ describe('matchesMaintenanceSearch', () => {
     const order = makeSearchOrder({ description: undefined });
     expect(() => matchesMaintenanceSearch(order, 'óleo')).not.toThrow();
     expect(matchesMaintenanceSearch(order, 'óleo')).toBe(false);
+  });
+
+  it('matches by vehicleModel (case-insensitive)', () => {
+    const order = makeSearchOrder({ vehicleModel: 'FH 540' });
+    expect(matchesMaintenanceSearch(order, 'fh 540')).toBe(true);
+  });
+
+  it('matches by vehicleModel partial', () => {
+    const order = makeSearchOrder({ vehicleModel: 'FH 540' });
+    expect(matchesMaintenanceSearch(order, 'fh')).toBe(true);
+  });
+
+  it('does not match by currentKm (Km is not part of search)', () => {
+    const order = makeSearchOrder({ vehicleModel: 'FH 540' });
+    expect(matchesMaintenanceSearch(order, '128')).toBe(false);
+  });
+
+  it('retrocompatible: order without vehicleModel still matches by plate', () => {
+    const order = makeSearchOrder({ vehicleModel: undefined });
+    expect(matchesMaintenanceSearch(order, 'abc1d23')).toBe(true);
   });
 });

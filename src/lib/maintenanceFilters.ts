@@ -36,7 +36,7 @@ export function buildMaintenanceFilterOptions(
 }
 
 export function matchesMaintenanceSearch(
-  order: Pick<MaintenanceOrder, 'licensePlate' | 'os' | 'description'>,
+  order: Pick<MaintenanceOrder, 'licensePlate' | 'os' | 'description' | 'vehicleModel'>,
   term: string,
 ): boolean {
   const trimmed = term.trim();
@@ -45,7 +45,8 @@ export function matchesMaintenanceSearch(
   const plate = (order.licensePlate ?? '').toLowerCase();
   const os = (order.os ?? '').toLowerCase();
   const description = (order.description ?? '').toLowerCase();
-  return plate.includes(needle) || os.includes(needle) || description.includes(needle);
+  const model = (order.vehicleModel ?? '').toLowerCase();
+  return plate.includes(needle) || os.includes(needle) || description.includes(needle) || model.includes(needle);
 }
 
 export function applyMaintenanceListFilters<

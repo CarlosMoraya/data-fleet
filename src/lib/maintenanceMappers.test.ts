@@ -132,3 +132,38 @@ describe('maintenanceFromRow — shipperName / operationalUnitName', () => {
     expect(order.operationalUnitName).toBeUndefined();
   });
 });
+
+describe('maintenanceFromRow — vehicleModel', () => {
+  it('mounts vehicleModel from model', () => {
+    const row = makeMaintenanceRow({
+      vehicles: { license_plate: 'ABC-1234', model: 'FH 540' },
+    });
+    expect(maintenanceFromRow(row).vehicleModel).toBe('FH 540');
+  });
+
+  it('trims whitespace around model', () => {
+    const row = makeMaintenanceRow({
+      vehicles: { license_plate: 'ABC-1234', model: '  ACTROS  ' },
+    });
+    expect(maintenanceFromRow(row).vehicleModel).toBe('ACTROS');
+  });
+
+  it('returns undefined when model is null', () => {
+    const row = makeMaintenanceRow({
+      vehicles: { license_plate: 'ABC-1234', model: null },
+    });
+    expect(maintenanceFromRow(row).vehicleModel).toBeUndefined();
+  });
+
+  it('returns undefined when model is empty/whitespace', () => {
+    const row = makeMaintenanceRow({
+      vehicles: { license_plate: 'ABC-1234', model: '   ' },
+    });
+    expect(maintenanceFromRow(row).vehicleModel).toBeUndefined();
+  });
+
+  it('returns undefined when vehicles is missing', () => {
+    const row = makeMaintenanceRow({ vehicles: undefined });
+    expect(maintenanceFromRow(row).vehicleModel).toBeUndefined();
+  });
+});

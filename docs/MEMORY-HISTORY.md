@@ -2,6 +2,49 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-03 (Refinamento "premium" da célula "Placa / Status" + busca por modelo)
+
+### O que foi implementado
+
+Refinamento visual da lista da tela de Manutenção (`/manutencao`). Dentro da célula "Placa / Status" existente (que já mostra placa em negrito + badge de status), passam a aparecer como informação secundária empilhada, seguindo o print de referência: (1) o **modelo do veículo** (apenas `model`, ex.: "FH 540" — sem a marca, para não poluir a célula) em `text-xs text-zinc-500` com `truncate` e `title` para tooltip; (2) o **Km atual** (ex.: "128.450 km") em `text-xs text-zinc-400` via `o.currentKm.toLocaleString('pt-BR') + ' km'`. Ambos são renderizados condicionalmente — modelo só se `o.vehicleModel` existir; Km só se `o.currentKm` for truthy (evita "0 km"/"undefined km"). A ordem vertical da célula passou a ser: placa → badge de status → modelo → km. **Não foi criada nova coluna nem novo `<th>`** (decisão de produto "opção 1"). A busca da lista (`matchesMaintenanceSearch` em `src/lib/maintenanceFilters.ts`) passou a casar também por `vehicleModel` (apenas o modelo, case-insensitive), retrocompatível; **Km não entra na busca** (decisão explícita do usuário — buscar por quilometragem gera falsos positivos). Padrões aplicados: (1) **Presentation Mapper** — o campo `vehicleModel` é derivado em `buildVehicleModelLabel` dentro de `maintenanceFromRow` (`src/lib/maintenanceMappers.ts`), mantendo a UI livre de lógica (DRY); (2) **Predicate function pura** estendida de forma retrocompatível. Nenhuma mudança em banco/backend/RLS/migrations/service — os campos `model` e `current_km` já existem (`supabase/migrations/20260619000000_align_vehicle_columns.sql`). A query de `maintenance_orders` apenas acrescentou `model` ao join `vehicles(...)` já existente. Filtros (`applyMaintenanceListFilters`), opções de filtro (`buildMaintenanceFilterOptions`), contadores (`computeMaintenanceCounts`), ações da tabela e `MaintenanceDetailModal.tsx` permanecem intactos.
+
+### Arquivos criados
+
+- nenhum
+
+### Arquivos modificados
+
+- `src/types/maintenance.ts` — interface `MaintenanceOrderRow`: join `vehicles` ganhou `model?: string | null` (sem `brand`); interface `MaintenanceOrder`: adicionado `vehicleModel?: string` junto de `licensePlate`
+- `src/lib/maintenanceMappers.ts` — nova função exportada `buildVehicleModelLabel(model?)` (retorna `model.trim()` ou `undefined`); `maintenanceFromRow` passou a retornar `vehicleModel: buildVehicleModelLabel(row.vehicles?.model)` (restante intacto, incluindo `currentKm`)
+- `src/lib/maintenanceFilters.ts` — `matchesMaintenanceSearch`: `Pick` ampliado para incluir `vehicleModel`; adicionado `const model = (order.vehicleModel ?? '').toLowerCase()` e `|| model.includes(needle)` no retorno (normalização/retrocompatibilidade preservadas; Km não entra)
+- `src/pages/Maintenance.tsx` — query: join `vehicles` passou a `vehicles (license_plate, model, shippers (name), operational_units (name))`; célula "Placa / Status" do `<tbody>` ganhou as duas linhas condicionais (modelo + km) abaixo do badge de status (sem nova coluna nem novo `<th>`)
+- `src/lib/maintenanceMappers.test.ts` — novo `describe('maintenanceFromRow — vehicleModel')` com 5 cenários (model, trim, null, vazio, vehicles ausente)
+- `src/lib/maintenanceFilters.test.ts` — helper `makeSearchOrder` ampliado para incluir `vehicleModel`; 4 novos casos em `matchesMaintenanceSearch` (modelo case-insensitive, modelo parcial, Km fora da busca, retrocompatibilidade sem `vehicleModel`)
+- `docs/MEMORY.md`
+- `docs/MEMORY-HISTORY.md`
+
+### Decisões confirmadas
+
+- **Apenas modelo, sem marca:** decisão explícita do usuário após ver a célula poluída com `brand + model`. `buildVehicleModelLabel` usa só `model`; `brand` foi removido do join da query e do tipo `MaintenanceOrderRow.vehicles`.
+- **Km fora da busca (só modelo entra):** decisão explícita do usuário. Buscar por quilometragem gera falsos positivos. Intencional — não "corrigir" incluindo Km na busca.
+- **Modelo e Km dentro da célula da placa (opção 1), sem coluna de Km:** decisão de produto fechada; o print de referência tem prioridade.
+- **Modelo e Km como texto secundário mudo (sem badge):** fidelidade ao print.
+- **Sem migration/alteração de banco:** `brand`, `model`, `current_km` já existem.
+- Padrão "Presentation Mapper" aplicado à composição de `vehicleModel` (ponto único em `buildVehicleModelLabel`/`maintenanceFromRow`); padrão "Pure Function / Separation of Concerns" aplicado à extensão de `matchesMaintenanceSearch` (coerência com as funções de filtro já existentes).
+- Segurança: sem gatilho de segurança — os campos exibidos já são visíveis ao mesmo conjunto de usuários sob a mesma RLS por `client_id`/workshop; a query não muda de escopo, apenas acrescenta colunas do veículo já relacionado à OS. Classificação: **RISCO ACEITO (nulo)**.
+
+### Validações executadas
+
+- `npx tsc --noEmit` — 0 erros
+- `npx eslint src/` — 0 erros, 104 warnings (baseline 104, sem regressão)
+- `npx vitest run` — 707/707 (698 base + 9 novos), 0 falhas
+
+### Observações
+
+- Validação manual do layout na tela (placa → status → modelo → km) fica pendente de execução pelo usuário.
+- Débito técnico pré-existente (não tratado): warnings de `react-hooks/rules-of-hooks` em `src/pages/Maintenance.tsx` (hooks `useMemo`/`useState`/`useQuery` chamados após early return de `<Navigate>`, ~linhas 177–336). Corrigir exige mover o early return para depois de todos os hooks — fora do escopo deste refinamento visual.
+- Sem teste de componente (component test) para a tabela de Manutenção; a validação do layout permanece manual/E2E.
+
 ## Sessão — 2026-07-02 (Refinamento visual da tabela de Manutenção + busca por descrição)
 
 ### O que foi implementado

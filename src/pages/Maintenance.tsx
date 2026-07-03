@@ -209,7 +209,7 @@ export default function Maintenance() {
         .from('maintenance_orders')
         .select(`
           *,
-          vehicles (license_plate, shippers (name), operational_units (name)),
+          vehicles (license_plate, model, shippers (name), operational_units (name)),
           workshops (name),
           profiles!created_by_id (name),
           budget_reviewer:profiles!budget_reviewed_by (name),
@@ -534,6 +534,12 @@ export default function Maintenance() {
                           <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', statusColor(o.status))}>
                             {o.status}
                           </span>
+                          {o.vehicleModel && (
+                            <span className="truncate text-xs text-zinc-500" title={o.vehicleModel}>{o.vehicleModel}</span>
+                          )}
+                          {o.currentKm ? (
+                            <span className="text-xs text-zinc-400">{o.currentKm.toLocaleString('pt-BR')} km</span>
+                          ) : null}
                         </div>
                       </td>
                       <td className="max-w-[240px] px-4 py-3">
