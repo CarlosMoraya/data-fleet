@@ -33,7 +33,7 @@ const VehicleTypeBarChart = lazy(() => import('./VehicleTypeBarChart'));
 const MaintenanceTypeDonutChart = lazy(() => import('./MaintenanceTypeDonutChart'));
 const CostTrendChart = lazy(() => import('./CostTrendChart'));
 
-const VEHICLE_TYPES = ['Passeio', 'Utilitário', 'Van', 'Moto', 'Vuc', 'Toco', 'Truck', 'Cavalo'];
+const VEHICLE_TYPES = ['Passeio', 'Utilitário', 'Van', 'Moto', 'Vuc', 'Toco', 'Truck', 'Cavalo', 'Semirreboque', 'Reboque', 'Dolly'];
 const MAINTENANCE_TYPES = ['Corretiva', 'Preventiva', 'Preditiva'] as const;
 
 const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });

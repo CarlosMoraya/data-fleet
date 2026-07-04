@@ -7,7 +7,7 @@ export interface Vehicle {
   clientId: string;
   active: boolean;
   inactivatedAt?: string | null;
-  type: 'Passeio' | 'Utilitário' | 'Van' | 'Moto' | 'Vuc' | 'Toco' | 'Truck' | 'Cavalo';
+  type: 'Passeio' | 'Utilitário' | 'Van' | 'Moto' | 'Vuc' | 'Toco' | 'Truck' | 'Cavalo' | 'Semirreboque' | 'Reboque' | 'Dolly';
   energySource: 'Combustão' | 'Elétrico' | 'Híbrido';
   coolingEquipment: boolean;
 
@@ -47,7 +47,7 @@ export interface Vehicle {
   vehicleManual?: boolean;
   grUpload?: string;
   grExpirationDate?: string;
-  category?: 'Leve' | 'Médio' | 'Pesado' | 'Elétrico';
+  category?: 'Leve' | 'Médio' | 'Pesado' | 'Elétrico' | 'Semi-reboque/Implemento';
 
   // Especificações de peso/capacidade
   pbt?: number;   // Peso Bruto Total (t)

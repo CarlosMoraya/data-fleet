@@ -47,12 +47,13 @@ const CATEGORIES: { value: TemplateCategory; label: string }[] = [
   { value: 'Médio', label: 'Médio' },
   { value: 'Pesado', label: 'Pesado' },
   { value: 'Elétrico', label: 'Elétrico' },
+  { value: 'Semi-reboque/Implemento', label: 'Semi-reboque/Implemento' },
 ];
 
 const CONTEXTS: { value: ChecklistContext; label: string; description: string }[] = [
   { value: 'Rotina', label: 'Rotina', description: 'Inspeção rotineira do veículo' },
   { value: 'Auditoria', label: 'Auditoria', description: 'Realizado por Auditores de Pátio' },
-  { value: 'Reboque', label: 'Reboque', description: 'Inspeção específica para reboques' },
+  { value: 'Guincho', label: 'Guincho', description: 'Inspeção de veículo sendo guinchado até a oficina' },
   { value: 'Entrada em Oficina', label: 'Entrada em Oficina', description: 'Registro ao enviar veículo para manutenção' },
   { value: 'Saída de Oficina', label: 'Saída de Oficina', description: 'Conferência ao receber veículo da manutenção' },
   { value: 'Segurança', label: 'Segurança', description: 'Itens críticos de segurança (pode bloquear veículo)' },

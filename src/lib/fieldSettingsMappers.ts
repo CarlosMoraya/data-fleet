@@ -229,7 +229,7 @@ export const CONFIGURABLE_FIELDS: { key: keyof VehicleFieldSettings; label: stri
   { key: 'tankCapacityOptional', label: 'Capacidade do Tanque', section: 'Campos Condicionais', note: 'Quando Fonte = Combustão' },
   { key: 'avgConsumptionOptional', label: 'Consumo Médio', section: 'Campos Condicionais', note: 'Quando Fonte = Combustão' },
   { key: 'coolingBrandOptional', label: 'Marca do Refrigerador', section: 'Campos Condicionais', note: 'Quando Refrigeração = Sim' },
-  { key: 'placaSemiReboqueOptional', label: 'Placa Semi-Reboque', section: 'Campos Condicionais', note: 'Quando Tipo = Cavalo' },
+  { key: 'placaSemiReboqueOptional', label: 'Placa Semi-Reboque', section: 'Campos Condicionais', note: 'Quando Tipo = Cavalo (campo legado, em descontinuação)' },
   // Peso & Capacidade
   { key: 'pbtOptional', label: 'PBT (Peso Bruto Total)', section: 'Especificações Técnicas' },
   { key: 'cmtOptional', label: 'CMT (Cap. Máxima de Tração)', section: 'Especificações Técnicas' },

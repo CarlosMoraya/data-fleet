@@ -33,6 +33,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   Médio: 'Médio',
   Pesado: 'Pesado',
   Elétrico: 'Elétrico',
+  'Semi-reboque/Implemento': 'Semi-reboque/Implemento',
 };
 
 export default function ChecklistTemplates() {
@@ -225,7 +226,7 @@ export default function ChecklistTemplates() {
       {/* Filters */}
       <div className="space-y-2">
         <div className="flex flex-wrap gap-2">
-          {(['Todos', 'Leve', 'Médio', 'Pesado', 'Elétrico'] as const).map(cat => (
+          {(['Todos', 'Leve', 'Médio', 'Pesado', 'Elétrico', 'Semi-reboque/Implemento'] as const).map(cat => (
             <button
               key={cat}
               onClick={() => setFilterCategory(cat)}
@@ -239,7 +240,7 @@ export default function ChecklistTemplates() {
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          {(['Todos', 'Rotina', 'Auditoria', 'Reboque', 'Entrada em Oficina', 'Saída de Oficina', 'Segurança'] as const).map(ctx => (
+          {(['Todos', 'Rotina', 'Auditoria', 'Guincho', 'Entrada em Oficina', 'Saída de Oficina', 'Segurança'] as const).map(ctx => (
             <button
               key={ctx}
               onClick={() => setFilterContext(ctx)}

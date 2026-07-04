@@ -12,7 +12,7 @@ describe('canSaveTemplateWithoutItems', () => {
   it.each<ChecklistContext>([
     'Rotina',
     'Auditoria',
-    'Reboque',
+    'Guincho',
     'Entrada em Oficina',
     'Saída de Oficina',
     'Segurança',

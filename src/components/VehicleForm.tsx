@@ -202,8 +202,11 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     'Leve': ['Moto', 'Passeio', 'Utilitário'],
     'Médio': ['Van', 'Vuc', 'Toco'],
     'Pesado': ['Truck', 'Cavalo'],
-    'Elétrico': ['Passeio', 'Utilitário'] // Adicionado por coerência com os tipos existentes
+    'Elétrico': ['Passeio', 'Utilitário'],
+    'Semi-reboque/Implemento': ['Semirreboque', 'Reboque', 'Dolly'],
   } as const;
+
+  const isImplement = formData.category === 'Semi-reboque/Implemento';
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type: inputType } = e.target;
@@ -605,6 +608,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                     <option value="Leve">Leve</option>
                     <option value="Médio">Médio</option>
                     <option value="Pesado">Pesado</option>
+                    <option value="Semi-reboque/Implemento">Semi-reboque/Implemento</option>
                   </select>
                 </div>
 
@@ -678,31 +682,43 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                         <option value="Toco">Toco</option>
                         <option value="Truck">Truck</option>
                         <option value="Cavalo">Cavalo</option>
+                        <option value="Semirreboque">Semirreboque</option>
+                        <option value="Reboque">Reboque</option>
+                        <option value="Dolly">Dolly</option>
                       </>
                     )}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700">Fonte de Energia<span className="ml-0.5 text-red-500">*</span></label>
-                  <select name="energySource" value={formData.energySource || 'Combustão'} onChange={handleChange} className={inputClass}>
-                    <option value="Combustão">Combustão</option>
-                    <option value="Elétrico">Elétrico</option>
-                    <option value="Híbrido">Híbrido</option>
-                  </select>
-                </div>
+                {!isImplement && (
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700">Fonte de Energia<span className="ml-0.5 text-red-500">*</span></label>
+                    <select name="energySource" value={formData.energySource || 'Combustão'} onChange={handleChange} className={inputClass}>
+                      <option value="Combustão">Combustão</option>
+                      <option value="Elétrico">Elétrico</option>
+                      <option value="Híbrido">Híbrido</option>
+                    </select>
+                  </div>
+                )}
 
                 {/* PBT / CMT / Eixos */}
                 <div>
                   <Label name="pbt">PBT — Peso Bruto Total (t)</Label>
                   <input type="text" name="pbt" required={req('pbt')} inputMode="decimal" value={formData.pbt ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 3,5" />
                 </div>
-                <div>
-                  <Label name="cmt">CMT — Cap. Máxima de Tração (t)</Label>
-                  <input type="text" name="cmt" required={req('cmt')} inputMode="decimal" value={formData.cmt ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 45,0" />
-                </div>
+                {!isImplement && (
+                  <div>
+                    <Label name="cmt">CMT — Cap. Máxima de Tração (t)</Label>
+                    <input type="text" name="cmt" required={req('cmt')} inputMode="decimal" value={formData.cmt ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 45,0" />
+                  </div>
+                )}
                 <div>
                   <Label name="eixos">Eixos</Label>
                   <input type="text" name="eixos" required={req('eixos')} inputMode="numeric" maxLength={2} value={formData.eixos ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 2" />
+                  {formData.type === 'Cavalo' && (
+                    <p className="mt-1 text-xs text-zinc-400">
+                      Informe apenas os eixos do cavalo mecânico; os do semi-reboque são cadastrados no próprio semi-reboque.
+                    </p>
+                  )}
                 </div>
 
                 {/* Axle Configuration Editor */}
@@ -727,8 +743,15 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                 {formData.type === 'Cavalo' && (
                   <>
                     <div className="flex h-full items-center pt-6">
-                      <input id="semiReboque" name="semiReboque" type="checkbox" checked={formData.semiReboque || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600" />
-                      <label htmlFor="semiReboque" className="ml-2 block text-sm text-zinc-900">Possui Semi-reboque?</label>
+                      <div>
+                        <div className="flex items-center">
+                          <input id="semiReboque" name="semiReboque" type="checkbox" checked={formData.semiReboque || false} onChange={handleChange} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600" />
+                          <label htmlFor="semiReboque" className="ml-2 block text-sm text-zinc-900">Possui Semi-reboque?</label>
+                        </div>
+                        <p className="mt-1 text-xs text-amber-600">
+                          Campo em descontinuação: em breve o semi-reboque será um cadastro próprio (ativo) vinculado por engate. Continue preenchendo por ora.
+                        </p>
+                      </div>
                     </div>
                     {formData.semiReboque && (
                       <div>
@@ -740,7 +763,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                 )}
 
                 {/* Conditional: Combustão */}
-                {formData.energySource === 'Combustão' && (
+                {!isImplement && formData.energySource === 'Combustão' && (
                   <>
                     <div>
                       <Label name="fuelType">Tipo de Combustível</Label>
@@ -861,38 +884,40 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
             </div>
 
             {/* Motorista Responsável */}
-            <div>
-              <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Motorista Responsável</h3>
-              <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-zinc-700">Motorista</label>
-                  <select
-                    name="driverId"
-                    value={formData.driverId || ''}
-                    onChange={handleChange}
-                    className={inputClass}
-                  >
-                    <option value="">Nenhum motorista</option>
-                    {/* Motorista atual (pode não estar na lista de disponíveis se já estava associado) */}
-                    {vehicle?.driverId && vehicle?.driverName && formData.driverId === vehicle.driverId && (
-                      <option key={vehicle.driverId} value={vehicle.driverId}>
-                        {vehicle.driverName} (Atual)
-                      </option>
-                    )}
-                    {availableDrivers
-                      .filter(d => d.id !== vehicle?.driverId) // evita duplicata se já aparece acima
-                      .map(d => (
-                        <option key={d.id} value={d.id}>
-                          {d.name} — CPF: {formatCPF(d.cpf)}
+            {!isImplement && (
+              <div>
+                <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Motorista Responsável</h3>
+                <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-zinc-700">Motorista</label>
+                    <select
+                      name="driverId"
+                      value={formData.driverId || ''}
+                      onChange={handleChange}
+                      className={inputClass}
+                    >
+                      <option value="">Nenhum motorista</option>
+                      {/* Motorista atual (pode não estar na lista de disponíveis se já estava associado) */}
+                      {vehicle?.driverId && vehicle?.driverName && formData.driverId === vehicle.driverId && (
+                        <option key={vehicle.driverId} value={vehicle.driverId}>
+                          {vehicle.driverName} (Atual)
                         </option>
-                      ))}
-                  </select>
-                  <p className="mt-1 text-xs text-zinc-400">
-                    Apenas motoristas sem veículo atribuído são listados. Selecione &quot;Nenhum motorista&quot; para desassociar.
-                  </p>
+                      )}
+                      {availableDrivers
+                        .filter(d => d.id !== vehicle?.driverId)
+                        .map(d => (
+                          <option key={d.id} value={d.id}>
+                            {d.name} — CPF: {formatCPF(d.cpf)}
+                          </option>
+                        ))}
+                    </select>
+                    <p className="mt-1 text-xs text-zinc-400">
+                      Apenas motoristas sem veículo atribuído são listados. Selecione &quot;Nenhum motorista&quot; para desassociar.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Logística */}
             <div>
