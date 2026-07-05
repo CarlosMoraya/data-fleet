@@ -108,6 +108,8 @@ export interface ActionPlan {
   name?: string;
   responsibleId?: string;
   responsibleName?: string; // from join
+  responsibleUpdatedBy?: string;
+  responsibleUpdatedAt?: string;
   dueDate?: string;
   assignedBy?: string;
   assignedByName?: string; // from join

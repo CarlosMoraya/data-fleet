@@ -5,6 +5,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { validateOdometerCorrection } from '../lib/odometerCorrectionValidation';
 import { canCorrectOdometer } from '../lib/rolePermissions';
+
+import VehicleKmGuidance from './VehicleKmGuidance';
 import {
   createOdometerCorrection,
   listVehicleOdometerHistory,
@@ -149,6 +151,7 @@ function CorrectKmModal({
           </button>
         </div>
         <div className="space-y-4 px-5 py-4">
+          <VehicleKmGuidance />
           <label className="block">
             <span className="text-sm font-medium text-zinc-700">Km correto</span>
             <input

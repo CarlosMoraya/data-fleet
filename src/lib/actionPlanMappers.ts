@@ -18,6 +18,8 @@ export interface ActionPlanRow {
   // v2 fields
   name: string | null;
   responsible_id: string | null;
+  responsible_updated_by: string | null;
+  responsible_updated_at: string | null;
   due_date: string | null;
   assigned_by: string | null;
   claimed_by: string | null;
@@ -62,6 +64,8 @@ export function actionPlanFromRow(row: ActionPlanRow): ActionPlan {
     name: row.name ?? undefined,
     responsibleId: row.responsible_id ?? undefined,
     responsibleName: row.responsible_profile?.name ?? undefined,
+    responsibleUpdatedBy: row.responsible_updated_by ?? undefined,
+    responsibleUpdatedAt: row.responsible_updated_at ?? undefined,
     dueDate: row.due_date ?? undefined,
     assignedBy: row.assigned_by ?? undefined,
     assignedByName: row.assigned_by_profile?.name ?? undefined,

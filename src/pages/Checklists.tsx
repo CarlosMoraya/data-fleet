@@ -23,6 +23,7 @@ import {
   createTireInspection,
   findOpenTireInspection,
 } from '../services/tireInspectionService';
+import { formatLastKmLabel, getVehicleLastKmMap } from '../services/vehicleOdometerService';
 import { ODOMETER_UPDATE_CONTEXT } from '../types';
 
 import type { Checklist, ChecklistTemplate, TireInspection, AxleConfigEntry } from '../types';
@@ -242,6 +243,17 @@ export default function Checklists() {
       return (data ?? []).map(r => checklistFromRow(r as ChecklistRow));
     },
     enabled: showsAggregatedData(user?.role, currentClient?.id)
+  });
+
+  const checklistVehicleIds = useMemo(
+    () => Array.from(new Set(checklists.map((c) => c.vehicleId).filter((id): id is string => !!id))),
+    [checklists],
+  );
+
+  const { data: checklistLastKmMap = new Map<string, number>() } = useQuery({
+    queryKey: ['vehicleLastKmMap', 'checklists', checklistVehicleIds],
+    queryFn: () => getVehicleLastKmMap(checklistVehicleIds),
+    enabled: checklistVehicleIds.length > 0,
   });
 
   // Query for issues (inconformidades) - mainly for Assistant+
@@ -794,7 +806,16 @@ export default function Checklists() {
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-xs text-zinc-500">{c.templateContext ?? '—'}</td>
-                              <td className="px-4 py-3 text-sm text-zinc-600">{c.vehicleLicensePlate ?? '—'}</td>
+                              <td className="px-4 py-3 text-sm text-zinc-600">
+                                {c.vehicleLicensePlate ? (
+                                  <>
+                                    <div>{c.vehicleLicensePlate}</div>
+                                    <div className="text-xs text-zinc-400">
+                                      {formatLastKmLabel(c.vehicleId ? checklistLastKmMap.get(c.vehicleId) : undefined)}
+                                    </div>
+                                  </>
+                                ) : '—'}
+                              </td>
                               <td className="px-4 py-3 text-sm text-zinc-600">{c.filledByName ?? '—'}</td>
                               <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(c.startedAt)}</td>
                               <td className="px-4 py-3">

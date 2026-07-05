@@ -5,6 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 
 import CameraCapture from '../components/CameraCapture';
 import OfflineBanner from '../components/OfflineBanner';
+import VehicleKmGuidance from '../components/VehicleKmGuidance';
 import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePendingSyncCount } from '../hooks/usePendingSyncCount';
@@ -725,6 +726,7 @@ export default function ChecklistFill() {
                     : 'Informe o hodômetro'}
                 </p>
               </div>
+              {!kmConfirmed && <VehicleKmGuidance />}
               {referenceKm !== null && (
                 <p className="text-xs text-zinc-500">
                   Último Km registrado: {referenceKm.toLocaleString('pt-BR')} km

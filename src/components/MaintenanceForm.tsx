@@ -13,6 +13,7 @@ import { listPendingEventsForVehicle } from '../services/warrantyRevisionService
 
 import BudgetItemsTable from './BudgetItemsTable';
 import PartPhotosSection from './PartPhotosSection';
+import VehicleKmGuidance from './VehicleKmGuidance';
 
 import type { PartPhotoDraft } from '../services/maintenancePartPhotoService';
 import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType } from '../types/maintenance';
@@ -537,6 +538,9 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
                     {/* Km atual */}
                     <div>
                       <Label htmlFor="currentKm">Km Atual do Veículo</Label>
+                      <div className="mb-2">
+                        <VehicleKmGuidance />
+                      </div>
                       <input
                         id="currentKm"
                         name="currentKm"

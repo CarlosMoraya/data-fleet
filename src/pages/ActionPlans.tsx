@@ -9,6 +9,7 @@ import { actionPlanFromRow, actionStatusLabel, actionStatusColor, type ActionPla
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
+import { formatLastKmLabel, getVehicleLastKmMap } from '../services/vehicleOdometerService';
 
 import type { ActionPlan, ActionPlanStatus } from '../types';
 
@@ -93,6 +94,17 @@ export default function ActionPlans() {
       });
     },
     enabled: showsAggregatedData(user?.role, currentClient?.id)
+  });
+
+  const vehicleIds = useMemo(
+    () => Array.from(new Set(plans.map((p) => p.vehicleId).filter((id): id is string => !!id))),
+    [plans],
+  );
+
+  const { data: lastKmMap = new Map<string, number>() } = useQuery({
+    queryKey: ['vehicleLastKmMap', 'actionPlans', vehicleIds],
+    queryFn: () => getVehicleLastKmMap(vehicleIds),
+    enabled: vehicleIds.length > 0,
   });
 
   const counts = useMemo(() => {
@@ -239,7 +251,16 @@ export default function ActionPlans() {
                       <p className="truncate text-xs text-zinc-500">{p.suggestedAction}</p>
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-zinc-900">
-                      {p.vehicleLicensePlate ?? <span className="text-zinc-400 italic">—</span>}
+                      {p.vehicleLicensePlate ? (
+                        <>
+                          <div>{p.vehicleLicensePlate}</div>
+                          <div className="text-xs font-normal text-zinc-400">
+                            {formatLastKmLabel(p.vehicleId ? lastKmMap.get(p.vehicleId) : undefined)}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-zinc-400 italic">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', actionStatusColor(p.status))}>
@@ -273,8 +294,11 @@ export default function ActionPlans() {
         <ActionPlanModal
           plan={selectedPlan}
           onClose={() => setSelectedPlan(null)}
-          onSaved={() => { 
-            setSelectedPlan(null); 
+          onSaved={() => {
+            setSelectedPlan(null);
+            void queryClient.invalidateQueries({ queryKey: ['actionPlans', currentClient?.id] });
+          }}
+          onReassigned={() => {
             void queryClient.invalidateQueries({ queryKey: ['actionPlans', currentClient?.id] });
           }}
         />

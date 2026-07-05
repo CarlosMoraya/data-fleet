@@ -1,5 +1,5 @@
-import { X, Camera, Loader2, CheckCircle, UserCheck, XCircle, Paperclip, FileText, UploadCloud } from 'lucide-react';
-import React, { useRef, useState } from 'react';
+import { X, Camera, Loader2, CheckCircle, UserCheck, XCircle, Paperclip, FileText, UploadCloud, Pencil } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { actionPlanToRow, actionStatusLabel, actionStatusColor } from '../lib/actionPlanMappers';
@@ -7,14 +7,22 @@ import { uploadActionPlanEvidence } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 
-import type { ActionPlan } from '../types';
+import type { ActionPlan, ActionPlanStatus } from '../types';
 
 
 interface Props {
   plan: ActionPlan;
   onClose: () => void;
   onSaved: () => void;
+  onReassigned?: () => void;
 }
+
+interface ResponsibleOption {
+  id: string;
+  name: string;
+}
+
+const REASSIGNABLE_STATUSES: ActionPlanStatus[] = ['pending', 'in_progress', 'awaiting_conclusion'];
 
 const ROLE_RANK: Record<string, number> = {
   'Driver': 1,
@@ -28,11 +36,12 @@ const ROLE_RANK: Record<string, number> = {
   'Admin Master': 9,
 };
 
-export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
+export default function ActionPlanModal({ plan, onClose, onSaved, onReassigned }: Props) {
   const { user, currentClient } = useAuth();
   const rank = ROLE_RANK[user?.role ?? ''] ?? 0;
   const isAnalystPlus = rank >= 4;
   const isAssistantPlus = rank >= 3;
+  const isCoordinatorPlus = rank >= ROLE_RANK['Coordinator'];
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
@@ -41,6 +50,48 @@ export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const [responsibleId, setResponsibleId] = useState(plan.responsibleId ?? '');
+  const [responsibleName, setResponsibleName] = useState(plan.responsibleName);
+  const [editingResponsible, setEditingResponsible] = useState(false);
+  const [responsibleOptions, setResponsibleOptions] = useState<ResponsibleOption[]>([]);
+  const [reassigning, setReassigning] = useState(false);
+  const [reassignError, setReassignError] = useState('');
+
+  const canReassignResponsible = isCoordinatorPlus && REASSIGNABLE_STATUSES.includes(plan.status);
+
+  useEffect(() => {
+    if (!editingResponsible) return;
+    void (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .eq('client_id', currentClient.id)
+        .not('role', 'in', '("Driver","Yard Auditor")')
+        .order('name');
+      setResponsibleOptions((data ?? []) as ResponsibleOption[]);
+    })();
+  }, [editingResponsible, currentClient.id]);
+
+  const handleReassign = async () => {
+    if (!responsibleId) return;
+    setReassigning(true);
+    setReassignError('');
+    try {
+      const { error: rpcError } = await supabase.rpc('reassign_action_plan_responsible', {
+        p_action_plan_id: plan.id,
+        p_responsible_id: responsibleId,
+      });
+      if (rpcError) throw rpcError;
+      setResponsibleName(responsibleOptions.find((p) => p.id === responsibleId)?.name);
+      setEditingResponsible(false);
+      onReassigned?.();
+    } catch (err: unknown) {
+      setReassignError(err instanceof Error ? err.message : 'Erro ao reatribuir responsável');
+    } finally {
+      setReassigning(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -155,11 +206,57 @@ export default function ActionPlanModal({ plan, onClose, onSaved }: Props) {
               <Field label="Template" value={plan.templateName} />
               <Field label="Item inspecionado" value={plan.itemTitle} />
               <Field label="Reportado por" value={plan.reportedByName} />
-              <Field label="Responsável sugerido" value={plan.responsibleName} />
+              {!editingResponsible && <Field label="Responsável sugerido" value={responsibleName} />}
               <Field label="Data limite" value={plan.dueDate} />
               <Field label="Criado em" value={fmtDate(plan.createdAt)} />
               <Field label="Atribuído por" value={plan.assignedByName} />
             </div>
+
+            {canReassignResponsible && !editingResponsible && (
+              <button
+                type="button"
+                onClick={() => setEditingResponsible(true)}
+                className="flex items-center gap-1 text-xs font-medium text-orange-500 hover:underline"
+              >
+                <Pencil className="h-3 w-3" />
+                Alterar responsável
+              </button>
+            )}
+
+            {editingResponsible && (
+              <div className="space-y-2 rounded-lg border border-zinc-200 bg-white p-3">
+                <label className="block text-xs font-medium text-zinc-600">Novo responsável</label>
+                <select
+                  value={responsibleId}
+                  onChange={(e) => setResponsibleId(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+                >
+                  <option value="">Selecione...</option>
+                  {responsibleOptions.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                {reassignError && <p className="text-xs text-red-600">{reassignError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { void handleReassign(); }}
+                    disabled={reassigning || !responsibleId}
+                    className="flex items-center gap-2 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    {reassigning && <Loader2 className="h-3 w-3 animate-spin" />}
+                    Salvar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setEditingResponsible(false); setReassignError(''); setResponsibleId(plan.responsibleId ?? ''); }}
+                    className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
             {plan.observedIssue && (
               <div>
                 <p className="text-xs tracking-wide text-zinc-400 uppercase">Observação</p>

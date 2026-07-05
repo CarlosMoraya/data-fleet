@@ -30,6 +30,7 @@ import {
   type VehicleStructuredFilters,
 } from '../lib/vehicleFilters';
 import { vehicleFromRow, VehicleRow } from '../lib/vehicleMappers';
+import { formatLastKmLabel, getVehicleLastKmMap } from '../services/vehicleOdometerService';
 import { saveVehicle, deleteVehicle, toggleVehicleActive } from '../services/vehicleService';
 import { Vehicle } from '../types';
 
@@ -385,6 +386,17 @@ export default function Vehicles() {
     return filterByActive(list, showInactive);
   }, [vehicles, search, filters, pendencyCtx, showInactive]);
 
+  const vehicleIds = useMemo(
+    () => filteredVehicles.map((v) => v.id),
+    [filteredVehicles],
+  );
+
+  const { data: lastKmMap = new Map<string, number>() } = useQuery({
+    queryKey: ['vehicleLastKmMap', 'vehicles', vehicleIds],
+    queryFn: () => getVehicleLastKmMap(vehicleIds),
+    enabled: vehicleIds.length > 0,
+  });
+
   const vehicleDeleteBlockedReason = useMemo(() => {
     if (!vehicleToDelete) return null;
     const total = vehicleDeleteLinks ?? 0;
@@ -549,6 +561,7 @@ export default function Vehicles() {
                         </div>
                         <div className="ml-4">
                           <div className="font-medium text-zinc-900">{vehicle.licensePlate}</div>
+                          <div className="text-xs text-zinc-400">{formatLastKmLabel(lastKmMap.get(vehicle.id))}</div>
                           <div className="text-sm text-zinc-500">{vehicle.brand} {vehicle.model} ({vehicle.year})</div>
                         </div>
                       </div>

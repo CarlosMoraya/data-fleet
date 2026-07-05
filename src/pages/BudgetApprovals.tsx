@@ -21,6 +21,7 @@ import {
 } from '../lib/maintenanceMappers';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
+import { formatLastKmLabel, getVehicleLastKmMap } from '../services/vehicleOdometerService';
 
 import type { User } from '../types';
 
@@ -45,6 +46,7 @@ export function canApprove(
 interface PendingOrder {
   id: string;
   os: string;
+  vehicleId?: string;
   licensePlate: string;
   workshop: string;
   entryDate: string;
@@ -73,10 +75,11 @@ interface OrderRowProps {
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   approving: boolean;
+  lastKm?: number;
   key?: React.Key;
 }
 
-function OrderRow({ order, user, onApprove, onReject, approving }: OrderRowProps) {
+function OrderRow({ order, user, onApprove, onReject, approving, lastKm }: OrderRowProps) {
   const [expanded, setExpanded] = useState(false);
 
   const { data: items = [], isLoading: loadingItems } = useQuery<BudgetItem[]>({
@@ -128,6 +131,7 @@ function OrderRow({ order, user, onApprove, onReject, approving }: OrderRowProps
         </td>
         <td className="px-4 py-3 text-sm text-zinc-700">
           <span className="font-mono font-semibold">{order.licensePlate}</span>
+          <div className="text-xs font-normal text-zinc-400">{formatLastKmLabel(lastKm)}</div>
         </td>
         <td className="px-4 py-3 text-sm text-zinc-600">{order.workshop}</td>
         <td className="px-4 py-3 text-sm text-zinc-500">{formatDate(order.entryDate)}</td>
@@ -230,7 +234,7 @@ export default function BudgetApprovals() {
         .from('maintenance_orders')
         .select(`
           id, os_number, entry_date, workshop_os_number, current_km,
-          budget_pdf_url, created_at,
+          budget_pdf_url, created_at, vehicle_id,
           vehicles(license_plate),
           workshops(name),
           profiles!created_by_id(name)
@@ -248,6 +252,7 @@ export default function BudgetApprovals() {
       type OrderQueryRow = {
         id: string; os_number: string; entry_date: string; workshop_os_number: string | null;
         current_km: number | null; budget_pdf_url: string | null; created_at: string;
+        vehicle_id: string | null;
         vehicles: { license_plate: string } | null;
         workshops: { name: string } | null;
         profiles: { name: string } | null;
@@ -255,6 +260,7 @@ export default function BudgetApprovals() {
       return (data as unknown as OrderQueryRow[]).map((row) => ({
         id: row.id,
         os: row.os_number,
+        vehicleId: row.vehicle_id ?? undefined,
         licensePlate: row.vehicles?.license_plate ?? 'N/A',
         workshop: row.workshops?.name ?? '—',
         entryDate: row.entry_date,
@@ -265,6 +271,17 @@ export default function BudgetApprovals() {
         createdAt: row.created_at,
       }));
     },
+  });
+
+  const vehicleIds = React.useMemo(
+    () => Array.from(new Set(orders.map((o) => o.vehicleId).filter((id): id is string => !!id))),
+    [orders],
+  );
+
+  const { data: lastKmMap = new Map<string, number>() } = useQuery({
+    queryKey: ['vehicleLastKmMap', 'budgetApprovals', vehicleIds],
+    queryFn: () => getVehicleLastKmMap(vehicleIds),
+    enabled: vehicleIds.length > 0,
   });
 
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -368,6 +385,7 @@ export default function BudgetApprovals() {
                     order={order}
                     user={user}
                     approving={processingId === order.id}
+                    lastKm={order.vehicleId ? lastKmMap.get(order.vehicleId) : undefined}
                     onApprove={id => reviewMutation.mutate({ id, approve: true })}
                     onReject={id => reviewMutation.mutate({ id, approve: false })}
                   />

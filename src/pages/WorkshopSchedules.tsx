@@ -29,6 +29,7 @@ import {
   buildGoogleMapsUrl,
   formatWorkshopAddress,
 } from '../lib/workshopScheduleMappers';
+import { formatLastKmLabel, getVehicleLastKmMap } from '../services/vehicleOdometerService';
 import { WorkshopSchedule } from '../types';
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
@@ -499,6 +500,17 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
     });
   }, [schedules, search, statusFilter]);
 
+  const vehicleIds = useMemo(
+    () => Array.from(new Set(schedules.map((s) => s.vehicleId).filter((id): id is string => !!id))),
+    [schedules],
+  );
+
+  const { data: lastKmMap = new Map<string, number>() } = useQuery({
+    queryKey: ['vehicleLastKmMap', 'workshopSchedules', vehicleIds],
+    queryFn: () => getVehicleLastKmMap(vehicleIds),
+    enabled: vehicleIds.length > 0,
+  });
+
   const statusTabs: { key: StatusFilter; label: string }[] = [
     { key: 'all', label: 'Todos' },
     { key: 'scheduled', label: 'Agendados' },
@@ -622,6 +634,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
                     canWriteSchedules={canWriteSchedules}
                     blockWrite={blockWrite}
                     clientName={s.clientId ? (clientNameMap.get(s.clientId) ?? undefined) : undefined}
+                    lastKm={s.vehicleId ? lastKmMap.get(s.vehicleId) : undefined}
                     onEdit={canWriteSchedules ? () => {
                       sessionStorage.setItem('scheduleFormEditing', JSON.stringify(s));
                       sessionStorage.setItem('scheduleFormOpen', 'true');
@@ -667,12 +680,13 @@ const ScheduleRow: React.FC<{
   canWriteSchedules: boolean;
   blockWrite?: boolean;
   clientName?: string;
+  lastKm?: number;
   onEdit?: () => void;
   onComplete?: () => void;
   onCancel?: () => void;
   onDelete?: () => void;
   onGenerateMaintenance?: () => void;
-}> = ({ schedule, canDelete, canWriteSchedules, blockWrite, clientName, onEdit, onComplete, onCancel, onDelete, onGenerateMaintenance }) => {
+}> = ({ schedule, canDelete, canWriteSchedules, blockWrite, clientName, lastKm, onEdit, onComplete, onCancel, onDelete, onGenerateMaintenance }) => {
   const isScheduled = schedule.status === 'scheduled';
   const address = formatWorkshopAddress(schedule);
   const mapsUrl = buildGoogleMapsUrl(schedule);
@@ -688,7 +702,10 @@ const ScheduleRow: React.FC<{
         </td>
       )}
       <td className="px-4 py-3 font-mono text-xs font-medium text-zinc-700">
-        {schedule.vehicleLicensePlate ?? '-'}
+        <div>{schedule.vehicleLicensePlate ?? '-'}</div>
+        {schedule.vehicleLicensePlate && (
+          <div className="font-sans text-xs font-normal text-zinc-400">{formatLastKmLabel(lastKm)}</div>
+        )}
       </td>
       <td className="px-4 py-3">
         <div className="text-sm text-zinc-800">{schedule.workshopName ?? '-'}</div>

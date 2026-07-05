@@ -6,6 +6,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import OfflineBanner from '../components/OfflineBanner';
 import { TireInspectionForm } from '../components/TireInspectionForm';
 import { VehicleBlueprintDiagram } from '../components/VehicleBlueprintDiagram';
+import VehicleKmGuidance from '../components/VehicleKmGuidance';
 import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePendingTireInspectionCount } from '../hooks/usePendingTireInspectionCount';
@@ -354,6 +355,7 @@ function KmStep({ kmInput, kmError, loading, onChange, onConfirm }: {
         <Gauge size={20} />
         <span className="font-medium">KM atual do veículo</span>
       </div>
+      <VehicleKmGuidance />
       <input
         type="number"
         min={0}
