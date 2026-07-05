@@ -1,8 +1,22 @@
 import { supabase } from '../lib/supabase';
 
-/** Mapa de KM efetivo máximo (`MAX(effective_km)`) por veículo, buscado em lote. */
-export async function getVehicleLastKmMap(vehicleIds: string[]): Promise<Map<string, number>> {
-  const map = new Map<string, number>();
+export interface VehicleLastKmInfo {
+  value: number;
+  isCorrected: boolean;
+}
+
+export interface LastKmDisplayParts {
+  prefix: string;
+  valueText: string | null;
+  suffix: string | null;
+  fullText: string;
+}
+
+/** Mapa do último KM oficial (com metadado de correção) por veículo, buscado em lote. */
+export async function getVehicleLastKmMap(
+  vehicleIds: string[]
+): Promise<Map<string, VehicleLastKmInfo>> {
+  const map = new Map<string, VehicleLastKmInfo>();
   const uniqueIds = Array.from(new Set(vehicleIds));
   if (uniqueIds.length === 0) return map;
 
@@ -11,18 +25,30 @@ export async function getVehicleLastKmMap(vehicleIds: string[]): Promise<Map<str
   });
   if (rpcResult.error) throw rpcResult.error;
 
-  type KmRow = { vehicle_id: string; effective_km: number };
+  type KmRow = { vehicle_id: string; effective_km: number | null; is_corrected: boolean };
   for (const row of (rpcResult.data as KmRow[] | null) ?? []) {
+    if (row.effective_km == null) continue;
     const current = map.get(row.vehicle_id);
-    if (current == null || row.effective_km > current) {
-      map.set(row.vehicle_id, row.effective_km);
+    if (current == null || row.effective_km > current.value) {
+      map.set(row.vehicle_id, { value: row.effective_km, isCorrected: row.is_corrected });
     }
   }
   return map;
 }
 
-/** Formata o último KM oficial de um veículo para exibição discreta sob a placa. */
-export function formatLastKmLabel(km: number | null | undefined): string {
-  if (km == null) return 'Último Km: sem leitura';
-  return `Último Km: ${km.toLocaleString('pt-BR')} km`;
+/** Monta as partes textuais do rótulo de `Último Km` para apresentação padronizada. */
+export function buildLastKmDisplayParts(
+  info: VehicleLastKmInfo | null | undefined
+): LastKmDisplayParts {
+  const prefix = 'Último Km:';
+
+  if (info == null) {
+    return { prefix, valueText: null, suffix: null, fullText: 'Último Km: sem leitura' };
+  }
+
+  const valueText = `${info.value.toLocaleString('pt-BR')} km`;
+  const suffix = info.isCorrected ? '(Editado)' : null;
+  const fullText = suffix ? `${prefix} ${valueText} ${suffix}` : `${prefix} ${valueText}`;
+
+  return { prefix, valueText, suffix, fullText };
 }

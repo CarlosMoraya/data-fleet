@@ -3,13 +3,14 @@ import { ClipboardList, Loader2, Search } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 
 import ActionPlanModal from '../components/ActionPlanModal';
+import LastKmLabel from '../components/LastKmLabel';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { actionPlanFromRow, actionStatusLabel, actionStatusColor, type ActionPlanRow } from '../lib/actionPlanMappers';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
-import { formatLastKmLabel, getVehicleLastKmMap } from '../services/vehicleOdometerService';
+import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 
 import type { ActionPlan, ActionPlanStatus } from '../types';
 
@@ -101,7 +102,7 @@ export default function ActionPlans() {
     [plans],
   );
 
-  const { data: lastKmMap = new Map<string, number>() } = useQuery({
+  const { data: lastKmMap = new Map<string, VehicleLastKmInfo>() } = useQuery({
     queryKey: ['vehicleLastKmMap', 'actionPlans', vehicleIds],
     queryFn: () => getVehicleLastKmMap(vehicleIds),
     enabled: vehicleIds.length > 0,
@@ -254,9 +255,10 @@ export default function ActionPlans() {
                       {p.vehicleLicensePlate ? (
                         <>
                           <div>{p.vehicleLicensePlate}</div>
-                          <div className="text-xs font-normal text-zinc-400">
-                            {formatLastKmLabel(p.vehicleId ? lastKmMap.get(p.vehicleId) : undefined)}
-                          </div>
+                          <LastKmLabel
+                            info={p.vehicleId ? lastKmMap.get(p.vehicleId) : undefined}
+                            className="text-xs font-normal text-zinc-400"
+                          />
                         </>
                       ) : (
                         <span className="text-zinc-400 italic">—</span>

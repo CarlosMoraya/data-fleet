@@ -12,6 +12,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import BudgetItemsTable from '../components/BudgetItemsTable';
+import LastKmLabel from '../components/LastKmLabel';
 import { useAuth } from '../context/AuthContext';
 import {
   budgetItemFromRow,
@@ -21,7 +22,7 @@ import {
 } from '../lib/maintenanceMappers';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
-import { formatLastKmLabel, getVehicleLastKmMap } from '../services/vehicleOdometerService';
+import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 
 import type { User } from '../types';
 
@@ -75,11 +76,11 @@ interface OrderRowProps {
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   approving: boolean;
-  lastKm?: number;
+  lastKmInfo?: VehicleLastKmInfo;
   key?: React.Key;
 }
 
-function OrderRow({ order, user, onApprove, onReject, approving, lastKm }: OrderRowProps) {
+function OrderRow({ order, user, onApprove, onReject, approving, lastKmInfo }: OrderRowProps) {
   const [expanded, setExpanded] = useState(false);
 
   const { data: items = [], isLoading: loadingItems } = useQuery<BudgetItem[]>({
@@ -131,7 +132,7 @@ function OrderRow({ order, user, onApprove, onReject, approving, lastKm }: Order
         </td>
         <td className="px-4 py-3 text-sm text-zinc-700">
           <span className="font-mono font-semibold">{order.licensePlate}</span>
-          <div className="text-xs font-normal text-zinc-400">{formatLastKmLabel(lastKm)}</div>
+          <LastKmLabel info={lastKmInfo} className="text-xs font-normal text-zinc-400" />
         </td>
         <td className="px-4 py-3 text-sm text-zinc-600">{order.workshop}</td>
         <td className="px-4 py-3 text-sm text-zinc-500">{formatDate(order.entryDate)}</td>
@@ -278,7 +279,7 @@ export default function BudgetApprovals() {
     [orders],
   );
 
-  const { data: lastKmMap = new Map<string, number>() } = useQuery({
+  const { data: lastKmMap = new Map<string, VehicleLastKmInfo>() } = useQuery({
     queryKey: ['vehicleLastKmMap', 'budgetApprovals', vehicleIds],
     queryFn: () => getVehicleLastKmMap(vehicleIds),
     enabled: vehicleIds.length > 0,
@@ -385,7 +386,7 @@ export default function BudgetApprovals() {
                     order={order}
                     user={user}
                     approving={processingId === order.id}
-                    lastKm={order.vehicleId ? lastKmMap.get(order.vehicleId) : undefined}
+                    lastKmInfo={order.vehicleId ? lastKmMap.get(order.vehicleId) : undefined}
                     onApprove={id => reviewMutation.mutate({ id, approve: true })}
                     onReject={id => reviewMutation.mutate({ id, approve: false })}
                   />

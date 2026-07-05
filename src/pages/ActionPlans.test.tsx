@@ -108,7 +108,7 @@ beforeEach(() => {
   fromMock.mockReturnValue({ select: selectMock });
 
   rpcMock.mockResolvedValue({
-    data: [{ vehicle_id: 'vehicle-1', effective_km: 12345 }],
+    data: [{ vehicle_id: 'vehicle-1', effective_km: 12345, is_corrected: false }],
     error: null,
   });
 });
@@ -161,5 +161,27 @@ describe('ActionPlans — Último Km abaixo da placa', () => {
       expect(container.textContent).toContain('Último Km: 12.345 km');
     });
     expect(container.textContent).toContain('Último Km: sem leitura');
+  });
+
+  it('exibe (Editado) quando o último Km vier de leitura corrigida', async () => {
+    rpcMock.mockResolvedValue({
+      data: [{ vehicle_id: 'vehicle-1', effective_km: 12345, is_corrected: true }],
+      error: null,
+    });
+
+    const root = createRoot(container);
+    container.__reactRoot = root;
+
+    act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ActionPlans />
+        </QueryClientProvider>,
+      );
+    });
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Último Km: 12.345 km (Editado)');
+    });
   });
 });

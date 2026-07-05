@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 import ChecklistDetailModal from '../components/ChecklistDetailModal';
 import CreateActionPlanModal from '../components/CreateActionPlanModal';
+import LastKmLabel from '../components/LastKmLabel';
 import SelectClientNotice from '../components/SelectClientNotice';
 import TireInspectionDetailModal from '../components/TireInspectionDetailModal';
 import { useAuth } from '../context/AuthContext';
@@ -23,7 +24,7 @@ import {
   createTireInspection,
   findOpenTireInspection,
 } from '../services/tireInspectionService';
-import { formatLastKmLabel, getVehicleLastKmMap } from '../services/vehicleOdometerService';
+import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 import { ODOMETER_UPDATE_CONTEXT } from '../types';
 
 import type { Checklist, ChecklistTemplate, TireInspection, AxleConfigEntry } from '../types';
@@ -250,7 +251,7 @@ export default function Checklists() {
     [checklists],
   );
 
-  const { data: checklistLastKmMap = new Map<string, number>() } = useQuery({
+  const { data: checklistLastKmMap = new Map<string, VehicleLastKmInfo>() } = useQuery({
     queryKey: ['vehicleLastKmMap', 'checklists', checklistVehicleIds],
     queryFn: () => getVehicleLastKmMap(checklistVehicleIds),
     enabled: checklistVehicleIds.length > 0,
@@ -810,9 +811,10 @@ export default function Checklists() {
                                 {c.vehicleLicensePlate ? (
                                   <>
                                     <div>{c.vehicleLicensePlate}</div>
-                                    <div className="text-xs text-zinc-400">
-                                      {formatLastKmLabel(c.vehicleId ? checklistLastKmMap.get(c.vehicleId) : undefined)}
-                                    </div>
+                                    <LastKmLabel
+                                      info={c.vehicleId ? checklistLastKmMap.get(c.vehicleId) : undefined}
+                                      className="text-xs text-zinc-400"
+                                    />
                                   </>
                                 ) : '—'}
                               </td>

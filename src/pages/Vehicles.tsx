@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
+import LastKmLabel from '../components/LastKmLabel';
 import SelectClientNotice from '../components/SelectClientNotice';
 import VehicleActiveFilterBanner from '../components/VehicleActiveFilterBanner';
 import VehicleDetailModal from '../components/VehicleDetailModal';
@@ -30,7 +31,7 @@ import {
   type VehicleStructuredFilters,
 } from '../lib/vehicleFilters';
 import { vehicleFromRow, VehicleRow } from '../lib/vehicleMappers';
-import { formatLastKmLabel, getVehicleLastKmMap } from '../services/vehicleOdometerService';
+import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 import { saveVehicle, deleteVehicle, toggleVehicleActive } from '../services/vehicleService';
 import { Vehicle } from '../types';
 
@@ -391,7 +392,7 @@ export default function Vehicles() {
     [filteredVehicles],
   );
 
-  const { data: lastKmMap = new Map<string, number>() } = useQuery({
+  const { data: lastKmMap = new Map<string, VehicleLastKmInfo>() } = useQuery({
     queryKey: ['vehicleLastKmMap', 'vehicles', vehicleIds],
     queryFn: () => getVehicleLastKmMap(vehicleIds),
     enabled: vehicleIds.length > 0,
@@ -561,7 +562,7 @@ export default function Vehicles() {
                         </div>
                         <div className="ml-4">
                           <div className="font-medium text-zinc-900">{vehicle.licensePlate}</div>
-                          <div className="text-xs text-zinc-400">{formatLastKmLabel(lastKmMap.get(vehicle.id))}</div>
+                          <LastKmLabel info={lastKmMap.get(vehicle.id)} className="text-xs text-zinc-400" />
                           <div className="text-sm text-zinc-500">{vehicle.brand} {vehicle.model} ({vehicle.year})</div>
                         </div>
                       </div>
