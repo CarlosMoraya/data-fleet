@@ -1,4 +1,5 @@
 export type Role =
+  | 'Coupling Agent'
   | 'Driver'
   | 'Yard Auditor'
   | 'Workshop'

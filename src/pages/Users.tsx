@@ -50,6 +50,8 @@ interface CreateForm {
   operationalUnitIds: string[];
 }
 
+const COUPLING_AGENT_ROLE: Role = 'Coupling Agent';
+
 const CAN_MANAGE_PERMISSIONS: Role[] = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 const CAN_MANAGE_USERS: Role[] = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
 const EMPTY_SHIPPERS: Shipper[] = [];
@@ -440,6 +442,11 @@ export function CreateUserModal({
                 </option>
               ))}
             </select>
+            {form.role === COUPLING_AGENT_ROLE && (
+              <p className="mt-1 text-xs text-zinc-500">
+                Operador externo com acesso isolado ao fluxo de Engate e a troca de senha.
+              </p>
+            )}
           </div>
 
           {isOperationsRole && (

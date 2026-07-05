@@ -86,12 +86,40 @@ export interface VehicleDraftFileEntry {
   savedAt: number;
 }
 
+export interface CouplingPlateHashEntry {
+  hash: string;
+  plateHint: string;
+  validatedAt: number;
+}
+
+export interface CouplingDraftEntry {
+  checklistId: string;
+  action: 'Engate' | 'Desengate';
+  clientId: string;
+  trailerId: string;
+  trailerPlate: string;
+  tractorId?: string | null;
+  tractorPlate: string;
+  tractorDriverName: string;
+  thirdPartyTractorId?: string | null;
+  thirdPartyDriverId?: string | null;
+  platePhotoUrl?: string;
+  platePhotoPath?: string;
+  platePhotoLat?: number;
+  platePhotoLng?: number;
+  openCouplingId?: string | null;
+  openCouplingOdometer?: number | null;
+  savedAt: number;
+}
+
 // ─── Dexie database ───────────────────────────────────────────────────────────
 
 class OfflineDb extends Dexie {
   syncQueue!: Table<SyncQueueEntry, number>;
   photoBlobs!: Table<PhotoBlobEntry, string>;
   vehicleDraftFiles!: Table<VehicleDraftFileEntry, string>;
+  couplingPlateHashes!: Table<CouplingPlateHashEntry, string>;
+  couplingDrafts!: Table<CouplingDraftEntry, string>;
 
   constructor() {
     super('betafleet-offline-v1');
@@ -108,6 +136,13 @@ class OfflineDb extends Dexie {
       syncQueue: '++id, checklistId, inspectionId, status, createdAt',
       photoBlobs: 'key, checklistId',
       vehicleDraftFiles: 'key',
+    });
+    this.version(4).stores({
+      syncQueue: '++id, checklistId, inspectionId, status, createdAt',
+      photoBlobs: 'key, checklistId',
+      vehicleDraftFiles: 'key',
+      couplingPlateHashes: 'hash, validatedAt',
+      couplingDrafts: 'checklistId, action, trailerId, savedAt',
     });
   }
 }

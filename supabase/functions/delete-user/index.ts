@@ -14,6 +14,7 @@ function json(body: unknown, status: number) {
 }
 
 const ROLE_RANK: Record<string, number> = {
+  "Coupling Agent": 0,
   "Driver": 0,
   "Yard Auditor": 1,
   "Workshop": 2,

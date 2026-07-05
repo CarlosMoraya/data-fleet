@@ -13,6 +13,7 @@ import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
 import { uploadChecklistPhoto } from '../lib/checklistStorageHelpers';
 import { checklistItemFromRow, type ChecklistItemRow } from '../lib/checklistTemplateMappers';
 import { evaluateOdometerTolerance } from '../lib/odometerToleranceValidation';
+import { offlineDb, type CouplingDraftEntry } from '../lib/offline/offlineDb';
 import { enqueueOperation, enqueuePhoto } from '../lib/offline/syncService';
 import { applyOfflineKm, applyOfflineWorkshop, upsertResponse } from '../lib/offlineCacheUpdates';
 import { supabase } from '../lib/supabase';
@@ -71,6 +72,7 @@ export default function ChecklistFill() {
   const [kmError, setKmError] = useState<string | null>(null);
   const [odometerPhotoUrl, setOdometerPhotoUrl] = useState('');
   const [odometerCameraOpen, setOdometerCameraOpen] = useState(false);
+  const [couplingDraft, setCouplingDraft] = useState<CouplingDraftEntry | null>(null);
   const [toleranceState, setToleranceState] = useState<{
     requiresPhoto: boolean;
     expectedMaxKm?: number;
@@ -131,6 +133,7 @@ export default function ChecklistFill() {
   });
 
   const templateContext = checklist?.templateContext;
+  const isCouplingContext = templateContext === 'Engate' || templateContext === 'Desengate';
   const isOdometerContext = templateContext === ODOMETER_UPDATE_CONTEXT;
   const needsWorkshop = templateContext !== null && WORKSHOP_CONTEXTS.includes(templateContext);
   // Use workshop from checklist record or selected via local UI
@@ -150,7 +153,7 @@ export default function ChecklistFill() {
       const vehicle = data as VehicleInitialKmRow | null;
       return vehicle?.initial_km ?? null;
     },
-    enabled: !!checklist?.vehicleId,
+    enabled: !!checklist?.vehicleId && !isCouplingContext,
     gcTime: Infinity,
     networkMode: 'offlineFirst',
   });
@@ -236,6 +239,19 @@ export default function ChecklistFill() {
       setOdometerPhotoUrl(checklist.odometerPhotoUrl);
     }
   }, [checklist?.odometerPhotoUrl]);
+
+  React.useEffect(() => {
+    if (!checklistId) return;
+    let active = true;
+    void offlineDb.couplingDrafts.get(checklistId).then((draft) => {
+      if (active) {
+        setCouplingDraft(draft ?? null);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [checklistId]);
 
   // Referência para exibir ao usuário: último checklist > initial_km do veículo
   const referenceKm = lastOdometerKm ?? vehicleInitialKm ?? null;
@@ -402,6 +418,47 @@ export default function ChecklistFill() {
         .eq('id', checklistId);
       if (chkErr) throw chkErr;
 
+      if ((templateContext === 'Engate' || templateContext === 'Desengate') && checklist.vehicleId && couplingDraft) {
+        if (templateContext === 'Engate') {
+          const rpc = await supabase.rpc('insert_coupling_backoffice', {
+            p_client_id: currentClient!.id,
+            p_trailer_id: couplingDraft.trailerId,
+            p_tractor_id: couplingDraft.tractorId ?? null,
+            p_tractor_plate: couplingDraft.tractorPlate,
+            p_tractor_driver_name: couplingDraft.tractorDriverName,
+            p_third_party_tractor_id: couplingDraft.thirdPartyTractorId ?? null,
+            p_third_party_driver_id: couplingDraft.thirdPartyDriverId ?? null,
+            p_coupled_at: completedAt,
+            p_coupled_latitude: couplingDraft.platePhotoLat ?? null,
+            p_coupled_longitude: couplingDraft.platePhotoLng ?? null,
+            p_odometer_coupled: checklist.odometerKm ?? null,
+            p_coupling_checklist_id: checklistId,
+            p_notes: `Trailer ${couplingDraft.trailerPlate} coupled via checklist flow`,
+          });
+          if (rpc.error) throw rpc.error;
+        }
+
+        if (templateContext === 'Desengate' && couplingDraft.openCouplingId) {
+          const distanceKm = checklist.odometerKm != null && couplingDraft.openCouplingOdometer != null
+            ? Math.max(0, checklist.odometerKm - couplingDraft.openCouplingOdometer)
+            : null;
+
+          const update = await supabase
+            .from('vehicle_couplings')
+            .update({
+              uncoupled_at: completedAt,
+              uncoupled_latitude: couplingDraft.platePhotoLat ?? null,
+              uncoupled_longitude: couplingDraft.platePhotoLng ?? null,
+              odometer_uncoupled: checklist.odometerKm ?? null,
+              distance_km: distanceKm,
+              uncoupling_checklist_id: checklistId,
+              notes: `Trailer ${couplingDraft.trailerPlate} uncoupled via checklist flow`,
+            })
+            .eq('id', couplingDraft.openCouplingId);
+          if (update.error) throw update.error;
+        }
+      }
+
       // Auto-concluir agendamento de oficina
       if (templateContext === 'Entrada em Oficina' && checklist.workshopId && checklist.vehicleId) {
         await autoCompleteWorkshopSchedule(
@@ -426,6 +483,9 @@ export default function ChecklistFill() {
         void navigate('/checklists');
         return;
       }
+      if (checklistId) {
+        void offlineDb.couplingDrafts.delete(checklistId);
+      }
       // Remove o checklist aberto do cache imediatamente para evitar flash
       queryClient.setQueriesData({ queryKey: ['openChecklist'] }, null);
       // Invalida as queries de referência de hodômetro do veículo para que o
@@ -436,6 +496,7 @@ export default function ChecklistFill() {
         void queryClient.invalidateQueries({ queryKey: ['vehicleInitialKm', checklist.vehicleId] });
       }
       void queryClient.invalidateQueries({ queryKey: ['checklists'] });
+      void queryClient.invalidateQueries({ queryKey: ['vehicleCouplings'] });
       void navigate('/checklists');
     },
     onError: (err: Error) => {

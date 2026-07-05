@@ -29,8 +29,8 @@ export default function Layout() {
     return <Navigate to="/login" replace />;
   }
 
-  if (isOperationsManager(user.role) && !canAccessRoute(user.role, location.pathname)) {
-    return <Navigate to="/agendamentos" replace />;
+  if (!canAccessRoute(user.role, location.pathname)) {
+    return <Navigate to={isOperationsManager(user.role) ? '/agendamentos' : '/engate'} replace />;
   }
 
   return (

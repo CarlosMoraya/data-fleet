@@ -1,6 +1,7 @@
 // ─── Barrel export de todos os tipos ──────────────────────────────────────────
 
 export type { Role } from './role';
+export type { VehicleCoupling, ThirdPartyTractor, ThirdPartyDriver } from './coupling';
 export type { User, Client, OperationsManagerScope } from './user';
 export type { Vehicle, VehicleFieldSettings, VehicleKmInterval } from './vehicle';
 export type { OdometerReading, OdometerCorrectionInput } from './odometerCorrection';

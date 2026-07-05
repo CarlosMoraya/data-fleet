@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase';
 import { Role } from '../types';
 
 const ALL_ROLES: Role[] = [
+  'Coupling Agent',
   'Driver', 'Yard Auditor', 'Fleet Assistant',
   'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master',
 ];
@@ -57,6 +58,8 @@ interface CreateForm {
   role: Role;
   client_id: string;
 }
+
+const COUPLING_AGENT_ROLE: Role = 'Coupling Agent';
 
 const emptyCreate: CreateForm = { name: '', email: '', password: '', role: 'Driver', client_id: '' };
 
@@ -157,6 +160,11 @@ function CreateUserModal({
             >
               {ALL_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
+            {form.role === COUPLING_AGENT_ROLE && (
+              <p className="mt-1 text-xs text-zinc-500">
+                Operador externo com acesso isolado ao fluxo de Engate e a troca de senha.
+              </p>
+            )}
           </div>
 
           <div>

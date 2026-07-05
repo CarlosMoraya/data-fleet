@@ -2,6 +2,68 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-04 (Fase 2 — engate/desengate + terceiros + anti-fraude)
+
+### O que foi implementado
+
+Implementação local da Fase 2 do plano de semi-reboque/implemento como ativo de primeira classe, mantendo o backend/SQL à frente do frontend. A entrega foi organizada em 5 frentes. (1) **Banco / migrations**: criadas as migrations `20260711000000_coupling_and_third_party.sql` (tabelas `third_party_tractor`, `third_party_driver`, `vehicle_couplings` + RLS + índice parcial anti-engate-duplo), `20260711000100_coupling_contexts_and_legacy_migration.sql` (contexts `Engate`/`Desengate` + migração idempotente do flag legado `semi_reboque` com implemento mínimo marcado em `vehicles.tag = 'migrated-legacy-semireboque'`), `20260711000200_add_coupling_agent_role.sql`, `20260711000201_insert_coupling_backoffice_rpc.sql` e `20260711000300_lookup_trailer_rpc.sql`. (2) **Tipos / mappers / permissões**: novo tipo `Role = 'Coupling Agent'`, novos tipos `VehicleCoupling`, `ThirdPartyTractor`, `ThirdPartyDriver`, novos mappers `couplingMappers` e `thirdPartyMappers`, novo capability `canFillCoupling`, nova rota padrão `/engate` e isolamento de navegação do `Coupling Agent`. O papel permanece fora de `ROLES_WITH_ACCESS`, mas o plano foi corrigido na mesma data para que ele seja provisionado pelo fluxo existente de `Novo Usuário` em vez de depender de um cadastro inexistente. (3) **Fluxo `/engate`**: nova página `src/pages/CouplingAgent.tsx` que valida a placa da carreta por digitação + RPC `lookup_trailer_for_coupling`, exige foto geolocalizada da placa física, resolve o template publicado de `Engate`/`Desengate` para `Semi-reboque/Implemento`, cria o checklist em `checklists` e salva um rascunho técnico em Dexie para o hook pós-conclusão. O bucket reaproveitado é `checklist-photos`. (4) **Checklist existente + status surfaces**: `ChecklistFill.tsx` passou a consumir o rascunho salvo para criar `vehicle_couplings` via RPC no fim do checklist de `Engate` e fechar o vínculo aberto no checklist de `Desengate`, gravando GPS e o `distance_km` simples da fase 2. `VehicleDetailModal.tsx` ganhou badge `Engatado/Desvinculado` e aba `Histórico de Engates`; a frota ganhou o painel `/engates` em `src/pages/CouplingsPanel.tsx`. (5) **Offline/Dexie**: `offlineDb.ts` foi expandido para `version(4)` com os stores `couplingPlateHashes` e `couplingDrafts`, sem armazenar lista textual de placas.
+
+### Arquivos criados
+
+- `supabase/migrations/20260711000000_coupling_and_third_party.sql`
+- `supabase/migrations/20260711000100_coupling_contexts_and_legacy_migration.sql`
+- `supabase/migrations/20260711000200_add_coupling_agent_role.sql`
+- `supabase/migrations/20260711000201_insert_coupling_backoffice_rpc.sql`
+- `supabase/migrations/20260711000300_lookup_trailer_rpc.sql`
+- `src/types/coupling.ts`
+- `src/lib/couplingMappers.ts`
+- `src/lib/couplingMappers.test.ts`
+- `src/lib/thirdPartyMappers.ts`
+- `src/lib/thirdPartyMappers.test.ts`
+- `src/pages/CouplingAgent.tsx`
+- `src/pages/CouplingsPanel.tsx`
+
+### Arquivos modificados
+
+- `src/types/role.ts`
+- `src/types/checklist.ts`
+- `src/types/index.ts`
+- `src/lib/rolePermissions.ts`
+- `src/lib/rolePermissions.test.ts`
+- `src/lib/offline/offlineDb.ts`
+- `src/App.tsx`
+- `src/components/Layout.tsx`
+- `src/components/Sidebar.tsx`
+- `src/components/ChecklistTemplateForm.tsx`
+- `src/pages/ChecklistTemplates.tsx`
+- `src/pages/ChecklistFill.tsx`
+- `src/components/VehicleDetailModal.tsx`
+- `supabase/functions/create-user/index.ts`
+- `supabase/functions/delete-user/index.ts`
+- `docs/MEMORY.md`
+- `docs/MEMORY-HISTORY.md`
+
+### Decisões confirmadas
+
+- **`Coupling Agent` é provisionado pelo fluxo existente de `Novo Usuário`**: o papel continua isolado da frota por `ROLES_WITH_ACCESS`, Sidebar e `canAccessRoute`, mas passou a aparecer explicitamente nas opções de cargo do backoffice para que a Fase 2 seja operacionalmente executável.
+- **Integração com checklist existente em vez de novo formulário paralelo**: para não duplicar a infraestrutura offline e de evidência, o fluxo `/engate` apenas prepara o contexto e abre `ChecklistFill`, que continua sendo a tela de execução.
+- **Exceção técnica controlada em `canAccessRoute`**: embora a regra-base do papel seja `/engate`, foi necessário liberar `'/checklists/preencher/:id'` para o `Coupling Agent`; sem isso o usuário ficaria bloqueado fora da própria etapa de execução do checklist que o `/engate` acabou de iniciar. A Sidebar continua exibindo só `Engate`, sem expor a listagem de `/checklists`.
+- **Lookup anti-fraude continua sem inventário**: a RPC retorna apenas `exists` e `available`. A obtenção do `trailer_id` para abrir o checklist foi feita por consulta exata de placa dentro do fluxo autenticado, sem expor lista de ativos na UI.
+- **Migração legada marcada para rollback seguro**: os implementos criados a partir do flag legado recebem `tag = 'migrated-legacy-semireboque'`, permitindo limpeza explícita no bloco de rollback.
+
+### Validações executadas
+
+- `npm run lint` — 0 erros; warnings existentes do baseline + warnings type-aware nos novos componentes
+- `npm run test:unit` — 715/715
+- `npm run test:smoke` — 6/6
+
+### Observações
+
+- As migrations desta fase **não** foram aplicadas pelo agente em DEV/PROD nesta sessão; seguem pendentes de execução manual no SQL Editor conforme o protocolo do projeto.
+- O fluxo de provisionamento do `Coupling Agent` foi corrigido no próprio plano nesta mesma data, reaproveitando `Users`/`AdminUsers` e a edge `create-user`; não existe mais dependência de um cadastro dedicado fora do produto.
+- Na validação funcional seguinte, o papel conseguiu acessar `/engate` e validar a placa, mas não enxergou templates publicados. A causa foi RLS incompleta no circuito de checklist; a correção ficou encapsulada na migration `20260711000310_allow_coupling_agent_checklist_flow.sql`.
+- Na validação seguinte, o papel já conseguiu abrir o checklist, mas falhou ao finalizar o engate com `insufficient_privileges`. A causa foi a RPC `insert_coupling_backoffice` ainda exigir `role_rank >= 3`; a correção ficou na migration `20260711000312_fix_coupling_backoffice_rpc_for_coupling_agent.sql`.
+
 ## Sessão — 2026-07-03 (Refinamento "premium" da célula "Placa / Status" + busca por modelo)
 
 ### O que foi implementado

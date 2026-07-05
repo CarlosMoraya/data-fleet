@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { canAccessRoute, canCorrectOdometer } from './rolePermissions';
+import { canAccessRoute, canCorrectOdometer, canFillCoupling } from './rolePermissions';
 
 import type { Role } from '../types';
 
@@ -15,6 +15,12 @@ describe('canAccessRoute', () => {
 
   it('allows Driver to access the password page', () => {
     expect(canAccessRoute('Driver', '/conta/senha')).toBe(true);
+  });
+
+  it('keeps Coupling Agent restricted to /engate', () => {
+    expect(canAccessRoute('Coupling Agent', '/engate')).toBe(true);
+    expect(canAccessRoute('Coupling Agent', '/checklists/preencher/abc')).toBe(true);
+    expect(canAccessRoute('Coupling Agent', '/cadastros/veiculos')).toBe(false);
   });
 });
 
@@ -40,5 +46,19 @@ describe('canCorrectOdometer', () => {
     for (const role of denied) {
       expect(canCorrectOdometer(role)).toBe(false);
     }
+  });
+});
+
+describe('canFillCoupling', () => {
+  it('allows Coupling Agent and fleet roles configured for coupling', () => {
+    expect(canFillCoupling('Coupling Agent')).toBe(true);
+    expect(canFillCoupling('Fleet Assistant')).toBe(true);
+    expect(canFillCoupling('Coordinator')).toBe(true);
+  });
+
+  it('blocks roles outside the coupling flow', () => {
+    expect(canFillCoupling('Driver')).toBe(false);
+    expect(canFillCoupling('Workshop')).toBe(false);
+    expect(canFillCoupling(undefined)).toBe(false);
   });
 });

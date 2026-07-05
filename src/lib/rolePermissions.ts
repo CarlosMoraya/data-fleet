@@ -1,6 +1,7 @@
 import type { Role } from '../types';
 
 export const ROLE_RANK: Record<Role, number> = {
+  'Coupling Agent': 0,
   'Driver': 0,
   'Yard Auditor': 1,
   'Workshop': 2,
@@ -15,6 +16,7 @@ export const ROLE_RANK: Record<Role, number> = {
 };
 
 export const ROLE_LABELS: Record<Role, string> = {
+  'Coupling Agent': 'Operador de Engate',
   'Driver': 'Driver',
   'Yard Auditor': 'Yard Auditor',
   'Workshop': 'Workshop',
@@ -29,6 +31,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 };
 
 export const ROLE_COLORS: Record<Role, string> = {
+  'Coupling Agent': 'bg-teal-100 text-teal-700',
   'Driver': 'bg-zinc-100 text-zinc-700',
   'Workshop': 'bg-orange-100 text-orange-700',
   'Yard Auditor': 'bg-amber-100 text-amber-700',
@@ -83,6 +86,7 @@ export const ROLES_CAN_APPROVE_BUDGET: Role[] = [
 export const ROLES_CAN_CORRECT_ODOMETER: Role[] = ['Coordinator', 'Manager', 'Director', 'Admin Master'];
 
 export const TENANT_USER_ROLE_OPTIONS: Role[] = [
+  'Coupling Agent',
   'Driver',
   'Yard Auditor',
   'Fleet Assistant',
@@ -96,6 +100,19 @@ export const TENANT_USER_ROLE_OPTIONS: Role[] = [
 ];
 
 const OPERATIONS_MANAGER_ALLOWED_ROUTES = ['/agendamentos', '/manutencao', '/conta/senha'] as const;
+const COUPLING_AGENT_ALLOWED_ROUTES = ['/engate', '/checklists/preencher', '/conta/senha'] as const;
+
+export const ROLES_CAN_FILL_COUPLING: Role[] = [
+  'Coupling Agent',
+  'Fleet Assistant',
+  'Fleet Analyst',
+  'Supervisor',
+  'Operations Manager',
+  'Coordinator',
+  'Manager',
+  'Director',
+  'Admin Master',
+];
 
 export function hasRoleAccess(role: Role | undefined): boolean {
   return ROLES_WITH_ACCESS.includes(role);
@@ -133,6 +150,10 @@ export function canCorrectOdometer(role: Role | undefined | null): boolean {
   return ROLES_CAN_CORRECT_ODOMETER.includes(role);
 }
 
+export function canFillCoupling(role: Role | undefined | null): boolean {
+  return ROLES_CAN_FILL_COUPLING.includes(role);
+}
+
 export function canAccessOperationsReadonlyModules(role: Role | null | undefined): boolean {
   return isOperationsManager(role);
 }
@@ -150,6 +171,7 @@ export function getCreatableRoles(role: Role): Role[] {
 }
 
 export function getDefaultRouteForRole(role: Role | null | undefined): string {
+  if (role === 'Coupling Agent') return '/engate';
   if (role === 'Driver' || role === 'Yard Auditor') return '/checklists';
   if (role === 'Workshop') return '/manutencao';
   if (role === 'Operations Manager') return '/agendamentos';
@@ -158,6 +180,11 @@ export function getDefaultRouteForRole(role: Role | null | undefined): string {
 
 export function canAccessRoute(role: Role | null | undefined, pathname: string): boolean {
   if (!role) return false;
+  if (role === 'Coupling Agent') {
+    return COUPLING_AGENT_ALLOWED_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`)
+    );
+  }
   if (!isOperationsManager(role)) return true;
 
   return OPERATIONS_MANAGER_ALLOWED_ROUTES.some(

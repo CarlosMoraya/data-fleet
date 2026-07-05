@@ -54,6 +54,8 @@ const CONTEXTS: { value: ChecklistContext; label: string; description: string }[
   { value: 'Rotina', label: 'Rotina', description: 'Inspeção rotineira do veículo' },
   { value: 'Auditoria', label: 'Auditoria', description: 'Realizado por Auditores de Pátio' },
   { value: 'Guincho', label: 'Guincho', description: 'Inspeção de veículo sendo guinchado até a oficina' },
+  { value: 'Engate', label: 'Engate', description: 'Checklist de acoplamento entre cavalo e implemento' },
+  { value: 'Desengate', label: 'Desengate', description: 'Checklist de desacoplamento e retorno ao pátio' },
   { value: 'Entrada em Oficina', label: 'Entrada em Oficina', description: 'Registro ao enviar veículo para manutenção' },
   { value: 'Saída de Oficina', label: 'Saída de Oficina', description: 'Conferência ao receber veículo da manutenção' },
   { value: 'Segurança', label: 'Segurança', description: 'Itens críticos de segurança (pode bloquear veículo)' },

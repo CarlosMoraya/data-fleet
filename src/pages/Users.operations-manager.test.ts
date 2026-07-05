@@ -16,6 +16,16 @@ describe('Users operations manager helpers', () => {
     expect(getCreateUserRoleOptions('Fleet Analyst')).not.toContain('Operations Manager');
   });
 
+  it('shows Coupling Agent in the existing new-user flow for creator roles', () => {
+    expect(getCreateUserRoleOptions('Fleet Assistant')).toContain('Coupling Agent');
+    expect(getCreateUserRoleOptions('Fleet Analyst')).toContain('Coupling Agent');
+    expect(getCreateUserRoleOptions('Supervisor')).toContain('Coupling Agent');
+    expect(getCreateUserRoleOptions('Coordinator')).toContain('Coupling Agent');
+    expect(getCreateUserRoleOptions('Manager')).toContain('Coupling Agent');
+    expect(getCreateUserRoleOptions('Director')).toContain('Coupling Agent');
+    expect(getCreateUserRoleOptions('Admin Master')).toContain('Coupling Agent');
+  });
+
   it('blocks save without shipper selection', () => {
     expect(
       getOperationsManagerScopeError({

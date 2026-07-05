@@ -2,7 +2,7 @@
 
 export type VehicleCategory = 'Leve' | 'Médio' | 'Pesado' | 'Elétrico' | 'Semi-reboque/Implemento';
 export type TemplateCategory = VehicleCategory;
-export type ChecklistContext = 'Rotina' | 'Auditoria' | 'Guincho' | 'Entrada em Oficina' | 'Saída de Oficina' | 'Segurança' | 'Atualização de Hodômetro';
+export type ChecklistContext = 'Rotina' | 'Auditoria' | 'Guincho' | 'Engate' | 'Desengate' | 'Entrada em Oficina' | 'Saída de Oficina' | 'Segurança' | 'Atualização de Hodômetro';
 export const ODOMETER_UPDATE_CONTEXT: ChecklistContext = 'Atualização de Hodômetro';
 export const WORKSHOP_CONTEXTS: ChecklistContext[] = ['Entrada em Oficina', 'Saída de Oficina'];
 export type TemplateStatus = 'draft' | 'published' | 'deprecated';

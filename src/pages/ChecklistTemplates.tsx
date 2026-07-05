@@ -240,7 +240,7 @@ export default function ChecklistTemplates() {
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          {(['Todos', 'Rotina', 'Auditoria', 'Guincho', 'Entrada em Oficina', 'Saída de Oficina', 'Segurança'] as const).map(ctx => (
+          {(['Todos', 'Rotina', 'Auditoria', 'Guincho', 'Engate', 'Desengate', 'Entrada em Oficina', 'Saída de Oficina', 'Segurança'] as const).map(ctx => (
             <button
               key={ctx}
               onClick={() => setFilterContext(ctx)}

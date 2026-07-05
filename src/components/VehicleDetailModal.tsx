@@ -1,6 +1,9 @@
+import { useQuery } from '@tanstack/react-query';
 import { X, ExternalLink, Truck } from 'lucide-react';
 import React, { useState } from 'react';
 
+import { couplingFromRow, type VehicleCouplingRow } from '../lib/couplingMappers';
+import { supabase } from '../lib/supabase';
 import { Vehicle } from '../types';
 
 import VehicleKmHistoryTab from './VehicleKmHistoryTab';
@@ -62,7 +65,40 @@ function formatDate(dateStr?: string | null): string | undefined {
 }
 
 export default function VehicleDetailModal({ vehicle, onClose }: Props) {
-  const [activeTab, setActiveTab] = useState<'general' | 'kmHistory'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'kmHistory' | 'couplingHistory'>('general');
+  const isImplement = vehicle.category === 'Semi-reboque/Implemento';
+  const showCouplingHistory = isImplement || vehicle.type === 'Cavalo';
+
+  const { data: couplingHistory = [] } = useQuery({
+    queryKey: ['vehicleDetailCouplings', vehicle.id, vehicle.type, vehicle.category],
+    enabled: showCouplingHistory,
+    queryFn: async () => {
+      let query = supabase
+        .from('vehicle_couplings')
+        .select(`
+          *,
+          trailers:vehicles!vehicle_couplings_trailer_id_fkey(license_plate),
+          tractors:vehicles!vehicle_couplings_tractor_id_fkey(license_plate)
+        `)
+        .order('coupled_at', { ascending: false });
+
+      query = isImplement ? query.eq('trailer_id', vehicle.id) : query.eq('tractor_id', vehicle.id);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return (data as Array<VehicleCouplingRow & {
+        trailers?: { license_plate: string } | null;
+        tractors?: { license_plate: string } | null;
+      }> ?? []).map((row) => ({
+        ...couplingFromRow(row),
+        trailerPlate: row.trailers?.license_plate ?? '—',
+        resolvedTractorPlate: row.tractor_plate ?? row.tractors?.license_plate ?? '—',
+      }));
+    },
+  });
+
+  const openCoupling = couplingHistory.find((coupling) => !coupling.uncoupledAt);
 
   return (
     <div
@@ -77,7 +113,14 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
               <Truck className="h-5 w-5 text-orange-500" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-zinc-900">{vehicle.licensePlate}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-zinc-900">{vehicle.licensePlate}</h2>
+                {isImplement ? (
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${openCoupling ? 'bg-green-100 text-green-700' : 'bg-zinc-100 text-zinc-700'}`}>
+                    {openCoupling ? 'Engatado' : 'Desvinculado'}
+                  </span>
+                ) : null}
+              </div>
               <p className="text-sm text-zinc-500">{vehicle.brand} {vehicle.model} ({vehicle.year})</p>
             </div>
           </div>
@@ -118,6 +161,21 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
             >
               Histórico de KM
             </button>
+            {showCouplingHistory ? (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'couplingHistory'}
+                onClick={() => setActiveTab('couplingHistory')}
+                className={`rounded-t-xl px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === 'couplingHistory'
+                    ? 'border-b-2 border-orange-500 text-orange-600'
+                    : 'text-zinc-500 hover:text-zinc-800'
+                }`}
+              >
+                Histórico de Engates
+              </button>
+            ) : null}
           </div>
 
           {activeTab === 'general' ? (
@@ -238,8 +296,36 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
                 </div>
               </div>
             </>
-          ) : (
+          ) : activeTab === 'kmHistory' ? (
             <VehicleKmHistoryTab vehicleId={vehicle.id} />
+          ) : (
+            <div className="space-y-3">
+              {couplingHistory.length === 0 ? (
+                <p className="text-sm text-zinc-500">Nenhum engate registrado para este ativo.</p>
+              ) : couplingHistory.map((coupling) => (
+                <article key={coupling.id} className="rounded-2xl border border-zinc-200 p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-900">
+                        {isImplement ? coupling.resolvedTractorPlate : coupling.trailerPlate}
+                      </p>
+                      <p className="text-xs text-zinc-500">
+                        {coupling.tractorDriverName ?? 'Condutor não informado'}
+                      </p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${coupling.uncoupledAt ? 'bg-zinc-100 text-zinc-700' : 'bg-green-100 text-green-700'}`}>
+                      {coupling.uncoupledAt ? 'Fechado' : 'Aberto'}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-zinc-500">
+                    <p>Engate: {new Date(coupling.coupledAt).toLocaleString('pt-BR')}</p>
+                    <p>Desengate: {coupling.uncoupledAt ? new Date(coupling.uncoupledAt).toLocaleString('pt-BR') : '—'}</p>
+                    <p>KM engate: {coupling.odometerCoupled?.toLocaleString('pt-BR') ?? '—'}</p>
+                    <p>KM rodado: {coupling.distanceKm?.toLocaleString('pt-BR') ?? '—'}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
           )}
         </div>
 

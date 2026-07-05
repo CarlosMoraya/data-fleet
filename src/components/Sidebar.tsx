@@ -13,12 +13,13 @@ import {
   BadgeCheck,
   KeyRound,
   ShieldCheck,
+  Link2,
 } from 'lucide-react';
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
-import { getRoleLabel, isOperationsManager } from '../lib/rolePermissions';
+import { canFillCoupling, getRoleLabel, isOperationsManager } from '../lib/rolePermissions';
 import { cn } from '../lib/utils';
 
 import type { Role } from '../types';
@@ -35,6 +36,8 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'Dashboard', to: '/', icon: LayoutDashboard, roles: ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Cadastros', to: '/cadastros', icon: FolderOpen, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Checklists', to: '/checklists', icon: ClipboardCheck, roles: ['Driver', 'Yard Auditor', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
+  { name: 'Engate', to: '/engate', icon: Link2, roles: ['Coupling Agent'] },
+  { name: 'Engates/Pátio', to: '/engates', icon: Link2, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Plano de Ação', to: '/acoes', icon: ClipboardList, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Agendamentos', to: '/agendamentos', icon: CalendarClock, roles: ['Driver', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Manutenção', to: '/manutencao', icon: Wrench, roles: ['Workshop', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
@@ -60,9 +63,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const userRole = user?.role;
 
-  const visibleNavItems = isOperationsManager(userRole)
-    ? NAV_ITEMS.filter((item) => item.to === '/agendamentos' || item.to === '/manutencao')
-    : NAV_ITEMS.filter((item) => (userRole ? item.roles.includes(userRole) : false));
+  const visibleNavItems = userRole === 'Coupling Agent'
+    ? NAV_ITEMS.filter((item) => item.to === '/engate')
+    : isOperationsManager(userRole)
+      ? NAV_ITEMS.filter((item) => item.to === '/agendamentos' || item.to === '/manutencao')
+      : NAV_ITEMS.filter((item) => {
+          if (!userRole) return false;
+          if (item.to === '/engate') return canFillCoupling(userRole);
+          return item.roles.includes(userRole);
+        });
 
   return (
     <>
