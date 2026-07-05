@@ -36,6 +36,7 @@ const STATUS_BG: Record<string, string> = {
 export default function ChecklistDetailModal({ checklist, onClose }: Props) {
   const [responses, setResponses] = useState<ChecklistResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -145,15 +146,14 @@ export default function ChecklistDetailModal({ checklist, onClose }: Props) {
                 {checklist.odometerPhotoUrl && (
                   <div className="col-span-2 mt-1 flex items-center gap-2">
                     <img src={checklist.odometerPhotoUrl} alt="foto do hodômetro" className="h-20 w-20 rounded-lg object-cover" />
-                    <a
-                      href={checklist.odometerPhotoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => setLightboxUrl(checklist.odometerPhotoUrl!)}
                       className="flex items-center gap-1 text-xs text-orange-500 hover:underline"
                     >
                       <Camera className="h-3 w-3" />
                       Visualizar foto
-                    </a>
+                    </button>
                   </div>
                 )}
               </div>
@@ -189,15 +189,14 @@ export default function ChecklistDetailModal({ checklist, onClose }: Props) {
                         {r.photoUrl && (
                           <div className="mt-2 flex items-center gap-2">
                             <img src={r.photoUrl} alt="foto" className="h-16 w-16 rounded-lg object-cover" />
-                            <a
-                              href={r.photoUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => setLightboxUrl(r.photoUrl!)}
                               className="flex items-center gap-1 text-xs text-orange-500 hover:underline"
                             >
                               <Camera className="h-3 w-3" />
                               Visualizar foto
-                            </a>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -215,6 +214,22 @@ export default function ChecklistDetailModal({ checklist, onClose }: Props) {
           </button>
         </div>
       </div>
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <img src={lightboxUrl} alt="Foto do checklist" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" />
+          <button
+            type="button"
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 text-white/80 hover:text-white"
+            aria-label="Fechar"
+          >
+            <X size={28} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

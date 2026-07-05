@@ -12,10 +12,21 @@ interface Props {
   onClose: () => void;
 }
 
+function isLocalInviteOrigin(hostname: string) {
+  return hostname === 'localhost'
+    || hostname === '127.0.0.1'
+    || hostname.startsWith('192.168.')
+    || hostname.startsWith('10.')
+    || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
+}
+
 export default function InviteWorkshopModal({ onClose }: Props) {
   const { currentClient } = useAuth();
   const queryClient = useQueryClient();
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const configuredFrontendUrl = import.meta.env.VITE_FRONTEND_URL as string | undefined;
+  const isLocalOrigin = isLocalInviteOrigin(window.location.hostname);
+  const showDevelopmentWarning = isLocalOrigin && !configuredFrontendUrl;
 
   // Buscar convites pendentes
   const { data: invitations = [], isLoading: loadingInvitations } = useQuery({
@@ -118,19 +129,11 @@ export default function InviteWorkshopModal({ onClose }: Props) {
     setTimeout(() => setCopiedToken(null), 2000);
   };
 
-  const isLocalInviteOrigin = (hostname: string) =>
-    hostname === 'localhost'
-    || hostname === '127.0.0.1'
-    || hostname.startsWith('192.168.')
-    || hostname.startsWith('10.')
-    || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
-
   const getInviteBaseUrl = () => {
-    const configuredUrl = import.meta.env.VITE_FRONTEND_URL as string | undefined;
-    if (configuredUrl) return configuredUrl.replace(/\/+$/, '');
+    if (configuredFrontendUrl) return configuredFrontendUrl.replace(/\/+$/, '');
 
-    if (isLocalInviteOrigin(window.location.hostname)) {
-      return 'https://app.betafleet.com.br';
+    if (isLocalOrigin) {
+      return window.location.origin;
     }
 
     return window.location.origin;
@@ -187,6 +190,12 @@ export default function InviteWorkshopModal({ onClose }: Props) {
           {createMutation.isError && (
             <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
               Erro ao gerar convite: {(createMutation.error as { message?: string })?.message}
+            </p>
+          )}
+
+          {showDevelopmentWarning && (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+              ⚠️ Você está em um ambiente de desenvolvimento. Links gerados aqui só funcionam neste ambiente e não devem ser enviados a oficinas reais. Para convidar uma oficina de verdade, gere o link a partir de produção (app.betafleet.com.br).
             </p>
           )}
 
