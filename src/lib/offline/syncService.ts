@@ -128,7 +128,12 @@ async function processEntry(entry: SyncQueueEntry): Promise<void> {
     case 'confirm_km': {
       const { error } = await supabase
         .from('checklists')
-        .update({ odometer_km: op.odometerKm })
+        .update({
+          odometer_km: op.odometerKm,
+          latitude: op.latitude,
+          longitude: op.longitude,
+          location_status: op.locationStatus,
+        })
         .eq('id', checklistId);
       if (error) throw error;
       break;

@@ -1,4 +1,4 @@
-import type { Checklist, ChecklistResponse, ChecklistStatus, ResponseStatus, ChecklistContext } from '../types';
+import type { Checklist, ChecklistResponse, ChecklistStatus, ResponseStatus, ChecklistContext, ChecklistLocationStatus } from '../types';
 
 // ─── Row types (snake_case from Supabase) ─────────────────────────────────────
 
@@ -14,6 +14,7 @@ export interface ChecklistRow {
   status: string;
   latitude: number | null;
   longitude: number | null;
+  location_status: string | null;
   device_info: string | null;
   notes: string | null;
   workshop_id: string | null;
@@ -57,6 +58,7 @@ export function checklistFromRow(row: ChecklistRow): Checklist {
     status: row.status as ChecklistStatus,
     latitude: row.latitude ?? undefined,
     longitude: row.longitude ?? undefined,
+    locationStatus: (row.location_status as ChecklistLocationStatus | null) ?? undefined,
     deviceInfo: row.device_info ?? undefined,
     notes: row.notes ?? undefined,
     workshopId: row.workshop_id ?? undefined,

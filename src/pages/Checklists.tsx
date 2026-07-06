@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle, Disc, Gauge } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle, Disc, Gauge, MapPinOff } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import ChecklistDetailModal from '../components/ChecklistDetailModal';
 import CreateActionPlanModal from '../components/CreateActionPlanModal';
 import LastKmLabel from '../components/LastKmLabel';
+import ChecklistMapLink from '../components/ChecklistMapLink';
 import SelectClientNotice from '../components/SelectClientNotice';
 import TireInspectionDetailModal from '../components/TireInspectionDetailModal';
 import { useAuth } from '../context/AuthContext';
@@ -243,7 +244,10 @@ export default function Checklists() {
       if (error) throw error;
       return (data ?? []).map(r => checklistFromRow(r as ChecklistRow));
     },
-    enabled: showsAggregatedData(user?.role, currentClient?.id)
+    enabled: showsAggregatedData(user?.role, currentClient?.id),
+    // Checklists recém-preenchidos por motoristas devem refletir imediatamente: ignorar o cache
+    // persistido (o staleTime global de 3 min atrasava a aparição na tela do Assistente+).
+    staleTime: 0,
   });
 
   const checklistVehicleIds = useMemo(
@@ -815,6 +819,16 @@ export default function Checklists() {
                                       info={c.vehicleId ? checklistLastKmMap.get(c.vehicleId) : undefined}
                                       className="text-xs text-zinc-400"
                                     />
+                                    <ChecklistMapLink latitude={c.latitude} longitude={c.longitude} />
+                                    {c.locationStatus === 'denied' && (
+                                      <span
+                                        className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+                                        title="Localização negada pelo motorista — possível tentativa de burlar o processo"
+                                      >
+                                        <MapPinOff className="h-3 w-3" />
+                                        Localização negada
+                                      </span>
+                                    )}
                                   </>
                                 ) : '—'}
                               </td>
@@ -1018,6 +1032,7 @@ function HistoryCard({ checklists, historySearch, setHistorySearch, historyStatu
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-zinc-900">{c.templateName}</p>
                 <p className="text-xs text-zinc-500">{c.vehicleLicensePlate && `${c.vehicleLicensePlate} · `}{c.templateContext && `${c.templateContext} · `}{formatDate(c.startedAt)}</p>
+                <ChecklistMapLink latitude={c.latitude} longitude={c.longitude} />
               </div>
               <span className={cn('flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[c.status])}>
                 {STATUS_LABEL[c.status]}

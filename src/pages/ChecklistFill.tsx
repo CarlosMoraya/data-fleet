@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle, XCircle, MinusCircle, Camera, ChevronLeft, Loader2, Lock, AlertTriangle, Building2, Gauge } from 'lucide-react';
+import { CheckCircle, XCircle, MinusCircle, Camera, ChevronLeft, Loader2, Lock, AlertTriangle, Building2, Gauge, MapPinOff } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -13,9 +13,12 @@ import { validateChecklistOdometerKm } from '../lib/checklistKmValidation';
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
 import { uploadChecklistPhoto } from '../lib/checklistStorageHelpers';
 import { checklistItemFromRow, type ChecklistItemRow } from '../lib/checklistTemplateMappers';
+import { computeTractorWindowDistanceKm, resolveThirdPartyDistanceKm } from '../lib/couplingKm';
+import { mapOdometerReadingRow } from '../lib/odometerCorrectionMappers';
 import { evaluateOdometerTolerance } from '../lib/odometerToleranceValidation';
 import { offlineDb, type CouplingDraftEntry } from '../lib/offline/offlineDb';
 import { enqueueOperation, enqueuePhoto } from '../lib/offline/syncService';
+import { capturePosition } from '../lib/geolocation';
 import { applyOfflineKm, applyOfflineWorkshop, upsertResponse } from '../lib/offlineCacheUpdates';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
@@ -71,6 +74,7 @@ export default function ChecklistFill() {
   const [kmInput, setKmInput] = useState('');
   const [kmConfirmed, setKmConfirmed] = useState(false);
   const [kmError, setKmError] = useState<string | null>(null);
+  const [locationWarning, setLocationWarning] = useState<string | null>(null);
   const [odometerPhotoUrl, setOdometerPhotoUrl] = useState('');
   const [odometerCameraOpen, setOdometerCameraOpen] = useState(false);
   const [couplingDraft, setCouplingDraft] = useState<CouplingDraftEntry | null>(null);
@@ -316,18 +320,43 @@ export default function ChecklistFill() {
   const confirmKmMutation = useMutation({
     networkMode: 'offlineFirst',
     mutationFn: async (km: number) => {
+      const loc = await capturePosition();
       if (!navigator.onLine) {
-        await enqueueOperation({ type: 'confirm_km', odometerKm: km }, checklistId);
-        queryClient.setQueryData(['checklist', checklistId], (old: Checklist | undefined) => applyOfflineKm(old, km));
-        return;
+        await enqueueOperation(
+          {
+            type: 'confirm_km',
+            odometerKm: km,
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            locationStatus: loc.status,
+          },
+          checklistId,
+        );
+        queryClient.setQueryData(['checklist', checklistId], (old: Checklist | undefined) =>
+          old
+            ? { ...applyOfflineKm(old, km), latitude: loc.latitude ?? undefined, longitude: loc.longitude ?? undefined, locationStatus: loc.status }
+            : old,
+        );
+        return loc;
       }
       const { error } = await supabase
         .from('checklists')
-        .update({ odometer_km: km })
+        .update({
+          odometer_km: km,
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          location_status: loc.status,
+        })
         .eq('id', checklistId);
       if (error) throw error;
+      return loc;
     },
-    onSuccess: () => {
+    onSuccess: (loc) => {
+      if (loc && loc.status !== 'captured') {
+        setLocationWarning('Não foi possível registrar sua localização. Ative a permissão de localização do dispositivo para preencher o checklist da forma adequada.');
+      } else {
+        setLocationWarning(null);
+      }
       if (navigator.onLine) {
         void queryClient.invalidateQueries({ queryKey: ['checklist', checklistId] });
       }
@@ -440,9 +469,28 @@ export default function ChecklistFill() {
         }
 
         if (templateContext === 'Desengate' && couplingDraft.openCouplingId) {
-          const distanceKm = checklist.odometerKm != null && couplingDraft.openCouplingOdometer != null
-            ? Math.max(0, checklist.odometerKm - couplingDraft.openCouplingOdometer)
-            : null;
+          let distanceKm: number | null;
+
+          if (couplingDraft.tractorId) {
+            // Cavalo registrado: delta de km efetivo do PRÓPRIO cavalo na janela do engate.
+            const openCoupling = await supabase
+              .from('vehicle_couplings')
+              .select('coupled_at')
+              .eq('id', couplingDraft.openCouplingId)
+              .single();
+            if (openCoupling.error) throw openCoupling.error;
+
+            const readingsRpc = await supabase.rpc('get_vehicle_odometer_readings', {
+              p_vehicle_id: couplingDraft.tractorId,
+            });
+            if (readingsRpc.error) throw readingsRpc.error;
+            const readings = ((readingsRpc.data as Record<string, unknown>[] | null) ?? []).map(mapOdometerReadingRow);
+
+            distanceKm = computeTractorWindowDistanceKm(readings, openCoupling.data.coupled_at, completedAt);
+          } else {
+            // Cavalo de terceiro: valor informado pelo operador (odômetro da própria carreta no engate/desengate).
+            distanceKm = resolveThirdPartyDistanceKm(couplingDraft.openCouplingOdometer, checklist.odometerKm);
+          }
 
           const update = await supabase
             .from('vehicle_couplings')
@@ -756,6 +804,12 @@ export default function ChecklistFill() {
                   </button>
                   <p className="text-center text-xs text-zinc-500">Informe o hodômetro para liberar os itens do checklist</p>
                 </>
+              )}
+              {locationWarning && (
+                <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-600">
+                  <MapPinOff className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                  <span>{locationWarning}</span>
+                </p>
               )}
               {isOdometerContext && kmConfirmed && toleranceState.requiresPhoto && (
                 <div className="space-y-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-3">

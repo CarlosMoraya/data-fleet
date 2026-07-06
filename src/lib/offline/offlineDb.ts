@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 
-import type { ChecklistContext, ResponseStatus } from '../../types';
+import type { ChecklistContext, ChecklistLocationStatus, ResponseStatus } from '../../types';
 import type { TireInspectionResponseStatus } from '../../types/tireInspection';
 
 // ─── Sync operation types ─────────────────────────────────────────────────────
@@ -18,6 +18,9 @@ export type SyncOperation =
   | {
       type: 'confirm_km';
       odometerKm: number;
+      latitude: number | null;
+      longitude: number | null;
+      locationStatus: ChecklistLocationStatus;
     }
   | {
       type: 'confirm_workshop';

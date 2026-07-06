@@ -24,6 +24,7 @@ export type {
   ChecklistStatus,
   ResponseStatus,
   ActionPlanStatus,
+  ChecklistLocationStatus,
   ChecklistItemSuggestion,
   ChecklistTemplate,
   ChecklistTemplateVersion,

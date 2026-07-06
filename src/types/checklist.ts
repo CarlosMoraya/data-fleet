@@ -9,6 +9,7 @@ export type TemplateStatus = 'draft' | 'published' | 'deprecated';
 export type ChecklistStatus = 'in_progress' | 'completed';
 export type ResponseStatus = 'ok' | 'issue' | 'skipped' | 'not_applicable';
 export type ActionPlanStatus = 'pending' | 'in_progress' | 'awaiting_conclusion' | 'completed' | 'cancelled';
+export type ChecklistLocationStatus = 'captured' | 'denied' | 'unavailable';
 
 export interface ChecklistItemSuggestion {
   id: string;
@@ -72,6 +73,7 @@ export interface Checklist {
   status: ChecklistStatus;
   latitude?: number;
   longitude?: number;
+  locationStatus?: ChecklistLocationStatus;
   deviceInfo?: string;
   notes?: string;
   workshopId?: string;
