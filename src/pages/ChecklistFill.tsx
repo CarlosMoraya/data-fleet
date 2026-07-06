@@ -13,8 +13,6 @@ import { validateChecklistOdometerKm } from '../lib/checklistKmValidation';
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
 import { uploadChecklistPhoto } from '../lib/checklistStorageHelpers';
 import { checklistItemFromRow, type ChecklistItemRow } from '../lib/checklistTemplateMappers';
-import { computeTractorWindowDistanceKm, resolveThirdPartyDistanceKm } from '../lib/couplingKm';
-import { mapOdometerReadingRow } from '../lib/odometerCorrectionMappers';
 import { evaluateOdometerTolerance } from '../lib/odometerToleranceValidation';
 import { offlineDb, type CouplingDraftEntry } from '../lib/offline/offlineDb';
 import { enqueueOperation, enqueuePhoto } from '../lib/offline/syncService';
@@ -469,28 +467,9 @@ export default function ChecklistFill() {
         }
 
         if (templateContext === 'Desengate' && couplingDraft.openCouplingId) {
-          let distanceKm: number | null;
-
-          if (couplingDraft.tractorId) {
-            // Cavalo registrado: delta de km efetivo do PRÓPRIO cavalo na janela do engate.
-            const openCoupling = await supabase
-              .from('vehicle_couplings')
-              .select('coupled_at')
-              .eq('id', couplingDraft.openCouplingId)
-              .single();
-            if (openCoupling.error) throw openCoupling.error;
-
-            const readingsRpc = await supabase.rpc('get_vehicle_odometer_readings', {
-              p_vehicle_id: couplingDraft.tractorId,
-            });
-            if (readingsRpc.error) throw readingsRpc.error;
-            const readings = ((readingsRpc.data as Record<string, unknown>[] | null) ?? []).map(mapOdometerReadingRow);
-
-            distanceKm = computeTractorWindowDistanceKm(readings, openCoupling.data.coupled_at, completedAt);
-          } else {
-            // Cavalo de terceiro: valor informado pelo operador (odômetro da própria carreta no engate/desengate).
-            distanceKm = resolveThirdPartyDistanceKm(couplingDraft.openCouplingOdometer, checklist.odometerKm);
-          }
+          const distanceKm = checklist.odometerKm != null && couplingDraft.openCouplingOdometer != null
+            ? Math.max(0, checklist.odometerKm - couplingDraft.openCouplingOdometer)
+            : null;
 
           const update = await supabase
             .from('vehicle_couplings')
