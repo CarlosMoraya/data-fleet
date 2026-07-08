@@ -2,6 +2,97 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-08 (Edição de cargo no modal de edição de usuário)
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão (Tipo 3 — alteração em funcionalidade existente), o `EditUserModal` de `src/pages/Users.tsx` passou a permitir alterar o cargo (`role`) do usuário editado, além dos campos já existentes (nome, limite de aprovação de orçamento).
+
+1. **Helper puro exportado `getEditableRoleOptions(currentUserRole: Role): Role[]`** — `getCreatableRoles(currentUserRole).filter((role) => role !== 'Operations Manager')`. Espelha o padrão já usado por `getCreateUserRoleOptions` (Pure function + presentation split).
+2. **Estado `role`** no `EditUserModal`, inicializado/resetado a partir de `user.role` no mesmo `useEffect` que já reseta `name`/`budgetLimit`.
+3. **Renderização condicional do campo Cargo**: `showRoleSelect = canManagePermissions && !isOperationsRole`. Quando verdadeiro, `<select>` controlado por `role`/`setRole` com opções de `getEditableRoleOptions(currentUserRole)` e rótulos de `getRoleLabel`; caso contrário, mantém o texto estático "(não editável aqui)" exatamente como antes.
+4. **`editMutation`** passou a incluir `updates.role = role` sob a mesma condição `canManagePermissions && !isOperationsRole` que já controlava `budget_approval_limit`.
+5. **Teste unitário** — 3 casos novos em `src/pages/Users.operations-manager.test.ts` cobrindo exclusão de Operations Manager, cargos atribuíveis por Manager, e o caso de borda de Admin Master não poder atribuir o próprio Admin Master.
+
+### Decisões tomadas nesta sessão (registradas no `IMPLEMENTATION.md`)
+
+- **Coordinator PODE editar cargo** — usa a mesma porta `CAN_MANAGE_PERMISSIONS` (`['Manager','Coordinator','Director','Admin Master']`) já usada pelo limite de aprovação, consistente com a RLS que já libera Coordinator.
+- **"Gestor de Operações" fica fora do `<select>` de edição**, e usuários que já são Gestor de Operações permanecem somente leitura no campo Cargo — decisão intencional para não acoplar esta mudança aos campos de escopo dinâmicos (embarcador/unidade) nem à edge function `sync_operations_scope`, que continuam exclusivos do fluxo de criação (`CreateUserModal`) e de `AdminUsers.tsx`.
+- **Discrepância informativa, não corrigida**: `getCreatableRoles('Admin Master')` já excluía o próprio 'Admin Master' antes desta sessão (regra `rank < myRank`); inócuo porque a listagem de `Users.tsx` nunca expõe um Admin Master como editável.
+
+### Segurança
+
+A barreira de autorização real permanece a RLS `tenant_managers_update_profiles` (pré-existente, migration `20260619000001_sync_dev_to_prod.sql`), que exige `role_rank(role) < role_rank(get_my_role())` tanto na linha alvo (`USING`) quanto no novo valor de `role` (`WITH CHECK` herdado do `USING`). O filtro do `<select>` por `getEditableRoleOptions` é apenas UX — não substitui a RLS. Nenhuma migration, RLS, edge function ou contrato de tabela foi alterado nesta sessão.
+
+### Validação
+
+`npm run lint` **0 erros** (116 warnings, baseline sem regressão); `npm run test:unit` **764/764** (761 base + 3 novos). Validação manual guiada (4 cenários) e `npm run test:smoke` ficaram pendentes de execução pelo usuário — não automatizáveis nesta sessão (dependem de auth/browser).
+
+### Débito técnico registrado (fora do escopo)
+
+- Sem log de auditoria de troca de cargo (quem alterou o cargo de quem).
+- Sem teste de componente para `EditUserModal` (depende de `AuthContext` + React Query + Supabase); cobertura de UI permanece manual/E2E.
+- Suporte a trocar de/para "Gestor de Operações" nesta tela ficaria pendente de orquestrar os campos de escopo dinâmicos e `sync_operations_scope`, caso seja desejado no futuro.
+
+## Sessão — 2026-07-06 (Suíte de teste de carga / load testing)
+
+### O que foi implementado
+
+Suíte de **teste de carga** totalmente isolada do código de produto (Tipo 1 — Adição sem impacto em `src/` ou `supabase/`). Nenhuma linha de produção foi alterada. Entregues três blocos:
+
+1. **Seed de massa realista (`scripts/seed-loadtest.ts`)** — executável via `tsx` com guard fail-closed `assertDevEnvironment` (aborta se a URL não contiver o ref de Dev `vvbnbzzhpiksacqudmfu` ou contiver o ref de prod `oajfjdadcicgoxrfrnny`; sem override). Idempotente via padrão get-or-create (`insertIfMissing`/`upsertByKey` portados de `scripts/seed-betafleet-demo.mjs`) e idempotência por `count(*)` em tabelas volumosas. Limpeza cirúrgica `--purge` deleta em ordem reversa de FK apenas entidades marcadas com `LT — `/`LT<5>`/`@loadtest.betafleet.local`. Flags: `--clients`, `--vehicles-per-client`, `--drivers-per-client`, `--checklists-per-vehicle`, `--maintenance-per-client`, `--tires-per-vehicle`, `--months`, `--photos`, `--scale=smoke` (preset 5×100), `--purge`. Máximo de **50 usuários Driver reais** de auth por tenant (1.000 contas no full run); demais motoristas são linhas de `drivers` sem auth (`profile_id=null`). Service-role só de `process.env.SUPABASE_SERVICE_ROLE_KEY`; nunca logada. Gera JPEG sintético de 10 KB no Storage sob `<client_id>/loadtest/...`.
+
+2. **Seis cenários k6 (`loadtest/scenarios/*.ts`)** — TypeScript rodado nativamente pelo k6 v0.57+ (sem bundler nem SDK npm):
+   - `dashboard.ts` (50 VUs, RPCs `dashboard_previous_period_cost` + `dashboard_cost_projection_monthly` + listagem agregada)
+   - `checklists.ts` (200 VUs, lote de checklists + respostas, marca `notes='LT-K6'` para limpeza posterior)
+   - `listings.ts` (30 VUs paginadas em 5 recursos)
+   - `uploads.ts` (50 VUs, PUT no Storage + variante Image Transformation ligada por `LOADTEST_IMAGE_TRANSFORM=1`)
+   - `ocr.ts` (10 VUs, `gemini-ocr` — **desligado por default** no runner, teto rígido de 30 iterações)
+   - `stress.ts` (50→800 VUs em degraus, sem threshold — encontra ponto de ruptura)
+   Todos tagueiam `op`, `tenant` (0..19), `stage`/`variant` quando aplicável. `setup()` pré-emite JWTs (evita rate limit de auth) via password grant e os reusa por todas as VUs. Métricas customizadas e `THRESHOLDS` compartilhados em `loadtest/options.ts` (`read p(95)<2000ms`, `read failed rate==0`, `write failed rate<0.03`, `upload p(99)<5000ms`).
+
+3. **Runner + relatório diagnóstico (`loadtest/runner.ts` + `loadtest/report.ts`)** — orquestra `k6 run --summary-export=<json>` por cenário em `docs/reports/loadtest/.raw/` (gitignored), transforma em Markdown com 7 seções: resumo executivo ✅/❌, p50/p95/p99 por operação, série p95 por estágio do stress, **Gargalos priorizados (entrada direta da Etapa 2)** com hipótese de causa por métrica, comparativo vs `baseline.json` (delta %, gate regressão 15%), veredito Image Transformation on/off, espaço para anotação manual de CPU/RAM do banco. Flags do runner: `--only=`, `--include-ocr`, `--include-stress`, `--update-baseline`.
+
+### Arquivos criados
+
+- `scripts/seed-loadtest.ts`
+- `scripts/__tests__/seed-loadtest.util.test.ts`
+- `loadtest/options.ts`
+- `loadtest/scenarios/dashboard.ts`
+- `loadtest/scenarios/checklists.ts`
+- `loadtest/scenarios/listings.ts`
+- `loadtest/scenarios/uploads.ts`
+- `loadtest/scenarios/ocr.ts`
+- `loadtest/scenarios/stress.ts`
+- `loadtest/runner.ts`
+- `loadtest/report.ts`
+- `loadtest/__tests__/report.test.ts`
+- `docs/loadtest/README.md`
+- `docs/reports/loadtest/.gitkeep`
+
+### Arquivos modificados
+
+- `package.json` — apenas seção `scripts`: adicionados `loadtest:seed`, `loadtest:purge`, `loadtest:run`, `loadtest:report`.
+- `.gitignore` — apenas adição: `docs/reports/loadtest/.raw/` (summaries brutos não versionados).
+
+### Decisões tomadas nesta sessão
+
+- **Banco alvo = Dev** (`vvbnbzzhpiksacqudmfu`), guard fail-closed, sem override para prod.
+- **Seed via service-role com batch insert** — não passa por RLS de propósito; seed não valida RLS.
+- **Sync do Cenário 2 = batch POST com `Prefer: return=representation`** para pegar os ids de volta e gravar respostas correlacionadas — reflete como o betaFleet sincroniza por lote, não drip 1-a-1.
+- **k6 roda `.ts` nativamente (v≥0.57) — sem bundler nem dependência npm de k6.**
+- **Máx 50 usuários de auth Driver por tenant** — decisáo de custo/tempo; demais motoristas são linhas de `drivers` sem conta de auth. Suficiente para 200 VUs distribuídas entre 20 tenants.
+- **OCR e Stress desligados por default** — custo (Gemini) e impacto; só com flags explícitas.
+- **Image Transformation desligado por default** (`LOADTEST_IMAGE_TRANSFORM=0`) — o usuário ainda não ativou o serviço no Supabase Pro; a comparação fica pronta para quando ativar.
+
+### Observações (não-bloqueantes)
+
+- **vitest config restricts `include` to `src/**/*.test.{ts,tsx}`** — os testes desta suíte vivem em `scripts/__tests__/` e `loadtest/__tests__/` e não são coletados por `npx vitest run` sem `--config`. O comando-documentado no `IMPLEMENTATION.md` (`npx vitest run scripts/__tests__/... loadtest/__tests__/...`) não funciona com a config vigente sem adaptação. Workaround (documentado em `docs/loadtest/README.md`): uma config extensiva temporária em `/tmp/opencode/` que faz `mergeConfig(base, { test: { include: [... globs ...] } })`. A correção de longo prazo é estender o `include` de `vitest.config.ts`, mas o `IMPLEMENTATION.md` restringiu arquivos modificáveis a `package.json`/`.gitignore` — não foi alterado. Decisão de futuro: o usuário decide se incorpora `scripts/__tests__/` e `loadtest/__tests__/` ao `include` ou mantém o padrão `--config session/...`.
+- **Validação manual guiada não executada nesta sessão**: o `k6 run --vus 1 --iterations 1` e o `npm run loadtest:seed -- --scale=smoke` requerem `.env.local` com service-role e k6 instalado; não foram rodados. A validação automatizada da suíte foi `npx tsc --noEmit` (0 erros novos) + `npx vitest run` das duas suítes novas (30/30 passing via config extensiva).
+- **Edge Function `gemini-ocr`**: `agent/AGENT-BACKEND.md` não a lista entre as Edge Functions ativas, mas `supabase/functions/gemini-ocr/index.ts` existe e aceita `{ file_base64, mime_type, prompt }` com `Authorization: Bearer <jwt>`. O cenário `ocr.ts` segue esse contrato; se a function não estiver publicada no Dev, o cenário retornará 4xx (diagnóstico, sem abortar).
+
+---
+
 ## Sessão — 2026-07-04 (Fase 2 — engate/desengate + terceiros + anti-fraude)
 
 ### O que foi implementado

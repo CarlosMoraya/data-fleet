@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getCreateUserRoleOptions,
+  getEditableRoleOptions,
   getOperationsManagerScopeError,
   pruneOperationsManagerOperationalUnits,
 } from './Users';
@@ -42,6 +43,32 @@ describe('Users operations manager helpers', () => {
         operationalUnitIds: [],
       })
     ).toBe('Selecione ao menos 1 base operacional.');
+  });
+
+  it('getEditableRoleOptions exclui Operations Manager para todos os papéis de CAN_MANAGE_PERMISSIONS', () => {
+    (['Manager', 'Coordinator', 'Director', 'Admin Master'] as const).forEach((role) => {
+      const options = getEditableRoleOptions(role);
+      expect(options).not.toContain('Operations Manager');
+      expect(options.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('Manager pode atribuir cargos de rank inferior', () => {
+    const options = getEditableRoleOptions('Manager');
+    expect(options).toContain('Coordinator');
+    expect(options).toContain('Supervisor');
+    expect(options).toContain('Fleet Analyst');
+    expect(options).not.toContain('Manager');
+    expect(options).not.toContain('Director');
+    expect(options).not.toContain('Admin Master');
+  });
+
+  it('Admin Master não pode atribuir o próprio Admin Master', () => {
+    const options = getEditableRoleOptions('Admin Master');
+    expect(options).not.toContain('Admin Master');
+    expect(options).not.toContain('Operations Manager');
+    expect(options).toContain('Director');
+    expect(options).toContain('Manager');
   });
 
   it('removes orphan operational units when a shipper is removed', () => {

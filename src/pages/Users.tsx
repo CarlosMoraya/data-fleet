@@ -61,6 +61,10 @@ export function getCreateUserRoleOptions(role: Role): Role[] {
   return getCreatableRoles(role);
 }
 
+export function getEditableRoleOptions(currentUserRole: Role): Role[] {
+  return getCreatableRoles(currentUserRole).filter((role) => role !== 'Operations Manager');
+}
+
 export function getOperationsManagerScopeError(scope: Partial<OperationsManagerScope>): string | null {
   return validateOperationsManagerScope(scope);
 }
@@ -528,6 +532,7 @@ function EditUserModal({
   const canManagePermissions = CAN_MANAGE_PERMISSIONS.includes(currentUserRole);
   const [name, setName] = useState('');
   const [budgetLimit, setBudgetLimit] = useState('');
+  const [role, setRole] = useState<Role>(user?.role ?? 'Fleet Assistant');
   const [scope, setScope] = useState<OperationsManagerScope>({ shipperIds: [], operationalUnitIds: [] });
   const [error, setError] = useState('');
 
@@ -545,6 +550,7 @@ function EditUserModal({
       const updates: Record<string, unknown> = { name: capitalizeWords(name) };
       if (canManagePermissions && !isOperationsRole) {
         updates.budget_approval_limit = parseFloat(budgetLimit) || 0;
+        updates.role = role;
       }
 
       const { error: dbError } = await supabase.from('profiles').update(updates).eq('id', user.id);
@@ -580,6 +586,7 @@ function EditUserModal({
 
     setName(user.name);
     setBudgetLimit(user.budget_approval_limit ? user.budget_approval_limit.toString() : '');
+    setRole(user.role);
     setError('');
   }, [user, open]);
 
@@ -602,6 +609,8 @@ function EditUserModal({
   }, [isOperationsRole, operationalUnits]);
 
   if (!open || !user) return null;
+
+  const showRoleSelect = canManagePermissions && !isOperationsRole;
 
   const handleToggleShipper = (shipperId: string) => {
     setScope((previous) => {
@@ -659,9 +668,24 @@ function EditUserModal({
 
           <div>
             <label className="block text-sm font-medium text-zinc-700">Cargo</label>
-            <p className="mt-1 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-500">
-              {getRoleLabel(user.role)} <span className="text-zinc-400">(não editável aqui)</span>
-            </p>
+            {showRoleSelect ? (
+              <select
+                required
+                value={role}
+                onChange={(e) => setRole(e.target.value as Role)}
+                className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+              >
+                {getEditableRoleOptions(currentUserRole).map((option) => (
+                  <option key={option} value={option}>
+                    {getRoleLabel(option)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="mt-1 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-500">
+                {getRoleLabel(user.role)} <span className="text-zinc-400">(não editável aqui)</span>
+              </p>
+            )}
           </div>
 
           {isOperationsRole && (
