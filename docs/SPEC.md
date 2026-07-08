@@ -48,7 +48,7 @@ As políticas de RLS são aplicadas no nível da linha, garantindo que usuários
 CREATE POLICY "Assistant see tenant checklists" 
 ON checklists FOR SELECT 
 USING (
-  (client_id = auth.jwt()->>'client_id' AND (SELECT role_rank FROM profiles WHERE id = auth.uid()) >= 3)
+  (client_id = auth.jwt()->>'client_id' AND public.role_rank((SELECT role FROM profiles WHERE id = auth.uid())) >= 3)
   OR (SELECT role FROM profiles WHERE id = auth.uid()) = 'Admin Master'
 );
 ```

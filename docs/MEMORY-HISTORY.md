@@ -1962,6 +1962,16 @@ Em vez de usar ORMs complexos no frontend, utilizamos funções de mapeamento pu
 > [!NOTE]
 > Este arquivo substitui o antigo `CHANGELOG.md`, focando em decisões de alto nível e marcos históricos.
 
+### 08/07/2026 — Fonte única de níveis de papel no banco (`role_ranks`)
+
+- **Contexto:** sessão Tipo 4 para substituir a lista fixa dentro de `public.role_rank(role_name TEXT)` por uma lookup table de autorização no banco, sem alterar os 26 chamadores de RLS e sem tocar em `src/`.
+- **Entrega:** migration `supabase/migrations/20260721000000_role_ranks_single_source_of_truth.sql` criou `public.role_ranks (role TEXT PRIMARY KEY, rank INT NOT NULL)`, habilitou RLS sem policies, seedou os 12 papéis de `ROLE_RANK` (`Coupling Agent` e `Driver` com rank 0; `Admin Master` com rank 9) e reescreveu `public.role_rank(TEXT)` como `LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public`, com fallback `0`.
+- **Documentação:** `docs/SPEC.md` corrigiu o exemplo de RLS para chamar `public.role_rank((SELECT role FROM profiles WHERE id = auth.uid()))`; `agent/AGENT-DATABASE.md` passou a documentar `role_ranks` como fonte única do banco e a sincronização manual temporária com `src/lib/rolePermissions.ts`.
+- **Validação DEV:** antes da migration, `pg_get_functiondef('public.role_rank(text)'::regprocedure)` bateu com `20260601000000_add_operations_manager_role_and_scope.sql`; paridade antes/depois permaneceu `0, 0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9`; pós-migration confirmou 12 linhas, RLS `true`, 0 policies e função `sql stable security definer`.
+- **Validação E2E/local:** suíte de papéis + RLS (`role-director`, `role-operations-manager`, `role-workshop`, `rls-cross-tenant`) fechou com `25 passed, 2 skipped` após regenerar `e2e/.auth/alexandre.json` (falha inicial era storageState expirado); `npm run lint` 0 erros/116 warnings; `npm run test:unit` 764/764; `npm run test:smoke` 6/6.
+- **Promoção PROD:** usuário aplicou manualmente a mesma migration no SQL Editor de produção (`oajfjdadcicgoxrfrnny`) e validou paridade completa, 12 linhas, RLS `true` e 0 policies.
+- **Observação de tooling:** `supabase db query -f` falhou em DEV com `cannot insert multiple commands into a prepared statement`; a aplicação foi feita manualmente pelo usuário via SQL Editor em DEV e PROD.
+
 ### 12/06/2026 — Bugfix E2E: inspeção de pneus não abria modal no teste
 - **Contexto:** `tire-inspection-assistant.spec.ts` (bloco C) falhava com timeout aguardando `.fixed.inset-0` ficar visível.
 - **Causa raiz:** teste clicava no centro da `<tr>` (sem `onClick`); o modal só abre pelo botão "Visualizar". Não era regressão — a interação nunca existiu; falhou quando dados reais de inspeção destravaram a guarda `test.skip`.

@@ -22,6 +22,7 @@ OR (role = 'Admin Master')
 - **`clients`**: Tenants do sistema.
 - **`vehicles`**: Veículos da frota. Possui relacionamento 1:1 com `drivers` e N:1 com `shippers`.
 - **`drivers`**: Motoristas. Linkados a um `profile_id` único para acesso ao app de checklist.
+- **`role_ranks`**: Fonte única dos níveis de papel usados pela RLS no banco. A função `public.role_rank(role_name TEXT)` lê esta tabela via `SECURITY DEFINER` com `search_path` fixo. Para adicionar um papel novo (ex.: "Financeiro"), inserir o par papel/nível nesta tabela em vez de reescrever a função inteira; o mesmo valor também deve ser mantido manualmente em `ROLE_RANK` em `src/lib/rolePermissions.ts` até a unificação do frontend.
 
 ### Logística e Parceiros
 - **`shippers`**: Embarcadores (clientes da transportadora).
