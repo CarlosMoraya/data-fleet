@@ -10,4 +10,5 @@ export type Role =
   | 'Manager'
   | 'Coordinator'
   | 'Director'
-  | 'Admin Master';
+  | 'Admin Master'
+  | 'Financeiro';

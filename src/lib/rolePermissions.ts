@@ -13,6 +13,7 @@ export const ROLE_RANK: Record<Role, number> = {
   'Manager': 7,
   'Director': 8,
   'Admin Master': 9,
+  'Financeiro': 1,
 };
 
 export const ROLE_LABELS: Record<Role, string> = {
@@ -28,6 +29,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   'Manager': 'Manager',
   'Director': 'Director',
   'Admin Master': 'Admin Master',
+  'Financeiro': 'Financeiro',
 };
 
 export const ROLE_COLORS: Record<Role, string> = {
@@ -43,6 +45,7 @@ export const ROLE_COLORS: Record<Role, string> = {
   'Manager': 'bg-green-100 text-green-700',
   'Director': 'bg-purple-100 text-purple-700',
   'Admin Master': 'bg-orange-100 text-orange-700',
+  'Financeiro': 'bg-rose-100 text-rose-700',
 };
 
 export const ROLES_WITH_ACCESS: Role[] = [
@@ -97,6 +100,7 @@ export const TENANT_USER_ROLE_OPTIONS: Role[] = [
   'Manager',
   'Director',
   'Admin Master',
+  'Financeiro',
 ];
 
 const OPERATIONS_MANAGER_ALLOWED_ROUTES = ['/agendamentos', '/manutencao', '/conta/senha'] as const;

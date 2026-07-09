@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { canAccessRoute, canCorrectOdometer, canFillCoupling } from './rolePermissions';
+import {
+  ROLE_RANK,
+  canAccessRoute,
+  canCorrectOdometer,
+  canFillCoupling,
+  getCreatableRoles,
+  hasRoleAccess,
+} from './rolePermissions';
 
 import type { Role } from '../types';
 
@@ -46,6 +53,20 @@ describe('canCorrectOdometer', () => {
     for (const role of denied) {
       expect(canCorrectOdometer(role)).toBe(false);
     }
+  });
+});
+
+describe('Financeiro role', () => {
+  it('tem rank 1 (fora da escada de hierarquia operacional)', () => {
+    expect(ROLE_RANK['Financeiro']).toBe(1);
+  });
+
+  it('pode ser criado por Coordinator', () => {
+    expect(getCreatableRoles('Coordinator')).toContain('Financeiro');
+  });
+
+  it('não herda acesso operacional', () => {
+    expect(hasRoleAccess('Financeiro')).toBe(false);
   });
 });
 

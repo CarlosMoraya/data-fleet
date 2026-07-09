@@ -188,6 +188,56 @@ export async function uploadMaintenancePartPhoto(
 }
 
 // ─────────────────────────────────────────────────────────────
+// Financial Documents (boleto / nota fiscal)
+// Bucket: financial-documents (PRIVADO) — acesso só via signed URL.
+// Path: {clientId}/payments/{orderId}/{kind}-{ts}-{rand}.{ext}
+// ─────────────────────────────────────────────────────────────
+
+const FINANCIAL_BUCKET = 'financial-documents';
+
+/**
+ * Uploads a financial document (boleto or nota fiscal) to the private bucket.
+ * Images are compressed before upload. PDFs are sent as-is.
+ * Returns the storage PATH (not a public URL — bucket is private).
+ */
+export async function uploadFinancialDocument(
+  clientId: string,
+  orderId: string,
+  file: File,
+  kind: 'boleto' | 'nota',
+): Promise<string> {
+  validateFile(file);
+
+  const prepared = await prepareFile(file);
+  const ext = prepared.type === 'application/pdf' ? 'pdf' : 'jpg';
+  const fileName = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const path = `${clientId}/payments/${orderId}/${fileName}`;
+
+  const { error } = await supabase.storage
+    .from(FINANCIAL_BUCKET)
+    .upload(path, prepared, { upsert: false, contentType: prepared.type });
+
+  if (error) throw new Error(`Erro ao enviar documento financeiro: ${error.message}`);
+
+  return path;
+}
+
+/**
+ * Generates a short-lived (1h) signed URL for a private financial document path.
+ */
+export async function getFinancialDocumentSignedUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from(FINANCIAL_BUCKET)
+    .createSignedUrl(path, 3600);
+
+  if (error || !data) {
+    throw new Error(`Erro ao gerar URL do documento: ${error?.message ?? 'desconhecido'}`);
+  }
+
+  return data.signedUrl;
+}
+
+// ─────────────────────────────────────────────────────────────
 // Driver Documents
 // Bucket: driver-documents
 // Mesma lógica de validação/compressão dos documentos de veículo
