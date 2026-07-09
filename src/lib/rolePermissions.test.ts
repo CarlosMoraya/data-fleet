@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   ROLE_RANK,
   canAccessRoute,
+  canApprovePayments,
   canCorrectOdometer,
   canFillCoupling,
+  canMarkPaid,
+  canViewBudgetTab,
   getCreatableRoles,
   hasRoleAccess,
 } from './rolePermissions';
@@ -67,6 +70,27 @@ describe('Financeiro role', () => {
 
   it('não herda acesso operacional', () => {
     expect(hasRoleAccess('Financeiro')).toBe(false);
+  });
+});
+
+describe('permissões do módulo financeiro', () => {
+  it('canApprovePayments permite Coordinator e bloqueia Fleet Assistant', () => {
+    expect(canApprovePayments('Coordinator')).toBe(true);
+    expect(canApprovePayments('Fleet Assistant')).toBe(false);
+  });
+
+  it('canMarkPaid permite Financeiro e bloqueia Coordinator', () => {
+    expect(canMarkPaid('Financeiro')).toBe(true);
+    expect(canMarkPaid('Coordinator')).toBe(false);
+  });
+
+  it('canViewBudgetTab bloqueia Workshop', () => {
+    expect(canViewBudgetTab('Workshop')).toBe(false);
+  });
+
+  it('canAccessRoute restringe Financeiro a /financeiro', () => {
+    expect(canAccessRoute('Financeiro', '/manutencao')).toBe(false);
+    expect(canAccessRoute('Financeiro', '/financeiro')).toBe(true);
   });
 });
 

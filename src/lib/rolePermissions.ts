@@ -105,6 +105,49 @@ export const TENANT_USER_ROLE_OPTIONS: Role[] = [
 
 const OPERATIONS_MANAGER_ALLOWED_ROUTES = ['/agendamentos', '/manutencao', '/conta/senha'] as const;
 const COUPLING_AGENT_ALLOWED_ROUTES = ['/engate', '/checklists/preencher', '/conta/senha'] as const;
+const FINANCEIRO_ALLOWED_ROUTES = ['/financeiro', '/conta/senha'] as const;
+
+export const ROLES_CAN_VIEW_PAYMENTS: Role[] = [
+  'Fleet Assistant',
+  'Fleet Analyst',
+  'Supervisor',
+  'Coordinator',
+  'Manager',
+  'Director',
+  'Admin Master',
+  'Workshop',
+  'Financeiro',
+];
+
+export const ROLES_CAN_CREATE_PAYMENTS: Role[] = [
+  'Fleet Assistant',
+  'Fleet Analyst',
+  'Supervisor',
+  'Coordinator',
+  'Manager',
+  'Director',
+  'Admin Master',
+  'Workshop',
+];
+
+export const ROLES_CAN_APPROVE_PAYMENTS: Role[] = [
+  'Coordinator',
+  'Manager',
+  'Director',
+  'Admin Master',
+];
+
+export const ROLES_CAN_MARK_PAID: Role[] = ['Financeiro', 'Admin Master'];
+
+export const ROLES_CAN_VIEW_BUDGET_TAB: Role[] = [
+  'Fleet Assistant',
+  'Fleet Analyst',
+  'Supervisor',
+  'Manager',
+  'Coordinator',
+  'Director',
+  'Admin Master',
+];
 
 export const ROLES_CAN_FILL_COUPLING: Role[] = [
   'Coupling Agent',
@@ -179,6 +222,7 @@ export function getDefaultRouteForRole(role: Role | null | undefined): string {
   if (role === 'Driver' || role === 'Yard Auditor') return '/checklists';
   if (role === 'Workshop') return '/manutencao';
   if (role === 'Operations Manager') return '/agendamentos';
+  if (role === 'Financeiro') return '/financeiro';
   return '/';
 }
 
@@ -189,11 +233,36 @@ export function canAccessRoute(role: Role | null | undefined, pathname: string):
       (route) => pathname === route || pathname.startsWith(`${route}/`)
     );
   }
+  if (role === 'Financeiro') {
+    return FINANCEIRO_ALLOWED_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`)
+    );
+  }
   if (!isOperationsManager(role)) return true;
 
   return OPERATIONS_MANAGER_ALLOWED_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   );
+}
+
+export function canViewPayments(role: Role | undefined | null): boolean {
+  return ROLES_CAN_VIEW_PAYMENTS.includes(role);
+}
+
+export function canCreatePayments(role: Role | undefined | null): boolean {
+  return ROLES_CAN_CREATE_PAYMENTS.includes(role);
+}
+
+export function canApprovePayments(role: Role | undefined | null): boolean {
+  return ROLES_CAN_APPROVE_PAYMENTS.includes(role);
+}
+
+export function canMarkPaid(role: Role | undefined | null): boolean {
+  return ROLES_CAN_MARK_PAID.includes(role);
+}
+
+export function canViewBudgetTab(role: Role | undefined | null): boolean {
+  return ROLES_CAN_VIEW_BUDGET_TAB.includes(role);
 }
 
 export function canEditWorkshopOrder(role: Role | undefined | null): boolean {
