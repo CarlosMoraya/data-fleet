@@ -34,7 +34,7 @@ const Cadastros = lazy(() => import('./pages/Cadastros'));
 const Shippers = lazy(() => import('./pages/Shippers'));
 const OperationalUnits = lazy(() => import('./pages/OperationalUnits'));
 const WorkshopSchedules = lazy(() => import('./pages/WorkshopSchedules'));
-const BudgetApprovals = lazy(() => import('./pages/BudgetApprovals'));
+const Financeiro = lazy(() => import('./pages/Financeiro'));
 const Tires = lazy(() => import('./pages/Tires'));
 const WorkshopJoin = lazy(() => import('./pages/WorkshopJoin'));
 const TireInspectionFill = lazy(() => import('./pages/TireInspectionFill'));
@@ -107,7 +107,7 @@ export default function App() {
                 <Route path="acoes" element={<ActionPlans />} />
                 <Route path="agendamentos" element={<WorkshopSchedules />} />
                 <Route path="manutencao" element={<Maintenance />} />
-                <Route path="aprovacao-orcamentos" element={<BudgetApprovals />} />
+                <Route path="financeiro" element={<Financeiro />} />
                 <Route path="conta/senha" element={<ChangePassword />} />
                 <Route path="revisoes-garantia" element={<WarrantyRevisions />} />
                 <Route path="settings" element={<Settings />} />

@@ -1,7 +1,7 @@
 import { AlertTriangle, Clock } from 'lucide-react';
 import React from 'react';
 
-interface ActionQueueItemLike {
+export interface ActionQueueItemLike {
   category: string;
   label: string;
   count: number;

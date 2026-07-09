@@ -10,10 +10,10 @@ import {
   ClipboardList,
   Wrench,
   CalendarClock,
-  BadgeCheck,
   KeyRound,
   ShieldCheck,
   Link2,
+  Wallet,
 } from 'lucide-react';
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
@@ -41,7 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'Plano de Ação', to: '/acoes', icon: ClipboardList, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Agendamentos', to: '/agendamentos', icon: CalendarClock, roles: ['Driver', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Manutenção', to: '/manutencao', icon: Wrench, roles: ['Workshop', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
-  { name: 'Aprovação de Orçamentos', to: '/aprovacao-orcamentos', icon: BadgeCheck, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
+  { name: 'Financeiro', to: '/financeiro', icon: Wallet, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master', 'Workshop', 'Financeiro'] },
   { name: 'Revisões de Garantia', to: '/revisoes-garantia', icon: ShieldCheck, roles: ['Fleet Analyst', 'Supervisor', 'Coordinator', 'Manager', 'Director', 'Admin Master'] },
   { name: 'Templates', to: '/checklist-templates', icon: FileStack, roles: ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Configurações', to: '/settings', icon: Settings, roles: ['Coordinator', 'Manager', 'Director', 'Admin Master'] },
