@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, FileText, KeyRound, Plus } from 'lucide-react';
+import { Download, FileText, KeyRound, Pencil, Plus } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
@@ -16,9 +16,10 @@ import {
 } from '../../services/paymentInstallmentService';
 import ActionQueue from '../dashboard/ActionQueue';
 
+import PaymentInstallmentEditModal from './PaymentInstallmentEditModal';
 import PaymentInstallmentFormModal from './PaymentInstallmentFormModal';
 
-import type { PaymentInstallmentStatus, PaymentMethod } from '../../types/payment';
+import type { PaymentInstallment, PaymentInstallmentStatus, PaymentMethod } from '../../types/payment';
 
 const STATUS_LABELS: Record<PaymentInstallmentStatus, string> = {
   pendente_aprovacao: 'Pendente de aprovação',
@@ -82,6 +83,7 @@ export default function PaymentsTab(): React.ReactElement {
   const [filterClientId, setFilterClientId] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<PaymentInstallment | null>(null);
 
   const activeClientId = showClientFilter ? (filterClientId || undefined) : (currentClient?.id ?? undefined);
 
@@ -101,6 +103,12 @@ export default function PaymentsTab(): React.ReactElement {
     for (const o of approvedOrders) {
       if (o.budgetPdfUrl) m.set(o.id, o.budgetPdfUrl);
     }
+    return m;
+  }, [approvedOrders]);
+
+  const approvedCostMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const o of approvedOrders) m.set(o.id, o.approvedCost);
     return m;
   }, [approvedOrders]);
 
@@ -375,6 +383,28 @@ export default function PaymentsTab(): React.ReactElement {
                               🧾
                             </button>
                           )}
+                          {/* Nota fiscal (2º documento) via signed URL */}
+                          {i.notaFiscalUrl2 && (
+                            <button
+                              type="button"
+                              onClick={() => { void openSignedUrl(i.notaFiscalUrl2!); }}
+                              title="Nota fiscal (2º documento)"
+                              className="text-zinc-500 hover:text-green-600"
+                            >
+                              🧾
+                            </button>
+                          )}
+                          {/* Editar (só parcela pendente) */}
+                          {i.status === 'pendente_aprovacao' && canCreate && (
+                            <button
+                              type="button"
+                              onClick={() => setEditing(i)}
+                              title="Editar parcela"
+                              className="text-zinc-500 hover:text-orange-600"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -388,6 +418,18 @@ export default function PaymentsTab(): React.ReactElement {
 
       {canCreate && (
         <PaymentInstallmentFormModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      )}
+
+      {editing && (
+        <PaymentInstallmentEditModal
+          open
+          installment={editing}
+          approvedCost={approvedCostMap.get(editing.maintenanceOrderId) ?? 0}
+          existing={installments
+            .filter((x) => x.maintenanceOrderId === editing.maintenanceOrderId)
+            .map((x) => ({ id: x.id, value: x.value, status: x.status }))}
+          onClose={() => setEditing(null)}
+        />
       )}
     </div>
   );

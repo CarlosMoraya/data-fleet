@@ -6,6 +6,7 @@ import {
   remainingBudget,
   splitInstallmentValue,
   sumInstallmentsValue,
+  sumNonRejectedValue,
 } from './paymentInstallments';
 
 describe('splitInstallmentValue', () => {
@@ -147,5 +148,33 @@ describe('sumInstallmentsValue / remainingBudget', () => {
 
   it('remainingBudget fica negativo quando a soma excede o aprovado', () => {
     expect(remainingBudget(10000, [{ value: 8000 }, { value: 5000 }])).toBe(-3000);
+  });
+});
+
+describe('sumNonRejectedValue / remainingBudget (reprovadas liberam saldo)', () => {
+  it('sumNonRejectedValue ignora parcelas reprovadas', () => {
+    expect(
+      sumNonRejectedValue([
+        { value: 400, status: 'reprovado' },
+        { value: 600, status: 'pendente_aprovacao' },
+      ]),
+    ).toBe(600);
+  });
+
+  it('sumNonRejectedValue soma drafts sem status', () => {
+    expect(sumNonRejectedValue([{ value: 100 }, { value: 200 }])).toBe(300);
+  });
+
+  it('remainingBudget desconsidera reprovadas na soma', () => {
+    expect(
+      remainingBudget(1000, [
+        { value: 400, status: 'reprovado' },
+        { value: 600, status: 'aprovado' },
+      ]),
+    ).toBe(400);
+  });
+
+  it('remainingBudget com lista vazia devolve o total aprovado', () => {
+    expect(remainingBudget(1000, [])).toBe(1000);
   });
 });

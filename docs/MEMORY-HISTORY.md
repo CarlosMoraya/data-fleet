@@ -2,6 +2,49 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-09 (Financeiro: trava de orçamento, 2ª nota fiscal, edição de parcela pendente, preview do orçamento e aprovador)
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão (Tipo 4 — mudança estrutural/crítica: trava financeira no banco + edição de registros financeiros + upload), cinco evoluções sobre o módulo Financeiro (`/financeiro`):
+
+1. **Trava de orçamento (item 1)** — `sumNonRejectedValue`/`remainingBudget` (`src/lib/paymentInstallments.ts`) desconsideram parcelas `reprovado` no cálculo de saldo. No banco, migration `supabase/migrations/20260723000100_payment_installments_budget_cap_and_edit_lock.sql` bloco (A): trigger `BEFORE INSERT OR UPDATE OF value` (`fn_enforce_payment_installment_budget_cap`, `SECURITY DEFINER`) rejeita quando `SUM(value)` das parcelas não-reprovadas da mesma OS + o valor novo excede `maintenance_orders.approved_cost`. UI: `PaymentInstallmentFormModal.tsx` desabilita Salvar e mostra mensagem fixa quando `overBudget`; `PaymentInstallmentEditModal.tsx` calcula `saldoSemEsta` excluindo a própria parcela e aplica a mesma trava.
+2. **2ª nota fiscal opcional (item 2)** — migration `20260723000000_add_nota_fiscal_url_2.sql` adiciona `payment_installments.nota_fiscal_url_2` (aditiva, nullable). `PaymentInstallmentFormModal.tsx` ganhou um segundo `<input type="file">` opcional; upload best-effort via `uploadFinancialDocument(..., 'nota')` igual ao já existente. `PaymentsTab.tsx` renderiza um segundo ícone 🧾 quando `notaFiscalUrl2` existe.
+3. **Edição de parcela pendente (item 3)** — novo componente `src/components/financeiro/PaymentInstallmentEditModal.tsx`, acionado por um botão lápis em `PaymentsTab.tsx` visível só quando `status === 'pendente_aprovacao' && canCreatePayments`. Usa `updatePaymentInstallment` (já existente) com um `PaymentInstallmentPatch` estendido (`value`, `due_date`, `payment_method`, `competencia_date`, `nota_fiscal_url_2`). No banco, o bloco (B) da mesma migration da trava recria (`CREATE OR REPLACE`) `fn_validate_payment_installment_transition`: no ramo "status inalterado" (edição de campos), passou a exigir `OLD.status = 'pendente_aprovacao'`, senão `RAISE EXCEPTION`. Os ramos aprovar/reprovar/pagar permaneceram byte-a-byte idênticos ao original.
+4. **Preview/abrir orçamento na aba Aprovação (item 4)** — novo `src/components/financeiro/BudgetDocumentPreviewModal.tsx` (iframe + link "Abrir em nova aba"), usando `budgetPdfUrl` (URL **pública**, mesma já usada na tela de Orçamentos — diferente de boleto/nota, que são privados via signed URL). Acionado por um botão "📄 Orçamento" na célula OS de `PaymentApprovalsTab.tsx`; OS sem documento mostra "— sem documento".
+5. **Aprovador do orçamento (item 5)** — nova coluna "Orçamento aprovado por" na tabela "Parcelas aguardando aprovação" de `PaymentApprovalsTab.tsx`, populada por `budgetApprovedByName` (não confundir com `approverNames`, que é o aprovador do **pagamento**, exibido na tabela "Já processados").
+
+**Query única alimentando 4 e 5**: `INSTALLMENT_SELECT` (`src/services/paymentInstallmentService.ts`) passou a embutir `maintenance_orders(os_number, budget_pdf_url, budget_reviewed_by, workshops(name, cnpj), budget_reviewer:profiles!maintenance_orders_budget_reviewed_by_fkey(name))`; `paymentInstallmentFromRow` (`src/lib/paymentMappers.ts`) deriva `budgetPdfUrl`/`budgetApprovedByName`/`notaFiscalUrl2`.
+
+**Refatoração DRY**: `PixFields` foi extraído do arquivo `InstallmentDraftTable.tsx` para `src/components/financeiro/PixFields.tsx` com API genérica (`{ pixKeyType, pixKey, pixBeneficiaryName, onChange }`), reaproveitado tanto pela tabela de rascunhos quanto pelo novo modal de edição.
+
+### Decisões tomadas nesta sessão (registradas no `IMPLEMENTATION.md`)
+
+- **Parcelas reprovadas não consomem saldo** (liberam orçamento) — intencional, tanto na lógica pura quanto no trigger (`status <> 'reprovado'`).
+- **Edição de parcela restrita a `pendente_aprovacao` no banco** — endurecimento intencional que fecha um gap latente onde parcelas aprovadas/pagas podiam ter campos editados via API direta (a UI já restringia por botão, mas o banco não).
+- **Preview do orçamento usa URL pública**, diferente de boleto/nota (privados) — é o mesmo documento já público na tela de Orçamentos, sem elevação de exposição.
+- **`approved_cost` NULL ⇒ teto 0** (fail-closed): OS sem custo aprovado não aceita parcelas.
+- **`PixFields` extraído** para arquivo próprio para reuso entre `InstallmentDraftTable` e o modal de edição (DRY).
+
+### Segurança
+
+Integridade financeira (itens 1 e 3) imposta no banco por trigger `SECURITY DEFINER` (não contornável pela API), além do bloqueio de UX. Upload da 2ª nota reaproveita `uploadFinancialDocument` (bucket privado `financial-documents`, nomes únicos via `Date.now()+random`, acesso só via signed URL de 1h). Nenhuma policy RLS foi alterada; a mudança de comportamento vem exclusivamente dos triggers.
+
+### Validação
+
+`npm run lint` **0 erros / 117 warnings** (baseline, sem regressão); `npm run test:unit` **817/817** (811 base + 6 novos: `paymentInstallments.test.ts` para `sumNonRejectedValue`/`remainingBudget` com reprovadas, novo `paymentMappers.test.ts` para os campos derivados do orçamento); `npm run test:smoke` **6/6**. `e2e/pending/financeiro-payment-flow.spec.ts` ganhou 3 casos novos (over-budget, edição de pendente, colunas de orçamento/aprovador), seguindo o padrão `test.skip` do arquivo por depender de massa/credenciais que podem não existir no DEV; `--list` confirmou ausência de erro de sintaxe.
+
+### Pendências
+
+- Aplicar as 2 migrations novas (`20260723000000`, `20260723000100`) no **DEV**, validar por SQL, e só depois promover ao **PROD** com autorização expressa.
+- Roteiro de validação manual guiada (Etapa 8 do `IMPLEMENTATION.md`) ainda não executado/aprovado pelo usuário.
+
+### Débito técnico registrado (fora do escopo)
+
+- Não há harness de teste automatizado para SQL/trigger neste projeto; validação das migrations é manual no DEV.
+- Cobertura de componentes do módulo financeiro permanece manual/E2E (dependência de Auth+RQ+Supabase).
+- `PaymentsTab` mantém `budgetPdfMap` derivado de `approvedOrders`; com `INSTALLMENT_SELECT` agora trazendo `budgetPdfUrl` por parcela, há oportunidade futura de unificar as duas fontes — fora do escopo desta sessão.
+
 ## Sessão — 2026-07-08 (Edição de cargo no modal de edição de usuário)
 
 ### O que foi implementado

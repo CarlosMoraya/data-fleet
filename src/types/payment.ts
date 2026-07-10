@@ -21,6 +21,9 @@ export interface PaymentInstallment {
   paymentMethod: PaymentMethod;
   boletoUrl?: string;
   notaFiscalUrl?: string;
+  notaFiscalUrl2?: string;
+  budgetPdfUrl?: string;
+  budgetApprovedByName?: string;
   pixKeyType?: PixKeyType;
   pixKey?: string;
   pixBeneficiaryName?: string;
@@ -54,6 +57,7 @@ export interface PaymentInstallmentRow {
   payment_method: PaymentMethod;
   boleto_url: string | null;
   nota_fiscal_url: string | null;
+  nota_fiscal_url_2: string | null;
   pix_key_type: PixKeyType | null;
   pix_key: string | null;
   pix_beneficiary_name: string | null;
@@ -71,7 +75,9 @@ export interface PaymentInstallmentRow {
   // Joins
   maintenance_orders?: {
     os_number: string;
+    budget_pdf_url: string | null;
     workshops: { name: string; cnpj: string | null } | null;
+    budget_reviewer: { name: string } | null;
   } | null;
 }
 

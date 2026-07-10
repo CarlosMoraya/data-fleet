@@ -3,7 +3,9 @@ import React, { useState } from 'react';
 
 import { cn } from '../../lib/utils';
 
-import type { InstallmentDraft, PaymentMethod, PixKeyType } from '../../types/payment';
+import PixFields, { PIX_KEY_TYPE_LABELS } from './PixFields';
+
+import type { InstallmentDraft, PaymentMethod } from '../../types/payment';
 
 interface InstallmentDraftTableProps {
   drafts: InstallmentDraft[];
@@ -11,14 +13,6 @@ interface InstallmentDraftTableProps {
   onUploadBoleto: (index: number, file: File) => void;
   uploadingBoletoIndex?: number | null;
 }
-
-const STATUS_LABELS: Record<PixKeyType, string> = {
-  cpf: 'CPF',
-  cnpj: 'CNPJ',
-  email: 'E-mail',
-  telefone: 'Telefone',
-  aleatoria: 'Aleatória',
-};
 
 function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -119,10 +113,15 @@ export default function InstallmentDraftTable({
                   <td className="px-3 py-2">
                     {d.paymentMethod === 'pix' ? (
                       isEditing ? (
-                        <PixFields draft={d} onChange={(patch) => update(i, patch)} />
+                        <PixFields
+                          pixKeyType={d.pixKeyType}
+                          pixKey={d.pixKey}
+                          pixBeneficiaryName={d.pixBeneficiaryName}
+                          onChange={(patch) => update(i, patch)}
+                        />
                       ) : (
                         <span className="text-xs text-zinc-500">
-                          {d.pixKey ? `${STATUS_LABELS[d.pixKeyType ?? 'aleatoria']}: ${d.pixKey}` : '— sem chave —'}
+                          {d.pixKey ? `${PIX_KEY_TYPE_LABELS[d.pixKeyType ?? 'aleatoria']}: ${d.pixKey}` : '— sem chave —'}
                           {d.pixBeneficiaryName ? ` · ${d.pixBeneficiaryName}` : ''}
                         </span>
                       )
@@ -174,43 +173,6 @@ export default function InstallmentDraftTable({
           </tbody>
         </table>
       </div>
-    </div>
-  );
-}
-
-interface PixFieldsProps {
-  draft: InstallmentDraft;
-  onChange: (patch: Partial<InstallmentDraft>) => void;
-}
-
-function PixFields({ draft, onChange }: PixFieldsProps): React.ReactElement {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex gap-1.5">
-        <select
-          value={draft.pixKeyType ?? 'aleatoria'}
-          onChange={(e) => onChange({ pixKeyType: e.target.value as PixKeyType })}
-          className="rounded-lg border border-zinc-300 px-1.5 py-1 text-xs focus:ring-1 focus:ring-orange-400 focus:outline-none"
-        >
-          {(Object.keys(STATUS_LABELS) as PixKeyType[]).map((k) => (
-            <option key={k} value={k}>{STATUS_LABELS[k]}</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder="Chave Pix"
-          value={draft.pixKey ?? ''}
-          onChange={(e) => onChange({ pixKey: e.target.value })}
-          className="flex-1 rounded-lg border border-zinc-300 px-2 py-1 text-xs focus:ring-1 focus:ring-orange-400 focus:outline-none"
-        />
-      </div>
-      <input
-        type="text"
-        placeholder="Favorecido"
-        value={draft.pixBeneficiaryName ?? ''}
-        onChange={(e) => onChange({ pixBeneficiaryName: e.target.value })}
-        className="rounded-lg border border-zinc-300 px-2 py-1 text-xs focus:ring-1 focus:ring-orange-400 focus:outline-none"
-      />
     </div>
   );
 }

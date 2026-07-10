@@ -11,6 +11,8 @@ import {
   rejectPaymentInstallment,
 } from '../../services/paymentInstallmentService';
 
+import BudgetDocumentPreviewModal from './BudgetDocumentPreviewModal';
+
 import type { PaymentInstallment } from '../../types/payment';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -35,6 +37,7 @@ export default function PaymentApprovalsTab(): React.ReactElement {
   const queryClient = useQueryClient();
 
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ url: string; os: string } | null>(null);
 
   const { data: installments = [], isLoading } = useQuery({
     queryKey: ['paymentInstallments', 'approvals', { clientId: currentClient?.id }],
@@ -127,6 +130,7 @@ export default function PaymentApprovalsTab(): React.ReactElement {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Valor</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Vencimento</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Forma</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Orçamento aprovado por</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Ação</th>
                 </tr>
               </thead>
@@ -138,6 +142,7 @@ export default function PaymentApprovalsTab(): React.ReactElement {
                     approving={processingId === i.id}
                     onApprove={(id) => reviewMutation.mutate({ id, approve: true })}
                     onReject={(id) => reviewMutation.mutate({ id, approve: false })}
+                    onPreview={(url, os) => setPreview({ url, os })}
                   />
                 ))}
               </tbody>
@@ -194,6 +199,15 @@ export default function PaymentApprovalsTab(): React.ReactElement {
           </div>
         )}
       </div>
+
+      {preview && (
+        <BudgetDocumentPreviewModal
+          open
+          url={preview.url}
+          osNumber={preview.os}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </div>
   );
 }
@@ -203,13 +217,38 @@ interface PendingRowProps {
   approving: boolean;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
+  onPreview: (url: string, osNumber: string) => void;
 }
 
-function PendingRow({ installment: i, approving, onApprove, onReject }: PendingRowProps): React.ReactElement {
+function PendingRow({ installment: i, approving, onApprove, onReject, onPreview }: PendingRowProps): React.ReactElement {
+  const os = i.maintenanceOrderOs ?? i.maintenanceOrderId;
   return (
     <tr className="hover:bg-zinc-50">
-      <td className="px-4 py-3 font-mono text-xs font-semibold text-zinc-700">
-        {i.maintenanceOrderOs ?? i.maintenanceOrderId}
+      <td className="px-4 py-3 text-xs">
+        <div className="flex flex-col gap-0.5">
+          <span className="font-mono font-semibold text-zinc-700">{os}</span>
+          {i.budgetPdfUrl ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onPreview(i.budgetPdfUrl!, os)}
+                className="text-orange-600 hover:text-orange-700"
+              >
+                📄 Orçamento
+              </button>
+              <a
+                href={i.budgetPdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-zinc-400 hover:text-zinc-600"
+              >
+                Abrir
+              </a>
+            </div>
+          ) : (
+            <span className="text-zinc-400">— sem documento</span>
+          )}
+        </div>
       </td>
       <td className="px-4 py-3 text-zinc-500">{i.installmentNumber}/{i.installmentsTotal}</td>
       <td className="px-4 py-3 text-zinc-600">
@@ -219,6 +258,7 @@ function PendingRow({ installment: i, approving, onApprove, onReject }: PendingR
       <td className="px-4 py-3 font-medium text-zinc-800">{formatCurrency(i.value)}</td>
       <td className="px-4 py-3 text-zinc-600">{formatDate(i.dueDate)}</td>
       <td className="px-4 py-3 text-zinc-600">{i.paymentMethod === 'pix' ? 'Pix' : 'Boleto'}</td>
+      <td className="px-4 py-3 text-zinc-600">{i.budgetApprovedByName ?? '—'}</td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
           <button

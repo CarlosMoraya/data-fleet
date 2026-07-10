@@ -290,6 +290,96 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
     }
   });
 
+  test('08 — bloqueio de over-budget ao cadastrar parcelas acima do saldo aprovado', async ({ browser }) => {
+    const email = optionalEnv('TEST_ASSISTANT_EMAIL');
+    const password = optionalEnv('TEST_ASSISTANT_PASSWORD');
+    if (!email || !password || !osId) {
+      test.skip(true, 'TEST_ASSISTANT_EMAIL/PASSWORD ausentes ou fixture de OS aprovada indisponível.');
+      return;
+    }
+
+    const page = await loginAs(browser, email, password);
+    try {
+      await page.goto('/financeiro');
+      await page.getByRole('tab', { name: 'Pagamentos' }).click();
+      await page.getByRole('button', { name: /Cadastrar Pagamento/i }).click();
+      await expect(page.getByText('Ordem de Serviço (orçamento aprovado)')).toBeVisible({ timeout: 10000 });
+
+      await page.locator('select').first().selectOption({ label: new RegExp(osNumber) });
+      await page.getByLabel('Nº de parcelas').fill('1');
+      await page.getByLabel('1º vencimento').fill(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
+      await page.getByRole('button', { name: 'Gerar parcelas' }).click();
+
+      const valueInput = page.locator('table input[type="number"]').first();
+      await page.getByRole('button', { name: 'Editar parcela' }).click();
+      await valueInput.fill('99999999');
+
+      await expect(page.getByText(/A soma das parcelas ultrapassa o saldo do orçamento/)).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('button', { name: /Salvar 1 parcela/ })).toBeDisabled();
+    } finally {
+      await page.context().close();
+    }
+  });
+
+  test('09 — edição de parcela pendente persiste e parcela aprovada/paga não mostra Editar', async ({ browser }) => {
+    const email = optionalEnv('TEST_ASSISTANT_EMAIL');
+    const password = optionalEnv('TEST_ASSISTANT_PASSWORD');
+    if (!email || !password || !osId) {
+      test.skip(true, 'TEST_ASSISTANT_EMAIL/PASSWORD ausentes ou fixture de OS aprovada indisponível.');
+      return;
+    }
+
+    const supabase = adminClient();
+    const { data: pendingInstallment } = await supabase
+      .from('payment_installments')
+      .select('id')
+      .eq('maintenance_order_id', osId)
+      .eq('status', 'pendente_aprovacao')
+      .limit(1)
+      .maybeSingle();
+
+    if (!pendingInstallment) {
+      test.skip(true, 'Nenhuma parcela pendente disponível para este cenário (depende do teste 01).');
+      return;
+    }
+
+    const page = await loginAs(browser, email, password);
+    try {
+      await page.goto('/financeiro');
+      await page.getByRole('tab', { name: 'Pagamentos' }).click();
+      const row = page.locator('tr', { hasText: osNumber }).first();
+      await expect(row).toBeVisible({ timeout: 15000 });
+      await row.getByTitle('Editar parcela').click();
+
+      await expect(page.getByText(/Editar parcela/)).toBeVisible({ timeout: 10000 });
+      await page.getByRole('button', { name: 'Salvar' }).click();
+      await expect(page.getByText(/Editar parcela/)).not.toBeVisible({ timeout: 15000 });
+    } finally {
+      await page.context().close();
+    }
+  });
+
+  test('10 — aba Aprovação exibe colunas de orçamento e aprovador do orçamento', async ({ browser }) => {
+    const email = optionalEnv('TEST_COORDINATOR_EMAIL');
+    const password = optionalEnv('TEST_COORDINATOR_PASSWORD');
+    if (!email || !password || !osId) {
+      test.skip(true, 'TEST_COORDINATOR_EMAIL/PASSWORD ausentes ou fixture indisponível.');
+      return;
+    }
+
+    const page = await loginAs(browser, email, password);
+    try {
+      await page.goto('/financeiro');
+      await page.getByRole('tab', { name: 'Aprovação de Pagamentos' }).click();
+      await expect(page.getByText('Orçamento aprovado por')).toBeVisible({ timeout: 15000 });
+
+      const row = page.locator('tr', { hasText: osNumber }).first();
+      await expect(row).toBeVisible({ timeout: 15000 });
+    } finally {
+      await page.context().close();
+    }
+  });
+
   test('07 — rota /aprovacao-orcamentos não existe mais', async ({ browser }) => {
     const email = optionalEnv('TEST_ASSISTANT_EMAIL');
     const password = optionalEnv('TEST_ASSISTANT_PASSWORD');

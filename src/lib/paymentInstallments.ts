@@ -90,6 +90,15 @@ export function sumInstallmentsValue(list: { value: number }[]): number {
   return list.reduce((sum, i) => sum + i.value, 0);
 }
 
-export function remainingBudget(approvedCost: number, existing: { value: number }[]): number {
-  return approvedCost - sumInstallmentsValue(existing);
+export function sumNonRejectedValue(
+  list: { value: number; status?: PaymentInstallmentStatus }[],
+): number {
+  return list.reduce((sum, i) => (i.status === 'reprovado' ? sum : sum + i.value), 0);
+}
+
+export function remainingBudget(
+  approvedCost: number,
+  existing: { value: number; status?: PaymentInstallmentStatus }[],
+): number {
+  return approvedCost - sumNonRejectedValue(existing);
 }

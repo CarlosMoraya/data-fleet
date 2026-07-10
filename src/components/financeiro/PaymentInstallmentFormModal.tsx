@@ -7,6 +7,7 @@ import {
   generateInstallmentDrafts,
   remainingBudget,
   sumInstallmentsValue,
+  sumNonRejectedValue,
 } from '../../lib/paymentInstallments';
 import { uploadFinancialDocument } from '../../lib/storageHelpers';
 import { supabase } from '../../lib/supabase';
@@ -22,6 +23,7 @@ import type { InstallmentDraftInput } from '../../services/paymentInstallmentSer
 import type {
   InstallmentDraft,
   InstallmentInterval,
+  PaymentInstallmentStatus,
   PaymentMethod,
   PixKeyType,
 } from '../../types/payment';
@@ -61,6 +63,7 @@ export default function PaymentInstallmentFormModal({
   const [competenciaDate, setCompetenciaDate] = useState('');
   const [descricao, setDescricao] = useState('');
   const [notaFile, setNotaFile] = useState<File | null>(null);
+  const [notaFile2, setNotaFile2] = useState<File | null>(null);
   const [drafts, setDrafts] = useState<InstallmentDraft[]>([]);
   const [uploadingBoletoIndex, setUploadingBoletoIndex] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -87,14 +90,15 @@ export default function PaymentInstallmentFormModal({
         .select('value, status')
         .eq('maintenance_order_id', orderId);
       if (qErr) throw qErr;
-      return ((data ?? []) as { value: number; status: string }[]).map((r) => ({
+      return ((data ?? []) as { value: number; status: PaymentInstallmentStatus }[]).map((r) => ({
         value: Number(r.value),
+        status: r.status,
       }));
     },
   });
 
   const alreadyRegistered = existingInstallments.length;
-  const alreadyRegisteredSum = sumInstallmentsValue(existingInstallments);
+  const alreadyRegisteredSum = sumNonRejectedValue(existingInstallments);
   const saldo = selectedOrder
     ? remainingBudget(selectedOrder.approvedCost, existingInstallments)
     : 0;
@@ -108,7 +112,7 @@ export default function PaymentInstallmentFormModal({
     setOrderId(''); setBatchMode('batch'); setCount(1); setFirstDueDate('');
     setInterval('mensal'); setPaymentMethod('boleto'); setPixKeyType('aleatoria');
     setPixKey(''); setPixBeneficiaryName(''); setCategoria(''); setCentroCusto('');
-    setCompetenciaDate(''); setDescricao(''); setNotaFile(null); setDrafts([]);
+    setCompetenciaDate(''); setDescricao(''); setNotaFile(null); setNotaFile2(null); setDrafts([]);
     setError(''); setUploadWarnings([]);
   };
 
@@ -173,6 +177,18 @@ export default function PaymentInstallmentFormModal({
         }
       }
 
+      let notaFiscalUrl2: string | null = null;
+      if (notaFile2) {
+        try {
+          notaFiscalUrl2 = await uploadFinancialDocument(
+            currentClient.id, selectedOrder.id, notaFile2, 'nota',
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Falha ao anexar 2º documento.';
+          setUploadWarnings((prev) => [...prev, msg]);
+        }
+      }
+
       const inputs: InstallmentDraftInput[] = drafts.map((d) => ({
         installmentNumber: d.installmentNumber,
         value: d.value,
@@ -194,6 +210,7 @@ export default function PaymentInstallmentFormModal({
         centroCusto: centroCusto || null,
         descricao: descricao || null,
         notaFiscalUrl,
+        notaFiscalUrl2,
         drafts: inputs,
       });
 
@@ -378,13 +395,22 @@ export default function PaymentInstallmentFormModal({
               />
             </div>
 
-            {/* Nota fiscal única (aplicada a todas) */}
-            <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-zinc-700">Nota fiscal (única para todas as parcelas)</label>
+            {/* Nota fiscal (até 2 documentos, ambos opcionais) */}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">Nota fiscal (opcional)</label>
               <input
                 type="file"
                 accept="application/pdf,image/jpeg,image/png,image/webp"
                 onChange={(e) => setNotaFile(e.target.files?.[0] ?? null)}
+                className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">2º documento (opcional)</label>
+              <input
+                type="file"
+                accept="application/pdf,image/jpeg,image/png,image/webp"
+                onChange={(e) => setNotaFile2(e.target.files?.[0] ?? null)}
                 className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200"
               />
             </div>
@@ -493,13 +519,18 @@ export default function PaymentInstallmentFormModal({
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 rounded-b-2xl border-t bg-zinc-50 px-6 py-4">
+          {overBudget && (
+            <p className="mr-auto text-xs font-medium text-red-600">
+              A soma das parcelas ultrapassa o saldo do orçamento. Ajuste os valores para continuar.
+            </p>
+          )}
           <button onClick={() => { reset(); onClose(); }} className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900">
             Cancelar
           </button>
           <button
             type="button"
             onClick={() => { void handleSave(); }}
-            disabled={saving || drafts.length === 0}
+            disabled={saving || drafts.length === 0 || overBudget}
             className="flex items-center gap-2 rounded-lg bg-orange-500 px-5 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
