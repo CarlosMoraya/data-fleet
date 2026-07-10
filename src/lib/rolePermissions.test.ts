@@ -92,6 +92,10 @@ describe('permissões do módulo financeiro', () => {
     expect(canAccessRoute('Financeiro', '/manutencao')).toBe(false);
     expect(canAccessRoute('Financeiro', '/financeiro')).toBe(true);
   });
+
+  it('canAccessRoute bloqueia Financeiro na rota raiz "/"', () => {
+    expect(canAccessRoute('Financeiro', '/')).toBe(false);
+  });
 });
 
 describe('canFillCoupling', () => {

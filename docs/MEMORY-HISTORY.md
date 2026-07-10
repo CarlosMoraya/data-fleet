@@ -2,6 +2,55 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-09 (fix: tela branca ao logar com perfil Financeiro)
+
+### O que foi implementado
+
+Correção de bug Tipo B (com dependências mapeadas) conforme `IMPLEMENTATION_FIXBUG.md` desta sessão. Ao logar com role `Financeiro`, a aplicação renderizava uma tela completamente em branco (sem sidebar, sem conteúdo, sem erro visível); `F5` não resolvia e "voltar" no navegador caía em `/login`.
+
+**Causa raiz** — `src/components/Layout.tsx` (linhas 32-34) usava um fallback hardcoded no guard de autorização:
+```tsx
+if (!canAccessRoute(user.role, location.pathname)) {
+  return <Navigate to={isOperationsManager(user.role) ? '/agendamentos' : '/engate'} replace />;
+}
+```
+`Layout` envolve **todas** as rotas autenticadas, inclusive a rota raiz `/` (`src/App.tsx`, `index` → `HomeRedirect`). Esse guard roda **antes** de `HomeRedirect`. Em `src/lib/rolePermissions.ts`, `canAccessRoute` restringe `Financeiro` a `FINANCEIRO_ALLOWED_ROUTES = ['/financeiro', '/conta/senha']` — `/` não está na lista. Logo, no primeiro acesso pós-login (`navigate('/')` em `src/pages/Login.tsx:33`), o guard barrava `/` para Financeiro e caía no fallback hardcoded que manda **qualquer papel que não seja Operations Manager** para `/engate`. `/engate` também não está liberado para Financeiro, então o mesmo guard barra de novo e tenta `<Navigate to="/engate" replace />` estando já em `/engate` — sem mudança de rota, o React Router não processa, e a árvore trava sem renderizar nada. O fallback hardcoded `/engate` funcionava hoje por coincidência para `Coupling Agent` (que tem `/engate` liberado), mas era a rota errada para qualquer outro papel restrito — atualmente, o único afetado é `Financeiro`.
+
+`getDefaultRouteForRole` (`src/lib/rolePermissions.ts`, linhas 220-227) já resolve a rota inicial correta por papel (inclusive `Financeiro → /financeiro`) e já era usada por `HomeRedirect` — mas nunca chegava a ser invocada nesse caminho porque o guard do `Layout` interceptava antes.
+
+### Correção aplicada
+
+1. `src/components/Layout.tsx` — import `getDefaultRouteForRole` (mesmo módulo de `canAccessRoute`/`isOperationsManager`); fallback do guard trocado por `<Navigate to={getDefaultRouteForRole(user.role)} replace />`; `isOperationsManager` deixou de ser usado e o import foi removido.
+2. `src/lib/rolePermissions.test.ts` — novo teste `canAccessRoute bloqueia Financeiro na rota raiz '/'` (`expect(canAccessRoute('Financeiro', '/')).toBe(false)`) documenta explicitamente que `/` não está entre as rotas liberadas para Financeiro — fecha lacuna de cobertura que permitiu o bug passar despercebido.
+3. `e2e/pending/financeiro-login-redirect.spec.ts` — novo spec E2E com `test.skip` condicional (credenciais `TEST_FINANCEIRO_EMAIL/PASSWORD` ausentes em `.env.local`): cenário 1 valida redirecionamento para `/financeiro` após login + render do conteúdo (não só URL); cenário 2 valida que acessar rota não permitida (`/manutencao`) como Financeiro redireciona para `/financeiro` (não `/engate`, não tela branca).
+
+### Restrições respeitadas (conforme `IMPLEMENTATION_FIXBUG.md`)
+
+- Não alterado: `FINANCEIRO_ALLOWED_ROUTES`, `COUPLING_AGENT_ALLOWED_ROUTES`, `OPERATIONS_MANAGER_ALLOWED_ROUTES`, função `canAccessRoute`, `HomeRedirect` em `src/App.tsx`, `src/context/AuthContext.tsx`, `src/pages/Login.tsx`.
+- `Layout.tsx` modificado apenas na linha do fallback + import — guard de loading, guard de `!user`, sidebar/topbar/outlet intactos.
+- Nenhuma refatoração além do especificado; nenhum teste alterado para passar.
+
+### Dependências mapeadas (substituição equivalente)
+
+- **Coupling Agent**: caía em `/engate`; `getDefaultRouteForRole('Coupling Agent')` também retorna `/engate` — idêntico.
+- **Operations Manager**: caía em `/agendamentos`; `getDefaultRouteForRole('Operations Manager')` também retorna `/agendamentos` — idêntico.
+- **Financeiro**: caía incorretamente em `/engate` (causa do bug); agora vai para `/financeiro` — corrige.
+- **Demais papéis** (Coordinator, Manager, Director, Admin Master, Fleet Assistant, Fleet Analyst, Supervisor, Workshop, Driver, Yard Auditor): `canAccessRoute` retorna `true` para eles em qualquer rota, o fallback não é exercido — nenhum impacto.
+
+### Validação
+
+- `npm run lint` — **0 erros, 117 warnings** (mesmo baseline pré-correção).
+- `npx vitest run src/lib/rolePermissions.test.ts` — 16/16 (15 base + 1 novo).
+- `npm run test:unit` — **818/818** (817 baseline + 1 novo).
+- `npm run test:smoke` — **6/6**.
+- `PLAYWRIGHT_INCLUDE_PENDING=1 npx playwright test e2e/pending/financeiro-login-redirect.spec.ts --project=chromium` — 1 passed (setup), 2 skipped (credenciais Financeiro ausentes, como previsto).
+- **Validação manual guiada pendente** de execução pelo usuário (logar em `http://localhost:3000/login` com usuário de role Financeiro).
+
+### Observações para sessões futuras
+
+- O padrão de guard em `Layout.tsx` agora está centralizado em `getDefaultRouteForRole`, mitigando o risco para futuros papéis restritos. Padrão a manter: **toda vez que um papel novo ganhar uma lista própria de `*_ALLOWED_ROUTES`, ele também precisa de uma entrada em `getDefaultRouteForRole`** (já é verdade hoje, mas não há teste que imponha essa relação).
+- Débito identificado (fora do escopo desta correção): não há teste de componente para `Layout.tsx` (guard de autenticação/autorização), apenas testes unitários de `rolePermissions.ts` isolados e o novo E2E.
+
 ## Sessão — 2026-07-09 (Financeiro: trava de orçamento, 2ª nota fiscal, edição de parcela pendente, preview do orçamento e aprovador)
 
 ### O que foi implementado

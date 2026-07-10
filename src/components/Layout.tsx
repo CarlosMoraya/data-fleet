@@ -3,7 +3,7 @@ import { Outlet, Navigate, useLocation } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 import { useIdleTimeout } from '../hooks/useIdleTimeout';
-import { canAccessRoute, isOperationsManager } from '../lib/rolePermissions';
+import { canAccessRoute, getDefaultRouteForRole } from '../lib/rolePermissions';
 
 import RouteFallback from './RouteFallback';
 import Sidebar from './Sidebar';
@@ -30,7 +30,7 @@ export default function Layout() {
   }
 
   if (!canAccessRoute(user.role, location.pathname)) {
-    return <Navigate to={isOperationsManager(user.role) ? '/agendamentos' : '/engate'} replace />;
+    return <Navigate to={getDefaultRouteForRole(user.role)} replace />;
   }
 
   return (
