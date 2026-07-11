@@ -26,6 +26,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+export function shouldReloadProfile(prevUserId: string | null | undefined, nextUserId: string): boolean {
+  return prevUserId !== nextUserId;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [currentClient, setCurrentClient] = useState<Client | null>(null);
@@ -229,6 +233,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
+        if (!shouldReloadProfile(user?.id, session.user.id)) {
+          return;
+        }
         setLoading(true);
         void fetchProfile(session.user.id, session.user.email ?? '').finally(() => setLoading(false));
       } else if (event === 'SIGNED_OUT') {

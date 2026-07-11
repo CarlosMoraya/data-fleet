@@ -244,3 +244,11 @@ Correção aplicada:
   - Bug 2: portado lightbox interno (padrão de TireInspectionDetailModal) para ChecklistDetailModal; fotos abrem em overlay sobre o modal.
 Arquivos modificados: src/components/InviteWorkshopModal.tsx, src/components/ChecklistDetailModal.tsx
 Testes adicionados: ChecklistDetailModal.test.tsx (lightbox), InviteWorkshopModal.test.tsx (resolução de URL local/prod)
+
+## Correção de bug — orçamento aprovado exibia R$ 0,00 no Cadastro de Pagamento + modal de pagamento resetava ao trocar de aba (2026-07-11)
+
+Bug corrigido: (1) Orçamento aprovado exibia R$ 0,00 no Cadastro de Pagamento e bloqueava o salvamento de parcelas; (2) modal de pagamento resetava ao trocar de aba do navegador.
+Causa raiz: (1) approved_cost nunca era populado a partir da soma dos itens do orçamento (nem na criação, nem na aprovação; sem trigger); (2) onAuthStateChange tratava o SIGNED_IN reemitido no foco da aba como novo login, ligando loading e remontando o Outlet no Layout.
+Correção aplicada: (1) gravar approved_cost = SUM(quantity*value) ao aprovar (BudgetApprovals) + migração de backfill para OS já aprovadas (aplicada em DEV e PROD); (2) ignorar SIGNED_IN quando o usuário já está carregado com o mesmo id (shouldReloadProfile).
+Arquivos modificados: src/pages/BudgetApprovals.tsx, supabase/migrations/20260725000000_backfill_approved_cost_from_budget_items.sql, src/context/AuthContext.tsx
+Testes adicionados: maintenanceMappers.calcBudgetSubtotal.test.ts (soma de itens do orçamento), AuthContext.shouldReloadProfile.test.ts (guarda de reload), roteiro manual em TESTES_HUMANOS.md (seção 16)

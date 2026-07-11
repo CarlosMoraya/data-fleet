@@ -220,6 +220,9 @@
 - [x] Aprovar orçamento (dentro do limite de aprovação)
 - [x] Reprovar orçamento
 - [o] Visualizar histórico de revisão (reviewed by/at) - NÃO LOCALIZEI HISTÓRICO DE REVISÕES
+- [ ] Aprovar um orçamento com itens conhecidos (ex.: soma R$ 1.370,00) e confirmar que em Financeiro → Cadastrar Pagamento a OS aparece com o valor real (não R$ 0,00) e permite salvar parcelas
+- [ ] Modal de "Cadastrar Pagamento": abrir, preencher campos, alternar para outra aba do navegador, voltar — confirmar que o modal continua aberto com os campos preservados
+- [ ] Fazer logout e login com outro usuário — confirmar que o perfil recarrega normalmente (sem regressão da guarda de `SIGNED_IN`)
 
 ---
 
