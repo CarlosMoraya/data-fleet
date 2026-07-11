@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 
 import type {
   PaymentInstallment,
+  PaymentInstallmentAuditors,
   PaymentInstallmentRow,
   PaymentInstallmentStatus,
   PaymentMethod,
@@ -110,6 +111,35 @@ export async function listPaymentInstallments(
   const { data, error } = await query;
   if (error) throw error;
   return ((data ?? []) as unknown as PaymentInstallmentRow[]).map(paymentInstallmentFromRow);
+}
+
+/**
+ * Resolve os nomes de auditoria (orçamento/pagamento/pago) de uma parcela
+ * via RPC SECURITY DEFINER, contornando a RLS de profiles de forma controlada.
+ * Retorna nomes vazios (undefined) quando a ação não ocorreu ou o chamador
+ * não pode ver a parcela.
+ */
+export async function getPaymentInstallmentAuditors(
+  installmentId: string,
+): Promise<PaymentInstallmentAuditors> {
+  const { data, error } = await supabase.rpc('get_payment_installment_auditors', {
+    p_installment_id: installmentId,
+  });
+  if (error) throw error;
+
+  const row = (data ?? [])[0] as
+    | {
+        budget_approved_by_name: string | null;
+        payment_approved_by_name: string | null;
+        paid_by_name: string | null;
+      }
+    | undefined;
+
+  return {
+    budgetApprovedByName: row?.budget_approved_by_name ?? undefined,
+    paymentApprovedByName: row?.payment_approved_by_name ?? undefined,
+    paidByName: row?.paid_by_name ?? undefined,
+  };
 }
 
 /**

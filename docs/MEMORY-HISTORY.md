@@ -2,6 +2,34 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-10 (Financeiro: nomes de auditoria via RPC no modal da parcela)
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão, o modal "Detalhes do pagamento" (`PaymentInstallmentViewModal.tsx`) passou a exibir os **nomes** de quem aprovou o orçamento, aprovou o pagamento e marcou como pago — antes, "Pagamento aprovado por" e "Pago por" mostravam o **UUID cru**, porque o papel `Financeiro` não tem RLS de leitura em `public.profiles`.
+
+1. **RPC `SECURITY DEFINER`** (`supabase/migrations/20260724000000_payment_installment_auditors_rpc.sql`) — `public.get_payment_installment_auditors(p_installment_id UUID)` retorna `budget_approved_by_name`, `payment_approved_by_name`, `paid_by_name`, lendo `profiles` com privilégios elevados mas reimpondo no `WHERE` a mesma trava de visibilidade da policy `payment_installments_select` (tenant do chamador, OU Admin Master, OU Workshop dono da OS). Se a parcela não for visível, retorna 0 linhas. `GRANT EXECUTE` para `authenticated`.
+2. **Tipo e service** — `PaymentInstallmentAuditors` (`src/types/payment.ts`) e `getPaymentInstallmentAuditors(installmentId)` (`src/services/paymentInstallmentService.ts`), que chama a RPC via `supabase.rpc` e converte a resposta snake_case para camelCase, deixando os campos `undefined` quando nulos ou ausentes.
+3. **Modal** — `PaymentInstallmentViewModal.tsx` ganhou `useQuery(['paymentInstallmentAuditors', installment.id], ..., { enabled: open })`, chamado **antes** do early return `if (!open) return null` (respeitando `react-hooks/rules-of-hooks`). "Orçamento aprovado por" mantém `installment.budgetApprovedByName` (do join já existente) como fallback enquanto a RPC carrega; "Pagamento aprovado por" e "Pago por" passaram a usar exclusivamente `auditors?.paymentApprovedByName`/`auditors?.paidByName`.
+
+### Segurança e decisões
+
+- **Menor privilégio**: a RPC expõe somente `profiles.name` das três pessoas envolvidas — nenhum outro campo de perfil, e a RLS de `profiles` permanece inalterada (decisão explícita do usuário: não ampliar o acesso do Financeiro a `profiles`, não denormalizar via colunas de snapshot).
+- **Isolamento multi-tenant**: validado por desenho (mesma trava da policy `payment_installments_select`); a suíte Vitest não sobe Postgres, então a validação real (incluindo negação cross-tenant) depende de SQL manual em DEV, executada pelo usuário.
+- **Somente leitura**: função `STABLE`, sem DML.
+
+### Validação local
+
+- `npm run lint` — **0 erros / 121 warnings** (baseline 117 + 2 warnings novos de `@typescript-eslint/no-unsafe-assignment`/`no-unsafe-member-access` ao desestruturar o retorno de `supabase.rpc` em `getPaymentInstallmentAuditors`, mesmo padrão já tolerado em outros services do projeto; demais warnings pré-existentes de arquivos fora do escopo desta sessão).
+- `npx vitest run src/services/paymentInstallmentService.test.ts src/components/financeiro/PaymentInstallmentViewModal.test.tsx` — **9/9** (4 novos no service, 2 novos no modal).
+- `npm run test:unit` — **838/838** (832 base + 6 novos).
+- `npm run test:smoke` — **6/6**.
+
+### Pendências
+
+- Migration `20260724000000_payment_installment_auditors_rpc.sql` aplicada em **DEV** pelo usuário nesta sessão; promoção ao **PROD** requer autorização expressa em sessão futura.
+- Validação manual guiada (Etapa 4 do `IMPLEMENTATION.md`): login como Financeiro, abrir parcela paga e confirmar os três nomes — ainda não executada/aprovada pelo usuário.
+
 ## Sessão — 2026-07-10 (Financeiro: NF/Fatura via OCR, CSV seletivo, visualização e fila)
 
 ### O que foi implementado

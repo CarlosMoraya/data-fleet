@@ -1,8 +1,10 @@
+import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import React from 'react';
 
 import { getFinancialDocumentSignedUrl } from '../../lib/storageHelpers';
 import { cn } from '../../lib/utils';
+import { getPaymentInstallmentAuditors } from '../../services/paymentInstallmentService';
 
 import type { PaymentInstallment, PaymentInstallmentStatus } from '../../types/payment';
 
@@ -51,6 +53,13 @@ export default function PaymentInstallmentViewModal({
   installment,
   onClose,
 }: PaymentInstallmentViewModalProps): React.ReactElement | null {
+  const { data: auditors } = useQuery({
+    queryKey: ['paymentInstallmentAuditors', installment.id],
+    queryFn: () => getPaymentInstallmentAuditors(installment.id),
+    enabled: open,
+    staleTime: 60_000,
+  });
+
   if (!open) return null;
 
   return (
@@ -129,10 +138,10 @@ export default function PaymentInstallmentViewModal({
           <section className="rounded-xl border border-zinc-200 p-4">
             <h3 className="mb-3 text-xs font-semibold tracking-wider text-zinc-500 uppercase">Auditoria</h3>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <ReadField label="Orçamento aprovado por" value={installment.budgetApprovedByName ?? '—'} />
-              <ReadField label="Pagamento aprovado por" value={installment.paymentApprovedBy ?? '—'} />
+              <ReadField label="Orçamento aprovado por" value={auditors?.budgetApprovedByName ?? installment.budgetApprovedByName ?? '—'} />
+              <ReadField label="Pagamento aprovado por" value={auditors?.paymentApprovedByName ?? '—'} />
               <ReadField label="Aprovação do pagamento" value={formatDate(installment.paymentApprovedAt)} />
-              <ReadField label="Pago por" value={installment.paidBy ?? '—'} />
+              <ReadField label="Pago por" value={auditors?.paidByName ?? '—'} />
               <ReadField label="Pagamento" value={formatDate(installment.paidAt)} />
             </div>
           </section>

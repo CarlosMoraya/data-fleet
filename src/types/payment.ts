@@ -83,6 +83,12 @@ export interface PaymentInstallmentRow {
   } | null;
 }
 
+export interface PaymentInstallmentAuditors {
+  budgetApprovedByName?: string;
+  paymentApprovedByName?: string;
+  paidByName?: string;
+}
+
 export interface InstallmentDraft {
   installmentNumber: number;
   value: number;
