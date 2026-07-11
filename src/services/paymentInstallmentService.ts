@@ -58,6 +58,7 @@ export interface CreateInstallmentBatchInput {
   categoria?: string | null;
   centroCusto?: string | null;
   descricao?: string | null;
+  notes?: string | null;
   notaFiscalUrl?: string | null;
   notaFiscalUrl2?: string | null;
   invoiceNumber?: string | null;
@@ -167,6 +168,7 @@ export async function createPaymentInstallmentsBatch(
     categoria: input.categoria ?? null,
     centro_custo: input.centroCusto ?? null,
     descricao: input.descricao ?? null,
+    notes: input.notes ?? null,
     nota_fiscal_url: input.notaFiscalUrl ?? null,
     nota_fiscal_url_2: input.notaFiscalUrl2 ?? null,
     invoice_number: input.invoiceNumber ?? null,

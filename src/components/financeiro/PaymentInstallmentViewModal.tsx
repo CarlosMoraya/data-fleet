@@ -91,6 +91,8 @@ export default function PaymentInstallmentViewModal({
               </span>
             </div>
             <ReadField label="Categoria" value={installment.categoria ?? '—'} />
+            <ReadField label="Cliente/Fornecedor" value={installment.workshopName ?? '—'} />
+            <ReadField label="CNPJ/CPF Cliente/Fornecedor" value={installment.workshopCnpj ?? '—'} />
             <ReadField label="Centro de custo" value={installment.centroCusto ?? '—'} />
             <ReadField label="Descrição" value={installment.descricao ?? '—'} wide />
             <ReadField label="Observações" value={installment.notes ?? '—'} wide />

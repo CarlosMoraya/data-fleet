@@ -117,6 +117,8 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
   let clientId = '';
   let assistantId = '';
   let workshopId = '';
+  let workshopName = '';
+  let workshopCnpj: string | null = null;
   let osId = '';
   let osNumber = '';
   let vehicleId = '';
@@ -130,6 +132,8 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
     const workshop = await getWorkshop(clientId);
     if (!workshop) return;
     workshopId = workshop.id;
+    workshopName = workshop.name;
+    workshopCnpj = workshop.cnpj;
     const order = await createApprovedOrder(clientId, workshopId, assistantId);
     osId = order.osId;
     osNumber = order.osNumber;
@@ -392,6 +396,43 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
     try {
       await page.goto('/aprovacao-orcamentos');
       await expect(page).not.toHaveURL('/aprovacao-orcamentos', { timeout: 15000 });
+    } finally {
+      await page.context().close();
+    }
+  });
+
+  test('11 — Financeiro vê Cliente/Fornecedor e CNPJ/CPF no detalhe da parcela e no CSV (RLS)', async ({ browser }) => {
+    const email = optionalEnv('TEST_FINANCEIRO_EMAIL');
+    const password = optionalEnv('TEST_FINANCEIRO_PASSWORD');
+    if (!email || !password || !osId || !workshopName) {
+      test.skip(true, 'TEST_FINANCEIRO_EMAIL/PASSWORD ausentes — cargo Financeiro não tem usuário de teste cadastrado ainda.');
+      return;
+    }
+
+    const page = await loginAs(browser, email, password);
+    try {
+      await expect(page).toHaveURL('/financeiro', { timeout: 15000 });
+      await expect(page.getByText(osNumber).first()).toBeVisible({ timeout: 15000 });
+
+      const row = page.locator('tr', { hasText: osNumber }).first();
+      await row.getByTitle('Visualizar parcela').click();
+
+      await expect(page.getByText('Cliente/Fornecedor')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText(workshopName)).toBeVisible();
+      if (workshopCnpj) {
+        await expect(page.getByText(workshopCnpj)).toBeVisible();
+      }
+
+      // Recarrega para fechar o modal sem depender de um seletor frágil do botão X.
+      await page.reload();
+      await page.getByRole('tab', { name: 'Pagamentos' }).click();
+      await expect(page.getByText(osNumber).first()).toBeVisible({ timeout: 15000 });
+
+      const downloadPromise = page.waitForEvent('download');
+      await page.getByRole('button', { name: /Baixar planilha|Baixar CSV/ }).click();
+      const download = await downloadPromise;
+      const csvPath = await download.path();
+      expect(csvPath).toBeTruthy();
     } finally {
       await page.context().close();
     }

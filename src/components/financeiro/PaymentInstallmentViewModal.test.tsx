@@ -84,6 +84,21 @@ describe('PaymentInstallmentViewModal', () => {
     expect(container.textContent).toContain('Pendente de aprovação');
   });
 
+  it('exibe Cliente/Fornecedor e CNPJ/CPF quando presentes', async () => {
+    await render(
+      <PaymentInstallmentViewModal
+        open
+        installment={makeInstallment({ workshopName: 'Oficina X', workshopCnpj: '12.345.678/0001-00' })}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(container.textContent).toContain('Cliente/Fornecedor');
+    expect(container.textContent).toContain('Oficina X');
+    expect(container.textContent).toContain('CNPJ/CPF Cliente/Fornecedor');
+    expect(container.textContent).toContain('12.345.678/0001-00');
+  });
+
   it('mostra beneficiário quando pagamento é pix', async () => {
     await render(
       <PaymentInstallmentViewModal

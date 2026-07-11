@@ -64,6 +64,7 @@ export default function PaymentInstallmentFormModal({
   const [centroCusto, setCentroCusto] = useState('');
   const [competenciaDate, setCompetenciaDate] = useState('');
   const [descricao, setDescricao] = useState('');
+  const [notes, setNotes] = useState('');
   const [notaFile, setNotaFile] = useState<File | null>(null);
   const [notaFile2, setNotaFile2] = useState<File | null>(null);
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -231,6 +232,7 @@ export default function PaymentInstallmentFormModal({
         categoria: categoria || null,
         centroCusto: centroCusto || null,
         descricao: descricao || null,
+        notes: notes || null,
         notaFiscalUrl,
         notaFiscalUrl2,
         invoiceNumber: invoiceNumber || null,
@@ -414,6 +416,15 @@ export default function PaymentInstallmentFormModal({
                 type="text"
                 value={descricao}
                 onChange={(e) => setDescricao(e.target.value)}
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-zinc-700">Observações</label>
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
               />
             </div>

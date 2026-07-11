@@ -47,6 +47,7 @@ export default function PaymentInstallmentEditModal({
   const [centroCusto, setCentroCusto] = useState(installment.centroCusto ?? '');
   const [competenciaDate, setCompetenciaDate] = useState(installment.competenciaDate ?? '');
   const [descricao, setDescricao] = useState(installment.descricao ?? '');
+  const [notes, setNotes] = useState(installment.notes ?? '');
   const [invoiceNumber, setInvoiceNumber] = useState(installment.invoiceNumber ?? '');
   const [boletoUrl, setBoletoUrl] = useState(installment.boletoUrl);
   const [notaFiscalUrl, setNotaFiscalUrl] = useState(installment.notaFiscalUrl);
@@ -108,6 +109,7 @@ export default function PaymentInstallmentEditModal({
       categoria: categoria || null,
       centro_custo: centroCusto || null,
       descricao: descricao || null,
+      notes: notes || null,
       invoice_number: invoiceNumber || null,
       boleto_url: boletoUrl ?? null,
       nota_fiscal_url: notaFiscalUrl ?? null,
@@ -250,6 +252,15 @@ export default function PaymentInstallmentEditModal({
                 type="text"
                 value={descricao}
                 onChange={(e) => setDescricao(e.target.value)}
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-zinc-700">Observações</label>
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
               />
             </div>

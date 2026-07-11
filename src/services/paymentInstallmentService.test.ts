@@ -13,6 +13,7 @@ vi.mock('../lib/supabase', () => ({
 }));
 
 import {
+  createPaymentInstallmentsBatch,
   getPaymentInstallmentAuditors,
   listApprovedOrdersForPayment,
 } from './paymentInstallmentService';
@@ -188,5 +189,52 @@ describe('listApprovedOrdersForPayment', () => {
     expect(fromMock).toHaveBeenCalledWith('maintenance_orders');
     expect(query.eq).toHaveBeenCalledWith('budget_status', 'aprovado');
     expect(query.eq).toHaveBeenCalledWith('client_id', 'client-1');
+  });
+});
+
+describe('createPaymentInstallmentsBatch', () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    fromMock.mockReset();
+  });
+
+  it('propaga notes para as linhas inseridas quando informado', async () => {
+    const insertMock = vi.fn().mockResolvedValue({ error: null });
+    fromMock.mockReturnValue({ insert: insertMock });
+
+    await createPaymentInstallmentsBatch({
+      maintenanceOrderId: 'mo-1',
+      clientId: 'client-1',
+      createdById: 'user-1',
+      installmentsTotal: 1,
+      descricao: 'Serviço X',
+      notes: 'Observação de teste',
+      drafts: [
+        { installmentNumber: 1, value: 100, dueDate: '2026-08-01', paymentMethod: 'boleto' },
+      ],
+    });
+
+    expect(insertMock).toHaveBeenCalledWith([
+      expect.objectContaining({ notes: 'Observação de teste' }),
+    ]);
+  });
+
+  it('grava notes como null quando omitido', async () => {
+    const insertMock = vi.fn().mockResolvedValue({ error: null });
+    fromMock.mockReturnValue({ insert: insertMock });
+
+    await createPaymentInstallmentsBatch({
+      maintenanceOrderId: 'mo-1',
+      clientId: 'client-1',
+      createdById: 'user-1',
+      installmentsTotal: 1,
+      drafts: [
+        { installmentNumber: 1, value: 100, dueDate: '2026-08-01', paymentMethod: 'boleto' },
+      ],
+    });
+
+    expect(insertMock).toHaveBeenCalledWith([
+      expect.objectContaining({ notes: null }),
+    ]);
   });
 });

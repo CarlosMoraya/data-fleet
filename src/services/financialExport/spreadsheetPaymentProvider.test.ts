@@ -113,6 +113,25 @@ describe('SpreadsheetPaymentProvider — CSV', () => {
     expect(lines).toHaveLength(4); // 1 header + 3 parcelas
   });
 
+  it('exporta Cliente/Fornecedor, CNPJ/CPF e Observações nas colunas corretas', async () => {
+    const result = await provider.exportData('c1', [
+      makeInstallment({
+        value: 100,
+        categoria: 'Cat',
+        descricao: 'Desc',
+        workshopName: 'Oficina X',
+        workshopCnpj: '12.345.678/0001-00',
+        centroCusto: 'CC',
+        notes: 'Pago com desconto',
+      }),
+    ]);
+
+    const line = result.content!.split('\r\n')[1];
+    expect(line).toBe(
+      '31/01/2026,15/02/2026,15/02/2026,"100,00",Cat,Desc,Oficina X,12.345.678/0001-00,CC,Pago com desconto',
+    );
+  });
+
   it('deixa cells vazias quando campos opcionais estão ausentes', async () => {
     const result = await provider.exportData('c1', [
       makeInstallment({
