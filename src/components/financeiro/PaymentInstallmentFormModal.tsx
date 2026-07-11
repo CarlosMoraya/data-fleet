@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { extractInvoiceNumber } from '../../lib/invoiceOcr';
 import {
+  exceedsBudget,
   generateInstallmentDrafts,
   remainingBudget,
   sumInstallmentsValue,
@@ -83,6 +84,10 @@ export default function PaymentInstallmentFormModal({
     () => approvedOrders.find((o) => o.id === orderId) ?? null,
     [approvedOrders, orderId],
   );
+  const ordersWithRemainingBudget = useMemo(
+    () => approvedOrders.filter((o) => o.remainingBudget > 0),
+    [approvedOrders],
+  );
 
   const { data: existingInstallments = [] } = useQuery({
     queryKey: ['paymentInstallments', { maintenanceOrderId: orderId }],
@@ -107,7 +112,7 @@ export default function PaymentInstallmentFormModal({
     : 0;
   const draftsSum = useMemo(() => sumInstallmentsValue(drafts), [drafts]);
   const saldoAfterSave = useMemo(() => saldo - draftsSum, [saldo, draftsSum]);
-  const overBudget = selectedOrder != null && draftsSum > saldo;
+  const overBudget = selectedOrder != null && exceedsBudget(draftsSum, saldo);
 
   if (!open) return null;
 
@@ -287,7 +292,7 @@ export default function PaymentInstallmentFormModal({
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
               >
                 <option value="">— Selecione —</option>
-                {approvedOrders.map((o) => (
+                {ordersWithRemainingBudget.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.osNumber} — {o.workshopName} ({formatCurrency(o.approvedCost)})
                   </option>

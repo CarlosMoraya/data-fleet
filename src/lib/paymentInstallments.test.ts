@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canTransitionStatus,
+  exceedsBudget,
   generateInstallmentDrafts,
   remainingBudget,
   splitInstallmentValue,
@@ -148,6 +149,24 @@ describe('sumInstallmentsValue / remainingBudget', () => {
 
   it('remainingBudget fica negativo quando a soma excede o aprovado', () => {
     expect(remainingBudget(10000, [{ value: 8000 }, { value: 5000 }])).toBe(-3000);
+  });
+});
+
+describe('exceedsBudget', () => {
+  it('retorna false quando a soma é menor que o saldo', () => {
+    expect(exceedsBudget(999.99, 1000)).toBe(false);
+  });
+
+  it('retorna false quando a soma é exatamente igual ao saldo com resíduo de float', () => {
+    const values = splitInstallmentValue(5936.08, 10);
+    const sum = sumInstallmentsValue(values.map((value) => ({ value })));
+
+    expect(sum).toBeGreaterThan(5936.08);
+    expect(exceedsBudget(sum, 5936.08)).toBe(false);
+  });
+
+  it('retorna true quando a soma excede o saldo em 1 centavo', () => {
+    expect(exceedsBudget(1000.01, 1000)).toBe(true);
   });
 });
 

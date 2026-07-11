@@ -1,20 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { rpcMock } = vi.hoisted(() => ({
+const { fromMock, rpcMock } = vi.hoisted(() => ({
   rpcMock: vi.fn(),
+  fromMock: vi.fn(),
 }));
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
     rpc: rpcMock,
+    from: fromMock,
   },
 }));
 
-import { getPaymentInstallmentAuditors } from './paymentInstallmentService';
+import {
+  getPaymentInstallmentAuditors,
+  listApprovedOrdersForPayment,
+} from './paymentInstallmentService';
 
 describe('getPaymentInstallmentAuditors', () => {
   beforeEach(() => {
     rpcMock.mockReset();
+    fromMock.mockReset();
   });
 
   it('mapeia os três nomes para camelCase', async () => {
@@ -78,5 +84,109 @@ describe('getPaymentInstallmentAuditors', () => {
     rpcMock.mockResolvedValue({ data: null, error: { message: 'boom' } });
 
     await expect(getPaymentInstallmentAuditors('i1')).rejects.toBeTruthy();
+  });
+});
+
+describe('listApprovedOrdersForPayment', () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    fromMock.mockReset();
+  });
+
+  it('calcula remainingBudget por OS aprovada', async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      data: [
+        {
+          id: 'os-1',
+          os_number: 'OS-001',
+          client_id: 'client-1',
+          approved_cost: 1000,
+          budget_pdf_url: 'budget-1.pdf',
+          workshops: { name: 'Oficina A', cnpj: '111' },
+          payment_installments: [],
+        },
+        {
+          id: 'os-2',
+          os_number: 'OS-002',
+          client_id: 'client-1',
+          approved_cost: 1000,
+          budget_pdf_url: null,
+          workshops: { name: 'Oficina B', cnpj: null },
+          payment_installments: [
+            { value: 400, status: 'pendente_aprovacao' },
+            { value: 600, status: 'aprovado' },
+          ],
+        },
+        {
+          id: 'os-3',
+          os_number: 'OS-003',
+          client_id: 'client-1',
+          approved_cost: 1000,
+          budget_pdf_url: null,
+          workshops: null,
+          payment_installments: [
+            { value: 400, status: 'reprovado' },
+            { value: 600, status: 'aprovado' },
+          ],
+        },
+        {
+          id: 'os-4',
+          os_number: 'OS-004',
+          client_id: 'client-1',
+          approved_cost: null,
+          budget_pdf_url: null,
+          workshops: { name: 'Oficina D', cnpj: null },
+          payment_installments: [],
+        },
+      ],
+      error: null,
+    };
+    fromMock.mockReturnValue(query);
+
+    const result = await listApprovedOrdersForPayment('client-1');
+
+    expect(result).toMatchObject([
+      {
+        id: 'os-1',
+        osNumber: 'OS-001',
+        approvedCost: 1000,
+        remainingBudget: 1000,
+        budgetPdfUrl: 'budget-1.pdf',
+        workshopName: 'Oficina A',
+        workshopCnpj: '111',
+        clientId: 'client-1',
+      },
+      {
+        id: 'os-2',
+        osNumber: 'OS-002',
+        approvedCost: 1000,
+        remainingBudget: 0,
+        workshopName: 'Oficina B',
+        workshopCnpj: undefined,
+        clientId: 'client-1',
+      },
+      {
+        id: 'os-3',
+        osNumber: 'OS-003',
+        approvedCost: 1000,
+        remainingBudget: 400,
+        workshopName: '—',
+        clientId: 'client-1',
+      },
+      {
+        id: 'os-4',
+        osNumber: 'OS-004',
+        approvedCost: 0,
+        remainingBudget: 0,
+        workshopName: 'Oficina D',
+        clientId: 'client-1',
+      },
+    ]);
+    expect(fromMock).toHaveBeenCalledWith('maintenance_orders');
+    expect(query.eq).toHaveBeenCalledWith('budget_status', 'aprovado');
+    expect(query.eq).toHaveBeenCalledWith('client_id', 'client-1');
   });
 });

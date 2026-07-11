@@ -1,3 +1,4 @@
+import { remainingBudget } from '../lib/paymentInstallments';
 import { paymentInstallmentFromRow } from '../lib/paymentMappers';
 import { supabase } from '../lib/supabase';
 
@@ -67,6 +68,7 @@ export interface ApprovedOrderForPayment {
   id: string;
   osNumber: string;
   approvedCost: number;
+  remainingBudget: number;
   budgetPdfUrl?: string;
   workshopName: string;
   workshopCnpj?: string;
@@ -245,7 +247,8 @@ export async function listApprovedOrdersForPayment(
     .from('maintenance_orders')
     .select(`
       id, os_number, client_id, approved_cost, budget_pdf_url,
-      workshops(name, cnpj)
+      workshops(name, cnpj),
+      payment_installments(value, status)
     `)
     .eq('budget_status', 'aprovado')
     .order('created_at', { ascending: false });
@@ -264,15 +267,27 @@ export async function listApprovedOrdersForPayment(
     approved_cost: number | null;
     budget_pdf_url: string | null;
     workshops: { name: string; cnpj: string | null } | null;
+    payment_installments:
+      | { value: number | string | null; status?: PaymentInstallmentStatus | null }[]
+      | null;
   };
 
-  return ((data ?? []) as unknown as Row[]).map((row) => ({
-    id: row.id,
-    osNumber: row.os_number,
-    approvedCost: row.approved_cost != null ? Number(row.approved_cost) : 0,
-    budgetPdfUrl: row.budget_pdf_url ?? undefined,
-    workshopName: row.workshops?.name ?? '—',
-    workshopCnpj: row.workshops?.cnpj ?? undefined,
-    clientId: row.client_id,
-  }));
+  return ((data ?? []) as unknown as Row[]).map((row) => {
+    const approvedCost = row.approved_cost != null ? Number(row.approved_cost) : 0;
+    const installments = (row.payment_installments ?? []).map((installment) => ({
+      value: installment.value != null ? Number(installment.value) : 0,
+      status: installment.status ?? undefined,
+    }));
+
+    return {
+      id: row.id,
+      osNumber: row.os_number,
+      approvedCost,
+      remainingBudget: remainingBudget(approvedCost, installments),
+      budgetPdfUrl: row.budget_pdf_url ?? undefined,
+      workshopName: row.workshops?.name ?? '—',
+      workshopCnpj: row.workshops?.cnpj ?? undefined,
+      clientId: row.client_id,
+    };
+  });
 }

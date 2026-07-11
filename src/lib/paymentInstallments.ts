@@ -90,6 +90,10 @@ export function sumInstallmentsValue(list: { value: number }[]): number {
   return list.reduce((sum, i) => sum + i.value, 0);
 }
 
+export function exceedsBudget(sum: number, budget: number): boolean {
+  return Math.round(sum * 100) > Math.round(budget * 100);
+}
+
 export function sumNonRejectedValue(
   list: { value: number; status?: PaymentInstallmentStatus }[],
 ): number {
