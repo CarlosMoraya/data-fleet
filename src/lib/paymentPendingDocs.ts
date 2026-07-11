@@ -12,6 +12,7 @@ export function buildPaymentPendingQueue(
   installments: PaymentInstallment[],
 ): ActionQueueItemLike[] {
   const pending = installments.filter((i) => {
+    if (i.status !== 'pendente_aprovacao') return false;
     if (i.paymentMethod === 'boleto') return !i.boletoUrl;
     if (i.paymentMethod === 'pix') return !i.pixKey || !i.pixBeneficiaryName;
     return false;
@@ -20,7 +21,7 @@ export function buildPaymentPendingQueue(
   if (pending.length === 0) return [];
 
   const details = pending.map((i) => {
-    const os = i.maintenanceOrderOs ?? i.maintenanceOrderId;
+    const os = i.invoiceNumber ?? i.maintenanceOrderOs ?? i.maintenanceOrderId;
     return `#${i.installmentNumber}/${i.installmentsTotal} — ${os ?? 'OS'}`;
   });
 

@@ -3,6 +3,7 @@ import { Loader2, X } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
+import { extractInvoiceNumber } from '../../lib/invoiceOcr';
 import { remainingBudget } from '../../lib/paymentInstallments';
 import { uploadFinancialDocument } from '../../lib/storageHelpers';
 import {
@@ -46,10 +47,12 @@ export default function PaymentInstallmentEditModal({
   const [centroCusto, setCentroCusto] = useState(installment.centroCusto ?? '');
   const [competenciaDate, setCompetenciaDate] = useState(installment.competenciaDate ?? '');
   const [descricao, setDescricao] = useState(installment.descricao ?? '');
+  const [invoiceNumber, setInvoiceNumber] = useState(installment.invoiceNumber ?? '');
   const [boletoUrl, setBoletoUrl] = useState(installment.boletoUrl);
   const [notaFiscalUrl, setNotaFiscalUrl] = useState(installment.notaFiscalUrl);
   const [notaFiscalUrl2, setNotaFiscalUrl2] = useState(installment.notaFiscalUrl2);
   const [uploading, setUploading] = useState<'boleto' | 'nota' | 'nota2' | null>(null);
+  const [extractingInvoice, setExtractingInvoice] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -72,8 +75,16 @@ export default function PaymentInstallmentEditModal({
         kind === 'boleto' ? 'boleto' : 'nota',
       );
       if (kind === 'boleto') setBoletoUrl(path);
-      else if (kind === 'nota') setNotaFiscalUrl(path);
-      else setNotaFiscalUrl2(path);
+      else if (kind === 'nota') {
+        setNotaFiscalUrl(path);
+        setExtractingInvoice(true);
+        try {
+          const result = await extractInvoiceNumber(file);
+          if (result.invoiceNumber && !invoiceNumber) setInvoiceNumber(result.invoiceNumber);
+        } finally {
+          setExtractingInvoice(false);
+        }
+      } else setNotaFiscalUrl2(path);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Falha ao anexar documento.';
       setError(msg);
@@ -97,6 +108,7 @@ export default function PaymentInstallmentEditModal({
       categoria: categoria || null,
       centro_custo: centroCusto || null,
       descricao: descricao || null,
+      invoice_number: invoiceNumber || null,
       boleto_url: boletoUrl ?? null,
       nota_fiscal_url: notaFiscalUrl ?? null,
       nota_fiscal_url_2: notaFiscalUrl2 ?? null,
@@ -212,6 +224,23 @@ export default function PaymentInstallmentEditModal({
                 type="text"
                 value={centroCusto}
                 onChange={(e) => setCentroCusto(e.target.value)}
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 flex items-center gap-2 text-sm font-medium text-zinc-700">
+                <span>NF / Fatura</span>
+                {extractingInvoice && (
+                  <span className="inline-flex items-center gap-1 text-xs font-normal text-zinc-500">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Lendo documento…
+                  </span>
+                )}
+              </label>
+              <input
+                type="text"
+                value={invoiceNumber}
+                onChange={(e) => setInvoiceNumber(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
               />
             </div>

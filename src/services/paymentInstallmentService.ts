@@ -26,6 +26,7 @@ export type PaymentInstallmentPatch = Partial<{
   boleto_url: string | null;
   nota_fiscal_url: string | null;
   nota_fiscal_url_2: string | null;
+  invoice_number: string | null;
   pix_key_type: PixKeyType | null;
   pix_key: string | null;
   pix_beneficiary_name: string | null;
@@ -57,6 +58,7 @@ export interface CreateInstallmentBatchInput {
   descricao?: string | null;
   notaFiscalUrl?: string | null;
   notaFiscalUrl2?: string | null;
+  invoiceNumber?: string | null;
   drafts: InstallmentDraftInput[];
 }
 
@@ -73,7 +75,7 @@ export interface ApprovedOrderForPayment {
 const INSTALLMENT_SELECT = `
   id, maintenance_order_id, client_id, installment_number, installments_total,
   value, due_date, competencia_date, status, payment_method, boleto_url,
-  nota_fiscal_url, nota_fiscal_url_2, pix_key_type, pix_key, pix_beneficiary_name, categoria,
+  nota_fiscal_url, nota_fiscal_url_2, invoice_number, pix_key_type, pix_key, pix_beneficiary_name, categoria,
   centro_custo, descricao, notes, created_by_id, payment_approved_by,
   payment_approved_at, paid_by, paid_at, created_at, updated_at,
   maintenance_orders(os_number, budget_pdf_url, budget_reviewed_by, workshops(name, cnpj), budget_reviewer:profiles!maintenance_orders_budget_reviewed_by_fkey(name))
@@ -135,6 +137,7 @@ export async function createPaymentInstallmentsBatch(
     descricao: input.descricao ?? null,
     nota_fiscal_url: input.notaFiscalUrl ?? null,
     nota_fiscal_url_2: input.notaFiscalUrl2 ?? null,
+    invoice_number: input.invoiceNumber ?? null,
     pix_key_type: d.pixKeyType ?? null,
     pix_key: d.pixKey ?? null,
     pix_beneficiary_name: d.pixBeneficiaryName ?? null,

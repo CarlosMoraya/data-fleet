@@ -2,6 +2,41 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-10 (Financeiro: NF/Fatura via OCR, CSV seletivo, visualização e fila)
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão, a aba Pagamentos do módulo Financeiro passou a usar NF/Fatura como referência de lista, sem liberar leitura de `maintenance_orders` para o papel Financeiro.
+
+1. **Coluna aditiva `invoice_number`** — nova migration `supabase/migrations/20260710000000_add_invoice_number_to_payment_installments.sql` adiciona `payment_installments.invoice_number TEXT` nullable, sem default, sem índice, sem backfill e sem alteração de RLS.
+2. **Tipos, mapper e serviço** — `src/types/payment.ts`, `src/lib/paymentMappers.ts` e `src/services/paymentInstallmentService.ts` propagam `invoiceNumber`/`invoice_number` em leitura, criação em lote e patch de edição.
+3. **OCR de NF/Fatura** — novo `src/lib/invoiceOcr.ts` expõe `extractInvoiceNumber(file)`, com regex-first em PDF usando `loadPdfjs()` e fallback Gemini usando `performOcr(file, prompt)`. A função nunca lança para o chamador; em falha retorna `invoiceNumber: undefined` e warning.
+4. **Cadastrar/Editar Pagamento** — `PaymentInstallmentFormModal.tsx` e `PaymentInstallmentEditModal.tsx` ganharam campo editável "NF / Fatura". O upload da nota fiscal dispara a extração automática; o usuário pode ajustar manualmente e o valor é persistido na parcela.
+5. **Lista de pagamentos** — `PaymentsTab.tsx` troca a coluna "OS" por "NF / Fatura" sem fallback para ID, troca o filtro para NF/Fatura, renomeia o botão para "Baixar CSV" e usa `resolveExportSelection(filtered, selected)` para exportar apenas as linhas selecionadas quando houver seleção.
+6. **Modal de visualização** — novo `PaymentInstallmentViewModal.tsx`, aberto por botão de olho, mostra a parcela em modo somente leitura, incluindo NF/Fatura, datas, valor, status, Pix, documentos e auditoria.
+7. **Fila de pendências** — `buildPaymentPendingQueue` agora só considera parcelas `status === 'pendente_aprovacao'`, preservando as regras de boleto/Pix faltantes.
+
+### Segurança e decisões
+
+- Não foi adicionada nenhuma policy liberando `maintenance_orders` para Financeiro; a decisão vigente é persistir a NF/Fatura na própria parcela.
+- Registros antigos permanecem com `invoice_number = NULL` e a UI exibe "—".
+- **Risco aceito**: a nota fiscal é enviada ao Gemini pelo mesmo caminho de OCR já aceito no projeto (`performOcr`), consistente com Orçamento/CRLV/CNH.
+- `invoice_number` é best-effort e nunca obrigatório; falha de OCR não bloqueia cadastro ou edição.
+- O CSV mantém o mesmo layout de 10 colunas; mudou apenas o conjunto de registros exportados.
+
+### Validação local
+
+- `npx tsc --noEmit` — OK.
+- `npx vitest run src/lib/paymentMappers.test.ts src/lib/paymentExportSelection.test.ts src/lib/paymentPendingDocs.test.ts src/lib/invoiceOcr.test.ts src/components/financeiro/PaymentInstallmentViewModal.test.tsx` — **23/23**.
+- `npm run lint` — **0 erros / 117 warnings** (baseline).
+- `npx vitest run` — **832/832**.
+- `npm run test:smoke` — **6/6**.
+
+### Pendências
+
+- `20260710000000_add_invoice_number_to_payment_installments.sql` foi aplicada em DEV pelo usuário; promover ao PROD somente com autorização expressa.
+- Executar validação manual guiada: upload real de NF no cadastro, edição de NF, coluna/filtro, CSV seletivo e modal de visualização.
+
 ## Sessão — 2026-07-09 (fix: tela branca ao logar com perfil Financeiro)
 
 ### O que foi implementado

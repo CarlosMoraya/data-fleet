@@ -22,6 +22,7 @@ export interface PaymentInstallment {
   boletoUrl?: string;
   notaFiscalUrl?: string;
   notaFiscalUrl2?: string;
+  invoiceNumber?: string;
   budgetPdfUrl?: string;
   budgetApprovedByName?: string;
   pixKeyType?: PixKeyType;
@@ -58,6 +59,7 @@ export interface PaymentInstallmentRow {
   boleto_url: string | null;
   nota_fiscal_url: string | null;
   nota_fiscal_url_2: string | null;
+  invoice_number: string | null;
   pix_key_type: PixKeyType | null;
   pix_key: string | null;
   pix_beneficiary_name: string | null;

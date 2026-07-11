@@ -19,6 +19,7 @@ function baseRow(overrides: Partial<PaymentInstallmentRow> = {}): PaymentInstall
     boleto_url: null,
     nota_fiscal_url: null,
     nota_fiscal_url_2: null,
+    invoice_number: null,
     pix_key_type: null,
     pix_key: null,
     pix_beneficiary_name: null,
@@ -65,5 +66,17 @@ describe('paymentInstallmentFromRow', () => {
     expect(result.notaFiscalUrl2).toBeUndefined();
     expect(result.budgetPdfUrl).toBeUndefined();
     expect(result.budgetApprovedByName).toBeUndefined();
+  });
+
+  it('mapeia invoice_number quando presente', () => {
+    const result = paymentInstallmentFromRow(baseRow({ invoice_number: 'NF-123' }));
+
+    expect(result.invoiceNumber).toBe('NF-123');
+  });
+
+  it('invoice_number nulo vira undefined', () => {
+    const result = paymentInstallmentFromRow(baseRow({ invoice_number: null }));
+
+    expect(result.invoiceNumber).toBeUndefined();
   });
 });

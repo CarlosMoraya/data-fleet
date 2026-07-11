@@ -3,6 +3,7 @@ import { Loader2, X } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
+import { extractInvoiceNumber } from '../../lib/invoiceOcr';
 import {
   generateInstallmentDrafts,
   remainingBudget,
@@ -64,6 +65,8 @@ export default function PaymentInstallmentFormModal({
   const [descricao, setDescricao] = useState('');
   const [notaFile, setNotaFile] = useState<File | null>(null);
   const [notaFile2, setNotaFile2] = useState<File | null>(null);
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [extractingInvoice, setExtractingInvoice] = useState(false);
   const [drafts, setDrafts] = useState<InstallmentDraft[]>([]);
   const [uploadingBoletoIndex, setUploadingBoletoIndex] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -113,7 +116,21 @@ export default function PaymentInstallmentFormModal({
     setInterval('mensal'); setPaymentMethod('boleto'); setPixKeyType('aleatoria');
     setPixKey(''); setPixBeneficiaryName(''); setCategoria(''); setCentroCusto('');
     setCompetenciaDate(''); setDescricao(''); setNotaFile(null); setNotaFile2(null); setDrafts([]);
+    setInvoiceNumber(''); setExtractingInvoice(false);
     setError(''); setUploadWarnings([]);
+  };
+
+  const handleNotaFileChange = async (file: File | null) => {
+    setNotaFile(file);
+    if (!file) return;
+
+    setExtractingInvoice(true);
+    try {
+      const result = await extractInvoiceNumber(file);
+      if (result.invoiceNumber) setInvoiceNumber(result.invoiceNumber);
+    } finally {
+      setExtractingInvoice(false);
+    }
   };
 
   const handleGenerate = () => {
@@ -211,6 +228,7 @@ export default function PaymentInstallmentFormModal({
         descricao: descricao || null,
         notaFiscalUrl,
         notaFiscalUrl2,
+        invoiceNumber: invoiceNumber || null,
         drafts: inputs,
       });
 
@@ -401,7 +419,7 @@ export default function PaymentInstallmentFormModal({
               <input
                 type="file"
                 accept="application/pdf,image/jpeg,image/png,image/webp"
-                onChange={(e) => setNotaFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => { void handleNotaFileChange(e.target.files?.[0] ?? null); }}
                 className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200"
               />
             </div>
@@ -412,6 +430,23 @@ export default function PaymentInstallmentFormModal({
                 accept="application/pdf,image/jpeg,image/png,image/webp"
                 onChange={(e) => setNotaFile2(e.target.files?.[0] ?? null)}
                 className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 flex items-center gap-2 text-sm font-medium text-zinc-700">
+                <span>NF / Fatura</span>
+                {extractingInvoice && (
+                  <span className="inline-flex items-center gap-1 text-xs font-normal text-zinc-500">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Lendo documento…
+                  </span>
+                )}
+              </label>
+              <input
+                type="text"
+                value={invoiceNumber}
+                onChange={(e) => setInvoiceNumber(e.target.value)}
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
               />
             </div>
           </div>

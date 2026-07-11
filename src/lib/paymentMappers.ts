@@ -19,6 +19,7 @@ export function paymentInstallmentFromRow(row: PaymentInstallmentRow): PaymentIn
     boletoUrl: row.boleto_url ?? undefined,
     notaFiscalUrl: row.nota_fiscal_url ?? undefined,
     notaFiscalUrl2: row.nota_fiscal_url_2 ?? undefined,
+    invoiceNumber: row.invoice_number ?? undefined,
     budgetPdfUrl: row.maintenance_orders?.budget_pdf_url ?? undefined,
     budgetApprovedByName: row.maintenance_orders?.budget_reviewer?.name ?? undefined,
     pixKeyType: row.pix_key_type ?? undefined,

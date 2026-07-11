@@ -48,6 +48,27 @@ describe('buildPaymentPendingQueue', () => {
     expect(items[0].details).toHaveLength(1);
   });
 
+  it('parcela aprovada sem boleto_url NÃO entra na fila', () => {
+    const items = buildPaymentPendingQueue([
+      makeInstallment({ status: 'aprovado', paymentMethod: 'boleto', boletoUrl: undefined }),
+    ]);
+
+    expect(items).toEqual([]);
+  });
+
+  it('parcela paga sem dados NÃO entra na fila', () => {
+    const items = buildPaymentPendingQueue([
+      makeInstallment({
+        status: 'pago',
+        paymentMethod: 'pix',
+        pixKey: undefined,
+        pixBeneficiaryName: undefined,
+      }),
+    ]);
+
+    expect(items).toEqual([]);
+  });
+
   it('pix sem pix_key entra na fila', () => {
     const items = buildPaymentPendingQueue([
       makeInstallment({ paymentMethod: 'pix', pixKey: undefined }),

@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, FileText, KeyRound, Pencil, Plus } from 'lucide-react';
+import { Download, Eye, FileText, KeyRound, Pencil, Plus } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
+import { resolveExportSelection } from '../../lib/paymentExportSelection';
 import { buildPaymentPendingQueue } from '../../lib/paymentPendingDocs';
 import { canCreatePayments, canMarkPaid } from '../../lib/rolePermissions';
 import { getFinancialDocumentSignedUrl } from '../../lib/storageHelpers';
@@ -18,6 +19,7 @@ import ActionQueue from '../dashboard/ActionQueue';
 
 import PaymentInstallmentEditModal from './PaymentInstallmentEditModal';
 import PaymentInstallmentFormModal from './PaymentInstallmentFormModal';
+import PaymentInstallmentViewModal from './PaymentInstallmentViewModal';
 
 import type { PaymentInstallment, PaymentInstallmentStatus, PaymentMethod } from '../../types/payment';
 
@@ -77,13 +79,14 @@ export default function PaymentsTab(): React.ReactElement {
   const canExport = canPaid; // só Financeiro/Admin Master (canMarkPaid)
   const showClientFilter = role === 'Admin Master' && clients.length > 0;
 
-  const [filterOs, setFilterOs] = useState('');
+  const [filterInvoice, setFilterInvoice] = useState('');
   const [filterStatus, setFilterStatus] = useState<'' | PaymentInstallmentStatus>('');
   const [filterMethod, setFilterMethod] = useState<'' | PaymentMethod>('');
   const [filterClientId, setFilterClientId] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<PaymentInstallment | null>(null);
+  const [viewing, setViewing] = useState<PaymentInstallment | null>(null);
 
   const activeClientId = showClientFilter ? (filterClientId || undefined) : (currentClient?.id ?? undefined);
 
@@ -116,14 +119,14 @@ export default function PaymentsTab(): React.ReactElement {
 
   const filtered = useMemo(() => {
     return installments.filter((i) => {
-      if (filterOs && !(i.maintenanceOrderOs ?? '').toLowerCase().includes(filterOs.toLowerCase())) {
+      if (filterInvoice && !(i.invoiceNumber ?? '').toLowerCase().includes(filterInvoice.toLowerCase())) {
         return false;
       }
       if (filterStatus && i.status !== filterStatus) return false;
       if (filterMethod && i.paymentMethod !== filterMethod) return false;
       return true;
     });
-  }, [installments, filterOs, filterStatus, filterMethod]);
+  }, [installments, filterInvoice, filterStatus, filterMethod]);
 
   const selectedInstallments = useMemo(
     () => filtered.filter((i) => selected.has(i.id)),
@@ -164,7 +167,12 @@ export default function PaymentsTab(): React.ReactElement {
   const handleExport = async () => {
     try {
       const provider = new SpreadsheetPaymentProvider();
-      const result = await provider.exportData(activeClientId ?? '', filtered);
+      const exportRows = resolveExportSelection(filtered, selected);
+      if (exportRows.length === 0) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      const result = await provider.exportData(activeClientId ?? '', exportRows);
       if (!result.success || !result.content) {
         window.alert('Nada a exportar.');
         return;
@@ -179,7 +187,7 @@ export default function PaymentsTab(): React.ReactElement {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Falha ao gerar planilha.';
+      const msg = err instanceof Error ? err.message : 'Falha ao gerar CSV.';
       window.alert(msg);
     }
   };
@@ -195,9 +203,9 @@ export default function PaymentsTab(): React.ReactElement {
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="text"
-          placeholder="Filtrar por OS…"
-          value={filterOs}
-          onChange={(e) => setFilterOs(e.target.value)}
+          placeholder="Filtrar por NF/Fatura…"
+          value={filterInvoice}
+          onChange={(e) => setFilterInvoice(e.target.value)}
           className="rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
         />
         <select
@@ -233,7 +241,7 @@ export default function PaymentsTab(): React.ReactElement {
               className="flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
             >
               <Download className="h-4 w-4" />
-              Baixar planilha
+              Baixar CSV
             </button>
           )}
           {canCreate && (
@@ -303,7 +311,7 @@ export default function PaymentsTab(): React.ReactElement {
                       />
                     </th>
                   )}
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">OS</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">NF / Fatura</th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Parc.</th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Valor</th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Vencimento</th>
@@ -314,7 +322,6 @@ export default function PaymentsTab(): React.ReactElement {
               </thead>
               <tbody className="divide-y divide-zinc-100 bg-white">
                 {filtered.map((i) => {
-                  const os = i.maintenanceOrderOs ?? i.maintenanceOrderId;
                   return (
                     <tr key={i.id} className="hover:bg-zinc-50">
                       {canPaid && (
@@ -327,7 +334,7 @@ export default function PaymentsTab(): React.ReactElement {
                           />
                         </td>
                       )}
-                      <td className="px-3 py-2.5 font-mono text-xs font-semibold text-zinc-700">{os}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs font-semibold text-zinc-700">{i.invoiceNumber ?? '—'}</td>
                       <td className="px-3 py-2.5 text-zinc-500">{i.installmentNumber}/{i.installmentsTotal}</td>
                       <td className="px-3 py-2.5 font-medium text-zinc-800">{formatCurrency(i.value)}</td>
                       <td className="px-3 py-2.5 text-zinc-600">{formatDate(i.dueDate)}</td>
@@ -395,6 +402,14 @@ export default function PaymentsTab(): React.ReactElement {
                             </button>
                           )}
                           {/* Editar (só parcela pendente) */}
+                          <button
+                            type="button"
+                            onClick={() => setViewing(i)}
+                            title="Visualizar parcela"
+                            className="text-zinc-500 hover:text-blue-600"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </button>
                           {i.status === 'pendente_aprovacao' && canCreate && (
                             <button
                               type="button"
@@ -429,6 +444,14 @@ export default function PaymentsTab(): React.ReactElement {
             .filter((x) => x.maintenanceOrderId === editing.maintenanceOrderId)
             .map((x) => ({ id: x.id, value: x.value, status: x.status }))}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {viewing && (
+        <PaymentInstallmentViewModal
+          open
+          installment={viewing}
+          onClose={() => setViewing(null)}
         />
       )}
     </div>
