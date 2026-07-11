@@ -44,6 +44,7 @@ const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 const WarrantyRevisions = lazy(() => import('./pages/WarrantyRevisions'));
 const CouplingAgent = lazy(() => import('./pages/CouplingAgent'));
 const CouplingsPanel = lazy(() => import('./pages/CouplingsPanel'));
+const ControleCarretas = lazy(() => import('./pages/ControleCarretas'));
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -94,14 +95,19 @@ export default function App() {
                   <Route path="usuarios" element={<Users />} />
                   <Route path="pneus" element={<Tires />} />
                 </Route>
+                <Route path="controle-carretas" element={<ControleCarretas />}>
+                  <Route index element={<Navigate to="historico" replace />} />
+                  <Route path="historico" element={<CouplingsPanel />} />
+                  <Route path="engate" element={<CouplingAgent />} />
+                </Route>
                 {/* Redirects para compatibilidade com rotas antigas */}
                 <Route path="vehicles" element={<Navigate to="/cadastros/veiculos" replace />} />
                 <Route path="drivers" element={<Navigate to="/cadastros/motoristas" replace />} />
                 <Route path="users" element={<Navigate to="/cadastros/usuarios" replace />} />
+                <Route path="engate" element={<Navigate to="/controle-carretas/engate" replace />} />
+                <Route path="engates" element={<Navigate to="/controle-carretas/historico" replace />} />
                 <Route path="checklists" element={<Checklists />} />
                 <Route path="checklists/preencher/:checklistId" element={<ChecklistFill />} />
-                <Route path="engate" element={<CouplingAgent />} />
-                <Route path="engates" element={<CouplingsPanel />} />
                 <Route path="inspecao-pneus/:inspectionId" element={<TireInspectionFill />} />
                 <Route path="checklist-templates" element={<ChecklistTemplates />} />
                 <Route path="acoes" element={<ActionPlans />} />

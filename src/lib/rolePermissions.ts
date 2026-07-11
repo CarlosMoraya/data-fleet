@@ -104,7 +104,7 @@ export const TENANT_USER_ROLE_OPTIONS: Role[] = [
 ];
 
 const OPERATIONS_MANAGER_ALLOWED_ROUTES = ['/agendamentos', '/manutencao', '/conta/senha'] as const;
-const COUPLING_AGENT_ALLOWED_ROUTES = ['/engate', '/checklists/preencher', '/conta/senha'] as const;
+const COUPLING_AGENT_ALLOWED_ROUTES = ['/controle-carretas/engate', '/checklists/preencher', '/conta/senha'] as const;
 const FINANCEIRO_ALLOWED_ROUTES = ['/financeiro', '/conta/senha'] as const;
 
 export const ROLES_CAN_VIEW_PAYMENTS: Role[] = [
@@ -218,7 +218,7 @@ export function getCreatableRoles(role: Role): Role[] {
 }
 
 export function getDefaultRouteForRole(role: Role | null | undefined): string {
-  if (role === 'Coupling Agent') return '/engate';
+  if (role === 'Coupling Agent') return '/controle-carretas/engate';
   if (role === 'Driver' || role === 'Yard Auditor') return '/checklists';
   if (role === 'Workshop') return '/manutencao';
   if (role === 'Operations Manager') return '/agendamentos';

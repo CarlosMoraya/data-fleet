@@ -9,6 +9,7 @@ import {
   canMarkPaid,
   canViewBudgetTab,
   getCreatableRoles,
+  getDefaultRouteForRole,
   hasRoleAccess,
 } from './rolePermissions';
 
@@ -27,10 +28,17 @@ describe('canAccessRoute', () => {
     expect(canAccessRoute('Driver', '/conta/senha')).toBe(true);
   });
 
-  it('keeps Coupling Agent restricted to /engate', () => {
-    expect(canAccessRoute('Coupling Agent', '/engate')).toBe(true);
+  it('keeps Coupling Agent restricted to /controle-carretas/engate', () => {
+    expect(canAccessRoute('Coupling Agent', '/controle-carretas/engate')).toBe(true);
+    expect(canAccessRoute('Coupling Agent', '/controle-carretas/historico')).toBe(false);
     expect(canAccessRoute('Coupling Agent', '/checklists/preencher/abc')).toBe(true);
     expect(canAccessRoute('Coupling Agent', '/cadastros/veiculos')).toBe(false);
+  });
+});
+
+describe('getDefaultRouteForRole', () => {
+  it('leva Operador de Engate a /controle-carretas/engate', () => {
+    expect(getDefaultRouteForRole('Coupling Agent')).toBe('/controle-carretas/engate');
   });
 });
 
