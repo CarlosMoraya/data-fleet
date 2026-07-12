@@ -1,4 +1,4 @@
-import type { MaintenanceOrder } from '../types/maintenance';
+import type { MaintenanceOrder, MaintenanceStatus } from '../types/maintenance';
 
 export interface MaintenanceListFilters {
   statuses: string[];
@@ -67,4 +67,24 @@ export function applyMaintenanceListFilters<
     if (workshopSet && !workshopSet.has(order.workshop ?? '')) return false;
     return true;
   });
+}
+
+// Status que liberam o veículo para uma nova OS (veículo "Retirado" ou OS cancelada).
+// Qualquer outro status é considerado "OS em aberto" e bloqueia nova OS para o mesmo veículo.
+export const MAINTENANCE_TERMINAL_STATUSES = new Set<MaintenanceStatus>([
+  'Veículo retirado',
+  'Cancelado',
+]);
+
+export function getVehicleIdsWithOpenMaintenance(
+  orders: Pick<MaintenanceOrder, 'vehicleId' | 'status'>[],
+): Set<string> {
+  const blocked = new Set<string>();
+  for (const order of orders) {
+    if (!order.vehicleId) continue;
+    if (!MAINTENANCE_TERMINAL_STATUSES.has(order.status)) {
+      blocked.add(order.vehicleId);
+    }
+  }
+  return blocked;
 }

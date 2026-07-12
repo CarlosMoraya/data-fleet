@@ -37,6 +37,7 @@ interface MaintenanceFormProps {
   order: MaintenanceOrder | null;
   prefill?: Partial<MaintenanceOrder>;
   mode?: 'default' | 'workshop';
+  blockedVehicleIds?: Set<string>;
   onClose: () => void;
   onSave: (order: Partial<MaintenanceOrder>, budgetItems: BudgetItem[], budgetFile: File | null, pendingPartPhotos: PartPhotoDraft[]) => Promise<void>;
 }
@@ -46,7 +47,7 @@ interface WorkshopOption { id: string; name: string; }
 interface WarrantyEventOption { id: string; sequence: number; label: string; targetKm: number; }
 type VehicleMaxKmRpcResult = number | null;
 
-export default function MaintenanceForm({ order, prefill, mode = 'default', onClose, onSave }: MaintenanceFormProps) {
+export default function MaintenanceForm({ order, prefill, mode = 'default', blockedVehicleIds, onClose, onSave }: MaintenanceFormProps) {
   const { user, currentClient } = useAuth();
   const isWorkshopMode = mode === 'workshop';
 
@@ -240,6 +241,11 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
     return items.some(item => item.itemName.trim().length > 0 && !isKnownBudgetSystem(item.system));
   };
 
+  const selectableVehicles = useMemo(
+    () => (order ? vehicles : vehicles.filter((v) => !(blockedVehicleIds?.has(v.id)))),
+    [order, vehicles, blockedVehicleIds],
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (hasBudgetItemWithoutSystem(budgetItems)) {
@@ -258,6 +264,10 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
       }
     } else if (!formData.vehicleId || !formData.workshopId || !formData.entryDate || !formData.type || !formData.status) {
       setError('Preencha os campos obrigatórios.');
+      return;
+    }
+    if (!order && formData.vehicleId && blockedVehicleIds?.has(formData.vehicleId)) {
+      setError('Este veículo já possui uma OS em aberto. Só é possível abrir uma nova manutenção quando não houver OS ativa (veículo retirado).');
       return;
     }
     if (!isWorkshopMode) {
@@ -451,7 +461,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', onCl
                         disabled={!!order}
                       >
                         <option value="">Selecione...</option>
-                        {vehicles.map((v) => (
+                        {selectableVehicles.map((v) => (
                           <option key={v.id} value={v.id}>{v.licensePlate}</option>
                         ))}
                       </select>

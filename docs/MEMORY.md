@@ -260,3 +260,11 @@ Causa raiz: (1) approved_cost nunca era populado a partir da soma dos itens do o
 Correção aplicada: (1) gravar approved_cost = SUM(quantity*value) ao aprovar (BudgetApprovals) + migração de backfill para OS já aprovadas (aplicada em DEV e PROD); (2) ignorar SIGNED_IN quando o usuário já está carregado com o mesmo id (shouldReloadProfile).
 Arquivos modificados: src/pages/BudgetApprovals.tsx, supabase/migrations/20260725000000_backfill_approved_cost_from_budget_items.sql, src/context/AuthContext.tsx
 Testes adicionados: maintenanceMappers.calcBudgetSubtotal.test.ts (soma de itens do orçamento), AuthContext.shouldReloadProfile.test.ts (guarda de reload), roteiro manual em TESTES_HUMANOS.md (seção 16)
+
+## Correção de bug — sistema permitia abrir múltiplas OS para um veículo que já tinha OS em aberto (2026-07-11)
+
+Bug corrigido: sistema permitia abrir múltiplas OS para um veículo que já tinha OS em aberto (ex.: BTF1A06 com 3 OS ativas).
+Causa raiz: ausência total de validação (frontend, serviço e banco) impedindo nova OS quando o veículo já tem OS em status não-terminal.
+Correção aplicada (só frontend, por decisão do usuário): nova função pura getVehicleIdsWithOpenMaintenance + constante MAINTENANCE_TERMINAL_STATUSES ('Veículo retirado','Cancelado' — Concluído BLOQUEIA) em maintenanceFilters.ts; Maintenance.tsx deriva o conjunto de veículos bloqueados de `orders` e o passa ao MaintenanceForm; MaintenanceForm oculta esses veículos do dropdown (modo criação) e bloqueia o submit como rede de segurança. Sem migration/trigger. Duplicatas pré-existentes não saneadas.
+Arquivos modificados: src/lib/maintenanceFilters.ts, src/pages/Maintenance.tsx, src/components/MaintenanceForm.tsx
+Testes adicionados: src/lib/maintenanceFilters.test.ts (6 cenários de getVehicleIdsWithOpenMaintenance)

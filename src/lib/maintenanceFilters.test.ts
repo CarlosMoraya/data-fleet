@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch } from './maintenanceFilters';
+import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance } from './maintenanceFilters';
 
 import type { MaintenanceOrder } from '../types/maintenance';
 
@@ -195,5 +195,55 @@ describe('matchesMaintenanceSearch', () => {
   it('retrocompatible: order without vehicleModel still matches by plate', () => {
     const order = makeSearchOrder({ vehicleModel: undefined });
     expect(matchesMaintenanceSearch(order, 'abc1d23')).toBe(true);
+  });
+});
+
+describe('getVehicleIdsWithOpenMaintenance', () => {
+  function makeVehicleOrder(
+    overrides: Partial<Pick<MaintenanceOrder, 'vehicleId' | 'status'>> = {},
+  ): Pick<MaintenanceOrder, 'vehicleId' | 'status'> {
+    return {
+      vehicleId: 'v1',
+      status: 'Aguardando orçamento',
+      ...overrides,
+    };
+  }
+
+  it('includes vehicle with an order in "Aguardando orçamento"', () => {
+    const result = getVehicleIdsWithOpenMaintenance([makeVehicleOrder({ vehicleId: 'v1', status: 'Aguardando orçamento' })]);
+    expect(result.has('v1')).toBe(true);
+  });
+
+  it('includes vehicle with an order in "Concluído" (Concluído bloqueia)', () => {
+    const result = getVehicleIdsWithOpenMaintenance([makeVehicleOrder({ vehicleId: 'v1', status: 'Concluído' })]);
+    expect(result.has('v1')).toBe(true);
+  });
+
+  it('excludes vehicle whose orders are all "Veículo retirado" or "Cancelado"', () => {
+    const result = getVehicleIdsWithOpenMaintenance([
+      makeVehicleOrder({ vehicleId: 'v1', status: 'Veículo retirado' }),
+      makeVehicleOrder({ vehicleId: 'v1', status: 'Cancelado' }),
+    ]);
+    expect(result.has('v1')).toBe(false);
+  });
+
+  it('deduplicates a vehicle with multiple orders, at least one open', () => {
+    const result = getVehicleIdsWithOpenMaintenance([
+      makeVehicleOrder({ vehicleId: 'v1', status: 'Veículo retirado' }),
+      makeVehicleOrder({ vehicleId: 'v1', status: 'Aguardando orçamento' }),
+    ]);
+    expect(result.size).toBe(1);
+    expect(result.has('v1')).toBe(true);
+  });
+
+  it('returns an empty set for an empty list', () => {
+    const result = getVehicleIdsWithOpenMaintenance([]);
+    expect(result.size).toBe(0);
+  });
+
+  it('ignores an order with missing vehicleId without throwing', () => {
+    expect(() => getVehicleIdsWithOpenMaintenance([makeVehicleOrder({ vehicleId: '' })])).not.toThrow();
+    const result = getVehicleIdsWithOpenMaintenance([makeVehicleOrder({ vehicleId: '' })]);
+    expect(result.size).toBe(0);
   });
 });

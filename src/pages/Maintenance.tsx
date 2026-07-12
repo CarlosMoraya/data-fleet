@@ -10,7 +10,7 @@ import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection } from '../lib/clientScope';
-import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch } from '../lib/maintenanceFilters';
+import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance } from '../lib/maintenanceFilters';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
 import { canWorkshopFillOrder } from '../lib/maintenanceWorkshop';
 import { canEditWorkshopOrder, isOperationsManager } from '../lib/rolePermissions';
@@ -310,6 +310,11 @@ export default function Maintenance() {
   });
 
   const filterOptions = React.useMemo(() => buildMaintenanceFilterOptions(orders), [orders]);
+
+  const blockedVehicleIds = React.useMemo(
+    () => getVehicleIdsWithOpenMaintenance(orders),
+    [orders],
+  );
 
   const counts = React.useMemo(() => computeMaintenanceCounts(orders), [orders]);
 
@@ -682,6 +687,7 @@ export default function Maintenance() {
           order={orderToEdit}
           prefill={prefillData}
           mode={isWorkshopUser ? 'workshop' : 'default'}
+          blockedVehicleIds={blockedVehicleIds}
           onClose={() => {
             setIsFormOpen(false);
             setOrderToEdit(null);
