@@ -2,6 +2,39 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-11 (fix: previsão de saída da OS aparecia um dia antes em Manutenção)
+
+### O que foi implementado
+
+Correção de bug Tipo B conforme `IMPLEMENTATION_FIXBUG.md` desta sessão. Na tela `/manutencao`, a "Previsão de Saída" salva como data civil (`YYYY-MM-DD`) aparecia um dia antes na tabela e no detalhe da OS em ambientes com fuso `America/Sao_Paulo`.
+
+**Causa raiz** — `src/pages/Maintenance.tsx` e `src/components/MaintenanceDetailModal.tsx` usavam formatadores locais baseados em `new Date(iso).toLocaleDateString('pt-BR')`. Para strings no formato `YYYY-MM-DD`, o JavaScript interpreta a data como meia-noite UTC; em fusos negativos isso desloca a exibição para o dia anterior. O utilitário compartilhado `src/lib/dateUtils.ts` tinha o mesmo problema e o teste aceitava explicitamente variação por fuso, deixando a regressão sem proteção.
+
+### Correção aplicada
+
+1. **`src/lib/dateUtils.ts`** — `formatDate` agora detecta strings exatamente no formato `YYYY-MM-DD`, valida a data com `new Date(year, month - 1, day)` e retorna `DD/MM/YYYY` sem passar pela conversão UTC. Datas civis impossíveis continuam retornando `—`. Strings com horário (`YYYY-MM-DDTHH:mm...`) mantêm o fluxo anterior com `new Date(...)`, preservando a formatação de timestamps.
+2. **`src/lib/dateUtils.test.ts`** — o teste fraco que aceitava variação de fuso foi substituído por uma asserção exata de regressão: `formatDate('2026-07-31') === '31/07/2026'`. Também foi adicionado o caso `formatDate('2026-02-31') === '—'`.
+3. **`src/pages/Maintenance.tsx`** — removido o `formatDate` local inseguro; a coluna "Previsão de Saída" passou a usar o utilitário compartilhado `../lib/dateUtils`.
+4. **`src/components/MaintenanceDetailModal.tsx`** — removido o `formatDate` local inseguro; o modal passou a usar o mesmo utilitário compartilhado para "Data de Entrada", "Previsão de Saída", "Data de Saída Real", datas de auditoria e "Criado em".
+
+### Restrições respeitadas
+
+- Nenhuma alteração em `src/services/maintenanceService.ts`, `src/lib/maintenanceMappers.ts`, banco ou migrations.
+- `daysInWorkshop` permaneceu intacta em ambos os componentes, conforme o plano.
+- Nenhuma refatoração fora dos 4 arquivos de código previstos, além do registro obrigatório em `docs/MEMORY.md` e `docs/MEMORY-HISTORY.md`.
+
+### Validação
+
+- `TZ=America/Sao_Paulo npx vitest run src/lib/dateUtils.test.ts` — **1 arquivo / 8 testes passando**.
+- `npm run test:unit` — **883/883** passando.
+- `npx tsc --noEmit` — **0 erros**.
+- `npm run lint` — **0 erros / 137 warnings** (baseline pré-existente, sem regressão).
+- `npm run test:smoke` — **6/6** passando.
+
+### Pendências
+
+- A validação manual guiada em `/manutencao` descrita no `IMPLEMENTATION_FIXBUG.md` não foi executada nesta sessão automatizada.
+
 ## Sessão — 2026-07-11 (Manutenção: cards como filtro toggle, "Veículos não retirados" e ações de dropdown)
 
 ### O que foi implementado

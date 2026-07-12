@@ -3,6 +3,7 @@ import { X, Wrench, Building2, Calendar, User, FileText, DollarSign, Clock, Exte
 import React from 'react';
 
 import { useAuth } from '../context/AuthContext';
+import { formatDate } from '../lib/dateUtils';
 import { budgetItemFromRow, type MaintenanceBudgetItemRow } from '../lib/maintenanceMappers';
 import { canManagePartPhotos, canViewPartPhotos } from '../lib/rolePermissions';
 import { supabase } from '../lib/supabase';
@@ -53,10 +54,6 @@ function daysInWorkshop(entryDate: string) {
   const entry = new Date(entryDate);
   const today = new Date();
   return Math.floor((today.getTime() - entry.getTime()) / 86400000);
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR');
 }
 
 function formatCurrency(value: number) {

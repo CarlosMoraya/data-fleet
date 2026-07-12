@@ -6,6 +6,21 @@
 export function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   try {
+    const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+    if (dateOnlyMatch) {
+      const [, year, month, day] = dateOnlyMatch;
+      const localDate = new Date(Number(year), Number(month) - 1, Number(day));
+      if (
+        Number.isNaN(localDate.getTime()) ||
+        localDate.getFullYear() !== Number(year) ||
+        localDate.getMonth() !== Number(month) - 1 ||
+        localDate.getDate() !== Number(day)
+      ) {
+        return '—';
+      }
+      return `${day}/${month}/${year}`;
+    }
+
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return '—';
 

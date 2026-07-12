@@ -10,6 +10,7 @@ import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection } from '../lib/clientScope';
+import { formatDate } from '../lib/dateUtils';
 import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, matchesMaintenanceCard, countVehiclesNotWithdrawn } from '../lib/maintenanceFilters';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
 import { canWorkshopFillOrder } from '../lib/maintenanceWorkshop';
@@ -98,10 +99,6 @@ function daysInWorkshop(entryDate: string) {
   const entry = new Date(entryDate);
   const today = new Date();
   return Math.floor((today.getTime() - entry.getTime()) / 86400000);
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR');
 }
 
 function computeMaintenanceCounts(list: MaintenanceOrder[]) {

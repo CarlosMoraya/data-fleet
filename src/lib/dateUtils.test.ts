@@ -1,10 +1,12 @@
 import { formatDate, formatPhone } from './dateUtils';
 
 describe('formatDate', () => {
-  it('formata data ISO simples', () => {
-    const result = formatDate('2025-04-11');
-    // Pode variar por fuso horário
-    expect(result).toMatch(/\d{2}\/04\/2025/);
+  it('preserva datas civis sem deslocamento de fuso', () => {
+    expect(formatDate('2026-07-31')).toBe('31/07/2026');
+  });
+
+  it('rejeita datas civis impossíveis', () => {
+    expect(formatDate('2026-02-31')).toBe('—');
   });
 
   it('formata data ISO com hora', () => {
