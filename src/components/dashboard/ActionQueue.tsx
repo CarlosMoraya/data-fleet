@@ -37,8 +37,9 @@ export default function ActionQueue({ items, onItemClick, title = 'Fila de Açã
           const textClass = isHigh ? 'text-red-700' : 'text-amber-700';
           const badgeBg = isHigh ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700';
           const interactive = onItemClick !== undefined;
-          const visibleDetails = item.details.slice(0, 5);
-          const hiddenDetailsCount = item.details.length - visibleDetails.length;
+          const uniqueDetails = [...new Set(item.details)];
+          const visibleDetails = uniqueDetails.slice(0, 5);
+          const hiddenDetailsCount = uniqueDetails.length - visibleDetails.length;
 
           const content = (
             <div className="w-full">
