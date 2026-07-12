@@ -10,7 +10,7 @@ import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection } from '../lib/clientScope';
-import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance } from '../lib/maintenanceFilters';
+import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, matchesMaintenanceCard, countVehiclesNotWithdrawn } from '../lib/maintenanceFilters';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
 import { canWorkshopFillOrder } from '../lib/maintenanceWorkshop';
 import { canEditWorkshopOrder, isOperationsManager } from '../lib/rolePermissions';
@@ -26,6 +26,7 @@ import {
 
 import type { Role } from '../types';
 import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus } from '../types/maintenance';
+import type { MaintenanceCardKey } from '../lib/maintenanceFilters';
 
 // Re-export para compatibilidade com componentes que importam daqui
 export type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus };
@@ -145,6 +146,8 @@ export default function Maintenance() {
   const [shipperFilter, setShipperFilter] = usePersistentFilterState<string[]>('maintenance', 'shippers', []);
   const [unitFilter, setUnitFilter] = usePersistentFilterState<string[]>('maintenance', 'units', []);
   const [workshopFilter, setWorkshopFilter] = usePersistentFilterState<string[]>('maintenance', 'workshops', []);
+  const [activeCard, setActiveCard] = usePersistentFilterState<MaintenanceCardKey | null>('maintenance', 'activeCard', null);
+  const toggleCard = (key: MaintenanceCardKey) => setActiveCard(prev => (prev === key ? null : key));
   const [searchParams, setSearchParams] = useSearchParams();
   React.useEffect(() => {
     const placa = searchParams.get('placa');
@@ -320,17 +323,21 @@ export default function Maintenance() {
 
   const filtered = React.useMemo(() => {
     const bySearch = orders.filter(o => matchesMaintenanceSearch(o, search));
-    return applyMaintenanceListFilters(bySearch, {
+    const byFilters = applyMaintenanceListFilters(bySearch, {
       statuses: statusFilter,
       shippers: shipperFilter,
       operationalUnits: unitFilter,
       workshops: workshopFilter,
     });
-  }, [orders, search, statusFilter, shipperFilter, unitFilter, workshopFilter]);
+    return activeCard !== null ? byFilters.filter(o => matchesMaintenanceCard(o, activeCard)) : byFilters;
+  }, [orders, search, statusFilter, shipperFilter, unitFilter, workshopFilter, activeCard]);
 
   const filteredCounts = React.useMemo(() => computeMaintenanceCounts(filtered), [filtered]);
   const activeFilterGroups = [statusFilter, shipperFilter, unitFilter, workshopFilter].filter(a => a.length > 0).length;
   const hasActiveDropdownFilter = activeFilterGroups > 0;
+  const hasActiveFilter = hasActiveDropdownFilter || activeCard !== null;
+  const vehiclesNotWithdrawn = React.useMemo(() => countVehiclesNotWithdrawn(orders), [orders]);
+  const vehiclesNotWithdrawnFiltered = React.useMemo(() => countVehiclesNotWithdrawn(filtered), [filtered]);
   const filterChips: { key: string; label: string; onRemove: () => void }[] = [
     ...statusFilter.map(v => ({ key: `status:${v}`, label: v, onRemove: () => setStatusFilter(statusFilter.filter(x => x !== v)) })),
     ...shipperFilter.map(v => ({ key: `shipper:${v}`, label: v, onRemove: () => setShipperFilter(shipperFilter.filter(x => x !== v)) })),
@@ -378,48 +385,96 @@ export default function Maintenance() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
+        <button
+          type="button"
+          onClick={() => toggleCard('total')}
+          aria-pressed={activeCard === 'total'}
+          className={cn(
+            'cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm w-full',
+            activeCard === 'total' ? 'ring-2 ring-orange-400 border-orange-300' : 'border-zinc-200',
+          )}
+        >
           <p className="text-2xl font-bold text-zinc-900">{counts.all}</p>
-          {hasActiveDropdownFilter && (
+          {hasActiveFilter && (
             <p className="text-[10px] text-zinc-400">({filteredCounts.all})</p>
           )}
           <p className="mt-0.5 text-xs text-zinc-500">Total em Manutenção</p>
-        </div>
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleCard('aguardando-orcamento')}
+          aria-pressed={activeCard === 'aguardando-orcamento'}
+          className={cn(
+            'cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm w-full',
+            activeCard === 'aguardando-orcamento' ? 'ring-2 ring-orange-400 border-orange-300' : 'border-zinc-200',
+          )}
+        >
           <p className="text-2xl font-bold text-yellow-600">{counts['Aguardando orçamento']}</p>
-          {hasActiveDropdownFilter && (
+          {hasActiveFilter && (
             <p className="text-[10px] text-zinc-400">({filteredCounts['Aguardando orçamento']})</p>
           )}
           <p className="mt-0.5 text-xs text-zinc-500">Aguardando Orçamento</p>
-        </div>
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleCard('aguardando-aprovacao')}
+          aria-pressed={activeCard === 'aguardando-aprovacao'}
+          className={cn(
+            'cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm w-full',
+            activeCard === 'aguardando-aprovacao' ? 'ring-2 ring-orange-400 border-orange-300' : 'border-zinc-200',
+          )}
+        >
           <p className="text-2xl font-bold text-orange-600">{counts['Aguardando aprovação']}</p>
-          {hasActiveDropdownFilter && (
+          {hasActiveFilter && (
             <p className="text-[10px] text-zinc-400">({filteredCounts['Aguardando aprovação']})</p>
           )}
           <p className="mt-0.5 text-xs text-zinc-500">Ag. Aprovação</p>
-        </div>
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleCard('em-execucao')}
+          aria-pressed={activeCard === 'em-execucao'}
+          className={cn(
+            'cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm w-full',
+            activeCard === 'em-execucao' ? 'ring-2 ring-orange-400 border-orange-300' : 'border-zinc-200',
+          )}
+        >
           <p className="text-2xl font-bold text-purple-600">{counts['Serviço em execução']}</p>
-          {hasActiveDropdownFilter && (
+          {hasActiveFilter && (
             <p className="text-[10px] text-zinc-400">({filteredCounts['Serviço em execução']})</p>
           )}
           <p className="mt-0.5 text-xs text-zinc-500">Em Execução</p>
-        </div>
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleCard('corretiva')}
+          aria-pressed={activeCard === 'corretiva'}
+          className={cn(
+            'cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm w-full',
+            activeCard === 'corretiva' ? 'ring-2 ring-orange-400 border-orange-300' : 'border-zinc-200',
+          )}
+        >
           <p className="text-2xl font-bold text-red-600">{counts.corretiva}</p>
-          {hasActiveDropdownFilter && (
+          {hasActiveFilter && (
             <p className="text-[10px] text-zinc-400">({filteredCounts.corretiva})</p>
           )}
           <p className="mt-0.5 text-xs text-zinc-500">Total Corretiva</p>
-        </div>
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-left">
-          <p className="text-2xl font-bold text-zinc-400">{counts['Cancelado']}</p>
-          {hasActiveDropdownFilter && (
-            <p className="text-[10px] text-zinc-400">({filteredCounts['Cancelado']})</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleCard('nao-retirados')}
+          aria-pressed={activeCard === 'nao-retirados'}
+          className={cn(
+            'cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm w-full',
+            activeCard === 'nao-retirados' ? 'ring-2 ring-orange-400 border-orange-300' : 'border-zinc-200',
           )}
-          <p className="mt-0.5 text-xs text-zinc-500">Cancelados</p>
-        </div>
+        >
+          <p className="text-2xl font-bold text-green-600">{vehiclesNotWithdrawn}</p>
+          {hasActiveFilter && (
+            <p className="text-[10px] text-zinc-400">({vehiclesNotWithdrawnFiltered})</p>
+          )}
+          <p className="mt-0.5 text-xs text-zinc-500">Veículos não retirados</p>
+        </button>
       </div>
 
       {/* Filters */}

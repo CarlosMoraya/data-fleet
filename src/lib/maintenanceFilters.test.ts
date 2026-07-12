@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance } from './maintenanceFilters';
+import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, countVehiclesNotWithdrawn, matchesMaintenanceCard } from './maintenanceFilters';
 
 import type { MaintenanceOrder } from '../types/maintenance';
 
@@ -245,5 +245,86 @@ describe('getVehicleIdsWithOpenMaintenance', () => {
     expect(() => getVehicleIdsWithOpenMaintenance([makeVehicleOrder({ vehicleId: '' })])).not.toThrow();
     const result = getVehicleIdsWithOpenMaintenance([makeVehicleOrder({ vehicleId: '' })]);
     expect(result.size).toBe(0);
+  });
+});
+
+describe('countVehiclesNotWithdrawn', () => {
+  function makeOrderForCount(
+    overrides: Partial<Pick<MaintenanceOrder, 'vehicleId' | 'status'>> = {},
+  ): Pick<MaintenanceOrder, 'vehicleId' | 'status'> {
+    return {
+      vehicleId: 'v1',
+      status: 'Concluído',
+      ...overrides,
+    };
+  }
+
+  it('counts distinct vehicles with status Concluído, deduplicating repeated orders', () => {
+    const orders = [
+      makeOrderForCount({ vehicleId: 'v1', status: 'Concluído' }),
+      makeOrderForCount({ vehicleId: 'v1', status: 'Concluído' }),
+      makeOrderForCount({ vehicleId: 'v1', status: 'Concluído' }),
+      makeOrderForCount({ vehicleId: 'v2', status: 'Concluído' }),
+    ];
+    expect(countVehiclesNotWithdrawn(orders)).toBe(2);
+  });
+
+  it('ignores orders with other statuses', () => {
+    const orders = [
+      makeOrderForCount({ vehicleId: 'v1', status: 'Concluído' }),
+      makeOrderForCount({ vehicleId: 'v2', status: 'Serviço em execução' }),
+      makeOrderForCount({ vehicleId: 'v3', status: 'Veículo retirado' }),
+      makeOrderForCount({ vehicleId: 'v4', status: 'Cancelado' }),
+    ];
+    expect(countVehiclesNotWithdrawn(orders)).toBe(1);
+  });
+
+  it('ignores orders with missing vehicleId without throwing and returns 0 for empty list', () => {
+    expect(() => countVehiclesNotWithdrawn([makeOrderForCount({ vehicleId: '' })])).not.toThrow();
+    expect(countVehiclesNotWithdrawn([makeOrderForCount({ vehicleId: '' })])).toBe(0);
+    expect(countVehiclesNotWithdrawn([])).toBe(0);
+  });
+});
+
+describe('matchesMaintenanceCard', () => {
+  function makeCardOrder(
+    overrides: Partial<Pick<MaintenanceOrder, 'status' | 'type'>> = {},
+  ): Pick<MaintenanceOrder, 'status' | 'type'> {
+    return {
+      status: 'Aguardando orçamento',
+      type: 'Preventiva',
+      ...overrides,
+    };
+  }
+
+  it('total: matches active status and does not match terminal statuses', () => {
+    expect(matchesMaintenanceCard(makeCardOrder({ status: 'Aguardando orçamento' }), 'total')).toBe(true);
+    expect(matchesMaintenanceCard(makeCardOrder({ status: 'Cancelado' }), 'total')).toBe(false);
+    expect(matchesMaintenanceCard(makeCardOrder({ status: 'Veículo retirado' }), 'total')).toBe(false);
+  });
+
+  it('aguardando-orcamento', () => {
+    expect(matchesMaintenanceCard(makeCardOrder({ status: 'Aguardando orçamento' }), 'aguardando-orcamento')).toBe(true);
+    expect(matchesMaintenanceCard(makeCardOrder({ status: 'Aguardando aprovação' }), 'aguardando-orcamento')).toBe(false);
+  });
+
+  it('aguardando-aprovacao', () => {
+    expect(matchesMaintenanceCard(makeCardOrder({ status: 'Aguardando aprovação' }), 'aguardando-aprovacao')).toBe(true);
+    expect(matchesMaintenanceCard(makeCardOrder({ status: 'Aguardando orçamento' }), 'aguardando-aprovacao')).toBe(false);
+  });
+
+  it('em-execucao', () => {
+    expect(matchesMaintenanceCard(makeCardOrder({ status: 'Serviço em execução' }), 'em-execucao')).toBe(true);
+    expect(matchesMaintenanceCard(makeCardOrder({ status: 'Concluído' }), 'em-execucao')).toBe(false);
+  });
+
+  it('corretiva: matches type Corretiva and does not match Preventiva', () => {
+    expect(matchesMaintenanceCard(makeCardOrder({ type: 'Corretiva' }), 'corretiva')).toBe(true);
+    expect(matchesMaintenanceCard(makeCardOrder({ type: 'Preventiva' }), 'corretiva')).toBe(false);
+  });
+
+  it('nao-retirados: matches status Concluído and does not match Veículo retirado', () => {
+    expect(matchesMaintenanceCard(makeCardOrder({ status: 'Concluído' }), 'nao-retirados')).toBe(true);
+    expect(matchesMaintenanceCard(makeCardOrder({ status: 'Veículo retirado' }), 'nao-retirados')).toBe(false);
   });
 });

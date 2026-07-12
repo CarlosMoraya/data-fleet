@@ -2,6 +2,39 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-11 (Manutenção: cards como filtro toggle, "Veículos não retirados" e ações de dropdown)
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão, a tela `/manutencao` ganhou três mudanças de interação, todas puramente frontend (sem migration, sem nova leitura de banco, sem alteração de RLS):
+
+1. **Cards como filtro toggle** — os 6 cards de resumo (`Total em Manutenção`, `Aguardando Orçamento`, `Ag. Aprovação`, `Em Execução`, `Total Corretiva`, `Veículos não retirados`) viraram `<button type="button">` com `aria-pressed` e destaque visual (`ring-2 ring-orange-400 border-orange-300`) quando ativos. Apenas um card pode estar ativo por vez (toggle single-select); clicar no mesmo card desliga o filtro. O estado `activeCard` (`MaintenanceCardKey | null`) é persistido via `usePersistentFilterState('maintenance', 'activeCard', null)`, mesmo mecanismo já usado pelos filtros de status/embarcador/unidade/oficina. O predicado de cada card é decidido por uma nova função pura `matchesMaintenanceCard(order, cardKey)` em `src/lib/maintenanceFilters.ts`, aplicada **depois** da busca e dos filtros de dropdown no `useMemo` `filtered` de `Maintenance.tsx` — ou seja, o filtro-por-card combina por **E (AND)** com tudo o resto, nunca é multi-seleção.
+2. **Card "Cancelados" substituído por "Veículos não retirados"** — nova função pura `countVehiclesNotWithdrawn(orders)` conta **veículos distintos** (`Set` de `vehicleId`) com status exatamente `'Concluído'`, ignorando `vehicleId` vazio/ausente. O 6º card passou a exibir esse número (cor `text-green-600`, coerente com o verde já usado para "Concluído" em `statusColor`), com o mesmo comportamento de toggle (`cardKey: 'nao-retirados'`). **Decisão de produto confirmada explicitamente com o usuário**: o número do card conta veículos distintos, mas ao usar o card como filtro a **lista** mostra as **ordens de serviço** com status "Concluído" (não os veículos) — se um veículo tiver 2 OS "Concluído", o card mostra "1" mas a lista filtrada mostra 2 linhas. Isso é coerente com os demais cards, que sempre contam OS. `computeMaintenanceCounts` **não** teve a chave `Cancelado` removida (só deixou de ser exibida como card); a opção "Cancelado" continua no dropdown "Status" e as OS canceladas continuam visíveis/filtráveis normalmente.
+3. **"Selecionar todos" / "Limpar seleção" no `MultiSelectDropdown`** — novo cabeçalho fixo no painel aberto do componente, acima da lista de opções, com dois botões (`onChange([...options])` e `onChange([])`, ambos desabilitados quando já não fazem sentido — todas selecionadas / nenhuma selecionada). O antigo botão "Limpar" de rodapé foi **removido** (consolidação DRY: uma única forma de limpar). Como o componente é usado exclusivamente pelos 4 dropdowns de Manutenção (Status, Embarcador, Unidade Operacional, Oficina — confirmado por busca antes de implementar), as duas ações passaram a existir automaticamente nos 4.
+
+### Padrões aplicados
+
+- **Pure function / Predicate function**: toda a lógica nova de contagem/filtro-por-card está em `src/lib/maintenanceFilters.ts`, testável isoladamente e sem tocar a UI — mesmo padrão de `applyMaintenanceListFilters`/`getVehicleIdsWithOpenMaintenance` já existentes no arquivo.
+- **Controlled component**: tanto o filtro-por-card quanto as novas ações do dropdown seguem o padrão já usado nos filtros existentes (estado no componente pai `Maintenance.tsx`, `MultiSelectDropdown` permanece sem estado de dados próprio).
+
+### Testes
+
+- `src/lib/maintenanceFilters.test.ts`: 12 casos novos cobrindo `countVehiclesNotWithdrawn` (dedup por veículo, ignora outros status, ignora `vehicleId` vazio, lista vazia) e `matchesMaintenanceCard` (um caso verdadeiro/falso por cada uma das 6 chaves).
+- `src/components/MultiSelectDropdown.test.tsx` (**novo arquivo** — o componente não tinha teste antes): usa o padrão já existente no repo de `createRoot`/`act` do `react-dom/client` (não `@testing-library/react`, que **não está instalado** no projeto — o `IMPLEMENTATION.md` presumia incorretamente que estava; seguido o padrão real de `VehicleForm.test.tsx`/`Sidebar.test.tsx` em vez de instalar dependência nova). 5 casos: abre o painel, "Selecionar todos" chama `onChange` com todas as opções, "Limpar seleção" chama `onChange` com `[]`, toggle de item individual continua funcionando, "Selecionar todos" fica desabilitado quando tudo já está selecionado.
+- Não há teste de componente para `Maintenance.tsx` em si (débito técnico pré-existente e já registrado, a tela depende de AuthContext + React Query + Supabase) — o comportamento de UI (toggle visual, destaque do card ativo, combinação com dropdowns) foi coberto por validação manual guiada real (ver abaixo), não apenas pelos testes unitários das funções puras.
+
+### Validação
+
+- `npx vitest run src/lib/maintenanceFilters.test.ts src/components/MultiSelectDropdown.test.tsx` — **46/46** passando.
+- `npm run lint` — **0 erros / 137 warnings** (baseline pré-existente, sem regressão — os warnings de `react-hooks/rules-of-hooks` em `Maintenance.tsx`, já conhecidos, não foram tocados por decisão explícita do plano).
+- `npm run test:unit` — **882/882** passando (nenhuma regressão).
+- `npm run test:smoke` — **6/6**.
+- **Validação manual real via Playwright dirigido** (não apenas leitura de código): sessão de auth já persistida (`e2e/.auth/admin.json`) reaproveitada num spec temporário para clicar de fato na UI em `http://localhost:3000/manutencao` e capturar screenshots — confirmado: os 6 cards renderizam (sem "Cancelados"); clique em "Total Corretiva" ativa `aria-pressed`, mostra anel laranja e filtra a lista para 1 OS Corretiva; clique novamente desliga; clicar em dois cards em sequência mantém só o último ativo (toggle single-select); dropdown "Status" mostra o novo cabeçalho, "Selecionar todos" marca as 7 opções e gera os 7 chips, "Limpar seleção" desmarca tudo. O ambiente de teste não tinha veículo com 2+ OS "Concluído", então a dedup visual específica desse cenário não foi observada ao vivo — mas está coberta deterministicamente pelo teste unitário de `countVehiclesNotWithdrawn`.
+
+### Aprovação e entrega
+
+Usuário testou e aprovou a implementação. Commit e push autorizados explicitamente ("branch atual vai direto para produção") — sem migration pendente, mudança 100% frontend.
+
 ## Sessão — 2026-07-10 (Financeiro: nomes de auditoria via RPC no modal da parcela)
 
 ### O que foi implementado

@@ -88,3 +88,44 @@ export function getVehicleIdsWithOpenMaintenance(
   }
   return blocked;
 }
+
+export type MaintenanceCardKey =
+  | 'total'
+  | 'aguardando-orcamento'
+  | 'aguardando-aprovacao'
+  | 'em-execucao'
+  | 'corretiva'
+  | 'nao-retirados';
+
+export function countVehiclesNotWithdrawn(
+  orders: Pick<MaintenanceOrder, 'vehicleId' | 'status'>[],
+): number {
+  const set = new Set<string>();
+  for (const order of orders) {
+    if (!order.vehicleId) continue;
+    if (order.status === 'Concluído') {
+      set.add(order.vehicleId);
+    }
+  }
+  return set.size;
+}
+
+export function matchesMaintenanceCard(
+  order: Pick<MaintenanceOrder, 'status' | 'type'>,
+  cardKey: MaintenanceCardKey,
+): boolean {
+  switch (cardKey) {
+    case 'total':
+      return !MAINTENANCE_TERMINAL_STATUSES.has(order.status);
+    case 'aguardando-orcamento':
+      return order.status === 'Aguardando orçamento';
+    case 'aguardando-aprovacao':
+      return order.status === 'Aguardando aprovação';
+    case 'em-execucao':
+      return order.status === 'Serviço em execução';
+    case 'corretiva':
+      return order.type === 'Corretiva';
+    case 'nao-retirados':
+      return order.status === 'Concluído';
+  }
+}

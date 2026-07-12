@@ -72,6 +72,26 @@ export default function MultiSelectDropdown({
           role="listbox"
           className="absolute left-0 z-20 mt-1 w-56 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg"
         >
+          {options.length > 0 && (
+            <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-3 py-1.5">
+              <button
+                type="button"
+                onClick={() => onChange([...options])}
+                disabled={selected.length === options.length}
+                className="text-xs font-medium text-orange-600 transition-colors hover:text-orange-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Selecionar todos
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange([])}
+                disabled={selected.length === 0}
+                className="text-xs font-medium text-orange-600 transition-colors hover:text-orange-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Limpar seleção
+              </button>
+            </div>
+          )}
           <div className="max-h-56 overflow-y-auto">
             {options.length === 0 ? (
               <div className="px-3 py-2 text-sm text-zinc-400">{emptyLabel}</div>
@@ -105,17 +125,6 @@ export default function MultiSelectDropdown({
               })
             )}
           </div>
-          {selected.length > 0 && (
-            <div className="border-t border-zinc-100 px-3 py-1.5">
-              <button
-                type="button"
-                onClick={() => onChange([])}
-                className="text-xs font-medium text-orange-600 transition-colors hover:text-orange-700"
-              >
-                Limpar
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>
