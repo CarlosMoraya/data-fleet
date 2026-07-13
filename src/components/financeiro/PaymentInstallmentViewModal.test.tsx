@@ -39,6 +39,7 @@ function makeInstallment(overrides: Partial<PaymentInstallment> = {}): PaymentIn
   return {
     id: 'i1',
     maintenanceOrderId: 'mo-1',
+    sourceType: 'maintenance_order',
     clientId: 'c1',
     installmentNumber: 1,
     installmentsTotal: 2,
@@ -138,5 +139,46 @@ describe('PaymentInstallmentViewModal', () => {
     );
 
     expect(container.textContent).not.toContain('b22f6b92');
+  });
+
+  it('exibe bloco Origem com dados do pagamento extra e auditoria', async () => {
+    await render(
+      <PaymentInstallmentViewModal
+        open
+        installment={makeInstallment({
+          maintenanceOrderId: undefined,
+          sourceType: 'extra_payment',
+          extraPaymentRequestId: 'epr-1',
+          extraPaymentNumber: 'PE-2607-0001',
+          extraPaymentCategory: 'guincho',
+          extraPaymentSupplierName: 'Guincho Rápido LTDA',
+          extraPaymentSupplierDocument: '12.345.678/0001-90',
+          extraPaymentVehiclePlate: 'ABC1D23',
+          extraPaymentDriverName: 'João Motorista',
+          extraPaymentApprovedByName: 'Coordenador Fulano',
+        })}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(container.textContent).toContain('Origem');
+    expect(container.textContent).toContain('PE-2607-0001');
+    expect(container.textContent).toContain('Guincho Rápido LTDA');
+    expect(container.textContent).toContain('ABC1D23');
+    expect(container.textContent).toContain('João Motorista');
+    expect(container.textContent).toContain('Coordenador Fulano');
+  });
+
+  it('exibe a OS para origem de manutenção', async () => {
+    await render(
+      <PaymentInstallmentViewModal
+        open
+        installment={makeInstallment({ maintenanceOrderOs: 'OS-001' })}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(container.textContent).toContain('Ordem de Serviço');
+    expect(container.textContent).toContain('OS-001');
   });
 });

@@ -94,3 +94,28 @@ O KM atual é sempre `MAX(effective_km)` da view `vehicle_odometer_effective_rea
 
 ### Espelho não-destrutivo
 A 1ª etapa criada pela tela espelha `vehicles.first_revision_max_km` (só preenche/atualiza, nunca grava `null`).
+
+---
+
+## 💸 Módulo Financeiro — Pagamentos Extras
+
+Domínio para despesas operacionais fora da manutenção (guincho, chaveiro, borracheiro, Uber/táxi, frete de apoio), sem vínculo obrigatório com OS.
+
+### Tabela `extra_payment_requests`
+Cabeçalho/contexto operacional do lançamento extra: `client_id`, `request_number` (formato `PE-YYMM-0001`, gerado pela RPC `next_extra_payment_request_number`), `category`, `service_date`, `supplier_name`/`supplier_document`, `vehicle_id`/`driver_id` (ambos opcionais, para autopreenchimento cruzado), `amount`, `status` (`pendente_aprovacao|aprovado|reprovado|pago|cancelado`), campos de auditoria (`approved_by/at`, `rejected_by/at/reason`, `paid_by/at`).
+
+### Origem mista em `payment_installments`
+As parcelas de Pagamentos Extras **não** têm tabela própria — `payment_installments` foi generalizada com `source_type` (`maintenance_order|extra_payment`) e `extra_payment_request_id`. `maintenance_order_id` deixou de ser `NOT NULL`. Constraint `payment_installments_source_check` garante exclusividade: origem manutenção exige `maintenance_order_id` e proíbe `extra_payment_request_id`; origem extra é o inverso.
+
+### State machine e sincronização
+`fn_validate_extra_payment_request_transition` (trigger em `extra_payment_requests`) valida `pendente_aprovacao → aprovado|reprovado|cancelado` (Coordinator+/Admin Master; reprovação exige motivo) e propaga o status para as parcelas vinculadas. `fn_validate_payment_installment_transition` foi estendida para exigir Financeiro/Admin Master ao marcar parcela extra como paga, e atualiza `extra_payment_requests.status = 'pago'` no mesmo trigger. `fn_enforce_payment_installment_budget_cap` (teto de orçamento) só se aplica quando `source_type = 'maintenance_order'`.
+
+### RLS
+`extra_payment_requests`: SELECT para Fleet Assistant+ do tenant e Admin Master (todos os status); Financeiro do tenant só vê `aprovado`/`pago`. INSERT restrito a Fleet Assistant+ exceto Workshop/Financeiro, sempre `pendente_aprovacao` e `created_by_id = auth.uid()`. UPDATE para Coordinator+/Admin Master (aprovar/reprovar/cancelar) e para o próprio criador cancelar (`pendente_aprovacao → cancelado`). Sem policy de DELETE.
+
+### RPCs
+- `next_extra_payment_request_number(p_client_id)`: gera o próximo número sequencial por mês/cliente.
+- `get_extra_payment_auditors(p_extra_payment_request_id)`: nomes de auditoria (criado/aprovado/reprovado/pago por), `SECURITY DEFINER` reimpondo visibilidade por tenant/status.
+
+### Frontend
+`ExtraPaymentFormModal` (criação, Fleet Assistant+), `ExtraPaymentsTab` (fila operacional), `ExtraPaymentApprovalsTab` (fila de aprovação, Coordinator+), `ExtraPaymentViewModal` (detalhe + auditoria). `PaymentsTab`/`PaymentInstallmentViewModal`/CSV do Financeiro foram estendidos para exibir e exportar origem mista sem duplicar componentes.

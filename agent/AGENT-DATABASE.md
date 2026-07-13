@@ -35,6 +35,10 @@ OR (role = 'Admin Master')
 - **`maintenance_orders`**: Ordens de serviço com workflow de aprovação de orçamento.
 - **`tires`**: Gestão individual de pneus por código de fogo e posição.
 
+### Financeiro
+- **`payment_installments`**: Parcelas de pagamento com origem mista via `source_type` (`maintenance_order` ou `extra_payment`). `maintenance_order_id` é opcional (NULL quando a origem é extra); `extra_payment_request_id` é opcional (NULL quando a origem é manutenção). Constraint `payment_installments_source_check` garante que exatamente um dos dois FKs esteja preenchido conforme `source_type`.
+- **`extra_payment_requests`**: Cabeçalho de Pagamentos Extras / Serviços Avulsos (guincho, chaveiro, borracheiro, Uber/táxi, frete de apoio), sem vínculo obrigatório com `maintenance_orders`. Vínculo opcional com `vehicles`/`drivers`. Não criar uma segunda tabela de parcelas para esta origem — sempre gerar linhas em `payment_installments` com `source_type = 'extra_payment'`.
+
 ---
 
 ## ⚙️ Configurações Dinâmicas

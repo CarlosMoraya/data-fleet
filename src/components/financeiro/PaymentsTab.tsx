@@ -21,7 +21,18 @@ import PaymentInstallmentEditModal from './PaymentInstallmentEditModal';
 import PaymentInstallmentFormModal from './PaymentInstallmentFormModal';
 import PaymentInstallmentViewModal from './PaymentInstallmentViewModal';
 
-import type { PaymentInstallment, PaymentInstallmentStatus, PaymentMethod } from '../../types/payment';
+import type { PaymentInstallment, PaymentInstallmentStatus, PaymentMethod, PaymentSourceType } from '../../types/payment';
+
+const SOURCE_OPTIONS: { value: '' | PaymentSourceType; label: string }[] = [
+  { value: '', label: 'Todos' },
+  { value: 'maintenance_order', label: 'Manutenção' },
+  { value: 'extra_payment', label: 'Extras' },
+];
+
+const SOURCE_LABELS: Record<PaymentSourceType, string> = {
+  maintenance_order: 'Manutenção',
+  extra_payment: 'Extra',
+};
 
 const STATUS_LABELS: Record<PaymentInstallmentStatus, string> = {
   pendente_aprovacao: 'Pendente de aprovação',
@@ -82,6 +93,7 @@ export default function PaymentsTab(): React.ReactElement {
   const [filterInvoice, setFilterInvoice] = useState('');
   const [filterStatus, setFilterStatus] = useState<'' | PaymentInstallmentStatus>('');
   const [filterMethod, setFilterMethod] = useState<'' | PaymentMethod>('');
+  const [filterSource, setFilterSource] = useState<'' | PaymentSourceType>('');
   const [filterClientId, setFilterClientId] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
@@ -109,6 +121,11 @@ export default function PaymentsTab(): React.ReactElement {
     return m;
   }, [approvedOrders]);
 
+  function getBudgetPdfUrl(i: PaymentInstallment): string | undefined {
+    if (i.sourceType !== 'maintenance_order' || !i.maintenanceOrderId) return undefined;
+    return budgetPdfMap.get(i.maintenanceOrderId);
+  }
+
   const approvedCostMap = useMemo(() => {
     const m = new Map<string, number>();
     for (const o of approvedOrders) m.set(o.id, o.approvedCost);
@@ -124,9 +141,10 @@ export default function PaymentsTab(): React.ReactElement {
       }
       if (filterStatus && i.status !== filterStatus) return false;
       if (filterMethod && i.paymentMethod !== filterMethod) return false;
+      if (filterSource && i.sourceType !== filterSource) return false;
       return true;
     });
-  }, [installments, filterInvoice, filterStatus, filterMethod]);
+  }, [installments, filterInvoice, filterStatus, filterMethod, filterSource]);
 
   const selectedInstallments = useMemo(
     () => filtered.filter((i) => selected.has(i.id)),
@@ -222,6 +240,13 @@ export default function PaymentsTab(): React.ReactElement {
         >
           {METHOD_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
+        <select
+          value={filterSource}
+          onChange={(e) => setFilterSource(e.target.value as '' | PaymentSourceType)}
+          className="rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+        >
+          {SOURCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
         {showClientFilter && (
           <select
             value={filterClientId}
@@ -312,6 +337,7 @@ export default function PaymentsTab(): React.ReactElement {
                     </th>
                   )}
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">NF / Fatura</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Origem</th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Parc.</th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Valor</th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Vencimento</th>
@@ -335,6 +361,14 @@ export default function PaymentsTab(): React.ReactElement {
                         </td>
                       )}
                       <td className="px-3 py-2.5 font-mono text-xs font-semibold text-zinc-700">{i.invoiceNumber ?? '—'}</td>
+                      <td className="px-3 py-2.5">
+                        <span className={cn(
+                          'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                          i.sourceType === 'extra_payment' ? 'bg-violet-100 text-violet-700' : 'bg-zinc-100 text-zinc-600',
+                        )}>
+                          {SOURCE_LABELS[i.sourceType]}
+                        </span>
+                      </td>
                       <td className="px-3 py-2.5 text-zinc-500">{i.installmentNumber}/{i.installmentsTotal}</td>
                       <td className="px-3 py-2.5 font-medium text-zinc-800">{formatCurrency(i.value)}</td>
                       <td className="px-3 py-2.5 text-zinc-600">{formatDate(i.dueDate)}</td>
@@ -352,10 +386,10 @@ export default function PaymentsTab(): React.ReactElement {
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-1.5 text-xs">
-                          {/* Orçamento (budget PDF) */}
-                          {budgetPdfMap.get(i.maintenanceOrderId) && (
+                          {/* Orçamento (budget PDF) — somente origem manutenção */}
+                          {getBudgetPdfUrl(i) && (
                             <a
-                              href={budgetPdfMap.get(i.maintenanceOrderId)}
+                              href={getBudgetPdfUrl(i)}
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Orçamento"
@@ -410,7 +444,7 @@ export default function PaymentsTab(): React.ReactElement {
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </button>
-                          {i.status === 'pendente_aprovacao' && canCreate && (
+                          {i.sourceType === 'maintenance_order' && i.status === 'pendente_aprovacao' && canCreate && (
                             <button
                               type="button"
                               onClick={() => setEditing(i)}

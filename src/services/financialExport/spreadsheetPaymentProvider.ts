@@ -38,10 +38,10 @@ function toCsvRow(installment: PaymentInstallment): string {
     escapeCsv(formatDateCell(installment.dueDate)),
     escapeCsv(formatDateCell(installment.dueDate)),
     escapeCsv(formatValueCell(installment.value)),
-    escapeCsv(installment.categoria),
+    escapeCsv(installment.extraPaymentCategory ?? installment.categoria),
     escapeCsv(installment.descricao),
-    escapeCsv(installment.workshopName),
-    escapeCsv(installment.workshopCnpj),
+    escapeCsv(installment.extraPaymentSupplierName ?? installment.workshopName),
+    escapeCsv(installment.extraPaymentSupplierDocument ?? installment.workshopCnpj),
     escapeCsv(installment.centroCusto),
     escapeCsv(installment.notes),
   ];

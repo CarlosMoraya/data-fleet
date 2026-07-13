@@ -8,6 +8,7 @@ import type {
   PaymentInstallmentRow,
   PaymentInstallmentStatus,
   PaymentMethod,
+  PaymentSourceType,
   PixKeyType,
 } from '../types/payment';
 
@@ -18,6 +19,7 @@ export interface PaymentInstallmentFilters {
   status?: PaymentInstallmentStatus;
   paymentMethod?: PaymentMethod;
   clientId?: string;
+  sourceType?: PaymentSourceType;
 }
 
 export type PaymentInstallmentPatch = Partial<{
@@ -77,12 +79,13 @@ export interface ApprovedOrderForPayment {
 }
 
 const INSTALLMENT_SELECT = `
-  id, maintenance_order_id, client_id, installment_number, installments_total,
+  id, maintenance_order_id, source_type, extra_payment_request_id, client_id, installment_number, installments_total,
   value, due_date, competencia_date, status, payment_method, boleto_url,
   nota_fiscal_url, nota_fiscal_url_2, invoice_number, pix_key_type, pix_key, pix_beneficiary_name, categoria,
   centro_custo, descricao, notes, created_by_id, payment_approved_by,
   payment_approved_at, paid_by, paid_at, created_at, updated_at,
-  maintenance_orders(os_number, budget_pdf_url, budget_reviewed_by, workshops(name, cnpj), budget_reviewer:profiles!maintenance_orders_budget_reviewed_by_fkey(name))
+  maintenance_orders(os_number, budget_pdf_url, budget_reviewed_by, workshops(name, cnpj), budget_reviewer:profiles!maintenance_orders_budget_reviewed_by_fkey(name)),
+  extra_payment_requests(request_number, category, supplier_name, supplier_document, approved_by, approved_at, vehicles(license_plate), drivers(name), approver:profiles!extra_payment_requests_approved_by_fkey(name))
 `;
 
 // ─── Funções de serviço ──────────────────────────────────────────────────────
@@ -110,10 +113,23 @@ export async function listPaymentInstallments(
   if (filters.clientId) {
     query = query.eq('client_id', filters.clientId);
   }
+  if (filters.sourceType) {
+    query = query.eq('source_type', filters.sourceType);
+  }
 
   const { data, error } = await query;
   if (error) throw error;
   return ((data ?? []) as unknown as PaymentInstallmentRow[]).map(paymentInstallmentFromRow);
+}
+
+/**
+ * Wrapper de listPaymentInstallments filtrando somente parcelas de
+ * Pagamentos Extras (origem 'extra_payment').
+ */
+export async function listExtraPaymentInstallments(
+  filters: PaymentInstallmentFilters = {},
+): Promise<PaymentInstallment[]> {
+  return listPaymentInstallments({ ...filters, sourceType: 'extra_payment' });
 }
 
 /**
@@ -157,6 +173,62 @@ export async function createPaymentInstallmentsBatch(
 
   const rows = input.drafts.map((d) => ({
     maintenance_order_id: input.maintenanceOrderId,
+    client_id: input.clientId,
+    created_by_id: input.createdById,
+    installments_total: input.installmentsTotal,
+    installment_number: d.installmentNumber,
+    value: d.value,
+    due_date: d.dueDate,
+    payment_method: d.paymentMethod,
+    competencia_date: input.competenciaDate ?? null,
+    categoria: input.categoria ?? null,
+    centro_custo: input.centroCusto ?? null,
+    descricao: input.descricao ?? null,
+    notes: input.notes ?? null,
+    nota_fiscal_url: input.notaFiscalUrl ?? null,
+    nota_fiscal_url_2: input.notaFiscalUrl2 ?? null,
+    invoice_number: input.invoiceNumber ?? null,
+    pix_key_type: d.pixKeyType ?? null,
+    pix_key: d.pixKey ?? null,
+    pix_beneficiary_name: d.pixBeneficiaryName ?? null,
+    boleto_url: d.boletoUrl ?? null,
+    status: 'pendente_aprovacao' as PaymentInstallmentStatus,
+  }));
+
+  const { error } = await supabase.from('payment_installments').insert(rows);
+  if (error) throw error;
+}
+
+export interface CreateExtraPaymentInstallmentBatchInput {
+  extraPaymentRequestId: string;
+  clientId: string;
+  createdById: string;
+  installmentsTotal: number;
+  competenciaDate?: string | null;
+  categoria?: string | null;
+  centroCusto?: string | null;
+  descricao?: string | null;
+  notes?: string | null;
+  notaFiscalUrl?: string | null;
+  notaFiscalUrl2?: string | null;
+  invoiceNumber?: string | null;
+  drafts: InstallmentDraftInput[];
+}
+
+/**
+ * Insere um lote de parcelas de Pagamento Extra (source_type='extra_payment',
+ * maintenance_order_id=null). Mesma estrutura de createPaymentInstallmentsBatch,
+ * mas vinculada a um extra_payment_request_id em vez de uma OS.
+ */
+export async function createExtraPaymentInstallmentsBatch(
+  input: CreateExtraPaymentInstallmentBatchInput,
+): Promise<void> {
+  if (input.drafts.length === 0) return;
+
+  const rows = input.drafts.map((d) => ({
+    maintenance_order_id: null,
+    source_type: 'extra_payment' as const,
+    extra_payment_request_id: input.extraPaymentRequestId,
     client_id: input.clientId,
     created_by_id: input.createdById,
     installments_total: input.installmentsTotal,

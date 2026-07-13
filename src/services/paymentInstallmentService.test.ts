@@ -13,9 +13,11 @@ vi.mock('../lib/supabase', () => ({
 }));
 
 import {
+  createExtraPaymentInstallmentsBatch,
   createPaymentInstallmentsBatch,
   getPaymentInstallmentAuditors,
   listApprovedOrdersForPayment,
+  listPaymentInstallments,
 } from './paymentInstallmentService';
 
 describe('getPaymentInstallmentAuditors', () => {
@@ -236,5 +238,59 @@ describe('createPaymentInstallmentsBatch', () => {
     expect(insertMock).toHaveBeenCalledWith([
       expect.objectContaining({ notes: null }),
     ]);
+  });
+});
+
+describe('createExtraPaymentInstallmentsBatch', () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    fromMock.mockReset();
+  });
+
+  it('insere parcelas com source_type extra_payment, extra_payment_request_id e maintenance_order_id null', async () => {
+    const insertMock = vi.fn().mockResolvedValue({ error: null });
+    fromMock.mockReturnValue({ insert: insertMock });
+
+    await createExtraPaymentInstallmentsBatch({
+      extraPaymentRequestId: 'epr-1',
+      clientId: 'client-1',
+      createdById: 'user-1',
+      installmentsTotal: 1,
+      drafts: [
+        { installmentNumber: 1, value: 350, dueDate: '2026-08-01', paymentMethod: 'pix' },
+      ],
+    });
+
+    expect(fromMock).toHaveBeenCalledWith('payment_installments');
+    expect(insertMock).toHaveBeenCalledWith([
+      expect.objectContaining({
+        source_type: 'extra_payment',
+        extra_payment_request_id: 'epr-1',
+        maintenance_order_id: null,
+        status: 'pendente_aprovacao',
+      }),
+    ]);
+  });
+});
+
+describe('listPaymentInstallments com filtro sourceType', () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    fromMock.mockReset();
+  });
+
+  it('aplica eq(source_type, extra_payment) quando sourceType é informado', async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      data: [],
+      error: null,
+    };
+    fromMock.mockReturnValue(query);
+
+    await listPaymentInstallments({ sourceType: 'extra_payment' });
+
+    expect(query.eq).toHaveBeenCalledWith('source_type', 'extra_payment');
   });
 });

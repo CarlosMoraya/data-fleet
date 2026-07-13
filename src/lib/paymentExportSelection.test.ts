@@ -8,6 +8,7 @@ function makeInstallment(id: string): PaymentInstallment {
   return {
     id,
     maintenanceOrderId: 'mo-1',
+    sourceType: 'maintenance_order',
     clientId: 'c1',
     installmentNumber: 1,
     installmentsTotal: 1,

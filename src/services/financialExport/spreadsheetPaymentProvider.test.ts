@@ -8,6 +8,7 @@ function makeInstallment(overrides: Partial<PaymentInstallment> = {}): PaymentIn
   return {
     id: 'p1',
     maintenanceOrderId: 'mo-1',
+    sourceType: 'maintenance_order',
     clientId: 'c1',
     installmentNumber: 1,
     installmentsTotal: 1,
@@ -151,5 +152,26 @@ describe('SpreadsheetPaymentProvider — CSV', () => {
     // Primeiro cell (Competência) vazio → linha começa com vírgula; Valor continua formatado e quotado.
     expect(line.startsWith(',')).toBe(true);
     expect(line).toContain('"5.000,00"');
+  });
+
+  it('CSV de extra usa fornecedor/documento/categoria do extra', async () => {
+    const result = await provider.exportData('c1', [
+      makeInstallment({
+        maintenanceOrderId: undefined,
+        sourceType: 'extra_payment',
+        extraPaymentRequestId: 'epr-1',
+        extraPaymentCategory: 'guincho',
+        extraPaymentSupplierName: 'Guincho Rápido LTDA',
+        extraPaymentSupplierDocument: '12.345.678/0001-90',
+        workshopName: undefined,
+        workshopCnpj: undefined,
+        categoria: undefined,
+      }),
+    ]);
+
+    const line = result.content!.split('\r\n')[1];
+    expect(line).toContain('guincho');
+    expect(line).toContain('Guincho Rápido LTDA');
+    expect(line).toContain('12.345.678/0001-90');
   });
 });

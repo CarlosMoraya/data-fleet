@@ -3,11 +3,15 @@ import { describe, expect, it } from 'vitest';
 import {
   ROLE_RANK,
   canAccessRoute,
+  canApproveExtraPayments,
   canApprovePayments,
   canCorrectOdometer,
+  canCreateExtraPayments,
   canFillCoupling,
+  canMarkExtraPaymentsPaid,
   canMarkPaid,
   canViewBudgetTab,
+  canViewExtraPayments,
   getCreatableRoles,
   getDefaultRouteForRole,
   hasRoleAccess,
@@ -103,6 +107,35 @@ describe('permissões do módulo financeiro', () => {
 
   it('canAccessRoute bloqueia Financeiro na rota raiz "/"', () => {
     expect(canAccessRoute('Financeiro', '/')).toBe(false);
+  });
+});
+
+describe('permissões de Pagamentos Extras', () => {
+  it('Workshop não cria extras', () => {
+    expect(canCreateExtraPayments('Workshop')).toBe(false);
+  });
+
+  it('Financeiro não cria nem aprova extras', () => {
+    expect(canCreateExtraPayments('Financeiro')).toBe(false);
+    expect(canApproveExtraPayments('Financeiro')).toBe(false);
+  });
+
+  it('Financeiro pode marcar extra como pago', () => {
+    expect(canMarkExtraPaymentsPaid('Financeiro')).toBe(true);
+  });
+
+  it('Fleet Assistant cria extra, mas não aprova', () => {
+    expect(canCreateExtraPayments('Fleet Assistant')).toBe(true);
+    expect(canApproveExtraPayments('Fleet Assistant')).toBe(false);
+  });
+
+  it('Coordinator aprova extra', () => {
+    expect(canApproveExtraPayments('Coordinator')).toBe(true);
+  });
+
+  it('canViewExtraPayments inclui Financeiro e exclui Workshop', () => {
+    expect(canViewExtraPayments('Financeiro')).toBe(true);
+    expect(canViewExtraPayments('Workshop')).toBe(false);
   });
 });
 

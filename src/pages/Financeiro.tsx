@@ -5,8 +5,10 @@ import RouteFallback from '../components/RouteFallback';
 import { useAuth } from '../context/AuthContext';
 import { usePersistentTabState } from '../hooks/usePersistentUiState';
 import {
+  canApproveExtraPayments,
   canApprovePayments,
   canViewBudgetTab,
+  canViewExtraPayments,
   canViewPayments,
 } from '../lib/rolePermissions';
 import { cn } from '../lib/utils';
@@ -18,8 +20,12 @@ const PaymentsTab = lazy(() => import('../components/financeiro/PaymentsTab'));
 const PaymentApprovalsTab = lazy(
   () => import('../components/financeiro/PaymentApprovalsTab'),
 );
+const ExtraPaymentsTab = lazy(() => import('../components/financeiro/ExtraPaymentsTab'));
+const ExtraPaymentApprovalsTab = lazy(
+  () => import('../components/financeiro/ExtraPaymentApprovalsTab'),
+);
 
-type TabId = 'budget' | 'payments' | 'approvals';
+type TabId = 'budget' | 'payments' | 'approvals' | 'extras' | 'extra-approvals';
 
 interface TabDef {
   id: TabId;
@@ -66,6 +72,26 @@ export default function Financeiro() {
           </Suspense>
         ),
       },
+      {
+        id: 'extras',
+        label: 'Pagamentos Extras',
+        canAccess: canViewExtraPayments,
+        render: () => (
+          <Suspense fallback={<RouteFallback />}>
+            <ExtraPaymentsTab />
+          </Suspense>
+        ),
+      },
+      {
+        id: 'extra-approvals',
+        label: 'Aprovação de Extras',
+        canAccess: canApproveExtraPayments,
+        render: () => (
+          <Suspense fallback={<RouteFallback />}>
+            <ExtraPaymentApprovalsTab />
+          </Suspense>
+        ),
+      },
     ];
   }, []);
 
@@ -108,7 +134,7 @@ export default function Financeiro() {
         <div>
           <h1 className="text-xl font-bold text-zinc-900">Financeiro</h1>
           <p className="text-sm text-zinc-500">
-            Orçamentos, parcelas e aprovação de pagamentos
+            Orçamentos, pagamentos, extras e aprovação
           </p>
         </div>
       </div>

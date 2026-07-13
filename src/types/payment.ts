@@ -2,6 +2,8 @@
 
 export type PaymentInstallmentStatus = 'pendente_aprovacao' | 'aprovado' | 'reprovado' | 'pago';
 
+export type PaymentSourceType = 'maintenance_order' | 'extra_payment';
+
 export type PaymentMethod = 'boleto' | 'pix';
 
 export type PixKeyType = 'cpf' | 'cnpj' | 'email' | 'telefone' | 'aleatoria';
@@ -10,7 +12,9 @@ export type InstallmentInterval = 'mensal' | 'quinzenal' | 'semanal';
 
 export interface PaymentInstallment {
   id: string;
-  maintenanceOrderId: string;
+  maintenanceOrderId?: string;
+  sourceType: PaymentSourceType;
+  extraPaymentRequestId?: string;
   clientId: string;
   installmentNumber: number;
   installmentsTotal: number;
@@ -43,11 +47,21 @@ export interface PaymentInstallment {
   workshopName?: string;
   workshopCnpj?: string;
   maintenanceOrderOs?: string;
+  // Campos derivados de origem extra (Pagamentos Extras / Serviços Avulsos)
+  extraPaymentNumber?: string;
+  extraPaymentCategory?: string;
+  extraPaymentSupplierName?: string;
+  extraPaymentSupplierDocument?: string;
+  extraPaymentVehiclePlate?: string;
+  extraPaymentDriverName?: string;
+  extraPaymentApprovedByName?: string;
 }
 
 export interface PaymentInstallmentRow {
   id: string;
-  maintenance_order_id: string;
+  maintenance_order_id: string | null;
+  source_type: PaymentSourceType;
+  extra_payment_request_id: string | null;
   client_id: string;
   installment_number: number;
   installments_total: number;
@@ -80,6 +94,17 @@ export interface PaymentInstallmentRow {
     budget_pdf_url: string | null;
     workshops: { name: string; cnpj: string | null } | null;
     budget_reviewer: { name: string } | null;
+  } | null;
+  extra_payment_requests?: {
+    request_number: string;
+    category: string;
+    supplier_name: string;
+    supplier_document: string | null;
+    approved_by: string | null;
+    approved_at: string | null;
+    vehicles: { license_plate: string } | null;
+    drivers: { name: string } | null;
+    approver: { name: string } | null;
   } | null;
 }
 

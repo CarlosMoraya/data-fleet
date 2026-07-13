@@ -8,6 +8,8 @@ function baseRow(overrides: Partial<PaymentInstallmentRow> = {}): PaymentInstall
   return {
     id: 'inst-1',
     maintenance_order_id: 'os-1',
+    source_type: 'maintenance_order',
+    extra_payment_request_id: null,
     client_id: 'client-1',
     installment_number: 1,
     installments_total: 1,
@@ -35,6 +37,7 @@ function baseRow(overrides: Partial<PaymentInstallmentRow> = {}): PaymentInstall
     created_at: '2026-07-01T00:00:00Z',
     updated_at: '2026-07-01T00:00:00Z',
     maintenance_orders: null,
+    extra_payment_requests: null,
     ...overrides,
   };
 }
@@ -78,5 +81,47 @@ describe('paymentInstallmentFromRow', () => {
     const result = paymentInstallmentFromRow(baseRow({ invoice_number: null }));
 
     expect(result.invoiceNumber).toBeUndefined();
+  });
+
+  it('mapeia parcela de manutenção como antes (sourceType maintenance_order)', () => {
+    const result = paymentInstallmentFromRow(baseRow());
+
+    expect(result.sourceType).toBe('maintenance_order');
+    expect(result.maintenanceOrderId).toBe('os-1');
+    expect(result.extraPaymentRequestId).toBeUndefined();
+  });
+
+  it('mapeia parcela extra com fornecedor/documento/categoria/aprovador', () => {
+    const row = baseRow({
+      maintenance_order_id: null,
+      source_type: 'extra_payment',
+      extra_payment_request_id: 'epr-1',
+      extra_payment_requests: {
+        request_number: 'PE-2607-0001',
+        category: 'guincho',
+        supplier_name: 'Guincho Rápido LTDA',
+        supplier_document: '12.345.678/0001-90',
+        approved_by: 'user-1',
+        approved_at: '2026-07-12T10:00:00Z',
+        vehicles: { license_plate: 'ABC1D23' },
+        drivers: { name: 'João Motorista' },
+        approver: { name: 'Coordenador Fulano' },
+      },
+    });
+
+    const result = paymentInstallmentFromRow(row);
+
+    expect(result.sourceType).toBe('extra_payment');
+    expect(result.maintenanceOrderId).toBeUndefined();
+    expect(result.extraPaymentRequestId).toBe('epr-1');
+    expect(result.extraPaymentNumber).toBe('PE-2607-0001');
+    expect(result.extraPaymentCategory).toBe('guincho');
+    expect(result.extraPaymentSupplierName).toBe('Guincho Rápido LTDA');
+    expect(result.extraPaymentSupplierDocument).toBe('12.345.678/0001-90');
+    expect(result.extraPaymentVehiclePlate).toBe('ABC1D23');
+    expect(result.extraPaymentDriverName).toBe('João Motorista');
+    expect(result.extraPaymentApprovedByName).toBe('Coordenador Fulano');
+    expect(result.workshopName).toBe('Guincho Rápido LTDA');
+    expect(result.workshopCnpj).toBe('12.345.678/0001-90');
   });
 });

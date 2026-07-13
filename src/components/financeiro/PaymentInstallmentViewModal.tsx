@@ -78,6 +78,23 @@ export default function PaymentInstallmentViewModal({
         </div>
 
         <div className="space-y-5 px-6 py-4">
+          <section className="rounded-xl border border-zinc-200 p-4">
+            <h3 className="mb-3 text-xs font-semibold tracking-wider text-zinc-500 uppercase">Origem</h3>
+            {installment.sourceType === 'extra_payment' ? (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <ReadField label="Número do pagamento extra" value={installment.extraPaymentNumber ?? '—'} />
+                <ReadField label="Categoria" value={installment.extraPaymentCategory ?? '—'} />
+                <ReadField label="Fornecedor" value={installment.extraPaymentSupplierName ?? '—'} />
+                <ReadField label="CPF/CNPJ" value={installment.extraPaymentSupplierDocument ?? '—'} />
+                <ReadField label="Veículo" value={installment.extraPaymentVehiclePlate ?? '—'} />
+                <ReadField label="Motorista" value={installment.extraPaymentDriverName ?? '—'} />
+                <ReadField label="Aprovado por" value={installment.extraPaymentApprovedByName ?? '—'} />
+              </div>
+            ) : (
+              <ReadField label="Ordem de Serviço" value={installment.maintenanceOrderOs ?? installment.maintenanceOrderId ?? '—'} />
+            )}
+          </section>
+
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <ReadField label="NF/Fatura" value={installment.invoiceNumber ?? '—'} />
             <ReadField label="Valor" value={formatCurrency(installment.value)} />

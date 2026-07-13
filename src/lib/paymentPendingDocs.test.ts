@@ -10,6 +10,7 @@ function makeInstallment(
   return {
     id: 'i1',
     maintenanceOrderId: 'mo-1',
+    sourceType: 'maintenance_order',
     clientId: 'c1',
     installmentNumber: 1,
     installmentsTotal: 1,
@@ -113,5 +114,20 @@ describe('buildPaymentPendingQueue', () => {
     // detalhe referencia número da parcela e OS
     expect(items[0].details.join(' ')).toContain('#1/3');
     expect(items[0].details.join(' ')).toContain('#2/3');
+  });
+
+  it('fila usa número de extra quando origem for extra_payment', () => {
+    const items = buildPaymentPendingQueue([
+      makeInstallment({
+        sourceType: 'extra_payment',
+        maintenanceOrderId: undefined,
+        maintenanceOrderOs: undefined,
+        extraPaymentNumber: 'PE-2607-0001',
+        boletoUrl: undefined,
+      }),
+    ]);
+
+    expect(items).toHaveLength(1);
+    expect(items[0].details[0]).toContain('PE-2607-0001');
   });
 });

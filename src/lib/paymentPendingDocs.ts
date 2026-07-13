@@ -21,7 +21,9 @@ export function buildPaymentPendingQueue(
   if (pending.length === 0) return [];
 
   const details = pending.map((i) => {
-    const os = i.invoiceNumber ?? i.maintenanceOrderOs ?? i.maintenanceOrderId;
+    const os = i.sourceType === 'extra_payment'
+      ? i.extraPaymentNumber
+      : (i.invoiceNumber ?? i.maintenanceOrderOs ?? i.maintenanceOrderId);
     return `#${i.installmentNumber}/${i.installmentsTotal} — ${os ?? 'OS'}`;
   });
 

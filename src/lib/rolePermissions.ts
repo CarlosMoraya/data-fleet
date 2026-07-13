@@ -139,6 +139,36 @@ export const ROLES_CAN_APPROVE_PAYMENTS: Role[] = [
 
 export const ROLES_CAN_MARK_PAID: Role[] = ['Financeiro', 'Admin Master'];
 
+export const ROLES_CAN_CREATE_EXTRA_PAYMENTS: Role[] = [
+  'Fleet Assistant',
+  'Fleet Analyst',
+  'Supervisor',
+  'Coordinator',
+  'Manager',
+  'Director',
+  'Admin Master',
+];
+
+export const ROLES_CAN_APPROVE_EXTRA_PAYMENTS: Role[] = [
+  'Coordinator',
+  'Manager',
+  'Director',
+  'Admin Master',
+];
+
+export const ROLES_CAN_VIEW_EXTRA_PAYMENTS: Role[] = [
+  'Fleet Assistant',
+  'Fleet Analyst',
+  'Supervisor',
+  'Coordinator',
+  'Manager',
+  'Director',
+  'Admin Master',
+  'Financeiro',
+];
+
+export const ROLES_CAN_MARK_EXTRA_PAYMENTS_PAID: Role[] = ['Financeiro', 'Admin Master'];
+
 export const ROLES_CAN_VIEW_BUDGET_TAB: Role[] = [
   'Fleet Assistant',
   'Fleet Analyst',
@@ -259,6 +289,22 @@ export function canApprovePayments(role: Role | undefined | null): boolean {
 
 export function canMarkPaid(role: Role | undefined | null): boolean {
   return ROLES_CAN_MARK_PAID.includes(role);
+}
+
+export function canCreateExtraPayments(role: Role | undefined | null): boolean {
+  return ROLES_CAN_CREATE_EXTRA_PAYMENTS.includes(role);
+}
+
+export function canApproveExtraPayments(role: Role | undefined | null): boolean {
+  return ROLES_CAN_APPROVE_EXTRA_PAYMENTS.includes(role);
+}
+
+export function canViewExtraPayments(role: Role | undefined | null): boolean {
+  return ROLES_CAN_VIEW_EXTRA_PAYMENTS.includes(role);
+}
+
+export function canMarkExtraPaymentsPaid(role: Role | undefined | null): boolean {
+  return ROLES_CAN_MARK_EXTRA_PAYMENTS_PAID.includes(role);
 }
 
 export function canViewBudgetTab(role: Role | undefined | null): boolean {
