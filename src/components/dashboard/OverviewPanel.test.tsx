@@ -148,3 +148,103 @@ describe('OverviewPanel — derives cards from raw data', () => {
     expect(text).toContain('2');
   });
 });
+
+describe('OverviewPanel — rosca de disponibilidade e reorganização do Mapa da Frota', () => {
+  async function renderWithActAsync(ui: React.ReactElement) {
+    const root = createRoot(container);
+    container.__reactRoot = root;
+    await act(async () => {
+      root.render(ui);
+    });
+    return root;
+  }
+
+  const vehicles: VehicleRow[] = [
+    {
+      id: '1',
+      type: 'Cavalo',
+      crlv_year: null,
+      crlv_expiration_date: null,
+      driver_id: null,
+      category: 'Pesado',
+      model: 'Volvo FH',
+      acquisition: 'Owned',
+      shipper_name: 'ACME',
+      operational_unit_name: 'SP',
+      license_plate: 'AAA-1234',
+      brand: 'Volvo',
+      has_insurance: true,
+      tracker: 'rastreador1',
+    },
+    {
+      id: '2',
+      type: 'Truck',
+      crlv_year: null,
+      crlv_expiration_date: null,
+      driver_id: null,
+      category: 'Leve',
+      model: 'Iveco Daily',
+      acquisition: 'Rented',
+      shipper_name: 'Beta',
+      operational_unit_name: 'RJ',
+      license_plate: 'BBB-5678',
+      brand: 'Iveco',
+      has_insurance: false,
+      tracker: null,
+    },
+  ];
+
+  it('renderiza o FleetAvailabilityDonutChart', async () => {
+    await renderWithActAsync(<OverviewPanel {...baseProps} vehicles={vehicles} />);
+
+    const text = container.textContent ?? '';
+    expect(text).toContain('Disponibilidade da Frota');
+  });
+
+  it('"Frota por Unidade Operacional" aparece exatamente 1 vez', async () => {
+    await renderWithActAsync(<OverviewPanel {...baseProps} vehicles={vehicles} />);
+
+    const matches = (container.textContent ?? '').match(/Frota por Unidade Operacional/g) ?? [];
+    expect(matches.length).toBe(1);
+  });
+
+  it('"Frota por Embarcador" aparece exatamente 1 vez', async () => {
+    await renderWithActAsync(<OverviewPanel {...baseProps} vehicles={vehicles} />);
+
+    const matches = (container.textContent ?? '').match(/Frota por Embarcador/g) ?? [];
+    expect(matches.length).toBe(1);
+  });
+
+  it('clicar em "Indisponíveis" filtra os cards e reflete na barra de filtros ativos', async () => {
+    await renderWithActAsync(
+      <OverviewPanel
+        {...baseProps}
+        vehicles={vehicles}
+        activeMaintenanceOrders={[{ vehicle_id: '1', status: 'Serviço em execução' }]}
+      />,
+    );
+
+    const indisponiveisButton = Array.from(container.querySelectorAll('button')).find((el) =>
+      (el.textContent ?? '').includes('Indisponíveis — 1'),
+    );
+    expect(indisponiveisButton).toBeTruthy();
+
+    await act(async () => {
+      indisponiveisButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const text = container.textContent ?? '';
+    expect(text).toContain('Disponibilidade: Indisponíveis');
+
+    const limparTudo = Array.from(container.querySelectorAll('button')).find(
+      (el) => el.textContent === 'Limpar tudo',
+    );
+    expect(limparTudo).toBeTruthy();
+
+    await act(async () => {
+      limparTudo!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent ?? '').not.toContain('Disponibilidade: Indisponíveis');
+  });
+});

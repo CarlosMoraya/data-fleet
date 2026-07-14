@@ -179,3 +179,64 @@ export function countOverdueChecklistByIds(
   }
   return count;
 }
+
+export const AVAILABILITY_AVAILABLE = 'Disponíveis';
+export const AVAILABILITY_UNAVAILABLE = 'Indisponíveis';
+export type AvailabilityValue = typeof AVAILABILITY_AVAILABLE | typeof AVAILABILITY_UNAVAILABLE;
+
+export function computeUnavailableVehicleIds(
+  orders: { vehicle_id: string; status: string }[],
+  allowedVehicleIds: Set<string>,
+): Set<string> {
+  const unavailableIds = new Set<string>();
+  for (const order of orders) {
+    if (INACTIVE_MAINTENANCE_STATUSES.has(order.status)) continue;
+    if (allowedVehicleIds.has(order.vehicle_id)) {
+      unavailableIds.add(order.vehicle_id);
+    }
+  }
+  return unavailableIds;
+}
+
+export function applyAvailabilityFilter(
+  vehicles: VehicleRow[],
+  unavailableIds: Set<string>,
+  selected: AvailabilityValue[],
+): VehicleRow[] {
+  if (selected.length === 0 || selected.length === 2) return vehicles;
+  if (selected[0] === AVAILABILITY_AVAILABLE) {
+    return vehicles.filter((v) => !unavailableIds.has(v.id));
+  }
+  return vehicles.filter((v) => unavailableIds.has(v.id));
+}
+
+export function toggleAvailabilityValue(
+  selected: AvailabilityValue[],
+  value: AvailabilityValue,
+  additive: boolean,
+): AvailabilityValue[] {
+  if (!additive) {
+    if (selected.length === 1 && selected[0] === value) {
+      return [];
+    }
+    return [value];
+  }
+
+  const index = selected.indexOf(value);
+  if (index === -1) {
+    return [...selected, value];
+  }
+  return selected.filter((_, i) => i !== index);
+}
+
+export function buildAvailabilityChartData(
+  vehicles: VehicleRow[],
+  unavailableIds: Set<string>,
+): { name: AvailabilityValue; value: number }[] {
+  const unavailableCount = vehicles.filter((v) => unavailableIds.has(v.id)).length;
+  const availableCount = vehicles.length - unavailableCount;
+  return [
+    { name: AVAILABILITY_AVAILABLE, value: availableCount },
+    { name: AVAILABILITY_UNAVAILABLE, value: unavailableCount },
+  ];
+}

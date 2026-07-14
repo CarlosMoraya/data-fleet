@@ -31,12 +31,18 @@ import {
   countActiveMaintenanceVehiclesByIds,
   sumApprovedCostByVehicleIds,
   countOverdueChecklistByIds,
+  computeUnavailableVehicleIds,
+  applyAvailabilityFilter,
+  toggleAvailabilityValue,
+  buildAvailabilityChartData,
   type OverviewFleetFilters,
   type OverviewFilterKey,
+  type AvailabilityValue,
 } from '../../lib/overviewFleetFilters';
 import RouteFallback from '../RouteFallback';
 
 import DashboardKpiCard from './DashboardKpiCard';
+import FleetAvailabilityDonutChart from './FleetAvailabilityDonutChart';
 
 import type { VehicleRow } from './OperationalPanel';
 
@@ -68,18 +74,38 @@ export default function OverviewPanel({
   isLoading = false,
 }: OverviewPanelProps) {
   const [filters, setFilters] = useState<OverviewFleetFilters>(EMPTY_OVERVIEW_FILTERS);
+  const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityValue[]>([]);
 
   const filteredVehicles = useMemo(
     () => applyOverviewFleetFilter(vehicles, filters),
     [vehicles, filters],
   );
 
-  const filteredIds = useMemo(
-    () => new Set(filteredVehicles.map((v) => v.id)),
-    [filteredVehicles],
+  const unavailableIdsForFilter = useMemo(
+    () =>
+      computeUnavailableVehicleIds(
+        activeMaintenanceOrders,
+        new Set(filteredVehicles.map((v) => v.id)),
+      ),
+    [activeMaintenanceOrders, filteredVehicles],
   );
 
-  const totalVehicles = filteredVehicles.length;
+  const finalVehicles = useMemo(
+    () => applyAvailabilityFilter(filteredVehicles, unavailableIdsForFilter, availabilityFilter),
+    [filteredVehicles, unavailableIdsForFilter, availabilityFilter],
+  );
+
+  const donutData = useMemo(
+    () => buildAvailabilityChartData(filteredVehicles, unavailableIdsForFilter),
+    [filteredVehicles, unavailableIdsForFilter],
+  );
+
+  const filteredIds = useMemo(
+    () => new Set(finalVehicles.map((v) => v.id)),
+    [finalVehicles],
+  );
+
+  const totalVehicles = finalVehicles.length;
 
   const unavailableVehicles = useMemo(
     () => countActiveMaintenanceVehiclesByIds(activeMaintenanceOrders, filteredIds),
@@ -100,8 +126,8 @@ export default function OverviewPanel({
   );
 
   const complianceRate = calculateChecklistComplianceRate(totalVehicles, overdueCount);
-  const trackerCoverageRate = calculateTrackerCoverageRate(filteredVehicles);
-  const insuranceCoverageRate = calculateInsuranceCoverageRate(filteredVehicles);
+  const trackerCoverageRate = calculateTrackerCoverageRate(finalVehicles);
+  const insuranceCoverageRate = calculateInsuranceCoverageRate(finalVehicles);
 
   const chartDataByDimension = useMemo(() => {
     const result = {} as Record<OverviewFilterKey, { name: string; value: number }[]>;
@@ -116,7 +142,7 @@ export default function OverviewPanel({
     return result;
   }, [vehicles, filters]);
 
-  const filtersActive = !isFiltersEmpty(filters);
+  const filtersActive = !isFiltersEmpty(filters) || availabilityFilter.length > 0;
 
   if (isLoading) {
     return (
@@ -154,9 +180,28 @@ export default function OverviewPanel({
               </span>
             )),
           )}
+          {availabilityFilter.map((value) => (
+            <span
+              key={`availability:${value}`}
+              className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-blue-600"
+            >
+              Disponibilidade: {value}
+              <button
+                type="button"
+                onClick={() => setAvailabilityFilter((prev) => prev.filter((v) => v !== value))}
+                className="ml-0.5 text-zinc-400 hover:text-zinc-600"
+                aria-label={`Remover filtro ${value}`}
+              >
+                ×
+              </button>
+            </span>
+          ))}
           <button
             type="button"
-            onClick={() => setFilters(EMPTY_OVERVIEW_FILTERS)}
+            onClick={() => {
+              setFilters(EMPTY_OVERVIEW_FILTERS);
+              setAvailabilityFilter([]);
+            }}
             className="ml-1 text-xs text-zinc-400 underline hover:text-zinc-600"
           >
             Limpar tudo
@@ -233,8 +278,31 @@ export default function OverviewPanel({
           <p className="text-sm text-zinc-500">Composição da frota</p>
         </div>
         <Suspense fallback={<RouteFallback />}>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {OVERVIEW_DIMENSIONS.map((dimension) => (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <FleetAvailabilityDonutChart
+                data={donutData}
+                selectedValues={availabilityFilter}
+                onSelect={(name, additive) =>
+                  setAvailabilityFilter((prev) => toggleAvailabilityValue(prev, name, additive))
+                }
+                onClearAll={() => setAvailabilityFilter([])}
+              />
+              {OVERVIEW_DIMENSIONS.filter((dimension) => dimension.key === 'shipper').map((dimension) => (
+                <VehicleTypeBarChart
+                  key={dimension.key}
+                  title={dimension.title}
+                  data={chartDataByDimension[dimension.key]}
+                  selectedValues={filters[dimension.key]}
+                  onSelect={(name, additive) =>
+                    setFilters((prev) => toggleDimensionValue(prev, dimension.key, name, additive))
+                  }
+                  onClearAll={() => setFilters((prev) => clearDimension(prev, dimension.key))}
+                  multiSelectHint
+                />
+              ))}
+            </div>
+            {OVERVIEW_DIMENSIONS.filter((dimension) => dimension.key === 'operationalUnit').map((dimension) => (
               <VehicleTypeBarChart
                 key={dimension.key}
                 title={dimension.title}
@@ -247,6 +315,23 @@ export default function OverviewPanel({
                 multiSelectHint
               />
             ))}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {OVERVIEW_DIMENSIONS.filter((dimension) =>
+                ['category', 'type', 'model', 'acquisition'].includes(dimension.key),
+              ).map((dimension) => (
+                <VehicleTypeBarChart
+                  key={dimension.key}
+                  title={dimension.title}
+                  data={chartDataByDimension[dimension.key]}
+                  selectedValues={filters[dimension.key]}
+                  onSelect={(name, additive) =>
+                    setFilters((prev) => toggleDimensionValue(prev, dimension.key, name, additive))
+                  }
+                  onClearAll={() => setFilters((prev) => clearDimension(prev, dimension.key))}
+                  multiSelectHint
+                />
+              ))}
+            </div>
           </div>
         </Suspense>
       </div>

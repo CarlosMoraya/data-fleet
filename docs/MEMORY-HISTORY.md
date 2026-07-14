@@ -2,6 +2,44 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-13 (Dashboard → Visão Geral: rosca de disponibilidade + reorganização do "Mapa da Frota")
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão (Tipo 3), a aba "Visão Geral" do Dashboard ganhou um gráfico de rosca (Disponíveis × Indisponíveis) integrado ao sistema de filtros interativos, e os gráficos de "Mapa da Frota" foram reordenados. Mudança 100% client-side: sem alteração de query Supabase, RPC, RLS ou migration.
+
+1. **`src/lib/overviewFleetFilters.ts`** — adicionadas constantes/tipo `AVAILABILITY_AVAILABLE`/`AVAILABILITY_UNAVAILABLE`/`AvailabilityValue` e 4 funções novas: `computeUnavailableVehicleIds`, `applyAvailabilityFilter`, `toggleAvailabilityValue`, `buildAvailabilityChartData`. A disponibilidade **não** entrou em `OverviewFilterKey`/`OVERVIEW_DIMENSIONS` por não ser atributo do veículo (é derivada de OS de manutenção) — decisão intencional para não alterar `applyOverviewFleetFilter`, que alimenta todos os outros gráficos via `filtersExcept`.
+2. **`src/components/dashboard/FleetAvailabilityDonutChart.tsx`** (novo) — componente Recharts (`PieChart`/`Pie`/`Cell`, `innerRadius=60`/`outerRadius=90`), cores semânticas verde (`#16a34a` Disponíveis) / âmbar (`#f59e0b` Indisponíveis), esmaecimento (`fillOpacity 0.25`) da fatia não selecionada quando há filtro ativo, legenda customizada clicável com contagem e percentual, chips de seleção com botão remover, suporte a Ctrl/Cmd para seleção aditiva, empty state quando a soma é 0.
+3. **`src/components/dashboard/OverviewPanel.tsx`** — novo estado `availabilityFilter`; `finalVehicles` (composição: `filteredVehicles` → `applyAvailabilityFilter`) passou a alimentar os 8 cards KPI, `filteredIds`, cobertura de rastreador/seguro; os dados da rosca (`donutData`) continuam derivando de `filteredVehicles` (antes do próprio filtro de disponibilidade), mesmo princípio do `filtersExcept`. Barra "Filtros ativos" ganhou chips `Disponibilidade: {valor}`; "Limpar tudo" agora zera também `availabilityFilter`. Layout do "Mapa da Frota" reordenado: linha 1 (`grid-cols-2`) = rosca + "Frota por Embarcador"; linha 2 (largura total) = "Frota por Unidade Operacional"; linha 3 (`grid-cols-2`) = Categoria/Tipo/Modelo/Aquisição, na ordem original de `OVERVIEW_DIMENSIONS`.
+
+### Restrições respeitadas
+
+- `applyOverviewFleetFilter` (assinatura e corpo) intocada.
+- Nenhuma query Supabase/RPC/RLS alterada.
+- Nenhum gráfico duplicado; cada dimensão aparece exatamente 1 vez.
+- Nenhuma dependência nova instalada (Recharts já presente).
+- `VehicleTypeBarChart.tsx` não modificado — usado apenas como referência de padrão.
+- Estado da rosca em `useState` local, sem `sessionStorage`/`localStorage`.
+
+### Testes
+
+- `src/lib/overviewFleetFilters.availability.test.ts` (novo): `applyAvailabilityFilter`, `toggleAvailabilityValue`, `buildAvailabilityChartData`, `computeUnavailableVehicleIds` — cenários felizes e edge cases (seleção vazia, ambos valores selecionados, dedup por `vehicle_id`).
+- `src/components/dashboard/FleetAvailabilityDonutChart.test.tsx` (novo): título e legenda com contagem/percentual corretos, clique na legenda dispara `onSelect`, chip com botão remover quando há seleção, empty state quando soma é 0. Seguiu o padrão real do repo (`createRoot`/`act` de `react-dom/client`) em vez de `@testing-library/react`, que **não está instalado** no projeto.
+- `src/components/dashboard/OverviewPanel.test.tsx` (estendido): rosca renderiza, "Frota por Unidade Operacional" e "Frota por Embarcador" aparecem exatamente 1 vez cada, clicar em "Indisponíveis" reflete no chip "Disponibilidade: Indisponíveis" e "Limpar tudo" o remove.
+
+### Validação
+
+- `npm run test:unit` — **952/952** passando (930 base + 22 novos).
+- `npx tsc --noEmit` — **0 erros**.
+- `npm run lint` — **0 erros / 152 warnings** (baseline 147 + 5 novos por arquivos de teste adicionais na mesma categoria pré-existente de warnings, sem regressão de erro).
+- `npm run test:smoke` — **não executado nesta sessão** (mudança 100% de UI, sem impacto em auth/rotas/queries cobertas pelo smoke); pendente validação do usuário antes de considerar a feature concluída.
+
+### Pendências
+
+- Executar `npm run test:smoke` (6/6 esperado) com o app no ar antes de dar a feature como concluída.
+- Long-press por toque na rosca ficou opcional (fora do escopo desta sessão); alinhar com `LONG_PRESS_MS = 600` de `VehicleTypeBarChart` se houver demanda mobile.
+- Extrair helpers de interação de filtro (chips/toggle/long-press) compartilhados entre `VehicleTypeBarChart` e `FleetAvailabilityDonutChart` para um hook único — avaliado e adiado para não tocar o gráfico de barra estável nesta sessão.
+
 ## Sessão — 2026-07-11 (fix: previsão de saída da OS aparecia um dia antes em Manutenção)
 
 ### O que foi implementado
