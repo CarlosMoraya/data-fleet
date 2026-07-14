@@ -6,8 +6,10 @@
 export interface ExportResult {
   success: boolean;
   recordsSent: number;
-  /** Conteúdo gerado (ex.: CSV) para download client-side. */
+  /** Conteúdo gerado (ex.: CSV) para download client-side. Usado por providers textuais. */
   content?: string;
+  /** Blob binário gerado (ex.: XLSX) para download client-side. Usado por providers binários. */
+  blob?: Blob;
 }
 
 export interface ExportProvider {

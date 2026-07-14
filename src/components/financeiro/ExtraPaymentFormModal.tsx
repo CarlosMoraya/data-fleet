@@ -99,6 +99,7 @@ export default function ExtraPaymentFormModal({
   const [vehicleId, setVehicleId] = useState('');
   const [driverId, setDriverId] = useState('');
   const [description, setDescription] = useState('');
+  const [centroCusto, setCentroCusto] = useState('');
   const [justification, setJustification] = useState('');
   const [notes, setNotes] = useState('');
   const [amount, setAmount] = useState(0);
@@ -136,7 +137,7 @@ export default function ExtraPaymentFormModal({
 
   const reset = () => {
     setCategory('guincho'); setServiceDate(''); setSupplierName(''); setSupplierDocument('');
-    setVehicleId(''); setDriverId(''); setDescription(''); setJustification(''); setNotes('');
+    setVehicleId(''); setDriverId(''); setDescription(''); setCentroCusto(''); setJustification(''); setNotes('');
     setAmount(0); setBatchMode('single'); setCount(1); setFirstDueDate(''); setInterval('mensal');
     setPaymentMethod('boleto'); setPixKeyType('aleatoria'); setPixKey(''); setPixBeneficiaryName('');
     setInvoiceFile(null); setReceiptFile(null); setDrafts([]);
@@ -281,6 +282,7 @@ export default function ExtraPaymentFormModal({
         clientId: currentClient.id,
         createdById: user.id,
         installmentsTotal: drafts.length,
+        centroCusto: centroCusto || undefined,
         drafts: inputs,
       });
 
@@ -413,6 +415,15 @@ export default function ExtraPaymentFormModal({
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">Centro de Custo</label>
+              <input
+                type="text"
+                value={centroCusto}
+                onChange={(e) => setCentroCusto(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
               />
             </div>

@@ -11,7 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection } from '../lib/clientScope';
 import { formatDate } from '../lib/dateUtils';
-import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, matchesMaintenanceCard, countVehiclesNotWithdrawn } from '../lib/maintenanceFilters';
+import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, matchesMaintenanceCard, countVehiclesNotWithdrawn, BUDGET_STATUS_FILTER_OPTIONS } from '../lib/maintenanceFilters';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
 import { canWorkshopFillOrder } from '../lib/maintenanceWorkshop';
 import { canEditWorkshopOrder, isOperationsManager } from '../lib/rolePermissions';
@@ -143,6 +143,7 @@ export default function Maintenance() {
   const [shipperFilter, setShipperFilter] = usePersistentFilterState<string[]>('maintenance', 'shippers', []);
   const [unitFilter, setUnitFilter] = usePersistentFilterState<string[]>('maintenance', 'units', []);
   const [workshopFilter, setWorkshopFilter] = usePersistentFilterState<string[]>('maintenance', 'workshops', []);
+  const [budgetStatusFilter, setBudgetStatusFilter] = usePersistentFilterState<string[]>('maintenance', 'budgetStatuses', []);
   const [activeCard, setActiveCard] = usePersistentFilterState<MaintenanceCardKey | null>('maintenance', 'activeCard', null);
   const toggleCard = (key: MaintenanceCardKey) => setActiveCard(prev => (prev === key ? null : key));
   const [searchParams, setSearchParams] = useSearchParams();
@@ -325,12 +326,13 @@ export default function Maintenance() {
       shippers: shipperFilter,
       operationalUnits: unitFilter,
       workshops: workshopFilter,
+      budgetStatuses: budgetStatusFilter,
     });
     return activeCard !== null ? byFilters.filter(o => matchesMaintenanceCard(o, activeCard)) : byFilters;
-  }, [orders, search, statusFilter, shipperFilter, unitFilter, workshopFilter, activeCard]);
+  }, [orders, search, statusFilter, shipperFilter, unitFilter, workshopFilter, budgetStatusFilter, activeCard]);
 
   const filteredCounts = React.useMemo(() => computeMaintenanceCounts(filtered), [filtered]);
-  const activeFilterGroups = [statusFilter, shipperFilter, unitFilter, workshopFilter].filter(a => a.length > 0).length;
+  const activeFilterGroups = [statusFilter, shipperFilter, unitFilter, workshopFilter, budgetStatusFilter].filter(a => a.length > 0).length;
   const hasActiveDropdownFilter = activeFilterGroups > 0;
   const hasActiveFilter = hasActiveDropdownFilter || activeCard !== null;
   const vehiclesNotWithdrawn = React.useMemo(() => countVehiclesNotWithdrawn(orders), [orders]);
@@ -340,6 +342,7 @@ export default function Maintenance() {
     ...shipperFilter.map(v => ({ key: `shipper:${v}`, label: v, onRemove: () => setShipperFilter(shipperFilter.filter(x => x !== v)) })),
     ...unitFilter.map(v => ({ key: `unit:${v}`, label: v, onRemove: () => setUnitFilter(unitFilter.filter(x => x !== v)) })),
     ...workshopFilter.map(v => ({ key: `workshop:${v}`, label: v, onRemove: () => setWorkshopFilter(workshopFilter.filter(x => x !== v)) })),
+    ...budgetStatusFilter.map(v => ({ key: `budgetStatus:${v}`, label: v, onRemove: () => setBudgetStatusFilter(budgetStatusFilter.filter(x => x !== v)) })),
   ];
 
   const clientNameMap = React.useMemo(() => {
@@ -478,6 +481,7 @@ export default function Maintenance() {
       <div className="flex flex-col gap-3">
         <div className="hidden flex-wrap items-center gap-2 sm:flex">
           <MultiSelectDropdown label="Status" options={MAINTENANCE_STATUS_OPTIONS} selected={statusFilter} onChange={setStatusFilter} />
+          <MultiSelectDropdown label="Status do Orçamento" options={BUDGET_STATUS_FILTER_OPTIONS.map(o => o.label)} selected={budgetStatusFilter} onChange={setBudgetStatusFilter} />
           <MultiSelectDropdown label="Embarcador" options={filterOptions.shippers} selected={shipperFilter} onChange={setShipperFilter} />
           <MultiSelectDropdown label="Unidade Operacional" options={filterOptions.operationalUnits} selected={unitFilter} onChange={setUnitFilter} />
           <MultiSelectDropdown label="Oficina" options={filterOptions.workshops} selected={workshopFilter} onChange={setWorkshopFilter} />
@@ -494,6 +498,7 @@ export default function Maintenance() {
           {mobileFiltersOpen && (
             <div className="mt-2 flex flex-col gap-2">
               <MultiSelectDropdown label="Status" options={MAINTENANCE_STATUS_OPTIONS} selected={statusFilter} onChange={setStatusFilter} />
+              <MultiSelectDropdown label="Status do Orçamento" options={BUDGET_STATUS_FILTER_OPTIONS.map(o => o.label)} selected={budgetStatusFilter} onChange={setBudgetStatusFilter} />
               <MultiSelectDropdown label="Embarcador" options={filterOptions.shippers} selected={shipperFilter} onChange={setShipperFilter} />
               <MultiSelectDropdown label="Unidade Operacional" options={filterOptions.operationalUnits} selected={unitFilter} onChange={setUnitFilter} />
               <MultiSelectDropdown label="Oficina" options={filterOptions.workshops} selected={workshopFilter} onChange={setWorkshopFilter} />

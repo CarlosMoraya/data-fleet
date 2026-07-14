@@ -9,6 +9,7 @@ import { canCreatePayments, canMarkPaid } from '../../lib/rolePermissions';
 import { getFinancialDocumentSignedUrl } from '../../lib/storageHelpers';
 import { cn } from '../../lib/utils';
 import { SpreadsheetPaymentProvider } from '../../services/financialExport/spreadsheetPaymentProvider';
+import { XlsxPaymentProvider } from '../../services/financialExport/xlsxPaymentProvider';
 import {
   listPaymentInstallments,
   listApprovedOrdersForPayment,
@@ -210,6 +211,33 @@ export default function PaymentsTab(): React.ReactElement {
     }
   };
 
+  const handleExportXlsx = async () => {
+    try {
+      const provider = new XlsxPaymentProvider();
+      const exportRows = resolveExportSelection(filtered, selected);
+      if (exportRows.length === 0) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      const result = await provider.exportData(activeClientId ?? '', exportRows);
+      if (!result.success || !result.blob) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      const url = URL.createObjectURL(result.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pagamentos_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Falha ao gerar XLSX.';
+      window.alert(msg);
+    }
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Pending docs card */}
@@ -267,6 +295,16 @@ export default function PaymentsTab(): React.ReactElement {
             >
               <Download className="h-4 w-4" />
               Baixar CSV
+            </button>
+          )}
+          {canExport && (
+            <button
+              type="button"
+              onClick={() => { void handleExportXlsx(); }}
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+            >
+              <Download className="h-4 w-4" />
+              Baixar XLSX
             </button>
           )}
           {canCreate && (

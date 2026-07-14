@@ -91,6 +91,7 @@ export async function saveMaintenanceOrder(
         budget_pdf_url: pdfUrl,
         budget_status: 'pendente',
         status: 'Aguardando aprovação',
+        budget_rejection_reason: null,
       })
       .eq('id', orderId);
     if (error) throw error;

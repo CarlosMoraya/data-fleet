@@ -1,11 +1,19 @@
-import type { MaintenanceOrder, MaintenanceStatus } from '../types/maintenance';
+import type { BudgetStatus, MaintenanceOrder, MaintenanceStatus } from '../types/maintenance';
 
 export interface MaintenanceListFilters {
   statuses: string[];
   shippers: string[];
   operationalUnits: string[];
   workshops: string[];
+  budgetStatuses: string[];
 }
+
+export const BUDGET_STATUS_FILTER_OPTIONS: { value: BudgetStatus; label: string }[] = [
+  { value: 'sem_orcamento', label: 'Sem Orçamento' },
+  { value: 'pendente', label: 'Aguardando Aprovação' },
+  { value: 'aprovado', label: 'Aprovado' },
+  { value: 'reprovado', label: 'Reprovado' },
+];
 
 function normalizeName(value?: string): string | null {
   if (!value || !value.trim()) return null;
@@ -50,7 +58,7 @@ export function matchesMaintenanceSearch(
 }
 
 export function applyMaintenanceListFilters<
-  T extends Pick<MaintenanceOrder, 'status' | 'shipperName' | 'operationalUnitName' | 'workshop'>
+  T extends Pick<MaintenanceOrder, 'status' | 'shipperName' | 'operationalUnitName' | 'workshop' | 'budgetStatus'>
 >(
   orders: T[],
   filters: MaintenanceListFilters,
@@ -59,12 +67,20 @@ export function applyMaintenanceListFilters<
   const shipperSet = filters.shippers.length > 0 ? new Set(filters.shippers) : null;
   const unitSet = filters.operationalUnits.length > 0 ? new Set(filters.operationalUnits) : null;
   const workshopSet = filters.workshops.length > 0 ? new Set(filters.workshops) : null;
+  const budgetStatusSet = filters.budgetStatuses.length > 0
+    ? new Set(
+        BUDGET_STATUS_FILTER_OPTIONS
+          .filter(o => filters.budgetStatuses.includes(o.label))
+          .map(o => o.value),
+      )
+    : null;
 
   return orders.filter((order) => {
     if (statusSet && !statusSet.has(order.status)) return false;
     if (shipperSet && !shipperSet.has(order.shipperName ?? '')) return false;
     if (unitSet && !unitSet.has(order.operationalUnitName ?? '')) return false;
     if (workshopSet && !workshopSet.has(order.workshop ?? '')) return false;
+    if (budgetStatusSet && !budgetStatusSet.has(order.budgetStatus ?? 'sem_orcamento')) return false;
     return true;
   });
 }

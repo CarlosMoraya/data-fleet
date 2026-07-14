@@ -221,6 +221,60 @@ describe('ExtraPaymentFormModal', () => {
     expect(createExtraPaymentRequestMock).toHaveBeenCalled();
     expect(createExtraPaymentInstallmentsBatchMock).toHaveBeenCalled();
   });
+
+  it('preenche Centro de Custo e envia o valor em createExtraPaymentInstallmentsBatch', async () => {
+    mockQueries([], []);
+    renderModal();
+
+    const setNativeValue = (el: HTMLInputElement, value: string) => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(el, value);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    const textInputs = container.querySelectorAll('input[type="text"]');
+    const supplierInput = textInputs[0] as HTMLInputElement;
+    const centroCustoLabel = Array.from(container.querySelectorAll('label')).find((l) =>
+      l.textContent === 'Centro de Custo',
+    );
+    const centroCustoInput = centroCustoLabel?.nextElementSibling as HTMLInputElement;
+    const dateInputs = container.querySelectorAll('input[type="date"]');
+    const serviceDateInput = dateInputs[0] as HTMLInputElement;
+    const amountInput = container.querySelector('input[type="number"]') as HTMLInputElement;
+
+    act(() => {
+      setNativeValue(serviceDateInput, '2026-07-10');
+      setNativeValue(supplierInput, 'Guincho Rápido LTDA');
+      setNativeValue(centroCustoInput, 'Frota SP');
+      setNativeValue(amountInput, '350');
+    });
+
+    const firstDueDateInput = container.querySelectorAll('input[type="date"]')[1] as HTMLInputElement;
+    act(() => {
+      setNativeValue(firstDueDateInput, '2026-08-01');
+    });
+
+    const generateButton = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Gerar parcelas'),
+    );
+    act(() => {
+      generateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const saveButton = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.startsWith('Salvar'),
+    );
+    await act(async () => {
+      saveButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(createExtraPaymentInstallmentsBatchMock).toHaveBeenCalledWith(
+      expect.objectContaining({ centroCusto: 'Frota SP' }),
+    );
+  });
 });
 
 describe('permissão de criação (Financeiro não cria Pagamento Extra)', () => {

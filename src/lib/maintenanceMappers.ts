@@ -80,6 +80,7 @@ export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
     budgetStatus: row.budget_status || 'sem_orcamento',
     budgetReviewedBy: row.budget_reviewer?.name || undefined,
     budgetReviewedAt: row.budget_reviewed_at || undefined,
+    budgetRejectionReason: row.budget_rejection_reason || undefined,
     cancelledAt: row.cancelled_at || undefined,
     cancelledById: row.cancelled_by_id || undefined,
     clientName: row.clients?.name || undefined,

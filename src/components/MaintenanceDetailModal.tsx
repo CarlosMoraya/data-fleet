@@ -245,6 +245,9 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
                   {order.budgetReviewedAt && (
                     <Field label="Revisado em" value={formatDate(order.budgetReviewedAt)} />
                   )}
+                  {order.budgetStatus === 'reprovado' && order.budgetRejectionReason && (
+                    <Field label="Motivo da Reprovação" value={order.budgetRejectionReason} className="col-span-2" />
+                  )}
                 </div>
                 {budgetItems.length > 0 && (
                   <BudgetItemsTable items={budgetItems} readOnly />

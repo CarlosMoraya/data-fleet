@@ -61,6 +61,8 @@ const orderRows = [
   },
 ];
 
+const updateMock = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+
 beforeEach(() => {
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -68,6 +70,7 @@ beforeEach(() => {
 
   fromMock.mockReset();
   rpcMock.mockReset();
+  updateMock.mockReset().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
 
   fromMock.mockImplementation((table: string) => {
     if (table === 'maintenance_orders') {
@@ -79,6 +82,7 @@ beforeEach(() => {
             }),
           }),
         }),
+        update: updateMock,
       };
     }
     if (table === 'maintenance_budget_items') {
@@ -169,5 +173,76 @@ describe('BudgetApprovals — Último Km abaixo da placa', () => {
     await waitForAssertion(() => {
       expect(container.textContent).toContain('Último Km: 54.321 km (Editado)');
     });
+  });
+});
+
+describe('BudgetApprovals — motivo de reprovação', () => {
+  it('clicar "Reprovar" abre o modal e "Confirmar reprovação" fica desabilitado com motivo vazio', async () => {
+    const root = createRoot(container);
+    container.__reactRoot = root;
+
+    act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <BudgetApprovals />
+        </QueryClientProvider>,
+      );
+    });
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('OS-001');
+    });
+
+    const rejectButton = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.includes('Reprovar'));
+    act(() => {
+      rejectButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('Reprovar Orçamento');
+    const confirmButton = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.includes('Confirmar reprovação')) as HTMLButtonElement;
+    expect(confirmButton.disabled).toBe(true);
+  });
+
+  it('preencher o motivo e confirmar chama update com budget_status reprovado e o motivo informado', async () => {
+    const root = createRoot(container);
+    container.__reactRoot = root;
+
+    act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <BudgetApprovals />
+        </QueryClientProvider>,
+      );
+    });
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('OS-001');
+    });
+
+    const rejectButton = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.includes('Reprovar'));
+    act(() => {
+      rejectButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const textarea = container.querySelector('textarea') as HTMLTextAreaElement;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+    act(() => {
+      setter?.call(textarea, 'Valor acima do combinado');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    const confirmButton = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.includes('Confirmar reprovação'));
+    await act(async () => {
+      confirmButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        budget_status: 'reprovado',
+        budget_rejection_reason: 'Valor acima do combinado',
+      }),
+    );
   });
 });

@@ -1,11 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Eye, Plus, Wallet } from 'lucide-react';
+import { Ban, Download, Eye, Plus, Wallet } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
+import { selectInstallmentsForVisibleRequests } from '../../lib/extraPaymentExportSelection';
 import { computeExtraPaymentCounts, filterExtraPayments, matchesExtraPaymentSearch } from '../../lib/serviceExpenseFilters';
-import { canCreateExtraPayments } from '../../lib/rolePermissions';
+import { canCreateExtraPayments, canMarkExtraPaymentsPaid } from '../../lib/rolePermissions';
 import { cn } from '../../lib/utils';
+import { SpreadsheetPaymentProvider } from '../../services/financialExport/spreadsheetPaymentProvider';
+import { XlsxPaymentProvider } from '../../services/financialExport/xlsxPaymentProvider';
+import { listExtraPaymentInstallments } from '../../services/paymentInstallmentService';
 import { cancelExtraPaymentRequest, listExtraPaymentRequests } from '../../services/serviceExpenseService';
 
 import ExtraPaymentFormModal from './ExtraPaymentFormModal';
@@ -75,6 +79,7 @@ export default function ExtraPaymentsTab(): React.ReactElement {
   const queryClient = useQueryClient();
   const role = user?.role;
   const canCreate = canCreateExtraPayments(role);
+  const canExport = canMarkExtraPaymentsPaid(role);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'' | ExtraPaymentStatus>('');
@@ -85,6 +90,12 @@ export default function ExtraPaymentsTab(): React.ReactElement {
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ['extraPaymentRequests', currentClient?.id],
     queryFn: () => listExtraPaymentRequests({ clientId: currentClient?.id }),
+  });
+
+  const { data: installments = [] } = useQuery({
+    queryKey: ['extraPaymentInstallments', currentClient?.id],
+    enabled: canExport,
+    queryFn: () => listExtraPaymentInstallments({ clientId: currentClient?.id }),
   });
 
   const cancelMutation = useMutation({
@@ -112,6 +123,66 @@ export default function ExtraPaymentsTab(): React.ReactElement {
     });
   }, [requests, search, statusFilter, categoryFilter]);
 
+  function resolveExportRows(): typeof installments {
+    const visibleRequestIds = new Set(filtered.map((r) => r.id));
+    return selectInstallmentsForVisibleRequests(installments, visibleRequestIds);
+  }
+
+  const handleExportCsv = async () => {
+    try {
+      const rowsToExport = resolveExportRows();
+      if (rowsToExport.length === 0) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      const provider = new SpreadsheetPaymentProvider();
+      const result = await provider.exportData(currentClient?.id ?? '', rowsToExport);
+      if (!result.success || !result.content) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      const blob = new Blob([result.content], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pagamentos_extras_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Falha ao gerar CSV.';
+      window.alert(msg);
+    }
+  };
+
+  const handleExportXlsx = async () => {
+    try {
+      const rowsToExport = resolveExportRows();
+      if (rowsToExport.length === 0) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      const provider = new XlsxPaymentProvider();
+      const result = await provider.exportData(currentClient?.id ?? '', rowsToExport);
+      if (!result.success || !result.blob) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      const url = URL.createObjectURL(result.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pagamentos_extras_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Falha ao gerar XLSX.';
+      window.alert(msg);
+    }
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Header */}
@@ -138,16 +209,38 @@ export default function ExtraPaymentsTab(): React.ReactElement {
           {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
 
-        {canCreate && (
-          <button
-            type="button"
-            onClick={() => setModalOpen(true)}
-            className="ml-auto flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
-          >
-            <Plus className="h-4 w-4" />
-            Novo Pagamento Extra
-          </button>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {canExport && (
+            <>
+              <button
+                type="button"
+                onClick={() => { void handleExportCsv(); }}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+              >
+                <Download className="h-4 w-4" />
+                Baixar CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleExportXlsx(); }}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+              >
+                <Download className="h-4 w-4" />
+                Baixar XLSX
+              </button>
+            </>
+          )}
+          {canCreate && (
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+            >
+              <Plus className="h-4 w-4" />
+              Novo Pagamento Extra
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Cards */}

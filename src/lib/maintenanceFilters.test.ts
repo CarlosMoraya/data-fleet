@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, countVehiclesNotWithdrawn, matchesMaintenanceCard } from './maintenanceFilters';
+import type { BudgetStatus } from '../types/maintenance';
 
 import type { MaintenanceOrder } from '../types/maintenance';
 
@@ -12,6 +13,19 @@ function makeOrder(
     shipperName: undefined,
     operationalUnitName: undefined,
     workshop: '',
+    ...overrides,
+  };
+}
+
+function makeBudgetOrder(
+  overrides: Partial<Pick<MaintenanceOrder, 'status' | 'shipperName' | 'operationalUnitName' | 'workshop' | 'budgetStatus'>> = {},
+): Pick<MaintenanceOrder, 'status' | 'shipperName' | 'operationalUnitName' | 'workshop' | 'budgetStatus'> {
+  return {
+    status: 'Aguardando orçamento',
+    shipperName: undefined,
+    operationalUnitName: undefined,
+    workshop: '',
+    budgetStatus: undefined as BudgetStatus | undefined,
     ...overrides,
   };
 }
@@ -71,50 +85,50 @@ describe('applyMaintenanceListFilters', () => {
   ] as Array<Pick<MaintenanceOrder, 'status' | 'shipperName' | 'operationalUnitName' | 'workshop'> & { id: string }>;
 
   it('filters by single shipper', () => {
-    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: ['Embarcador X'], operationalUnits: [], workshops: [] });
+    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: ['Embarcador X'], operationalUnits: [], workshops: [], budgetStatuses: [] });
     expect(result).toHaveLength(3);
     expect(result.map(o => o.id)).toEqual(['1', '3', '5']);
   });
 
   it('filters by combined shipper AND unit (intersection)', () => {
-    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: ['Embarcador X'], operationalUnits: ['Unidade SP'], workshops: [] });
+    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: ['Embarcador X'], operationalUnits: ['Unidade SP'], workshops: [], budgetStatuses: [] });
     expect(result).toHaveLength(2);
     expect(result.map(o => o.id)).toEqual(['1', '5']);
   });
 
   it('multi-selection within a field (OR)', () => {
-    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: ['Embarcador X', 'Embarcador Y'], operationalUnits: [], workshops: [] });
+    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: ['Embarcador X', 'Embarcador Y'], operationalUnits: [], workshops: [], budgetStatuses: [] });
     expect(result).toHaveLength(4);
     expect(result.map(o => o.id)).toEqual(['1', '2', '3', '5']);
   });
 
   it('empty filters return all orders', () => {
-    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: [], operationalUnits: [], workshops: [] });
+    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: [], operationalUnits: [], workshops: [], budgetStatuses: [] });
     expect(result).toHaveLength(5);
   });
 
   it('order with undefined shipperName does not pass when shipper filter is active', () => {
-    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: ['Embarcador X'], operationalUnits: [], workshops: [] });
+    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: ['Embarcador X'], operationalUnits: [], workshops: [], budgetStatuses: [] });
     expect(result.find(o => o.id === '4')).toBeUndefined();
   });
 
   it('filters by single status', () => {
-    const result = applyMaintenanceListFilters(orders, { statuses: ['Concluído'], shippers: [], operationalUnits: [], workshops: [] });
+    const result = applyMaintenanceListFilters(orders, { statuses: ['Concluído'], shippers: [], operationalUnits: [], workshops: [], budgetStatuses: [] });
     expect(result.map(o => o.id)).toEqual(['2', '5']);
   });
 
   it('filters by multiple statuses with OR semantics', () => {
-    const result = applyMaintenanceListFilters(orders, { statuses: ['Concluído', 'Cancelado'], shippers: [], operationalUnits: [], workshops: [] });
+    const result = applyMaintenanceListFilters(orders, { statuses: ['Concluído', 'Cancelado'], shippers: [], operationalUnits: [], workshops: [], budgetStatuses: [] });
     expect(result.map(o => o.id)).toEqual(['2', '3', '5']);
   });
 
   it('filters by single workshop', () => {
-    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: [], operationalUnits: [], workshops: ['Oficina B'] });
+    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: [], operationalUnits: [], workshops: ['Oficina B'], budgetStatuses: [] });
     expect(result.map(o => o.id)).toEqual(['2', '5']);
   });
 
   it('filters by multiple workshops with OR semantics', () => {
-    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: [], operationalUnits: [], workshops: ['Oficina A', 'Oficina C'] });
+    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: [], operationalUnits: [], workshops: ['Oficina A', 'Oficina C'], budgetStatuses: [] });
     expect(result.map(o => o.id)).toEqual(['1', '3']);
   });
 
@@ -124,13 +138,43 @@ describe('applyMaintenanceListFilters', () => {
       shippers: ['Embarcador X'],
       operationalUnits: ['Unidade SP'],
       workshops: ['Oficina B'],
+      budgetStatuses: [],
     });
     expect(result.map(o => o.id)).toEqual(['5']);
   });
 
   it('order with empty workshop does not pass when workshop filter is active', () => {
-    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: [], operationalUnits: [], workshops: ['Oficina A'] });
+    const result = applyMaintenanceListFilters(orders, { statuses: [], shippers: [], operationalUnits: [], workshops: ['Oficina A'], budgetStatuses: [] });
     expect(result.find(o => o.id === '4')).toBeUndefined();
+  });
+});
+
+describe('applyMaintenanceListFilters — budgetStatuses', () => {
+  const budgetOrders = [
+    { ...makeBudgetOrder({ budgetStatus: 'reprovado' }), id: '1' },
+    { ...makeBudgetOrder({ budgetStatus: 'aprovado' }), id: '2' },
+    { ...makeBudgetOrder({ budgetStatus: 'pendente' }), id: '3' },
+    { ...makeBudgetOrder({ budgetStatus: undefined }), id: '4' },
+  ] as Array<Pick<MaintenanceOrder, 'status' | 'shipperName' | 'operationalUnitName' | 'workshop' | 'budgetStatus'> & { id: string }>;
+
+  it('filters by a single budget status label (Reprovado)', () => {
+    const result = applyMaintenanceListFilters(budgetOrders, { statuses: [], shippers: [], operationalUnits: [], workshops: [], budgetStatuses: ['Reprovado'] });
+    expect(result.map(o => o.id)).toEqual(['1']);
+  });
+
+  it('multi-selection returns the union (Aprovado + Reprovado)', () => {
+    const result = applyMaintenanceListFilters(budgetOrders, { statuses: [], shippers: [], operationalUnits: [], workshops: [], budgetStatuses: ['Aprovado', 'Reprovado'] });
+    expect(result.map(o => o.id)).toEqual(['1', '2']);
+  });
+
+  it('undefined budgetStatus is treated as "Sem Orçamento"', () => {
+    const result = applyMaintenanceListFilters(budgetOrders, { statuses: [], shippers: [], operationalUnits: [], workshops: [], budgetStatuses: ['Sem Orçamento'] });
+    expect(result.map(o => o.id)).toEqual(['4']);
+  });
+
+  it('empty budgetStatuses does not filter anything', () => {
+    const result = applyMaintenanceListFilters(budgetOrders, { statuses: [], shippers: [], operationalUnits: [], workshops: [], budgetStatuses: [] });
+    expect(result).toHaveLength(4);
   });
 });
 

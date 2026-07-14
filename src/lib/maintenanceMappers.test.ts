@@ -73,6 +73,7 @@ function makeMaintenanceRow(overrides: Partial<MaintenanceOrderRow> = {}): Maint
     budget_status: null,
     budget_reviewed_by: null,
     budget_reviewed_at: null,
+    budget_rejection_reason: null,
     cancelled_at: null,
     cancelled_by_id: null,
     warranty_revision_event_id: null,
@@ -84,6 +85,18 @@ function makeMaintenanceRow(overrides: Partial<MaintenanceOrderRow> = {}): Maint
     ...overrides,
   };
 }
+
+describe('maintenanceFromRow — budgetRejectionReason', () => {
+  it('maps budget_rejection_reason to budgetRejectionReason', () => {
+    const row = makeMaintenanceRow({ budget_rejection_reason: 'Valor acima do orçado' });
+    expect(maintenanceFromRow(row).budgetRejectionReason).toBe('Valor acima do orçado');
+  });
+
+  it('maps null to undefined', () => {
+    const row = makeMaintenanceRow({ budget_rejection_reason: null });
+    expect(maintenanceFromRow(row).budgetRejectionReason).toBeUndefined();
+  });
+});
 
 describe('maintenanceFromRow — actualExitDate', () => {
   it('maps actualExitDate from row', () => {

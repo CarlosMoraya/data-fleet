@@ -2,6 +2,46 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-14: filtro de orçamento na Manutenção, motivo de reprovação, export XLSX (Pagamentos/Extras) e Centro de Custo em Extra
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão (Tipo 4 — migration aditiva em `maintenance_orders`; demais entregas Tipo 2/3), 5 etapas:
+
+1. **Filtro por Status do Orçamento (Manutenção)** — `src/lib/maintenanceFilters.ts` ganhou `BUDGET_STATUS_FILTER_OPTIONS` (mapa rótulo↔`BudgetStatus`) e `budgetStatuses: string[]` em `MaintenanceListFilters`; `applyMaintenanceListFilters` passou a aceitar `'budgetStatus'` no genérico e filtra convertendo rótulos selecionados para o conjunto de enums (`order.budgetStatus ?? 'sem_orcamento'`). `src/pages/Maintenance.tsx` ganhou o dropdown "Status do Orçamento" (desktop + mobile), chips e contagem em `activeFilterGroups`, com estado persistente via `usePersistentFilterState`.
+2. **Motivo de reprovação** — nova coluna `maintenance_orders.budget_rejection_reason` (migration `20260714000000_add_budget_rejection_reason_to_maintenance_orders.sql`, aditiva/nullable/idempotente, **não aplicada** pelo agente). `src/pages/BudgetApprovals.tsx`: clicar "Reprovar" abre modal com `textarea` obrigatório; `reviewMutation` passou a aceitar `reason` e grava `budget_rejection_reason` (limpo ao aprovar); em erro o modal permanece aberto. `saveMaintenanceOrder` (reenvio de orçamento) limpa o motivo. `MaintenanceDetailModal.tsx` exibe o motivo quando `budgetStatus === 'reprovado'`.
+3. **Helper compartilhado + provider XLSX + XLSX em Pagamentos** — `src/services/financialExport/paymentTemplateRows.ts` (novo) é a SSOT das 10 colunas do template (`PAYMENT_TEMPLATE_HEADERS`, `buildPaymentTemplateCells`), migrado de `spreadsheetPaymentProvider.ts` sem alterar comportamento (teste existente ficou verde sem alteração, prova de não-regressão do CSV). `xlsxPaymentProvider.ts` (novo) usa `write-excel-file` com **import dinâmico de `'write-excel-file/browser'`** — desvio pontual do texto do plano (`import('write-excel-file')`), necessário porque o `package.json` da lib só expõe os subpaths `/browser`, `/node`, `/universal`, `/utility` (sem export `"."`), então o import bare não resolve nem em `tsc --noEmit` nem em build; a API real também difere do plano: `writeXlsxFile(rows)` retorna `{ toBlob, toFile }`, não uma `Promise<Blob>` direta — usado `.toBlob()`. `ExportResult.blob?: Blob` adicionado a `types.ts`. `PaymentsTab.tsx` ganhou botão "Baixar XLSX" ao lado de "Baixar CSV", mesmo gate `canMarkPaid`.
+4. **CSV + XLSX em Pagamentos Extras** — `src/lib/extraPaymentExportSelection.ts` (novo) seleciona parcelas de extras (`listExtraPaymentInstallments`) cujo `extraPaymentRequestId` pertence às requisições visíveis (filtradas) na aba. `ExtraPaymentsTab.tsx` ganhou os dois botões, gated por `canMarkExtraPaymentsPaid`.
+5. **Centro de Custo em Pagamento Extra** — `ExtraPaymentFormModal.tsx` ganhou o campo (espelha "Cadastrar Pagamento"), passado como `centroCusto` para `createExtraPaymentInstallmentsBatch` (campo já existia na função, gravado em `payment_installments.centro_custo`).
+
+### Desvios do plano (technical, não arquiteturais)
+
+- Import de `write-excel-file` precisou ser `'write-excel-file/browser'` em vez do bare specifier do `IMPLEMENTATION.md` — o pacote não declara export `"."`. Sem essa correção, `tsc --noEmit` falha com `TS2307`.
+- `XlsxPaymentProvider.exportData` usa `(await writeXlsxFile(rows)).toBlob()` em vez de tratar o retorno como `Blob` direto — a API real do `write-excel-file` v4 retorna um objeto `{ toBlob, toFile }`.
+
+### Testes adicionados
+
+- `maintenanceFilters.test.ts`: 4 casos novos para `budgetStatuses` (single, multi-seleção/união, undefined→"Sem Orçamento", vazio não filtra) + `budgetStatuses: []` adicionado a todas as chamadas pré-existentes de `applyMaintenanceListFilters`.
+- `maintenanceMappers.test.ts`: `budgetRejectionReason` mapeado de `budget_rejection_reason` (string e null→undefined).
+- `BudgetApprovals.test.tsx`: abrir modal ao clicar "Reprovar", botão desabilitado com motivo vazio, confirmar chama `update` com `budget_status: 'reprovado'` e `budget_rejection_reason` preenchido.
+- `paymentTemplateRows.test.ts` (novo): 10 células na ordem correta, fallback de origem extra, campos ausentes não vazam `"undefined"`/`"null"`.
+- `spreadsheetPaymentProvider.test.ts`: mantido **sem alteração**, continuou verde após o refactor.
+- `extraPaymentExportSelection.test.ts` (novo): seleção por requisições visíveis, descarte de parcela sem `extraPaymentRequestId`, vazio.
+- `ExtraPaymentFormModal.test.tsx`: novo caso preenchendo Centro de Custo e verificando o valor em `createExtraPaymentInstallmentsBatch`.
+
+### Validação
+
+- `npm run test:unit` — **969/969** (953 base + 16 novos).
+- `npx tsc --noEmit` — **0 erros** (após a correção do import de `write-excel-file`).
+- `npm run lint` — **0 erros / 159 warnings** (sem novos erros; warnings novos são `no-unsafe-*` ao redor do retorno `any` de `writeXlsxFile`, mesmo padrão já tolerado em `paymentInstallmentService.ts`/`serviceExpenseService.ts` para RPCs).
+- `npm run test:smoke` — **6/6**.
+
+### Pendências
+
+- Aplicar `20260714000000_add_budget_rejection_reason_to_maintenance_orders.sql` no Supabase **DEV**, validar por SQL, promover a **PROD** só com autorização expressa.
+- Validação manual guiada: filtro "Status do Orçamento" cobre reprovados com OS em "Aguardando orçamento"; reprovar sem motivo bloqueado; XLSX abre corretamente no Excel/LibreOffice com as 10 colunas idênticas ao CSV (Pagamentos e Pagamentos Extras); Centro de Custo do Pagamento Extra aparece no export.
+- `escapeCsv` (CSV formula injection) permanece débito pré-existente, não corrigido nesta sessão.
+
 ## Sessão — 2026-07-13 (ajuste): gráficos de barra passam a reagir ao filtro de disponibilidade
 
 ### O que foi corrigido

@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   ExternalLink,
+  Loader2,
   ThumbsDown,
   ThumbsUp,
 } from 'lucide-react';
@@ -286,9 +287,11 @@ export default function BudgetApprovals() {
   });
 
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const reviewMutation = useMutation({
-    mutationFn: async ({ id, approve }: { id: string; approve: boolean }) => {
+    mutationFn: async ({ id, approve, reason }: { id: string; approve: boolean; reason?: string }) => {
       setProcessingId(id);
 
       let total = 0;
@@ -319,14 +322,16 @@ export default function BudgetApprovals() {
           status: approve ? 'Orçamento aprovado' : 'Aguardando orçamento',
           budget_reviewed_by: user!.id,
           budget_reviewed_at: new Date().toISOString(),
+          budget_rejection_reason: approve ? null : (reason ?? null),
           ...(approve ? { approved_cost: total } : {}),
         })
         .eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
       void queryClient.invalidateQueries({ queryKey: ['maintenanceOrders'] });
+      if (!variables.approve) setRejectingId(null);
     },
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : 'Falha ao processar aprovação.';
@@ -390,7 +395,7 @@ export default function BudgetApprovals() {
                     approving={processingId === order.id}
                     lastKmInfo={order.vehicleId ? lastKmMap.get(order.vehicleId) : undefined}
                     onApprove={id => reviewMutation.mutate({ id, approve: true })}
-                    onReject={id => reviewMutation.mutate({ id, approve: false })}
+                    onReject={id => { setRejectingId(id); setRejectReason(''); }}
                   />
                 ))}
               </tbody>
@@ -398,6 +403,42 @@ export default function BudgetApprovals() {
           </div>
         )}
       </div>
+
+      {rejectingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-base font-semibold text-zinc-900">Reprovar Orçamento</h3>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">
+                Motivo da reprovação <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                rows={4}
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setRejectingId(null)}
+                disabled={reviewMutation.isPending}
+                className="rounded-lg px-4 py-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => reviewMutation.mutate({ id: rejectingId, approve: false, reason: rejectReason })}
+                disabled={rejectReason.trim() === '' || reviewMutation.isPending}
+                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+              >
+                {reviewMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Confirmar reprovação
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

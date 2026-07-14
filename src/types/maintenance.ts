@@ -29,6 +29,7 @@ export interface MaintenanceOrder {
   budgetStatus?: BudgetStatus;
   budgetReviewedBy?: string;
   budgetReviewedAt?: string;
+  budgetRejectionReason?: string;
   cancelledAt?: string;
   cancelledById?: string;
   clientName?: string; // Populado quando Workshop vê múltiplas transportadoras
@@ -75,6 +76,7 @@ export interface MaintenanceOrderRow {
   budget_status: BudgetStatus | null;
   budget_reviewed_by: string | null;
   budget_reviewed_at: string | null;
+  budget_rejection_reason: string | null;
   cancelled_at: string | null;
   cancelled_by_id: string | null;
   warranty_revision_event_id: string | null;

@@ -26,7 +26,11 @@
     "migrate:shippers": "node scripts/exec-migration.mjs",
     "seed:demo:betafleet": "node scripts/seed-betafleet-demo.mjs",
     "perf": "tsx scripts/run-perf.ts",
-    "perf:bundle": "tsx scripts/measure-bundle.ts"
+    "perf:bundle": "tsx scripts/measure-bundle.ts",
+    "loadtest:seed": "tsx scripts/seed-loadtest.ts",
+    "loadtest:purge": "tsx scripts/seed-loadtest.ts --purge",
+    "loadtest:run": "tsx loadtest/runner.ts",
+    "loadtest:report": "tsx loadtest/report.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",
@@ -47,7 +51,8 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.13.1",
     "recharts": "^3.8.0",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
