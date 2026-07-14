@@ -81,23 +81,19 @@ export default function OverviewPanel({
     [vehicles, filters],
   );
 
-  const unavailableIdsForFilter = useMemo(
-    () =>
-      computeUnavailableVehicleIds(
-        activeMaintenanceOrders,
-        new Set(filteredVehicles.map((v) => v.id)),
-      ),
-    [activeMaintenanceOrders, filteredVehicles],
+  const unavailableIds = useMemo(
+    () => computeUnavailableVehicleIds(activeMaintenanceOrders, new Set(vehicles.map((v) => v.id))),
+    [activeMaintenanceOrders, vehicles],
   );
 
   const finalVehicles = useMemo(
-    () => applyAvailabilityFilter(filteredVehicles, unavailableIdsForFilter, availabilityFilter),
-    [filteredVehicles, unavailableIdsForFilter, availabilityFilter],
+    () => applyAvailabilityFilter(filteredVehicles, unavailableIds, availabilityFilter),
+    [filteredVehicles, unavailableIds, availabilityFilter],
   );
 
   const donutData = useMemo(
-    () => buildAvailabilityChartData(filteredVehicles, unavailableIdsForFilter),
-    [filteredVehicles, unavailableIdsForFilter],
+    () => buildAvailabilityChartData(filteredVehicles, unavailableIds),
+    [filteredVehicles, unavailableIds],
   );
 
   const filteredIds = useMemo(
@@ -132,7 +128,11 @@ export default function OverviewPanel({
   const chartDataByDimension = useMemo(() => {
     const result = {} as Record<OverviewFilterKey, { name: string; value: number }[]>;
     for (const dimension of OVERVIEW_DIMENSIONS) {
-      const baseVehicles = applyOverviewFleetFilter(vehicles, filtersExcept(filters, dimension.key));
+      const baseVehicles = applyAvailabilityFilter(
+        applyOverviewFleetFilter(vehicles, filtersExcept(filters, dimension.key)),
+        unavailableIds,
+        availabilityFilter,
+      );
       if (dimension.key === 'model') {
         result[dimension.key] = buildTopFleetModels(baseVehicles, 10, dimension.fallbackLabel);
       } else {
@@ -140,7 +140,7 @@ export default function OverviewPanel({
       }
     }
     return result;
-  }, [vehicles, filters]);
+  }, [vehicles, filters, unavailableIds, availabilityFilter]);
 
   const filtersActive = !isFiltersEmpty(filters) || availabilityFilter.length > 0;
 

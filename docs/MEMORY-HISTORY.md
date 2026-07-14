@@ -2,6 +2,27 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-13 (ajuste): gráficos de barra passam a reagir ao filtro de disponibilidade
+
+### O que foi corrigido
+
+Ajuste ao plano da sessão de rosca de disponibilidade (mesmo dia), identificado pelo usuário após validação: selecionar uma fatia da rosca ("Disponíveis"/"Indisponíveis") filtrava corretamente os 8 cards KPI, mas os gráficos de barra do "Mapa da Frota" (Categoria, Tipo, Modelo, Aquisição, Embarcador, Unidade Operacional) continuavam mostrando todos os veículos, ignorando a seleção da rosca — inconsistente com o comportamento padrão do painel, em que qualquer filtro reflete em todos os outros gráficos.
+
+**`src/components/dashboard/OverviewPanel.tsx`:**
+1. `unavailableIds` (antes `unavailableIdsForFilter`) passou a ser calculado uma única vez sobre `vehicles` (todos os veículos), em vez de sobre `filteredVehicles` (subconjunto já filtrado por atributo). A condição "está indisponível" (tem OS ativa) independe de qual subconjunto está sendo exibido; um único conjunto global serve para cards, rosca e todos os gráficos de barra, sem recomputar por dimensão dentro do loop.
+2. Dentro do `useMemo` que constrói `chartDataByDimension`, a base de veículos de cada dimensão passou de `applyOverviewFleetFilter(vehicles, filtersExcept(filters, dimension.key))` para essa mesma expressão encadeada com `applyAvailabilityFilter(..., unavailableIds, availabilityFilter)`. `unavailableIds` e `availabilityFilter` entraram nas dependências do `useMemo`.
+3. `applyOverviewFleetFilter` e `filtersExcept` permaneceram intocados — a composição foi feita inteiramente no painel, sem alterar a assinatura/corpo da função canônica de filtro.
+
+### Teste adicionado
+
+- `src/components/dashboard/OverviewPanel.test.tsx`: novo caso "selecionar 'Indisponíveis' na rosca refiltra os gráficos de barra" — usa 2 veículos com categorias distintas (um disponível, um indisponível) e assere que, após clicar em "Indisponíveis", o gráfico "Frota por Categoria" passa a mostrar só a categoria do veículo indisponível. Como Recharts não renderiza ticks de eixo em `jsdom` (largura/altura 0), foi necessário mockar `./VehicleTypeBarChart` (`vi.mock`, mesmo padrão já usado em `CostPanel.test.tsx`) para expor `title`/`data` como texto simples — os demais testes do arquivo (títulos, não-duplicação) continuam válidos com o mock, pois já verificavam apenas o `title`.
+
+### Validação
+
+- `npm run test:unit` — **953/953** (952 anteriores + 1 novo).
+- `npm run lint` — **0 erros / 153 warnings** (a variação de 152→153 é o warning pré-existente de `import/order` em `FleetAvailabilityDonutChart.tsx`, não introduzido por este ajuste).
+- `npm run test:smoke` — não executado nesta sessão (mesma justificativa da sessão anterior).
+
 ## Sessão — 2026-07-13 (Dashboard → Visão Geral: rosca de disponibilidade + reorganização do "Mapa da Frota")
 
 ### O que foi implementado

@@ -1,10 +1,33 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import OverviewPanel from './OverviewPanel';
 
 import type { VehicleRow } from './OperationalPanel';
+
+vi.mock('./VehicleTypeBarChart', () => ({
+  default: function MockVehicleTypeBarChart({
+    title,
+    data,
+  }: {
+    title: string;
+    data: { name: string; value: number }[];
+  }) {
+    return (
+      <div>
+        <h3>{title}</h3>
+        <ul>
+          {data.map((d) => (
+            <li key={d.name}>
+              {d.name}:{d.value}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  },
+}));
 
 interface RootedDiv extends HTMLDivElement {
   __reactRoot?: Root;
@@ -246,5 +269,31 @@ describe('OverviewPanel — rosca de disponibilidade e reorganização do Mapa d
     });
 
     expect(container.textContent ?? '').not.toContain('Disponibilidade: Indisponíveis');
+  });
+
+  it('selecionar "Indisponíveis" na rosca refiltra os gráficos de barra', async () => {
+    await renderWithActAsync(
+      <OverviewPanel
+        {...baseProps}
+        vehicles={vehicles}
+        activeMaintenanceOrders={[{ vehicle_id: '1', status: 'Serviço em execução' }]}
+      />,
+    );
+
+    expect(container.textContent ?? '').toContain('Pesado:1');
+    expect(container.textContent ?? '').toContain('Leve:1');
+
+    const indisponiveisButton = Array.from(container.querySelectorAll('button')).find((el) =>
+      (el.textContent ?? '').includes('Indisponíveis — 1'),
+    );
+    expect(indisponiveisButton).toBeTruthy();
+
+    await act(async () => {
+      indisponiveisButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const text = container.textContent ?? '';
+    expect(text).toContain('Pesado:1');
+    expect(text).not.toContain('Leve:1');
   });
 });
