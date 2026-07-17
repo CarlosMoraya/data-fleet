@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit2, Trash2, Truck, User, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Download, Plus, Search, Edit2, Trash2, Truck, User, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 
@@ -13,8 +13,10 @@ import { useAuth } from '../context/AuthContext';
 import { usePersistentUiState, useSessionUiState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection } from '../lib/clientScope';
 import { computeOverdueChecklistVehicleIds } from '../lib/dashboardKpi';
+import { resolveExportSelection } from '../lib/exportSelection';
 import { fieldSettingsFromRow, defaultFieldSettings, VehicleFieldSettingsRow } from '../lib/fieldSettingsMappers';
 import { clearVehicleDraftFiles } from '../lib/offline/vehicleDraftFiles';
+import { computeUnavailableVehicleIds } from '../lib/overviewFleetFilters';
 import { filterByActive } from '../lib/registryActiveFilter';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
@@ -31,10 +33,12 @@ import {
   type VehicleStructuredFilters,
 } from '../lib/vehicleFilters';
 import { vehicleFromRow, VehicleRow } from '../lib/vehicleMappers';
+import { XlsxVehicleProvider } from '../services/vehicleExport/xlsxVehicleProvider';
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 import { saveVehicle, deleteVehicle, toggleVehicleActive } from '../services/vehicleService';
 import { Vehicle } from '../types';
 
+import type { VehicleExportRow } from '../lib/vehicleExportRows';
 import type { VehicleFiles } from '../services/vehicleService';
 
 
@@ -96,6 +100,27 @@ export default function Vehicles() {
       return (data as VehicleRow[]).map(vehicleFromRow);
     },
     enabled: !!user,
+  });
+
+  const { data: activeMaintenanceOrders = [] } = useQuery<
+    { vehicle_id: string; status: string }[]
+  >({
+    queryKey: ['vehicles-active-maintenance', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from('maintenance_orders')
+        .select('vehicle_id, status')
+        .not('status', 'in', '("Concluído","Cancelado")');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as { vehicle_id: string; status: string }[];
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   const { data: fieldSettings } = useQuery({
@@ -382,10 +407,61 @@ export default function Vehicles() {
     enabled: !!vehicleToDelete,
   });
 
+  const unavailableVehicleIds = useMemo(
+    () => computeUnavailableVehicleIds(activeMaintenanceOrders, new Set(vehicles.map((v) => v.id))),
+    [activeMaintenanceOrders, vehicles],
+  );
+
   const filteredVehicles = useMemo(() => {
     const list = applyVehicleFilters(vehicles, search, filters, pendencyCtx);
     return filterByActive(list, showInactive);
   }, [vehicles, search, filters, pendencyCtx, showInactive]);
+
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (filteredVehicles.every((v) => selected.has(v.id))) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filteredVehicles.map((v) => v.id)));
+    }
+  };
+
+  const handleExportXlsx = async () => {
+    try {
+      const exportBase: VehicleExportRow[] = filteredVehicles.map((v) => ({ ...v, unavailable: unavailableVehicleIds.has(v.id) }));
+      const exportRows = resolveExportSelection(exportBase, selected);
+      if (exportRows.length === 0) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      const provider = new XlsxVehicleProvider();
+      const result = await provider.exportData(currentClient?.id ?? '', exportRows);
+      if (!result.success || !result.blob) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      const url = URL.createObjectURL(result.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `veiculos_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Falha ao gerar XLSX.');
+    }
+  };
 
   const vehicleIds = useMemo(
     () => filteredVehicles.map((v) => v.id),
@@ -422,21 +498,31 @@ export default function Vehicles() {
           <p className="mt-1 text-sm text-zinc-500">Gerencie a frota de veículos do cliente.</p>
         </div>
 
-        {canCreate && (
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => {
-              clearVehicleDraft();
-              void clearVehicleDraftFiles();
-              setIsFormOpen(true);
-              setEditingVehicle(null);
-              setIsFormOpen(true);
-            }}
-            className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none"
+            type="button"
+            onClick={() => { void handleExportXlsx(); }}
+            className="flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
           >
-            <Plus className="mr-2 -ml-1 h-5 w-5" aria-hidden="true" />
-            Adicionar Veículo
+            <Download className="h-4 w-4" />
+            Baixar XLSX
           </button>
-        )}
+          {canCreate && (
+            <button
+              onClick={() => {
+                clearVehicleDraft();
+                void clearVehicleDraftFiles();
+                setIsFormOpen(true);
+                setEditingVehicle(null);
+                setIsFormOpen(true);
+              }}
+              className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none"
+            >
+              <Plus className="mr-2 -ml-1 h-5 w-5" aria-hidden="true" />
+              Adicionar Veículo
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row">
@@ -527,6 +613,14 @@ export default function Vehicles() {
             <table className="min-w-full divide-y divide-zinc-200">
               <thead className="sticky top-0 z-10 bg-zinc-50">
                 <tr>
+                  <th className="w-10 px-3 py-3.5">
+                    <input
+                      type="checkbox"
+                      checked={filteredVehicles.length > 0 && filteredVehicles.every((v) => selected.has(v.id))}
+                      onChange={toggleAll}
+                      className="h-4 w-4 rounded border-zinc-300"
+                    />
+                  </th>
                   {blockWrite && (
                     <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Cliente</th>
                   )}
@@ -548,6 +642,14 @@ export default function Vehicles() {
                     key={vehicle.id}
                     className={`transition-colors hover:bg-zinc-50 ${vehicle.active === false ? 'opacity-50' : ''}`}
                   >
+                    <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(vehicle.id)}
+                        onChange={() => toggle(vehicle.id)}
+                        className="h-4 w-4 rounded border-zinc-300"
+                      />
+                    </td>
                     {blockWrite && (
                       <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-600">
                         <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
@@ -611,15 +713,26 @@ export default function Vehicles() {
                       )}
                     </td>
                     <td className="px-3 py-4 text-sm whitespace-nowrap">
-                      {vehicle.active === false ? (
-                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
-                          Inativo
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                          Ativo
-                        </span>
-                      )}
+                      <div className="flex flex-col items-start gap-1">
+                        {vehicle.active === false ? (
+                          <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
+                            Inativo
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                            Ativo
+                          </span>
+                        )}
+                        {unavailableVehicleIds.has(vehicle.id) ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                            Indisponível
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                            Disponível
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="relative py-4 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-6">
                       <div className="flex items-center justify-end gap-3">
@@ -670,7 +783,7 @@ export default function Vehicles() {
                 ))}
                 {filteredVehicles.length === 0 && (
                   <tr>
-                    <td colSpan={blockWrite ? 9 : 8} className="py-10 text-center text-sm text-zinc-500">
+                    <td colSpan={blockWrite ? 10 : 9} className="py-10 text-center text-sm text-zinc-500">
                       {(search || hasActiveStructuredFilters(filters)) ? 'Nenhum veículo encontrado para os filtros aplicados.' : blockWrite ? 'Nenhum veículo cadastrado em nenhum cliente.' : 'Nenhum veículo cadastrado para este cliente.'}
                     </td>
                   </tr>

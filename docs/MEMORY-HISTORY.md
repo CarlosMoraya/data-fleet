@@ -2,6 +2,33 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-16: Cadastros → Veículos — selo de Disponibilidade na coluna Status + export XLSX
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão (Tipo 2 — adição 100% frontend, sem migration), 5 etapas:
+
+1. **Selo de Disponibilidade** — nova query `vehicles-active-maintenance` em `src/pages/Vehicles.tsx` (espelha a query de OS ativas do Dashboard), `unavailableVehicleIds` derivado via `useMemo` reutilizando `computeUnavailableVehicleIds` (`src/lib/overviewFleetFilters.ts`, sem alterar assinatura). Célula da coluna Status ganhou um segundo selo (Disponível/Indisponível) abaixo do Ativo/Inativo, em todas as linhas (ativas e inativas).
+2. **SSOT das colunas do XLSX** — `src/lib/vehicleExportRows.ts` (novo): `VEHICLE_EXPORT_HEADERS` (17 colunas) e `buildVehicleExportCells` mapeando `VehicleExportRow = Vehicle & { unavailable: boolean }` para células de texto, com tradução local de `acquisition` (Owned/Rented/Agregado → Próprio/Alugado/Agregado).
+3. **Provider XLSX** — `src/services/vehicleExport/xlsxVehicleProvider.ts` (novo): `XlsxVehicleProvider implements ExportProvider`, espelha `XlsxPaymentProvider` (`write-excel-file/browser`, import dinâmico), reaproveita `ExportProvider`/`ExportResult` de `financialExport/types.ts`.
+4. **Helper genérico de seleção** — `src/lib/exportSelection.ts` (novo): `resolveExportSelection<T extends { id: string }>(filtered, selectedIds)`, generalização de `paymentExportSelection.ts` sem acoplar Veículos ao Financeiro.
+5. **UI de seleção + export** — checkbox por linha + "selecionar todos" (primeira coluna da tabela), botão "Baixar XLSX" ao lado de "Adicionar Veículo" (liberado a todos os `ROLES_WITH_ACCESS`, sem gating por papel — decisão do usuário, dado somente-leitura já visível), `handleExportXlsx` monta `VehicleExportRow[]` a partir de `filteredVehicles` + `unavailableVehicleIds`, resolve seleção, gera blob e baixa `veiculos_AAAA-MM-DD.xlsx`. `colSpan` do estado vazio ajustado de `blockWrite ? 9 : 8` para `blockWrite ? 10 : 9`.
+
+### Testes adicionados
+
+- `vehicleExportRows.test.ts` (novo, 6 casos): 17 headers na ordem exata, mapeamento completo (unavailable=false), Disponibilidade=Indisponível, Status=Inativo, campos opcionais ausentes → `''`, tradução dos 3 valores de `acquisition`.
+- `exportSelection.test.ts` (novo, 3 casos): sem seleção retorna tudo, seleção parcial preserva ordem de `filtered`, id selecionado inexistente em `filtered` é ignorado.
+
+### Validação
+
+`npx tsc --noEmit` 0 erros; `npm run lint` 0 erros / 162 warnings (159 base + 3 novos, todos `react-hooks/rules-of-hooks` no mesmo padrão pré-existente do arquivo — hooks chamados após o early-return de redirecionamento de `Vehicles.tsx`, já presente antes desta sessão); `npm run test:unit` 978/978 (969 base + 9 novos); `npm run test:smoke` 6/6; validação manual guiada via script Playwright contra `e2e/.auth/admin.json` (333 veículos, 325 badges "Disponível" + 8 "Indisponível" = 333, botão "Baixar XLSX" gerou e baixou `veiculos_2026-07-16.xlsx` com sucesso, layout conferido por screenshot).
+
+### Decisões e débitos técnicos registrados no plano
+
+- Débito: promover `ExportProvider`/`ExportResult` de `financialExport/types.ts` para um local compartilhado quando surgir um 3º consumidor (hoje 2: Financeiro e Veículos).
+- Débito: `resolveExportSelection` existe em duas formas (`paymentExportSelection.ts` específico de Pagamentos e `exportSelection.ts` genérico) — futura sessão de limpeza pode migrar Pagamentos para o genérico.
+- Nenhum arquivo do módulo Financeiro foi modificado.
+
 ## Sessão — 2026-07-14: filtro de orçamento na Manutenção, motivo de reprovação, export XLSX (Pagamentos/Extras) e Centro de Custo em Extra
 
 ### O que foi implementado
