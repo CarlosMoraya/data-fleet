@@ -12,6 +12,7 @@ interface InstallmentDraftTableProps {
   onChange: (drafts: InstallmentDraft[]) => void;
   onUploadBoleto: (index: number, file: File) => void;
   uploadingBoletoIndex?: number | null;
+  sharedBoletoPath?: string;
 }
 
 function formatCurrency(value: number): string {
@@ -23,6 +24,7 @@ export default function InstallmentDraftTable({
   onChange,
   onUploadBoleto,
   uploadingBoletoIndex = null,
+  sharedBoletoPath,
 }: InstallmentDraftTableProps): React.ReactElement {
   const [editing, setEditing] = useState<number | null>(null);
 
@@ -125,6 +127,10 @@ export default function InstallmentDraftTable({
                           {d.pixBeneficiaryName ? ` · ${d.pixBeneficiaryName}` : ''}
                         </span>
                       )
+                    ) : sharedBoletoPath ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500">
+                        Boleto único
+                      </span>
                     ) : (
                       <div className="flex items-center gap-2">
                         {d.boletoUrl ? (

@@ -345,4 +345,48 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
       await page.context().close();
     }
   });
+
+  test('09 — boleto único aplica-se a todas as parcelas', async ({ browser }) => {
+    const email = optionalEnv('TEST_ASSISTANT_EMAIL');
+    const password = optionalEnv('TEST_ASSISTANT_PASSWORD');
+    if (!email || !password) {
+      test.skip(true, 'TEST_ASSISTANT_EMAIL/PASSWORD ausentes.');
+      return;
+    }
+
+    const page = await loginAs(browser, email, password);
+    try {
+      await page.goto('/financeiro');
+      await page.getByRole('tab', { name: 'Pagamentos Extras' }).click();
+      await page.getByRole('button', { name: /Novo Pagamento Extra/i }).click();
+      await expect(page.getByText('Novo Pagamento Extra')).toBeVisible({ timeout: 10000 });
+
+      await page.getByLabel('Data do serviço').fill(new Date().toISOString().split('T')[0]);
+      await page.getByLabel('Fornecedor').fill('Boleto Único E2E');
+      await page.getByLabel('Valor').fill('600');
+
+      await page.getByLabel('Boleto único (opcional)').setInputFiles('test-crlv.pdf');
+      await expect(page.getByText('Boleto único anexado')).toBeVisible({ timeout: 10000 });
+
+      await page.getByRole('button', { name: 'Gerar em lote' }).click();
+      await page.getByLabel('Nº de parcelas').fill('3');
+      await page.getByLabel('1º vencimento').fill(new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0]);
+      await page.getByRole('button', { name: 'Gerar parcelas' }).click();
+
+      await expect(page.getByText(/3 parcela\(s\)/)).toBeVisible({ timeout: 10000 });
+
+      const rows = page.locator('table tbody tr');
+      await expect(rows).toHaveCount(3);
+      for (let i = 0; i < 3; i += 1) {
+        await expect(rows.nth(i).getByText('Boleto único')).toBeVisible();
+        await expect(rows.nth(i).locator('input[type="file"]')).toHaveCount(0);
+      }
+
+      await page.getByRole('button', { name: /Salvar 3 parcela/ }).click();
+      await expect(page.getByText('Novo Pagamento Extra')).not.toBeVisible({ timeout: 15000 });
+      await expect(page.getByText('Boleto Único E2E').first()).toBeVisible({ timeout: 15000 });
+    } finally {
+      await page.context().close();
+    }
+  });
 });

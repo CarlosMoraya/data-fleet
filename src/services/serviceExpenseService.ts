@@ -13,6 +13,7 @@ import type {
 const EXTRA_PAYMENT_SELECT = `
   id, client_id, request_number, category, service_date, supplier_name, supplier_document,
   vehicle_id, driver_id, amount, description, justification, notes, receipt_url, invoice_url,
+  evidence_urls,
   status, created_by_id, approved_by, approved_at, rejected_by, rejected_at, rejection_reason,
   paid_by, paid_at, created_at, updated_at,
   vehicles(license_plate), drivers(name), approver:profiles!extra_payment_requests_approved_by_fkey(name)

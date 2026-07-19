@@ -11,6 +11,11 @@ import {
   sumInstallmentsValue,
   sumNonRejectedValue,
 } from '../../lib/paymentInstallments';
+import {
+  applySharedBoletoToDrafts,
+  clearSharedBoletoFromDrafts,
+  countDraftsWithDistinctBoleto,
+} from '../../lib/sharedBoleto';
 import { uploadFinancialDocument } from '../../lib/storageHelpers';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
@@ -71,6 +76,8 @@ export default function PaymentInstallmentFormModal({
   const [extractingInvoice, setExtractingInvoice] = useState(false);
   const [drafts, setDrafts] = useState<InstallmentDraft[]>([]);
   const [uploadingBoletoIndex, setUploadingBoletoIndex] = useState<number | null>(null);
+  const [sharedBoletoPath, setSharedBoletoPath] = useState<string>('');
+  const [uploadingSharedBoleto, setUploadingSharedBoleto] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [uploadWarnings, setUploadWarnings] = useState<string[]>([]);
@@ -123,6 +130,7 @@ export default function PaymentInstallmentFormModal({
     setPixKey(''); setPixBeneficiaryName(''); setCategoria(''); setCentroCusto('');
     setCompetenciaDate(''); setDescricao(''); setNotaFile(null); setNotaFile2(null); setDrafts([]);
     setInvoiceNumber(''); setExtractingInvoice(false);
+    setSharedBoletoPath(''); setUploadingSharedBoleto(false);
     setError(''); setUploadWarnings([]);
   };
 
@@ -159,7 +167,7 @@ export default function PaymentInstallmentFormModal({
       pixBeneficiaryName: paymentMethod === 'pix' ? pixBeneficiaryName || undefined : undefined,
     }));
 
-    setDrafts(generated);
+    setDrafts(sharedBoletoPath ? applySharedBoletoToDrafts(generated, sharedBoletoPath) : generated);
   };
 
   const handleUploadBoleto = async (index: number, file: File) => {
@@ -174,6 +182,35 @@ export default function PaymentInstallmentFormModal({
     } finally {
       setUploadingBoletoIndex(null);
     }
+  };
+
+  const handleSharedBoletoPick = async (file: File) => {
+    if (!selectedOrder || !currentClient?.id) return;
+
+    const distintos = countDraftsWithDistinctBoleto(drafts, sharedBoletoPath);
+    if (distintos > 0) {
+      const confirmed = window.confirm(
+        `Isso vai substituir o boleto de ${distintos} parcela(s) já anexado(s). Continuar?`,
+      );
+      if (!confirmed) return;
+    }
+
+    setUploadingSharedBoleto(true);
+    try {
+      const path = await uploadFinancialDocument(currentClient.id, selectedOrder.id, file, 'boleto');
+      setSharedBoletoPath(path);
+      setDrafts((prev) => applySharedBoletoToDrafts(prev, path));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Falha ao anexar boleto único.';
+      setUploadWarnings((prev) => [...prev, msg]);
+    } finally {
+      setUploadingSharedBoleto(false);
+    }
+  };
+
+  const handleRemoveSharedBoleto = () => {
+    setDrafts((prev) => clearSharedBoletoFromDrafts(prev, sharedBoletoPath));
+    setSharedBoletoPath('');
   };
 
   const handleSave = async () => {
@@ -448,6 +485,28 @@ export default function PaymentInstallmentFormModal({
                 className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200"
               />
             </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">Boleto único (opcional)</label>
+              {sharedBoletoPath ? (
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                    Boleto único anexado
+                  </span>
+                  <button type="button" onClick={handleRemoveSharedBoleto}
+                    className="text-xs font-medium text-zinc-500 hover:text-red-600">
+                    Remover
+                  </button>
+                </div>
+              ) : (
+                <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp"
+                  disabled={uploadingSharedBoleto || !selectedOrder}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleSharedBoletoPick(f); e.target.value = ''; }}
+                  className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200" />
+              )}
+              <p className="mt-1 text-xs text-zinc-500">
+                Um único arquivo com todos os boletos. Ao anexar, o boleto individual por parcela fica desabilitado.
+              </p>
+            </div>
             <div className="md:col-span-2">
               <label className="mb-1 flex items-center gap-2 text-sm font-medium text-zinc-700">
                 <span>NF / Fatura</span>
@@ -563,6 +622,7 @@ export default function PaymentInstallmentFormModal({
                 onChange={setDrafts}
                 onUploadBoleto={(index, file) => { void handleUploadBoleto(index, file); }}
                 uploadingBoletoIndex={uploadingBoletoIndex}
+                sharedBoletoPath={sharedBoletoPath}
               />
             </div>
           )}

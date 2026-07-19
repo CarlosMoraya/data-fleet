@@ -21,6 +21,7 @@ function baseRow(overrides: Partial<ExtraPaymentRequestRow> = {}): ExtraPaymentR
     notes: null,
     receipt_url: null,
     invoice_url: null,
+    evidence_urls: null,
     status: 'pendente_aprovacao',
     created_by_id: 'user-1',
     approved_by: null,
@@ -76,6 +77,20 @@ describe('extraPaymentRequestFromRow', () => {
 
     expect(result.amount).toBe(350.5);
   });
+
+  it('mapeia evidence_urls com 2 caminhos', () => {
+    const result = extraPaymentRequestFromRow(
+      baseRow({ evidence_urls: ['a/b.jpg', 'c/d.jpg'] }),
+    );
+
+    expect(result.evidenceUrls).toEqual(['a/b.jpg', 'c/d.jpg']);
+  });
+
+  it('evidence_urls nulo vira undefined', () => {
+    const result = extraPaymentRequestFromRow(baseRow({ evidence_urls: null }));
+
+    expect(result.evidenceUrls).toBeUndefined();
+  });
 });
 
 describe('extraPaymentRequestToInsert', () => {
@@ -111,5 +126,22 @@ describe('extraPaymentRequestToInsert', () => {
       vehicle_id: null,
       driver_id: null,
     });
+  });
+
+  it('sem evidenceUrls, grava evidence_urls: null', () => {
+    const result = extraPaymentRequestToInsert(input, 'client-1', 'user-1', 'PE-2607-0001');
+
+    expect(result.evidence_urls).toBeNull();
+  });
+
+  it('com 3 caminhos, grava o array com os 3', () => {
+    const result = extraPaymentRequestToInsert(
+      { ...input, evidenceUrls: ['a.jpg', 'b.jpg', 'c.jpg'] },
+      'client-1',
+      'user-1',
+      'PE-2607-0001',
+    );
+
+    expect(result.evidence_urls).toEqual(['a.jpg', 'b.jpg', 'c.jpg']);
   });
 });

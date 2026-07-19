@@ -135,6 +135,19 @@ export default function ExtraPaymentViewModal({
           </section>
 
           <section className="rounded-xl border border-zinc-200 p-4">
+            <h3 className="mb-3 text-xs font-semibold tracking-wider text-zinc-500 uppercase">Evidências do serviço</h3>
+            <div className="flex flex-wrap gap-2">
+              {request.evidenceUrls && request.evidenceUrls.length > 0 ? (
+                request.evidenceUrls.map((path, index) => (
+                  <DocumentButton key={path} label={`Foto ${index + 1}`} path={path} />
+                ))
+              ) : (
+                <span className="text-sm text-zinc-400">Nenhuma evidência anexada.</span>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-zinc-200 p-4">
             <h3 className="mb-3 text-xs font-semibold tracking-wider text-zinc-500 uppercase">Parcelas</h3>
             {installments.length === 0 ? (
               <p className="text-sm text-zinc-400">Nenhuma parcela cadastrada.</p>

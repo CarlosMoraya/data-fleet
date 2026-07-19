@@ -27,6 +27,7 @@ export interface ExtraPaymentRequest {
   notes?: string;
   receiptUrl?: string;
   invoiceUrl?: string;
+  evidenceUrls?: string[];
   status: ExtraPaymentStatus;
   createdById: string;
   approvedBy?: string;
@@ -60,6 +61,7 @@ export interface ExtraPaymentRequestRow {
   notes: string | null;
   receipt_url: string | null;
   invoice_url: string | null;
+  evidence_urls: string[] | null;
   status: ExtraPaymentStatus;
   created_by_id: string;
   approved_by: string | null;
@@ -97,6 +99,7 @@ export interface ExtraPaymentFormInput {
   notes?: string;
   receiptUrl?: string;
   invoiceUrl?: string;
+  evidenceUrls?: string[];
 }
 
 export interface ExtraPaymentVehicleOption {

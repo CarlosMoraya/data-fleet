@@ -4,6 +4,11 @@ import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
 import { generateInstallmentDrafts, sumInstallmentsValue } from '../../lib/paymentInstallments';
+import {
+  applySharedBoletoToDrafts,
+  clearSharedBoletoFromDrafts,
+  countDraftsWithDistinctBoleto,
+} from '../../lib/sharedBoleto';
 import { uploadFinancialDocument } from '../../lib/storageHelpers';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
@@ -17,6 +22,7 @@ import {
   listExtraPaymentVehicles,
 } from '../../services/serviceExpenseService';
 
+import ExtraPaymentEvidencePhotos from './ExtraPaymentEvidencePhotos';
 import InstallmentDraftTable from './InstallmentDraftTable';
 
 import type {
@@ -113,8 +119,11 @@ export default function ExtraPaymentFormModal({
   const [pixBeneficiaryName, setPixBeneficiaryName] = useState('');
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [drafts, setDrafts] = useState<InstallmentDraft[]>([]);
   const [uploadingBoletoIndex, setUploadingBoletoIndex] = useState<number | null>(null);
+  const [sharedBoletoPath, setSharedBoletoPath] = useState<string>('');
+  const [uploadingSharedBoleto, setUploadingSharedBoleto] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [uploadWarnings, setUploadWarnings] = useState<string[]>([]);
@@ -141,6 +150,7 @@ export default function ExtraPaymentFormModal({
     setAmount(0); setBatchMode('single'); setCount(1); setFirstDueDate(''); setInterval('mensal');
     setPaymentMethod('boleto'); setPixKeyType('aleatoria'); setPixKey(''); setPixBeneficiaryName('');
     setInvoiceFile(null); setReceiptFile(null); setDrafts([]);
+    setSharedBoletoPath(''); setUploadingSharedBoleto(false); setEvidenceFiles([]);
     setError(''); setUploadWarnings([]);
   };
 
@@ -193,7 +203,7 @@ export default function ExtraPaymentFormModal({
       pixBeneficiaryName: paymentMethod === 'pix' ? pixBeneficiaryName || undefined : undefined,
     }));
 
-    setDrafts(generated);
+    setDrafts(sharedBoletoPath ? applySharedBoletoToDrafts(generated, sharedBoletoPath) : generated);
   };
 
   const handleUploadBoleto = async (index: number, file: File) => {
@@ -208,6 +218,35 @@ export default function ExtraPaymentFormModal({
     } finally {
       setUploadingBoletoIndex(null);
     }
+  };
+
+  const handleSharedBoletoPick = async (file: File) => {
+    if (!currentClient?.id) return;
+
+    const distintos = countDraftsWithDistinctBoleto(drafts, sharedBoletoPath);
+    if (distintos > 0) {
+      const confirmed = window.confirm(
+        `Isso vai substituir o boleto de ${distintos} parcela(s) já anexado(s). Continuar?`,
+      );
+      if (!confirmed) return;
+    }
+
+    setUploadingSharedBoleto(true);
+    try {
+      const path = await uploadFinancialDocument(currentClient.id, 'extra', file, 'boleto');
+      setSharedBoletoPath(path);
+      setDrafts((prev) => applySharedBoletoToDrafts(prev, path));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Falha ao anexar boleto único.';
+      setUploadWarnings((prev) => [...prev, msg]);
+    } finally {
+      setUploadingSharedBoleto(false);
+    }
+  };
+
+  const handleRemoveSharedBoleto = () => {
+    setDrafts((prev) => clearSharedBoletoFromDrafts(prev, sharedBoletoPath));
+    setSharedBoletoPath('');
   };
 
   const handleSave = async () => {
@@ -259,10 +298,26 @@ export default function ExtraPaymentFormModal({
         }
       }
 
-      if (invoiceUrl || receiptUrl) {
+      const evidenceUrls: string[] = [];
+      for (const file of evidenceFiles) {
+        try {
+          evidenceUrls.push(
+            await uploadFinancialDocument(currentClient.id, requestId, file, 'evidencia'),
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Falha ao anexar foto de evidência.';
+          setUploadWarnings((prev) => [...prev, msg]);
+        }
+      }
+
+      if (invoiceUrl || receiptUrl || evidenceUrls.length > 0) {
         await supabase
           .from('extra_payment_requests')
-          .update({ invoice_url: invoiceUrl, receipt_url: receiptUrl })
+          .update({
+            invoice_url: invoiceUrl,
+            receipt_url: receiptUrl,
+            evidence_urls: evidenceUrls.length > 0 ? evidenceUrls : null,
+          })
           .eq('id', requestId);
       }
 
@@ -463,6 +518,31 @@ export default function ExtraPaymentFormModal({
                 className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200"
               />
             </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">Boleto único (opcional)</label>
+              {sharedBoletoPath ? (
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                    Boleto único anexado
+                  </span>
+                  <button type="button" onClick={handleRemoveSharedBoleto}
+                    className="text-xs font-medium text-zinc-500 hover:text-red-600">
+                    Remover
+                  </button>
+                </div>
+              ) : (
+                <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp"
+                  disabled={uploadingSharedBoleto}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleSharedBoletoPick(f); e.target.value = ''; }}
+                  className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200" />
+              )}
+              <p className="mt-1 text-xs text-zinc-500">
+                Um único arquivo com todos os boletos. Ao anexar, o boleto individual por parcela fica desabilitado.
+              </p>
+            </div>
+            <div className="md:col-span-2">
+              <ExtraPaymentEvidencePhotos files={evidenceFiles} onChange={setEvidenceFiles} disabled={saving} />
+            </div>
           </div>
 
           {/* Pagamento */}
@@ -613,6 +693,7 @@ export default function ExtraPaymentFormModal({
                 onChange={setDrafts}
                 onUploadBoleto={(index, file) => { void handleUploadBoleto(index, file); }}
                 uploadingBoletoIndex={uploadingBoletoIndex}
+                sharedBoletoPath={sharedBoletoPath}
               />
             </div>
           )}

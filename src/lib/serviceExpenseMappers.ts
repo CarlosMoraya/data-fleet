@@ -25,6 +25,7 @@ export function extraPaymentRequestFromRow(row: ExtraPaymentRequestRow): ExtraPa
     notes: row.notes ?? undefined,
     receiptUrl: row.receipt_url ?? undefined,
     invoiceUrl: row.invoice_url ?? undefined,
+    evidenceUrls: row.evidence_urls ?? undefined,
     status: row.status,
     createdById: row.created_by_id,
     approvedBy: row.approved_by ?? undefined,
@@ -67,6 +68,7 @@ export function extraPaymentRequestToInsert(
     notes: input.notes ?? null,
     receipt_url: input.receiptUrl ?? null,
     invoice_url: input.invoiceUrl ?? null,
+    evidence_urls: input.evidenceUrls ?? null,
     status: 'pendente_aprovacao',
     created_by_id: userId,
   };

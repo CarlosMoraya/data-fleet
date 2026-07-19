@@ -204,7 +204,7 @@ export async function uploadFinancialDocument(
   clientId: string,
   orderId: string,
   file: File,
-  kind: 'boleto' | 'nota',
+  kind: 'boleto' | 'nota' | 'evidencia',
 ): Promise<string> {
   validateFile(file);
 
