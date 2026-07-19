@@ -2,6 +2,67 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-19: Boleto único aplicável a todas as parcelas + Fotos de evidência em Pagamentos Extras
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão (Tipo 4 — migration aditiva em `extra_payment_requests`, demais entregas Tipo 2/3), 14 etapas estruturadas em duas frentes:
+
+**Frente A — Boleto único (Etapas 1-5)**
+
+1. **Helper puro `sharedBoleto.ts`** — `src/lib/sharedBoleto.ts` (novo): `applySharedBoletoToDrafts` (replica `sharedPath` em todos os drafts), `countDraftsWithDistinctBoleto` (conta drafts com boleto individual), `clearSharedBoletoFromDrafts` (remove boleto único, preserva individuais). Sem dependência de React/Supabase, testável em unidade.
+2. **`InstallmentDraftTable` travando upload individual** — prop opcional `sharedBoletoPath?: string`; quando presente (não-vazio), renderiza selo "Boleto único" em vez do label clicável "+ Boleto" e `input[type=file]` desaparece. Teste novo `InstallmentDraftTable.test.tsx` cobre 5 cenários (sem boleto único × com boleto único, string vazia tratada como ausente, sem arquivo input quando ativo).
+3. **`PaymentInstallmentFormModal` — boleto único** — estado novo `sharedBoletoPath` + `uploadingSharedBoleto`, handlers `handleSharedBoletoPick` (com confirmação de sobrescrita), `handleRemoveSharedBoleto`, JSX campo "Boleto único (opcional)" após "2º documento", pass prop a `InstallmentDraftTable`, apply shared boleto no `handleGenerate` (cobre caso "upload antes de gerar").
+4. **`ExtraPaymentFormModal` — boleto único** — idêntico à Etapa 3, com diferenças: guarda só `currentClient?.id` (sem OS), caminho usa literal `'extra'` (convenção já vigente), campo não tem `disabled` por OS, posicionado após "Comprovante/recibo". Testes novos cobrem 4 cenários de boleto único em modal de extras.
+5. **E2E novo** — `e2e/pending/extra-payments-flow.spec.ts` cenário 09 "boleto único aplica-se a todas as parcelas": preenche mínimo, anexa PDF em "Boleto único (opcional)", gera 3 parcelas em lote, valida que todas as 3 exibem "Boleto único" e nenhuma oferece "+ Boleto", salva, confirma sucesso.
+
+**Frente B — Fotos de evidência (Etapas 6-12)**
+
+6. **Migration `20260719000000_add_evidence_urls_to_extra_payment_requests.sql`** (novo, **não executada pelo agente**) — `ALTER TABLE extra_payment_requests ADD COLUMN evidence_urls TEXT[]` + constraint `CHECK (evidence_urls IS NULL OR array_length(evidence_urls, 1) <= 3)`. Aditiva/nullable/idempotente, segura em produção com dados pré-existentes.
+7. **Helper de limite `extraPaymentEvidence.ts`** — `EVIDENCE_PHOTO_LIMIT = 3`, `canAddMoreEvidencePhotos`, `remainingEvidenceSlots`, `validateEvidencePhoto` (rejeita não-imagem, delega a `validateFile` para 10MB). Padrão espelhado de `maintenanceWorkshop.ts`. Teste novo cobre 12 cenários (limite, validação, edge cases).
+8. **`storageHelpers` estendido** — `uploadFinancialDocument` param `kind` estendido: `'boleto' | 'nota' | 'evidencia'`. Uma linha; sem lógica nova.
+9. **Tipos/mapper/serviço** — `ExtraPaymentRequest.evidenceUrls?: string[]`, `ExtraPaymentRequestRow.evidence_urls: string[] | null`, `ExtraPaymentFormInput.evidenceUrls?: string[]`. Mapper: `extraPaymentRequestFromRow` mapeia `evidence_urls → evidenceUrls`, `extraPaymentRequestToInsert` grava `evidenceUrls`. Service: `EXTRA_PAYMENT_SELECT` acrescenta `evidence_urls` ao SELECT (**ponto crítico**: sem isso, falha silenciosa). Testes novos cobrem 6 cenários (mapear/null/array).
+10. **`ExtraPaymentEvidencePhotos.tsx`** — componente de staged upload (3 fotos máximo, preview local, sem captura de câmera). Props: `files: File[]`, `onChange: (files) => void`, `disabled?`. Comportamento: botão "Adicionar foto" desabilitado quando `files.length >= 3` ou `disabled`; validação por arquivo com `validateEvidencePhoto`; corta excedente com `remainingEvidenceSlots`; grid de miniaturas com remoção individual. Object-URL preview padrão de `PartPhotosSection` (criar/revogar em `useEffect` sincronizado). Teste novo cobre 6 cenários (render vazio, adicionar, limite, validação, remover).
+11. **`ExtraPaymentFormModal` — integração de fotos** — estado novo `evidenceFiles: File[]`, reset no `reset()`, JSX renderiza `<ExtraPaymentEvidencePhotos>` em `md:col-span-2` após "Boleto único", `handleSave` faz upload loop best-effort (falha de 1 foto não bloqueia save), UPDATE grava `evidence_urls` (ou `null` se vazio). Testes novos cobrem 4 cenários (renderizar campo, salvar com fotos, salvar sem fotos, 1 de 2 falha → save com aviso).
+12. **`ExtraPaymentViewModal` — exibição de evidências** — seção nova "Evidências do serviço" antes de "Parcelas", renderiza `DocumentButton` por URL (usam signed URL), mensagem "Nenhuma evidência anexada." se vazio. Teste novo cobre 3 cenários (com URLs, sem URLs, vazio).
+
+### Testes adicionados
+
+- `sharedBoleto.test.ts`: 10 testes (apply, count, clear, edge cases)
+- `extraPaymentEvidence.test.ts`: 12 testes (limite, validação, edge cases)
+- `InstallmentDraftTable.test.tsx`: 5 testes (novo arquivo, primeira cobertura)
+- `ExtraPaymentEvidencePhotos.test.tsx`: 6 testes (novo componente, staged upload, limit, validação)
+- `ExtraPaymentViewModal.test.tsx`: 3 testes (novo arquivo, evidências)
+- Estendidos: `ExtraPaymentFormModal.test.tsx` (+4 boleto único, +4 evidências), `serviceExpenseMappers.test.ts` (+4 evidenceUrls)
+
+**Total de testes:** 978 → 1026 passando (48 novos, zero falhando).
+
+### Validação
+
+- `npx tsc --noEmit`: 0 erros
+- `npm run lint`: 0 erros / 165 warnings (162 base + 3 novos, limite de tolerância atingido)
+- `npm run test:unit`: 1026/1026 (117 arquivos)
+- `npm run test:smoke`: 6/6
+- Migration aplicada em DEV + PROD (verificado por SQL 2026-07-19: 10/10 objetos criados)
+
+### Decisões técnicas registradas
+
+- **Boleto único — fan-out na escrita, não na leitura**: replicado em cada parcela no `boleto_url` (não em coluna compartilhada com resolução na leitura), evita alterar 6 pontos de leitura já em produção.
+- **Parcela única sem tratamento especial**: mesma lógica das múltiplas, sem branches bifurcados. Esconder o campo quando n=1 seria pior (n é conhecido só após gerar).
+- **Fotos em `TEXT[]`, não em tabela dedicada**: máximo 3 sem metadado; tabela nova significaria RLS, serviço, testes — overkill.
+- **Upload boleto imediato, fotos no salvamento**: boleto sobe na hora (dispara travamento de "+ Boleto"), fotos esperam `requestId` (existe só pós-criação).
+- **Anexo opcional nunca bloqueia save** (padrão já vigente em Financeiro): best-effort, avisos em bloco amarelo, pagamento/parcelas criadas mesmo se foto falhar.
+
+### Débitos técnicos e riscos aceitos registrados
+
+- Arquivos órfãos em `financial-documents` ao trocar/remover boleto único (pré-existente em toda a suíte de uploads; limpar exigiria GC centralizado, fora do escopo).
+- Captura por câmera em evidências não implementada (recurso ativado em `PartPhotosSection` via `CameraCapture`, exigiria contexto seguro HTTPS/localhost).
+- Limpeza de `escapeCsv` contra CSV formula injection (débito pré-existente de todo o módulo Financeiro).
+
+### Observação sobre estado do banco
+
+`docs/MEMORY.md` foi corrigido: migração base de Pagamentos Extras (`20260712000000_create_extra_payment_requests.sql`) marcada como aplicada em DEV/PROD (verificado 2026-07-19). Caveat adicionado: `supabase_migrations.schema_migrations` está vazia (migrations via SQL Editor, não `db push`); nunca inferir estado a partir dessa tabela.
+
 ## Sessão — 2026-07-16: Cadastros → Veículos — selo de Disponibilidade na coluna Status + export XLSX
 
 ### O que foi implementado
