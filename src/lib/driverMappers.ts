@@ -1,11 +1,12 @@
-import { Driver } from '../types';
-
 import {
   capitalizeWords,
   normalizeUpper,
   normalizeTrim,
   filterCPF,
 } from './inputHelpers';
+
+import type { Driver } from '../types';
+import type { EmploymentRegime } from '../types/driver';
 
 /** Row retornado pelo Supabase (snake_case) */
 export interface DriverRow {
@@ -31,6 +32,8 @@ export interface DriverRow {
   certificate3_upload: string | null;
   course_name3: string | null;
   phone: string | null;
+  employment_regime: string | null;
+  service_contract_upload: string | null;
 }
 
 /** Converte row do Supabase (snake_case) para interface Driver (camelCase) */
@@ -58,6 +61,8 @@ export function driverFromRow(row: DriverRow): Driver {
     certificate3Upload: row.certificate3_upload ?? undefined,
     courseName3: row.course_name3 ?? undefined,
     phone: row.phone ?? undefined,
+    employmentRegime: (row.employment_regime as EmploymentRegime | null) ?? null,
+    serviceContractUpload: row.service_contract_upload ?? undefined,
   };
 }
 
@@ -83,5 +88,7 @@ export function driverToRow(driver: Partial<Driver>, clientId: string): Omit<Dri
     certificate3_upload: driver.certificate3Upload ?? null,
     course_name3: driver.courseName3 ? capitalizeWords(driver.courseName3) : null,
     phone: driver.phone ? normalizeTrim(driver.phone) : null,
+    employment_regime: driver.employmentRegime ?? null,
+    service_contract_upload: driver.serviceContractUpload ?? null,
   };
 }

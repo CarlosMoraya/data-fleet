@@ -5,7 +5,7 @@ import type { Driver } from '../types';
 
 export { SEARCH_PARAM, _parseSearchFromParams as parseSearchFromParams };
 
-export const DRIVER_PENDENCY_VALUES = ['cnh_expired', 'cnh_expiring', 'gr_expiring', 'gr_expired', 'cnh_missing', 'gr_missing', 'with_vehicle', 'without_vehicle'] as const;
+export const DRIVER_PENDENCY_VALUES = ['cnh_expired', 'cnh_expiring', 'gr_expiring', 'gr_expired', 'cnh_missing', 'gr_missing', 'with_vehicle', 'without_vehicle', 'pj_contract_missing'] as const;
 
 export type DriverPendency = typeof DRIVER_PENDENCY_VALUES[number];
 
@@ -18,6 +18,7 @@ export const DRIVER_PENDENCY_LABELS: Record<DriverPendency, string> = {
   gr_missing: 'Sem GR',
   with_vehicle: 'Com veículo',
   without_vehicle: 'Sem veículo',
+  pj_contract_missing: 'PJ sem contrato anexado',
 };
 
 export const LEGACY_DRIVER_ISSUE_VALUES: Record<string, DriverPendency> = {
@@ -110,6 +111,8 @@ export function driverMatchesPendency(driver: Driver, pendency: DriverPendency, 
       return !!ctx.vehicleByDriverId[driver.id];
     case 'without_vehicle':
       return !ctx.vehicleByDriverId[driver.id];
+    case 'pj_contract_missing':
+      return driver.employmentRegime === 'PJ' && isBlank(driver.serviceContractUpload);
   }
 }
 

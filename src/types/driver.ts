@@ -1,5 +1,8 @@
 // ─── Motoristas ───────────────────────────────────────────────────────────────
 
+/** Regime de contratação do motorista. `null`/`undefined` = não informado (cadastros legados). */
+export type EmploymentRegime = 'CLT' | 'PJ';
+
 export interface Driver {
   id: string;
   clientId: string;
@@ -11,6 +14,10 @@ export interface Driver {
   name: string;
   cpf: string;
   phone?: string;
+
+  // Regime de contratação
+  employmentRegime?: EmploymentRegime | null;
+  serviceContractUpload?: string; // apenas quando employmentRegime === 'PJ'
 
   // CNH
   issueDate?: string;

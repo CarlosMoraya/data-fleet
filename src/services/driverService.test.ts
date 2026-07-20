@@ -17,7 +17,7 @@ vi.mock('../lib/supabase', () => ({
   },
 }));
 
-import { toggleDriverActive } from './driverService';
+import { shouldClearServiceContract, toggleDriverActive } from './driverService';
 
 import type { Driver } from '../types/driver';
 
@@ -67,5 +67,28 @@ describe('toggleDriverActive', () => {
     await toggleDriverActive(driver, 'editor-3');
 
     expect(invokeEdgeFunctionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('shouldClearServiceContract', () => {
+  it('limpa contrato quando PJ vira CLT', () => {
+    expect(shouldClearServiceContract('CLT', 'https://x/contrato.pdf')).toBe(true);
+  });
+
+  it('preserva contrato enquanto o regime é PJ', () => {
+    expect(shouldClearServiceContract('PJ', 'https://x/contrato.pdf')).toBe(false);
+  });
+
+  it('não limpa quando não existe contrato', () => {
+    expect(shouldClearServiceContract('CLT', undefined)).toBe(false);
+    expect(shouldClearServiceContract('CLT', null)).toBe(false);
+  });
+
+  it('limpa contrato legado quando o regime não foi informado', () => {
+    expect(shouldClearServiceContract(null, 'https://x/contrato.pdf')).toBe(true);
+  });
+
+  it('ignora URL vazia', () => {
+    expect(shouldClearServiceContract(undefined, '')).toBe(false);
   });
 });

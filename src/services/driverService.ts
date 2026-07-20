@@ -6,11 +6,11 @@ import {
 } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 
-import type { Driver } from '../types/driver';
+import type { Driver, EmploymentRegime } from '../types/driver';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
-export type DriverDocType = 'cnh' | 'gr' | 'certificate-1' | 'certificate-2' | 'certificate-3';
+export type DriverDocType = 'cnh' | 'gr' | 'certificate-1' | 'certificate-2' | 'certificate-3' | 'service-contract';
 
 export interface DriverFiles {
   cnh: File | null;
@@ -18,6 +18,7 @@ export interface DriverFiles {
   certificate1: File | null;
   certificate2: File | null;
   certificate3: File | null;
+  serviceContract: File | null;
 }
 
 type DriverDocKey = keyof Omit<DriverFiles, never>;
@@ -28,6 +29,7 @@ const DOC_FIELD_MAP: Record<DriverDocKey, keyof Driver> = {
   certificate1: 'certificate1Upload',
   certificate2: 'certificate2Upload',
   certificate3: 'certificate3Upload',
+  serviceContract: 'serviceContractUpload',
 };
 
 const DB_COLUMN_MAP: Record<DriverDocKey, string> = {
@@ -36,6 +38,7 @@ const DB_COLUMN_MAP: Record<DriverDocKey, string> = {
   certificate1: 'certificate1_upload',
   certificate2: 'certificate2_upload',
   certificate3: 'certificate3_upload',
+  serviceContract: 'service_contract_upload',
 };
 
 const STORAGE_TYPE_MAP: Record<DriverDocKey, DriverDocType> = {
@@ -44,7 +47,15 @@ const STORAGE_TYPE_MAP: Record<DriverDocKey, DriverDocType> = {
   certificate1: 'certificate-1',
   certificate2: 'certificate-2',
   certificate3: 'certificate-3',
+  serviceContract: 'service-contract',
 };
+
+export function shouldClearServiceContract(
+  regime: EmploymentRegime | null | undefined,
+  existingContractUrl: string | null | undefined,
+): boolean {
+  return regime !== 'PJ' && !!existingContractUrl;
+}
 
 // ─── Funções de serviço ──────────────────────────────────────────────────────
 
@@ -59,6 +70,13 @@ export async function saveDriver(
   editingId?: string,
 ): Promise<string> {
   const row = driverToRow(driver, clientId);
+  const mustClearContract = shouldClearServiceContract(
+    driver.employmentRegime,
+    driver.serviceContractUpload,
+  );
+  if (mustClearContract) {
+    row.service_contract_upload = null;
+  }
 
   let savedId = editingId;
 
@@ -80,6 +98,10 @@ export async function saveDriver(
 
   if (savedId) {
     await uploadDriverFiles(clientId, savedId, driver, files);
+  }
+
+  if (mustClearContract && driver.serviceContractUpload) {
+    await deleteDriverDocument(driver.serviceContractUpload);
   }
 
   return savedId;
@@ -138,6 +160,7 @@ async function uploadDriverFiles(
   const urlUpdates: Record<string, string> = {};
 
   for (const key of Object.keys(files) as DriverDocKey[]) {
+    if (key === 'serviceContract' && driver.employmentRegime !== 'PJ') continue;
     const file = files[key];
     if (!file) continue;
 
@@ -170,6 +193,7 @@ async function deleteAllDriverDocuments(driver: Driver): Promise<void> {
     driver.certificate1Upload,
     driver.certificate2Upload,
     driver.certificate3Upload,
+    driver.serviceContractUpload,
   ];
 
   await Promise.all(

@@ -36,6 +36,23 @@ describe('driverToRow', () => {
     const row = driverToRow({ name: 'João', cpf: '12345678901' }, 'c1');
     expect(row.phone).toBeNull();
   });
+
+  it('mapeia regime e contrato de serviço para snake_case', () => {
+    const row = driverToRow({
+      name: 'João',
+      cpf: '12345678901',
+      employmentRegime: 'CLT',
+      serviceContractUpload: 'https://x/contrato.pdf',
+    }, 'c1');
+
+    expect(row.employment_regime).toBe('CLT');
+    expect(row.service_contract_upload).toBe('https://x/contrato.pdf');
+  });
+
+  it('mapeia regime ausente para null no payload', () => {
+    const row = driverToRow({ name: 'João', cpf: '12345678901' }, 'c1');
+    expect(row.employment_regime).toBeNull();
+  });
 });
 
 describe('driverFromRow', () => {
@@ -73,5 +90,35 @@ describe('driverFromRow', () => {
 
     const driver = driverFromRow(row);
     expect(driver.phone).toBe('11999999999');
+  });
+
+  it('mapeia regime PJ e contrato de serviço', () => {
+    const row = {
+      id: 'd1',
+      client_id: 'c1',
+      name: 'João Silva',
+      cpf: '12345678901',
+      employment_regime: 'PJ',
+      service_contract_upload: 'https://x/contrato.pdf',
+    } as unknown as DriverRow;
+
+    const driver = driverFromRow(row);
+    expect(driver.employmentRegime).toBe('PJ');
+    expect(driver.serviceContractUpload).toBe('https://x/contrato.pdf');
+  });
+
+  it('mapeia campos novos legados nulos', () => {
+    const row = {
+      id: 'd1',
+      client_id: 'c1',
+      name: 'João Silva',
+      cpf: '12345678901',
+      employment_regime: null,
+      service_contract_upload: null,
+    } as unknown as DriverRow;
+
+    const driver = driverFromRow(row);
+    expect(driver.employmentRegime).toBeNull();
+    expect(driver.serviceContractUpload).toBeUndefined();
   });
 });

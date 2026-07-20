@@ -140,6 +140,14 @@ describe('driverFilters', () => {
     expect(driverMatchesPendency(driver({ id: 'd1', grUpload: 'gr.pdf' }), 'gr_missing', ctx)).toBe(false);
   });
 
+  it('aplica situação pj_contract_missing apenas para PJ sem contrato', () => {
+    expect(driverMatchesPendency(driver({ employmentRegime: 'PJ' }), 'pj_contract_missing', ctx)).toBe(true);
+    expect(driverMatchesPendency(driver({ employmentRegime: 'PJ', serviceContractUpload: 'contrato.pdf' }), 'pj_contract_missing', ctx)).toBe(false);
+    expect(driverMatchesPendency(driver({ employmentRegime: 'CLT' }), 'pj_contract_missing', ctx)).toBe(false);
+    expect(driverMatchesPendency(driver({ employmentRegime: null }), 'pj_contract_missing', ctx)).toBe(false);
+    expect(driverMatchesPendency(driver({ employmentRegime: 'PJ', serviceContractUpload: '   ' }), 'pj_contract_missing', ctx)).toBe(true);
+  });
+
   it('aplica situação with_vehicle e without_vehicle', () => {
     expect(driverMatchesPendency(driver({ id: 'd1' }), 'with_vehicle', ctx)).toBe(true);
     expect(driverMatchesPendency(driver({ id: 'd2' }), 'with_vehicle', ctx)).toBe(false);
@@ -166,6 +174,21 @@ describe('driverFilters', () => {
 
     expect(applyDriverFilters(drivers, 'maria', { shipperId: 's1', operationalUnitId: null, pendency: 'cnh_expired' }, ctx))
       .toEqual([drivers[0]]);
+  });
+
+  it('filtra a lista por PJ sem contrato anexado', () => {
+    const drivers = [
+      driver({ id: 'd1', employmentRegime: 'PJ' }),
+      driver({ id: 'd2', employmentRegime: 'PJ', serviceContractUpload: 'contrato.pdf' }),
+      driver({ id: 'd3', employmentRegime: 'CLT' }),
+    ];
+
+    expect(applyDriverFilters(
+      drivers,
+      '',
+      { shipperId: null, operationalUnitId: null, pendency: 'pj_contract_missing' },
+      ctx,
+    )).toEqual([drivers[0]]);
   });
 
   it('filtra por unidade operacional do veículo vinculado', () => {

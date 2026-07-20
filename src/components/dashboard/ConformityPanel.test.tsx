@@ -41,6 +41,7 @@ function findCardValueByLabel(label: string): string | null {
 
 const baseProps = {
   documentaryComplianceRate: 82,
+  pjContractComplianceRate: 91,
   expiredDocumentsCount: 4,
   expiringDocumentsCount: 3,
   missingDocumentsCount: 5,
@@ -51,10 +52,11 @@ const baseProps = {
 };
 
 describe('ConformityPanel', () => {
-  it('renderiza os 7 títulos de card e os respectivos valores', () => {
+  it('renderiza os 8 títulos de card e os respectivos valores', () => {
     renderWithAct(<ConformityPanel {...baseProps} />);
 
     expect(container.textContent).toContain('Conformidade Documental');
+    expect(container.textContent).toContain('Contratos PJ Anexados');
     expect(container.textContent).toContain('Documentos Vencidos');
     expect(container.textContent).toContain('Documentos a Vencer em 30 dias');
     expect(container.textContent).toContain('Documentos Ausentes');
@@ -63,6 +65,7 @@ describe('ConformityPanel', () => {
     expect(container.textContent).toContain('Itens Críticos');
 
     expect(findCardValueByLabel('Conformidade Documental')).toBe('82%');
+    expect(findCardValueByLabel('Contratos PJ Anexados')).toBe('91%');
     expect(findCardValueByLabel('Documentos Vencidos')).toBe('4');
     expect(findCardValueByLabel('Documentos a Vencer em 30 dias')).toBe('3');
     expect(findCardValueByLabel('Documentos Ausentes')).toBe('5');
@@ -85,6 +88,13 @@ describe('ConformityPanel', () => {
             severity: 'high',
             details: ['ABC1D23', 'DEF4G56'],
           },
+          {
+            category: 'pj_contract_missing',
+            label: 'Motoristas PJ sem Contrato Anexado',
+            count: 1,
+            severity: 'high',
+            details: ['Ana'],
+          },
         ]}
       />
     );
@@ -101,6 +111,16 @@ describe('ConformityPanel', () => {
     });
 
     expect(onActionClick).toHaveBeenCalledWith('gr_vehicle_missing');
+
+    const contractQueueButton = Array.from(container.querySelectorAll('button')).find((node) =>
+      node.textContent?.includes('Motoristas PJ sem Contrato Anexado')
+    );
+
+    act(() => {
+      contractQueueButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onActionClick).toHaveBeenCalledWith('pj_contract_missing');
   });
 
   it('renderiza o estado vazio da fila quando actionItems é vazio', () => {

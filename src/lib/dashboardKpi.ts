@@ -1073,6 +1073,20 @@ export function getDriversWithVehicleMissingGrNames(
     .map((driver) => driver.name);
 }
 
+export function countActivePjDrivers(
+  drivers: { active?: boolean | null; employment_regime: string | null }[]
+): number {
+  return drivers.filter((driver) => driver.active !== false && driver.employment_regime === 'PJ').length;
+}
+
+export function getActivePjDriversMissingContractNames(
+  drivers: { name: string | null; active?: boolean | null; employment_regime: string | null; service_contract_upload: string | null }[]
+): string[] {
+  return drivers
+    .filter((driver) => driver.active !== false && driver.employment_regime === 'PJ' && isBlank(driver.service_contract_upload) && driver.name)
+    .map((driver) => driver.name as string);
+}
+
 export function isVehicleDocumentallyIrregular(
   vehicle: VehicleRow,
   currentYear: string,
@@ -1131,7 +1145,7 @@ export type ComplianceActionCategory =
   | 'crlv_expired' | 'cnh_expired' | 'gr_vehicle_expired' | 'gr_driver_expired'
   | 'crlv_expiring' | 'cnh_expiring' | 'gr_vehicle_expiring' | 'gr_driver_expiring'
   | 'crlv_missing' | 'cnh_missing' | 'gr_vehicle_missing' | 'gr_driver_missing'
-  | 'insurance_missing' | 'maintenance_contract_missing';
+  | 'insurance_missing' | 'maintenance_contract_missing' | 'pj_contract_missing';
 
 export interface ComplianceActionItem {
   category: ComplianceActionCategory;
@@ -1145,7 +1159,7 @@ export function buildComplianceActionQueue(input: {
   crlvExpired: string[]; cnhExpired: string[]; grVehicleExpired: string[]; grDriverExpired: string[];
   crlvExpiring: string[]; cnhExpiring: string[]; grVehicleExpiring: string[]; grDriverExpiring: string[];
   crlvMissing: string[]; cnhMissing: string[]; grVehicleMissing: string[]; grDriverMissing: string[];
-  insuranceMissing: string[]; maintenanceContractMissing: string[];
+  insuranceMissing: string[]; maintenanceContractMissing: string[]; pjContractMissing: string[];
 }): ComplianceActionItem[] {
   const items: ComplianceActionItem[] = [
     { category: 'crlv_expired', label: 'Veículos com CRLV Vencido', count: input.crlvExpired.length, severity: 'high', details: input.crlvExpired },
@@ -1160,6 +1174,7 @@ export function buildComplianceActionQueue(input: {
     { category: 'cnh_missing', label: 'Motoristas sem CNH Anexada', count: input.cnhMissing.length, severity: 'high', details: input.cnhMissing },
     { category: 'gr_vehicle_missing', label: 'Veículos sem GR', count: input.grVehicleMissing.length, severity: 'high', details: input.grVehicleMissing },
     { category: 'gr_driver_missing', label: 'Motoristas sem GR', count: input.grDriverMissing.length, severity: 'high', details: input.grDriverMissing },
+    { category: 'pj_contract_missing', label: 'Motoristas PJ sem Contrato Anexado', count: input.pjContractMissing.length, severity: 'high', details: input.pjContractMissing },
     { category: 'insurance_missing', label: 'Veículo sem Apólice de Seguro', count: input.insuranceMissing.length, severity: 'high', details: input.insuranceMissing },
     { category: 'maintenance_contract_missing', label: 'Veículo sem Contrato de Manutenção', count: input.maintenanceContractMissing.length, severity: 'high', details: input.maintenanceContractMissing },
   ];

@@ -17,12 +17,15 @@ import { validateFile } from '../lib/storageHelpers';
 import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
 import { Driver, DriverFieldSettings } from '../types';
 
+import type { EmploymentRegime } from '../types/driver';
+
 interface DriverFormFiles {
   cnh: File | null;
   gr: File | null;
   certificate1: File | null;
   certificate2: File | null;
   certificate3: File | null;
+  serviceContract: File | null;
 }
 
 interface DriverFormProps {
@@ -72,6 +75,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
   const [selectedCert1File, setSelectedCert1File] = useState<File | null>(null);
   const [selectedCert2File, setSelectedCert2File] = useState<File | null>(null);
   const [selectedCert3File, setSelectedCert3File] = useState<File | null>(null);
+  const [selectedServiceContractFile, setSelectedServiceContractFile] = useState<File | null>(null);
 
   // Helper: retorna true se o campo é obrigatório
   const req = (name: string) => fieldSettings ? isDriverFieldRequired(name, fieldSettings) : true;
@@ -159,6 +163,15 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
   const handleCert1FileChange = makeFileHandler(setSelectedCert1File);
   const handleCert2FileChange = makeFileHandler(setSelectedCert2File);
   const handleCert3FileChange = makeFileHandler(setSelectedCert3File);
+  const handleServiceContractFileChange = makeFileHandler(setSelectedServiceContractFile);
+
+  const handleEmploymentRegimeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value as EmploymentRegime | '';
+    setFormData(prev => ({ ...prev, employmentRegime: value === '' ? null : value }));
+    if (value !== 'PJ') {
+      setSelectedServiceContractFile(null);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,6 +228,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
           certificate1: selectedCert1File,
           certificate2: selectedCert2File,
           certificate3: selectedCert3File,
+          serviceContract: selectedServiceContractFile,
         }
       );
     } catch (err: unknown) {
@@ -388,7 +402,42 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     placeholder="Somente números"
                   />
                 </div>
+                <div>
+                  <label htmlFor="employment-regime" className="block text-sm font-medium text-zinc-700">
+                    Regime de Contratação<span className="ml-0.5 text-red-500">*</span>
+                  </label>
+                  <select
+                    id="employment-regime"
+                    name="employmentRegime"
+                    required
+                    value={formData.employmentRegime ?? ''}
+                    onChange={handleEmploymentRegimeChange}
+                    className={inputClass}
+                  >
+                    <option value="">Selecione…</option>
+                    <option value="CLT">CLT</option>
+                    <option value="PJ">PJ</option>
+                  </select>
+                </div>
               </div>
+              {formData.employmentRegime === 'PJ' && (
+                <div className="mt-6 sm:col-span-2">
+                  <label className="block text-sm font-medium text-zinc-700">
+                    Contrato de Prestação de Serviços
+                  </label>
+                  <FilePreview url={formData.serviceContractUpload} selectedFile={selectedServiceContractFile} label="Contrato atual" />
+                  <input
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/png,image/webp"
+                    onChange={handleServiceContractFileChange}
+                    className={fileInputClass}
+                  />
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Formatos aceitos: PDF, JPG, PNG, WEBP. Máximo 10MB.
+                    {formData.serviceContractUpload ? ' Selecionar um novo arquivo irá substituir o atual.' : ''}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* CNH */}

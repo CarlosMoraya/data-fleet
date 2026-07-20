@@ -54,8 +54,10 @@ import {
   buildMonthlyMaintenanceTypeCounts,
   buildComplianceActionQueue,
   calculateDocumentaryComplianceRate,
+  countActivePjDrivers,
   countIrregularDrivers,
   countIrregularVehicles,
+  getActivePjDriversMissingContractNames,
   getDriversMissingCnhUploadNames,
   getDriversWithVehicleMissingGrNames,
   getExpiredGrDriverNames,
@@ -1633,12 +1635,36 @@ describe('Conformidade documental', () => {
     expect(calculateDocumentaryComplianceRate(10, 20)).toBe(0);
   });
 
+  it('countActivePjDrivers conta apenas motoristas PJ ativos', () => {
+    expect(countActivePjDrivers([
+      { active: true, employment_regime: 'PJ' },
+      { active: true, employment_regime: 'PJ' },
+      { active: false, employment_regime: 'PJ' },
+      { active: true, employment_regime: 'CLT' },
+      { active: true, employment_regime: null },
+      { active: null, employment_regime: 'PJ' },
+      { employment_regime: 'PJ' },
+    ])).toBe(4);
+    expect(countActivePjDrivers([])).toBe(0);
+  });
+
+  it('getActivePjDriversMissingContractNames lista PJ ativos sem contrato', () => {
+    expect(getActivePjDriversMissingContractNames([
+      { name: 'Ana', active: true, employment_regime: 'PJ', service_contract_upload: null },
+      { name: 'Bruno', active: true, employment_regime: 'PJ', service_contract_upload: '' },
+      { name: 'Inativo', active: false, employment_regime: 'PJ', service_contract_upload: null },
+      { name: 'CLT', active: true, employment_regime: 'CLT', service_contract_upload: null },
+      { name: 'Com contrato', active: true, employment_regime: 'PJ', service_contract_upload: 'contrato.pdf' },
+      { name: null, active: true, employment_regime: 'PJ', service_contract_upload: null },
+    ])).toEqual(['Ana', 'Bruno']);
+  });
+
   it('buildComplianceActionQueue omite count 0, ordena high antes de medium e retorna vazio quando não há itens', () => {
     expect(buildComplianceActionQueue({
       crlvExpired: [], cnhExpired: [], grVehicleExpired: [], grDriverExpired: [],
       crlvExpiring: [], cnhExpiring: [], grVehicleExpiring: [], grDriverExpiring: [],
       crlvMissing: [], cnhMissing: [], grVehicleMissing: [], grDriverMissing: [],
-      insuranceMissing: [], maintenanceContractMissing: [],
+      insuranceMissing: [], maintenanceContractMissing: [], pjContractMissing: [],
     })).toEqual([]);
 
     const queue = buildComplianceActionQueue({
@@ -1656,6 +1682,7 @@ describe('Conformidade documental', () => {
       grDriverMissing: [],
       insuranceMissing: [],
       maintenanceContractMissing: [],
+      pjContractMissing: [],
     });
 
     expect(queue.map((item) => item.category)).toEqual(['crlv_expired', 'crlv_expiring']);
@@ -1663,7 +1690,7 @@ describe('Conformidade documental', () => {
     expect(queue[1].severity).toBe('medium');
   });
 
-  it('buildComplianceActionQueue valida os 14 labels', () => {
+  it('buildComplianceActionQueue valida os 15 labels', () => {
     const queue = buildComplianceActionQueue({
       crlvExpired: ['1'],
       cnhExpired: ['1'],
@@ -1679,6 +1706,7 @@ describe('Conformidade documental', () => {
       grDriverMissing: ['1'],
       insuranceMissing: ['1'],
       maintenanceContractMissing: ['1'],
+      pjContractMissing: ['1'],
     });
 
     expect(queue.map((item) => item.label)).toEqual([
@@ -1690,6 +1718,7 @@ describe('Conformidade documental', () => {
       'Motoristas sem CNH Anexada',
       'Veículos sem GR',
       'Motoristas sem GR',
+      'Motoristas PJ sem Contrato Anexado',
       'Veículo sem Apólice de Seguro',
       'Veículo sem Contrato de Manutenção',
       'CRLV a Vencer em 30 dias',

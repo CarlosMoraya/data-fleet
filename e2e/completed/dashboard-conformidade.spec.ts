@@ -6,10 +6,11 @@ test.describe.serial('Dashboard: aba Conformidade', () => {
     await expect(page.locator('h1', { hasText: 'Dashboard' })).toBeVisible({ timeout: 15000 });
   });
 
-  test('renderiza os 7 cards, a fila documental e navega por deep link quando houver item', async ({ page }) => {
+  test('renderiza os 8 cards, a fila documental e navega por deep link quando houver item', async ({ page }) => {
     await page.getByRole('button', { name: /Conformidade/ }).click();
 
     await expect(page.getByText('Conformidade Documental')).toBeVisible();
+    await expect(page.getByText('Contratos PJ Anexados')).toBeVisible();
     await expect(page.getByText('Documentos Vencidos')).toBeVisible();
     await expect(page.getByText('Documentos a Vencer em 30 dias')).toBeVisible();
     await expect(page.getByText('Documentos Ausentes')).toBeVisible();

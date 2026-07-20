@@ -53,4 +53,5 @@ export const COMPLIANCE_ACTION_ROUTES: Record<ComplianceActionCategory, string> 
   gr_driver_missing: '/cadastros/motoristas?issue=gr_missing',
   insurance_missing: '/cadastros/veiculos?issue=insurance_missing',
   maintenance_contract_missing: '/cadastros/veiculos?issue=maintenance_contract_missing',
+  pj_contract_missing: '/cadastros/motoristas?issue=pj_contract_missing',
 };

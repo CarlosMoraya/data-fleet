@@ -53,7 +53,7 @@ describe('actionQueueRoutes', () => {
     }
   });
 
-  it('COMPLIANCE_ACTION_ROUTES cobre todas as 14 categorias', () => {
+  it('COMPLIANCE_ACTION_ROUTES cobre todas as 15 categorias', () => {
     expect(Object.keys(COMPLIANCE_ACTION_ROUTES)).toEqual([
       'crlv_expired',
       'cnh_expired',
@@ -69,11 +69,12 @@ describe('actionQueueRoutes', () => {
       'gr_driver_missing',
       'insurance_missing',
       'maintenance_contract_missing',
+      'pj_contract_missing',
     ]);
   });
 
   it('rotas de motorista usam apenas valores válidos de issue de motorista e de veículo apenas valores válidos de veículo', () => {
-    const driverCategories = ['cnh_expired', 'cnh_expiring', 'gr_driver_expired', 'gr_driver_expiring', 'cnh_missing', 'gr_driver_missing'] as const;
+    const driverCategories = ['cnh_expired', 'cnh_expiring', 'gr_driver_expired', 'gr_driver_expiring', 'cnh_missing', 'gr_driver_missing', 'pj_contract_missing'] as const;
     const vehicleCategories = ['crlv_expired', 'gr_vehicle_expired', 'crlv_expiring', 'gr_vehicle_expiring', 'crlv_missing', 'gr_vehicle_missing', 'insurance_missing', 'maintenance_contract_missing'] as const;
 
     for (const category of driverCategories) {

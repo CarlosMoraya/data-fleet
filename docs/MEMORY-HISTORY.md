@@ -2,6 +2,35 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-20: Regime de contratação CLT/PJ e contrato de prestação de serviços
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão:
+
+1. **Migration aditiva** `supabase/migrations/20260726000000_add_driver_employment_regime.sql` — adiciona `drivers.employment_regime` e `drivers.service_contract_upload` como `TEXT` nullable, constraint `CLT`/`PJ`/`NULL` e índice parcial `idx_drivers_pj_regime`; sem `NOT NULL`, `DEFAULT`, backfill, policy ou alteração de linhas existentes.
+2. **Domínio e mappers** — `EmploymentRegime = 'CLT' | 'PJ'`, campos novos em `Driver` e conversão snake_case/camelCase nos dois sentidos, preservando `NULL` legado.
+3. **Storage e serviço** — `service-contract` usa o bucket público existente `driver-documents`; `DriverFiles`, mapas de campo/coluna/storage e exclusão em massa foram estendidos. `shouldClearServiceContract` limpa banco primeiro e remove o arquivo depois quando o regime deixa de ser PJ; contrato não é incluído em `driver_field_settings`.
+4. **Formulário e detalhe** — seletor obrigatório acessível, upload opcional condicional a PJ, descarte do arquivo em estágio ao sair de PJ e seção somente leitura no detalhe; somente `employmentRegime` entra na allowlist de rascunho.
+5. **Filtros e Dashboard** — `pj_contract_missing`, duas funções puras para PJ ativos, 15ª categoria da fila, deep link `/cadastros/motoristas?issue=pj_contract_missing`, 8º card `Contratos PJ Anexados` e cache buster `v4`. A conformidade documental, `Motoristas Irregulares` e os cálculos existentes não foram alterados.
+
+### Validação
+
+`npx tsc --noEmit` **0 erros**; `npm run lint` **0 erros / 184 warnings**; `npm run test:unit` **1102/1102**; `npm run test:smoke` **6/6**; E2E `e2e/completed/dashboard-conformidade.spec.ts --project=chromium` **2/2**. Testes focados dos sete módulos novos: **228/228**.
+
+### Migration e status dos ambientes
+
+A migration foi aplicada via `supabase db query --linked` no **DEV** `vvbnbzzhpiksacqudmfu`, após confirmar `supabase/.temp/project-ref` e `VITE_SUPABASE_URL`. As consultas confirmaram as duas colunas nullable, o constraint e o índice; a tabela tinha **27** motoristas e `com_regime = 0`. O `UPDATE` de teste com `employment_regime = 'MEI'` foi rejeitado por `23514`; a consulta posterior confirmou `invalid_values = 0`. **PROD `oajfjdadcicgoxrfrnny` não foi tocado**, conforme o guardrail da sessão.
+
+### Risco aceito
+
+O contrato pode ser acessado por quem possuir a URL porque usa o bucket público `driver-documents`, decisão expressa do usuário em 2026-07-20. Não foi usada URL assinada nem o bucket privado `financial-documents`.
+
+### Pendências
+
+1. Executar a validação manual guiada dos 8 passos da sessão com a migration aplicada em DEV e confirmar, antes do fluxo, os valores históricos dos cards "Conformidade Documental" e "Motoristas Irregulares".
+2. Promover a migration a PROD somente com autorização expressa do usuário.
+
 ## Sessão — 2026-07-20: Motorista escolhe o veículo, com aviso e registro auditável de divergência de vínculo
 
 ### O que foi implementado

@@ -26,6 +26,8 @@ import {
   mapVehicleIdsToPlates,
   getDriversMissingCnhUploadNames,
   getDriversWithVehicleMissingGrNames,
+  countActivePjDrivers,
+  getActivePjDriversMissingContractNames,
   getExpiredGrDriverNames,
   getExpiredGrVehiclePlates,
   countVehiclesWithoutDriver,
@@ -186,12 +188,15 @@ export default function Dashboard() {
     gr_expiration_date: string | null;
     cnh_upload: string | null;
     gr_upload: string | null;
+    active: boolean | null;
+    employment_regime: string | null;
+    service_contract_upload: string | null;
   }[]>({
     queryKey: ['dashboard-drivers', currentClient?.id],
     queryFn: async () => {
       let query = supabase
         .from('drivers')
-        .select('id, name, expiration_date, gr_expiration_date, cnh_upload, gr_upload');
+        .select('id, name, expiration_date, gr_expiration_date, cnh_upload, gr_upload, active, employment_regime, service_contract_upload');
       if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
       }
@@ -204,6 +209,9 @@ export default function Dashboard() {
         gr_expiration_date: row.gr_expiration_date != null ? (row.gr_expiration_date as string) : null,
         cnh_upload: row.cnh_upload != null ? (row.cnh_upload as string) : null,
         gr_upload: row.gr_upload != null ? (row.gr_upload as string) : null,
+        active: row.active != null ? (row.active as boolean) : null,
+        employment_regime: row.employment_regime != null ? (row.employment_regime as string) : null,
+        service_contract_upload: row.service_contract_upload != null ? (row.service_contract_upload as string) : null,
       }));
     },
     enabled: !!user,
@@ -614,6 +622,16 @@ export default function Dashboard() {
     [activeVehicles]
   );
 
+  const pjContractMissing = useMemo(
+    () => getActivePjDriversMissingContractNames(drivers),
+    [drivers]
+  );
+
+  const pjContractComplianceRate = useMemo(
+    () => calculateDocumentaryComplianceRate(countActivePjDrivers(drivers), pjContractMissing.length),
+    [drivers, pjContractMissing.length]
+  );
+
   const complianceActionItems = useMemo<ComplianceActionItem[]>(
     () => buildComplianceActionQueue({
       crlvExpired,
@@ -630,6 +648,7 @@ export default function Dashboard() {
       grDriverMissing,
       insuranceMissing,
       maintenanceContractMissing,
+      pjContractMissing,
     }),
     [
       cnhExpired,
@@ -646,6 +665,7 @@ export default function Dashboard() {
       grVehicleMissing,
       insuranceMissing,
       maintenanceContractMissing,
+      pjContractMissing,
     ]
   );
 
@@ -920,6 +940,7 @@ export default function Dashboard() {
         {activeTab === 'conformidade' && (
           <ConformityPanel
             documentaryComplianceRate={documentaryComplianceRate}
+            pjContractComplianceRate={pjContractComplianceRate}
             expiredDocumentsCount={expiredDocumentsCount}
             expiringDocumentsCount={expiringDocumentsCount}
             missingDocumentsCount={missingDocumentsCount}

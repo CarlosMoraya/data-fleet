@@ -125,7 +125,7 @@ const MODULE_ALLOWLISTS: Record<string, Set<string>> = {
   ]),
   drivers: new Set([
     'name', 'phone', 'active', 'licenseCategory', 'licenseNumber',
-    'notes',
+    'notes', 'employmentRegime',
   ]),
   maintenance: new Set([
     'vehicleId', 'description', 'status', 'priority', 'maintenanceType',

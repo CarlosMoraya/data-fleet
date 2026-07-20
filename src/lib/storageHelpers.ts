@@ -255,7 +255,7 @@ export async function uploadDriverDocument(
   clientId: string,
   driverId: string,
   file: File,
-  docType: 'cnh' | 'gr' | 'certificate-1' | 'certificate-2' | 'certificate-3'
+  docType: 'cnh' | 'gr' | 'certificate-1' | 'certificate-2' | 'certificate-3' | 'service-contract'
 ): Promise<string> {
   validateFile(file);
 

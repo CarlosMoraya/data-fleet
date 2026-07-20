@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarClock, FileWarning, FileX, Loader2, ShieldCheck, Truck, UserX } from 'lucide-react';
+import { AlertTriangle, CalendarClock, FileCheck, FileWarning, FileX, Loader2, ShieldCheck, Truck, UserX } from 'lucide-react';
 
 import ActionQueue from './ActionQueue';
 import DashboardKpiCard from './DashboardKpiCard';
@@ -7,6 +7,7 @@ import type { ComplianceActionCategory, ComplianceActionItem } from '../../lib/d
 
 interface ConformityPanelProps {
   documentaryComplianceRate: number;
+  pjContractComplianceRate: number;
   expiredDocumentsCount: number;
   expiringDocumentsCount: number;
   missingDocumentsCount: number;
@@ -20,6 +21,7 @@ interface ConformityPanelProps {
 
 export default function ConformityPanel({
   documentaryComplianceRate,
+  pjContractComplianceRate,
   expiredDocumentsCount,
   expiringDocumentsCount,
   missingDocumentsCount,
@@ -42,6 +44,7 @@ export default function ConformityPanel({
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         <DashboardKpiCard icon={ShieldCheck} iconBgClass="bg-emerald-50" iconColorClass="text-emerald-600" label="Conformidade Documental" value={`${documentaryComplianceRate}%`} />
+        <DashboardKpiCard icon={FileCheck} iconBgClass="bg-sky-50" iconColorClass="text-sky-600" label="Contratos PJ Anexados" value={`${pjContractComplianceRate}%`} />
         <DashboardKpiCard icon={FileWarning} iconBgClass="bg-red-50" iconColorClass="text-red-600" label="Documentos Vencidos" value={expiredDocumentsCount} isAlert={expiredDocumentsCount > 0} />
         <DashboardKpiCard icon={CalendarClock} iconBgClass="bg-amber-50" iconColorClass="text-amber-600" label="Documentos a Vencer em 30 dias" value={expiringDocumentsCount} />
         <DashboardKpiCard icon={FileX} iconBgClass="bg-orange-50" iconColorClass="text-orange-600" label="Documentos Ausentes" value={missingDocumentsCount} isAlert={missingDocumentsCount > 0} />

@@ -101,6 +101,7 @@ export default function DriverDetailModal({ driver, vehiclePlate, onClose }: Pro
               <DetailField label="Nome" value={driver.name} />
               <DetailField label="CPF" value={formatCPF(driver.cpf)} />
               <DetailField label="Telefone de Contato" value={formatPhone(driver.phone)} />
+              <DetailField label="Regime de Contratação" value={driver.employmentRegime} />
             </div>
           </div>
 
@@ -125,6 +126,15 @@ export default function DriverDetailModal({ driver, vehiclePlate, onClose }: Pro
               <FileField label="Arquivo GR" url={driver.grUpload} />
             </div>
           </div>
+
+          {driver.employmentRegime === 'PJ' && (
+            <div className="space-y-3">
+              <SectionTitle title="Contrato de Prestação de Serviços" />
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+                <FileField label="Contrato" url={driver.serviceContractUpload} />
+              </div>
+            </div>
+          )}
 
           {/* Certificados */}
           <div className="space-y-3">
