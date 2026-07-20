@@ -31,6 +31,10 @@ O contrato pode ser acessado por quem possuir a URL porque usa o bucket público
 1. Executar a validação manual guiada dos 8 passos da sessão com a migration aplicada em DEV e confirmar, antes do fluxo, os valores históricos dos cards "Conformidade Documental" e "Motoristas Irregulares".
 2. Promover a migration a PROD somente com autorização expressa do usuário.
 
+### Atualização posterior — promoção a PROD (2026-07-20)
+
+Após autorização expressa do usuário, a migration `20260726000000_add_driver_employment_regime.sql` foi aplicada no PROD `oajfjdadcicgoxrfrnny` via `supabase db query --linked`. A validação confirmou as duas colunas `text` nullable, a constraint `drivers_employment_regime_check` e o índice parcial `idx_drivers_pj_regime`. O PROD tinha 78 motoristas, `com_regime = 0`, `com_contrato = 0` e `valores_validos = 78`; nenhum dado existente foi preenchido ou alterado. A validação manual dos 8 passos foi confirmada pelo usuário.
+
 ## Sessão — 2026-07-20: Motorista escolhe o veículo, com aviso e registro auditável de divergência de vínculo
 
 ### O que foi implementado
