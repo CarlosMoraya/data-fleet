@@ -79,12 +79,12 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-async function renderModal() {
+async function renderModal(overrideChecklist: Checklist = checklist) {
   const root = createRoot(container);
   container.__reactRoot = root;
 
   act(() => {
-    root.render(<ChecklistDetailModal checklist={checklist} onClose={() => {}} />);
+    root.render(<ChecklistDetailModal checklist={overrideChecklist} onClose={() => {}} />);
   });
 
   await act(async () => {
@@ -146,5 +146,33 @@ describe('ChecklistDetailModal', () => {
 
     expect(container.querySelectorAll(`img[src="${responsePhotoUrl}"]`)).toHaveLength(1);
     expect(container.textContent).toContain('Checklist Diário');
+  });
+
+  it('com cnhPhotoUrl e signatureUrl, exibe o bloco de evidências e as duas imagens', async () => {
+    const handoverChecklist: Checklist = {
+      ...checklist,
+      driverName: 'João Motorista',
+      cnhPhotoUrl: 'https://storage.example.com/cnh.jpg',
+      signatureUrl: 'https://storage.example.com/assinatura.jpg',
+    };
+
+    await renderModal(handoverChecklist);
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Evidências de Entrega/Devolução');
+    });
+
+    expect(container.querySelector('img[src="https://storage.example.com/cnh.jpg"]')).not.toBeNull();
+    expect(container.querySelector('img[src="https://storage.example.com/assinatura.jpg"]')).not.toBeNull();
+  });
+
+  it('checklist antigo sem os campos novos renderiza normalmente e não exibe o bloco de evidências', async () => {
+    await renderModal();
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Checklist Diário');
+    });
+
+    expect(container.textContent).not.toContain('Evidências de Entrega/Devolução');
   });
 });

@@ -20,11 +20,15 @@ export interface ChecklistRow {
   workshop_id: string | null;
   odometer_km: number | null;
   odometer_photo_url: string | null;
+  driver_id: string | null;
+  cnh_photo_url: string | null;
+  signature_url: string | null;
   // join fields
   checklist_templates?: { name: string; context: string } | null;
   vehicles?: { license_plate: string } | null;
   profiles?: { name: string } | null;
   workshops?: { name: string } | null;
+  drivers?: { name: string } | null;
 }
 
 export interface ChecklistResponseRow {
@@ -65,6 +69,10 @@ export function checklistFromRow(row: ChecklistRow): Checklist {
     workshopName: row.workshops?.name ?? undefined,
     odometerKm: row.odometer_km ?? undefined,
     odometerPhotoUrl: row.odometer_photo_url ?? undefined,
+    driverId: row.driver_id ?? undefined,
+    driverName: row.drivers?.name ?? undefined,
+    cnhPhotoUrl: row.cnh_photo_url ?? undefined,
+    signatureUrl: row.signature_url ?? undefined,
   };
 }
 

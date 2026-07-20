@@ -160,6 +160,42 @@ export default function ChecklistDetailModal({ checklist, onClose }: Props) {
             </div>
           )}
 
+          {(checklist.cnhPhotoUrl || checklist.signatureUrl) && (
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+              <h3 className="mb-3 text-sm font-semibold text-zinc-700">Evidências de Entrega/Devolução</h3>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="col-span-2">
+                  <p className="text-xs tracking-wide text-zinc-400 uppercase">Motorista</p>
+                  <p className="font-medium text-zinc-800">{checklist.driverName ?? '—'}</p>
+                </div>
+                {checklist.cnhPhotoUrl && (
+                  <div>
+                    <p className="mb-1 text-xs tracking-wide text-zinc-400 uppercase">Foto da CNH</p>
+                    <button
+                      type="button"
+                      onClick={() => setLightboxUrl(checklist.cnhPhotoUrl!)}
+                      className="block"
+                    >
+                      <img src={checklist.cnhPhotoUrl} alt="foto da CNH" className="h-20 w-20 rounded-lg object-cover" />
+                    </button>
+                  </div>
+                )}
+                {checklist.signatureUrl && (
+                  <div>
+                    <p className="mb-1 text-xs tracking-wide text-zinc-400 uppercase">Assinatura</p>
+                    <button
+                      type="button"
+                      onClick={() => setLightboxUrl(checklist.signatureUrl!)}
+                      className="block"
+                    >
+                      <img src={checklist.signatureUrl} alt="assinatura do motorista" className="h-20 w-20 rounded-lg border border-zinc-200 object-cover" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Responses */}
           <div>
             <h3 className="mb-3 text-sm font-semibold text-zinc-700">Respostas</h3>

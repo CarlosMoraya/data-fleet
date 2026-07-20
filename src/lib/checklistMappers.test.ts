@@ -1,0 +1,54 @@
+import { describe, it, expect } from 'vitest';
+
+import { checklistFromRow, type ChecklistRow } from './checklistMappers';
+
+const baseRow: ChecklistRow = {
+  id: 'checklist-1',
+  client_id: 'client-1',
+  template_id: 'template-1',
+  version_number: 1,
+  vehicle_id: 'vehicle-1',
+  filled_by: 'user-1',
+  started_at: '2026-07-19T12:00:00Z',
+  completed_at: null,
+  status: 'in_progress',
+  latitude: null,
+  longitude: null,
+  location_status: null,
+  device_info: null,
+  notes: null,
+  workshop_id: null,
+  odometer_km: null,
+  odometer_photo_url: null,
+  driver_id: null,
+  cnh_photo_url: null,
+  signature_url: null,
+};
+
+describe('checklistFromRow', () => {
+  it('mapeia os campos novos de entrega/devolução quando presentes', () => {
+    const row: ChecklistRow = {
+      ...baseRow,
+      driver_id: 'driver-1',
+      cnh_photo_url: 'https://storage.example.com/cnh.jpg',
+      signature_url: 'https://storage.example.com/assinatura.jpg',
+      drivers: { name: 'João Motorista' },
+    };
+
+    const checklist = checklistFromRow(row);
+
+    expect(checklist.driverId).toBe('driver-1');
+    expect(checklist.driverName).toBe('João Motorista');
+    expect(checklist.cnhPhotoUrl).toBe('https://storage.example.com/cnh.jpg');
+    expect(checklist.signatureUrl).toBe('https://storage.example.com/assinatura.jpg');
+  });
+
+  it('uma linha de histórico antigo (sem os campos novos) resulta em undefined sem lançar erro', () => {
+    const checklist = checklistFromRow(baseRow);
+
+    expect(checklist.driverId).toBeUndefined();
+    expect(checklist.driverName).toBeUndefined();
+    expect(checklist.cnhPhotoUrl).toBeUndefined();
+    expect(checklist.signatureUrl).toBeUndefined();
+  });
+});

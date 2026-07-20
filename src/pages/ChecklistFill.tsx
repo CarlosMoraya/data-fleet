@@ -4,11 +4,13 @@ import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
 import CameraCapture from '../components/CameraCapture';
+import HandoverEvidenceSection from '../components/HandoverEvidenceSection';
 import OfflineBanner from '../components/OfflineBanner';
 import VehicleKmGuidance from '../components/VehicleKmGuidance';
 import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePendingSyncCount } from '../hooks/usePendingSyncCount';
+import { requiresHandoverEvidence, isHandoverGateBlocked } from '../lib/checklistContextRules';
 import { validateChecklistOdometerKm } from '../lib/checklistKmValidation';
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
 import { uploadChecklistPhoto } from '../lib/checklistStorageHelpers';
@@ -75,6 +77,8 @@ export default function ChecklistFill() {
   const [locationWarning, setLocationWarning] = useState<string | null>(null);
   const [odometerPhotoUrl, setOdometerPhotoUrl] = useState('');
   const [odometerCameraOpen, setOdometerCameraOpen] = useState(false);
+  const [cnhPhotoUrl, setCnhPhotoUrl] = useState('');
+  const [signatureUrl, setSignatureUrl] = useState('');
   const [couplingDraft, setCouplingDraft] = useState<CouplingDraftEntry | null>(null);
   const [toleranceState, setToleranceState] = useState<{
     requiresPhoto: boolean;
@@ -89,7 +93,7 @@ export default function ChecklistFill() {
     queryFn: async () => {
       const response = await supabase
         .from('checklists')
-        .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context), workshops(name)')
+        .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context), workshops(name), drivers(name)')
         .eq('id', checklistId)
         .single();
       const data = response.data as ChecklistRow | null;
@@ -242,6 +246,18 @@ export default function ChecklistFill() {
       setOdometerPhotoUrl(checklist.odometerPhotoUrl);
     }
   }, [checklist?.odometerPhotoUrl]);
+
+  React.useEffect(() => {
+    if (checklist?.cnhPhotoUrl) {
+      setCnhPhotoUrl(checklist.cnhPhotoUrl);
+    }
+  }, [checklist?.cnhPhotoUrl]);
+
+  React.useEffect(() => {
+    if (checklist?.signatureUrl) {
+      setSignatureUrl(checklist.signatureUrl);
+    }
+  }, [checklist?.signatureUrl]);
 
   React.useEffect(() => {
     if (!checklistId) return;
@@ -633,6 +649,38 @@ export default function ChecklistFill() {
     }
   };
 
+  const handleCnhPhotoUploaded = async (url: string) => {
+    try {
+      const { error: updateError } = await supabase
+        .from('checklists')
+        .update({ cnh_photo_url: url })
+        .eq('id', checklistId);
+      if (updateError) throw updateError;
+
+      setCnhPhotoUrl(url);
+      queryClient.setQueryData(['checklist', checklistId], (old: Checklist | undefined) => old ? { ...old, cnhPhotoUrl: url } : old);
+    } catch (err) {
+      console.error('CNH photo update error:', err);
+      setError('Evidência enviada mas não registrada. Tente novamente.');
+    }
+  };
+
+  const handleSignatureUploaded = async (url: string) => {
+    try {
+      const { error: updateError } = await supabase
+        .from('checklists')
+        .update({ signature_url: url })
+        .eq('id', checklistId);
+      if (updateError) throw updateError;
+
+      setSignatureUrl(url);
+      queryClient.setQueryData(['checklist', checklistId], (old: Checklist | undefined) => old ? { ...old, signatureUrl: url } : old);
+    } catch (err) {
+      console.error('Signature update error:', err);
+      setError('Evidência enviada mas não registrada. Tente novamente.');
+    }
+  };
+
   const handleObservationBlur = (idx: number) => {
     const s = itemStates[idx];
     if (s.status) {
@@ -648,6 +696,13 @@ export default function ChecklistFill() {
   const mandatoryAnswered = itemStates.filter(s => s.item.isMandatory).every(s => s.status !== null);
   const odometerPhotoRequired = isOdometerContext && toleranceState.requiresPhoto;
   const odometerPhotoGateBlocked = odometerPhotoRequired && !odometerPhotoUrl;
+  const isHandoverContext = requiresHandoverEvidence(checklist?.templateContext);
+  const handoverGateBlocked = isHandoverGateBlocked({
+    context: checklist?.templateContext,
+    driverId: checklist?.driverId,
+    cnhPhotoUrl,
+    signatureUrl,
+  });
   const totalAnswered = itemStates.filter(s => s.status !== null).length;
   const progress = itemStates.length > 0 ? Math.round((totalAnswered / itemStates.length) * 100) : 0;
 
@@ -935,6 +990,20 @@ export default function ChecklistFill() {
 
       </div>{/* end scrollable area */}
 
+      {isHandoverContext && checklistId && currentClient?.id && (
+        <div className="mx-auto w-full max-w-2xl px-4 py-4">
+          <HandoverEvidenceSection
+            clientId={currentClient.id}
+            checklistId={checklistId}
+            driverName={checklist?.driverName}
+            cnhPhotoUrl={cnhPhotoUrl || undefined}
+            signatureUrl={signatureUrl || undefined}
+            onCnhPhotoUploaded={(url) => { void handleCnhPhotoUploaded(url); }}
+            onSignatureUploaded={(url) => { void handleSignatureUploaded(url); }}
+          />
+        </div>
+      )}
+
       {/* Bottom bar */}
       <div className="flex-shrink-0 border-t border-zinc-200 bg-white px-4 py-3">
         <div className="mx-auto max-w-2xl space-y-2">
@@ -951,9 +1020,12 @@ export default function ChecklistFill() {
           {odometerPhotoGateBlocked && (
             <p className="text-center text-xs text-amber-600">Envie a foto do hodômetro para concluir.</p>
           )}
+          {handoverGateBlocked && (
+            <p className="text-center text-xs text-amber-600">Para finalizar, informe o motorista, a foto com a CNH e a assinatura.</p>
+          )}
           <button
             onClick={() => finishChecklistMutation.mutate()}
-            disabled={!mandatoryAnswered || finishChecklistMutation.isPending || !workshopReady || !kmConfirmed || odometerPhotoGateBlocked}
+            disabled={!mandatoryAnswered || finishChecklistMutation.isPending || !workshopReady || !kmConfirmed || odometerPhotoGateBlocked || handoverGateBlocked}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-40"
           >
             {finishChecklistMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}

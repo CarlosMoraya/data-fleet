@@ -4,9 +4,10 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 interface Props {
   onCapture: (file: File, latitude?: number, longitude?: number) => void;
   onClose: () => void;
+  requireLiveCapture?: boolean;
 }
 
-export default function CameraCapture({ onCapture, onClose }: Props) {
+export default function CameraCapture({ onCapture, onClose, requireLiveCapture = false }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -15,6 +16,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [error] = useState('');
   const [useFileInput, setUseFileInput] = useState(false);
+  const [cameraBlocked, setCameraBlocked] = useState(false);
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
 
   // Try to get GPS (fail silently)
@@ -28,7 +30,11 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
 
   const startCamera = useCallback(async () => {
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-      setUseFileInput(true);
+      if (requireLiveCapture) {
+        setCameraBlocked(true);
+      } else {
+        setUseFileInput(true);
+      }
       return;
     }
 
@@ -43,9 +49,13 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
         void videoRef.current.play();
       }
     } catch {
-      setUseFileInput(true);
+      if (requireLiveCapture) {
+        setCameraBlocked(true);
+      } else {
+        setUseFileInput(true);
+      }
     }
-  }, []);
+  }, [requireLiveCapture]);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach(t => t.stop());
@@ -126,7 +136,14 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
 
       {/* Camera / Preview area */}
       <div className="flex flex-1 items-center justify-center overflow-hidden">
-        {useFileInput ? (
+        {cameraBlocked ? (
+          <div className="space-y-4 px-8 text-center">
+            <Camera className="mx-auto h-16 w-16 text-zinc-400" />
+            <p className="text-sm text-zinc-300">
+              A câmera ao vivo é obrigatória para esta foto e não está disponível neste dispositivo ou endereço. Envio de arquivo não é permitido. Acesse o sistema por HTTPS e permita o uso da câmera para continuar.
+            </p>
+          </div>
+        ) : useFileInput ? (
           <div className="space-y-4 px-8 text-center">
             {preview ? (
               <img src={preview} alt="preview" className="mx-auto max-h-96 rounded-lg" />
@@ -198,7 +215,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
               <span className="text-xs">Usar foto</span>
             </button>
           </>
-        ) : !useFileInput ? (
+        ) : !useFileInput && !cameraBlocked ? (
           <button
             onClick={capturePhoto}
             className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-white/20"

@@ -2,6 +2,50 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-19 (2): Contextos de checklist "Entrega" e "Devolução" com evidência obrigatória
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão (Tipo 4 — migration aditiva + componentes compartilhados + dado pessoal), 9 etapas:
+
+1. **Migration** `supabase/migrations/20260721000000_add_handover_contexts.sql` + rollback em `supabase/migrations/rollback/` — adiciona `'Entrega'`/`'Devolução'` ao CHECK de `checklist_templates.context` e as colunas nullable `checklists.driver_id` (FK `drivers`), `cnh_photo_url`, `signature_url` + índice parcial em `driver_id`. **Não aplicada em nenhum banco nesta sessão** — usuário optou por adiar.
+2. **Resolvedor único** `src/lib/checklistContextRules.ts` — `AUDITOR_ONLY_CONTEXTS`, `HANDOVER_CONTEXTS`, `isAuditorOnlyContext`, `requiresHandoverEvidence`, `vehicleStatusFilterFor`, `isHandoverGateBlocked`, e as funções puras extraídas `filterTemplatesByContext`/`filterVehiclesForContext` (usadas tanto pelo componente quanto pelos testes). `ChecklistContext` e `Checklist` (campos `driverId`/`driverName`/`cnhPhotoUrl`/`signatureUrl`) estendidos em `src/types/checklist.ts`.
+3. **`src/pages/Checklists.tsx`** — allow-list fail-closed substitui a exclusão negativa antiga (`.neq('context','Auditoria')` → `.not('context','in',...)`, testado por curl direto contra o Supabase DEV com o valor acentuado `Devolução` sem quotes, HTTP 200); novo select de contexto no bloco do Auditor (renomeado "Iniciar Checklist"); select de motorista (`unassignedDrivers`, mesma semântica de "sem veículo" de `driverFilters.ts`) exibido só quando o contexto exige evidência; `startChecklist` ganha `driverId` opcional.
+4. **`CameraCapture.tsx`** — prop `requireLiveCapture` (default `false`); quando ativa e a câmera está indisponível, bloqueia com mensagem fixa em vez de cair para `<input type=file>`. Os três usos existentes (pneus, peças, hodômetro) não passam a prop — comportamento idêntico preservado.
+5. **`stampTimestampOnImage.ts`** — parâmetro opcional `coords`; quando presente, desenha uma segunda linha `GPS: lat, lng` (5 casas decimais) na mesma caixa do carimbo. Sem `coords`, saída pixel-idêntica à anterior (verificado por teste).
+6. **`SignaturePad.tsx`** (novo) — captura de assinatura via `<canvas>` + Pointer Events nativos, sem biblioteca externa; `devicePixelRatio` para não serrilhar; exporta JPEG.
+7. **`HandoverEvidenceSection.tsx`** (novo) — orquestra as 3 evidências (motorista somente leitura, foto CNH via `CameraCapture requireLiveCapture`, assinatura via `SignaturePad`), usa `uploadChecklistPhoto` existente com `itemId='cnh'`/`'signature'`. `ChecklistFill.tsx` ganha o gate `handoverGateBlocked` (mesmo padrão de `odometerPhotoGateBlocked`) e persiste cada evidência via `UPDATE` + `queryClient.setQueryData`. `checklistMappers.ts` estendido com os 3 campos novos + join `drivers(name)`.
+8. **`ChecklistDetailModal.tsx`** — bloco condicional "Evidências de Entrega/Devolução" (motorista + 2 miniaturas, reaproveitando o lightbox existente), renderizado só quando `cnhPhotoUrl || signatureUrl` — checklists antigos não mostram o bloco.
+9. **`e2e/pending/handover-checklist.spec.ts`** (novo, não executável) — usuários de teste Yard Auditor/Driver seguem deletados desde 2026-05-06.
+
+### Observação registrada durante a implementação (não coberta pelo plano)
+
+O `IMPLEMENTATION.md` referenciava um tipo `VehicleStatus` já exportado em `src/types/vehicle.ts:41`, mas o campo `status` da interface `Vehicle` era inline (`status?: 'Available' | 'In Use' | 'Maintenance'`), sem tipo nomeado exportado. Para cumprir literalmente a instrução "importar de lá, não redeclarar", foi adicionado `export type VehicleStatus = 'Available' | 'In Use' | 'Maintenance'` nesse arquivo e o campo `status` passou a referenciá-lo — mudança mecânica, sem alteração de comportamento.
+
+### Riscos aceitos (2026-07-19)
+
+1. **Bloqueio de upload de galeria só na interface** (`requireLiveCapture`) — contornável por um usuário tecnicamente avançado inspecionando/alterando o app. Aceito porque o operador (Yard Auditor) é identificado e da própria empresa.
+2. **Foto da CNH no bucket público `checklist-photos`** (mesmo bucket já usado por todas as fotos de checklist) — quem tiver a URL acessa sem autenticação. Mitigação futura (tornar o bucket privado com URL assinada) fica registrada como débito, impacta todas as fotos de checklist, não só CNH — sessão própria.
+
+### Validação
+
+`npm run test:unit` **1057/1057** (1026 base + 31 novos, 0 falhando); `npx tsc --noEmit` 0 erros; `npx eslint src/` **0 erros / 174 warnings** (165 base + 9 novos `react-hooks/rules-of-hooks`, mesmo padrão pré-existente de early-return); `npm run test:smoke` **6/6**.
+
+### Correção pós-implementação (mesma sessão, reportada pelo usuário)
+
+O `IMPLEMENTATION.md` não listava `src/components/ChecklistTemplateForm.tsx` entre os arquivos a alterar, mas esse componente tem um array `CONTEXTS` hardcoded próprio (usado no modal "Novo Template" de `/checklist-templates`) que não deriva de `ChecklistContext`/`AUDITOR_ONLY_CONTEXTS` — por isso Entrega/Devolução não apareciam como opção ao criar um template, mesmo com a Etapa 2 completa. Corrigido adicionando as duas entradas ao array (mesmo padrão de label/description dos demais contextos). `canSaveTemplateWithoutItems` (`checklistTemplateRules.ts`) não precisou de mudança — Entrega/Devolução seguem exigindo itens, como o plano especificou ("os mesmos itens de inspeção do contexto Auditoria").
+
+### Migration e aprovação (2026-07-19)
+
+Migration `20260721000000_add_handover_contexts.sql` aplicada pelo usuário no Supabase **DEV e PROD**. Fluxo testado manualmente e **aprovado pelo usuário**. Commit e push autorizados explicitamente — branch atual vai direto para produção.
+
+### Pendências
+
+1. Recadastrar Yard Auditor e Driver de teste, atualizar `.env.local`, mover `e2e/pending/handover-checklist.spec.ts` para `e2e/completed/`.
+2. Mitigações de segurança fora de escopo desta sessão: bucket privado com URL assinada, validação server-side de autenticidade de foto, política de retenção de fotos de checklist, aviso de consentimento LGPD ao motorista.
+
+---
+
 ## Sessão — 2026-07-19: Boleto único aplicável a todas as parcelas + Fotos de evidência em Pagamentos Extras
 
 ### O que foi implementado

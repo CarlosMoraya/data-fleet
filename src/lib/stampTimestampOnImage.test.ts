@@ -84,6 +84,43 @@ describe('stampTimestampOnImage', () => {
     );
   });
 
+  it('com coords, fillText é chamado duas vezes e a segunda contém "GPS: "', async () => {
+    const blob = new Blob(['fake-jpeg'], { type: 'image/jpeg' });
+    await stampTimestampOnImage(blob, 'foto.jpg', { latitude: -23.55052, longitude: -46.63331 });
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.mocked wraps the method ref; binding context is irrelevant in this test-only call
+    const createElement = vi.mocked(document.createElement);
+    const canvas = createElement.mock.results.filter(r => r.type === 'return').at(-1)?.value as HTMLCanvasElement;
+    const ctx = canvas?.getContext('2d') as CanvasRenderingContext2D & { fillText: ReturnType<typeof vi.fn> };
+
+    expect(ctx.fillText).toHaveBeenCalledTimes(2);
+    expect(ctx.fillText.mock.calls[1][0]).toContain('GPS: ');
+  });
+
+  it('sem coords, fillText é chamado uma única vez (comportamento atual preservado)', async () => {
+    const blob = new Blob(['fake-jpeg'], { type: 'image/jpeg' });
+    await stampTimestampOnImage(blob, 'foto.jpg');
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.mocked wraps the method ref; binding context is irrelevant in this test-only call
+    const createElement = vi.mocked(document.createElement);
+    const canvas = createElement.mock.results.filter(r => r.type === 'return').at(-1)?.value as HTMLCanvasElement;
+    const ctx = canvas?.getContext('2d') as CanvasRenderingContext2D & { fillText: ReturnType<typeof vi.fn> };
+
+    expect(ctx.fillText).toHaveBeenCalledTimes(1);
+  });
+
+  it('coordenadas negativas (hemisfério sul/oeste) são formatadas com sinal', async () => {
+    const blob = new Blob(['fake-jpeg'], { type: 'image/jpeg' });
+    await stampTimestampOnImage(blob, 'foto.jpg', { latitude: -23.55052, longitude: -46.63331 });
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.mocked wraps the method ref; binding context is irrelevant in this test-only call
+    const createElement = vi.mocked(document.createElement);
+    const canvas = createElement.mock.results.filter(r => r.type === 'return').at(-1)?.value as HTMLCanvasElement;
+    const ctx = canvas?.getContext('2d') as CanvasRenderingContext2D & { fillText: ReturnType<typeof vi.fn> };
+
+    expect(ctx.fillText.mock.calls[1][0]).toBe('GPS: -23.55052, -46.63331');
+  });
+
   it('fallback: retorna File com blob original se getContext retorna null', async () => {
     const mockCanvas = {
       width: 0,

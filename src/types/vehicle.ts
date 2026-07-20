@@ -2,6 +2,8 @@
 
 import type { AxleConfigEntry } from './tire';
 
+export type VehicleStatus = 'Available' | 'In Use' | 'Maintenance';
+
 export interface Vehicle {
   id: string;
   clientId: string;
@@ -38,7 +40,7 @@ export interface Vehicle {
   crlvUpload?: string;
   crlvYear?: string;
   crlvExpirationDate?: string;
-  status?: 'Available' | 'In Use' | 'Maintenance';
+  status?: VehicleStatus;
 
   // New fields
   tag?: string;

@@ -53,6 +53,8 @@ const CATEGORIES: { value: TemplateCategory; label: string }[] = [
 const CONTEXTS: { value: ChecklistContext; label: string; description: string }[] = [
   { value: 'Rotina', label: 'Rotina', description: 'Inspeção rotineira do veículo' },
   { value: 'Auditoria', label: 'Auditoria', description: 'Realizado por Auditores de Pátio' },
+  { value: 'Entrega', label: 'Entrega', description: 'Entrega do veículo ao motorista, com evidência de CNH e assinatura' },
+  { value: 'Devolução', label: 'Devolução', description: 'Devolução do veículo pelo motorista, com evidência de CNH e assinatura' },
   { value: 'Guincho', label: 'Guincho', description: 'Inspeção de veículo sendo guinchado até a oficina' },
   { value: 'Engate', label: 'Engate', description: 'Checklist de acoplamento entre cavalo e implemento' },
   { value: 'Desengate', label: 'Desengate', description: 'Checklist de desacoplamento e retorno ao pátio' },
