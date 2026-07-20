@@ -2,6 +2,60 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-20: Motorista escolhe o veículo, com aviso e registro auditável de divergência de vínculo
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão (Tipo 4 — RLS/funções de banco + fluxo em produção), 8 etapas:
+
+1. **Migration** `supabase/migrations/20260722000000_add_vehicle_link_divergence.sql` + rollback em `supabase/migrations/rollback/` — 3 colunas de auditoria (`vehicle_link_divergence_reasons`, `vehicle_link_assigned_driver_id`, `vehicle_link_executor_vehicle_id`) idênticas em `checklists` e `tire_inspections`, índice parcial em cada uma; coluna `checklist_day_intervals.enforce_driver_vehicle_link BOOLEAN NOT NULL DEFAULT false`; 4 funções `SECURITY DEFINER` (`evaluate_vehicle_link_divergence`, `stamp_vehicle_link_divergence` como trigger `BEFORE INSERT`, `list_vehicles_for_checklist_selection`, `get_vehicle_tire_inspection_config`), cada uma com barreira de tenant própria (`RAISE EXCEPTION` se o veículo não pertence ao `client_id` do chamador). **Aplicada em DEV** (`vvbnbzzhpiksacqudmfu`) nesta sessão, validada pelas 5 consultas SQL da Etapa 1 — 6 colunas, 1 flag, 4 funções, 2 triggers, 0 linhas de histórico tocadas.
+2. **`src/lib/vehicleLinkDivergence.ts`** (novo, pure function/humble object) — `hasVehicleLinkDivergence`, `buildVehicleLinkDivergenceMessage`, `buildVehicleLinkBlockedMessage`, `resolveDefaultVehicleId`, `describeDivergenceReason`. Textos de aviso literais e fixos pelo plano.
+3. **Tipos e mappers estendidos**: `src/types/checklist.ts`, `src/types/tireInspection.ts` (5 campos novos cada), `src/lib/checklistMappers.ts`, `src/lib/tireInspectionMappers.ts` (joins `assigned_driver`/`executor_vehicle`).
+4. **Desambiguação de FK duplicada no PostgREST** (maior fonte de regressão prevista pelo plano) — `checklists`/`tire_inspections` passaram a ter 2 FKs para `vehicles` e 2 para `drivers`; todo embed implícito `vehicles(...)`/`drivers(...)` nessas tabelas foi reescrito com FK explícita (`vehicles!vehicle_id(...)`, `drivers!driver_id(...)`) em `src/pages/Checklists.tsx` (3 queries), `src/pages/ChecklistFill.tsx`, `src/services/tireInspectionService.ts` (2 funções).
+5. **Seleção de veículo pelo Driver** — nova RPC `list_vehicles_for_checklist_selection` alimenta um `<select>` que substitui o bloco estático "Meu veículo" (o veículo vinculado vem pré-selecionado e no topo). Gate de divergência: ao clicar Iniciar/Inspeção de Pneus, chama `evaluate_vehicle_link_divergence` antes de prosseguir; sem divergência segue direto; com divergência abre `VehicleLinkDivergenceModal.tsx` (novo) — modo aviso (Sim/Não) quando o tenant não exige vínculo, modo bloqueio (só "Entendi") quando exige. `startTireInspectionMutation` passou a ler `axle_config`/`steps_count`/`type` via `get_vehicle_tire_inspection_config` em vez de `select` direto em `vehicles` (RLS nega para veículo de terceiro). Erros de bloqueio server-side (`VEHICLE_LINK_DIVERGENCE_BLOCKED`) nunca vazam a string técnica ao usuário.
+6. **Visibilidade ao Fleet Assistant+** — selo âmbar "Divergência de vínculo" na coluna Veículo (mesmo padrão visual do selo "Localização negada" já existente) nas duas abas de histórico; bloco de detalhe (motivos + motorista vinculado + veículo do executor) em `ChecklistDetailModal.tsx` e `TireInspectionDetailModal.tsx`, antes do bloco de evidências/Summary.
+7. **Interruptor por tenant** em `ChecklistDayIntervalSettings.tsx` — checkbox "Exigir que o motorista use o veículo vinculado a ele", persistido em `checklist_day_intervals.enforce_driver_vehicle_link` (default `false`, não muda comportamento de tenants existentes).
+8. **Validação de ponta a ponta** — ver seção abaixo.
+
+### Escopo deliberadamente fora (decisão do usuário, 2026-07-20, após investigação do código)
+
+Auditoria/Entrega/Devolução (Yard Auditor) e Engate/Desengate (Coupling Agent) não entraram: o primeiro já usa veículo de terceiro como comportamento correto e já exibe o motorista vinculado; o segundo não tem "veículo vinculado" para divergir (digitação de placa + RPC própria, com suporte a terceiros). Verificado por varredura: Driver é o único papel com trava de veículo, e `createTireInspection` tem um único ponto de entrada em todo o `src/`.
+
+### Obstáculo operacional não previsto pelo plano — CLI vinculado a PROD
+
+No início da Etapa 8, o Supabase CLI local estava linkado ao projeto de **PROD** (`oajfjdadcicgoxrfrnny`), não ao DEV (`vvbnbzzhpiksacqudmfu`) — rodar `supabase db push` nesse estado teria aplicado a migration (e potencialmente outras 78+ migrations não rastreadas em `schema_migrations`, já que o projeto aplica tudo via SQL Editor) contra produção. Usuário autorizou `supabase link --project-ref vvbnbzzhpiksacqudmfu` antes de prosseguir. `scripts/apply-migration.mjs` (débito pré-existente, item 7 das Tarefas em Andamento) quebrou no statement 6 (corpo `$$...$$` de função) por causa do split ingênuo por `;` — contornado com `supabase db query --file` statement-a-statement (script auxiliar descartável, respeitando `$$` como delimitador), sem alterar o script do projeto.
+
+### Teste de inviolabilidade e de bloqueio (Etapa 8.7/8.8, via SQL direto em DEV)
+
+Inserido um `checklist` real forçando `vehicle_link_divergence_reasons: NULL` no payload, para um motorista com veículo vinculado escolhendo o veículo de outro motorista: o trigger sobrescreveu com `['other_driver_assigned', 'executor_has_other_vehicle']` e os IDs corretos — confirma que o registro é inviolável pelo cliente. Em seguida, com `enforce_driver_vehicle_link = true` no tenant de teste, o mesmo insert falhou com `VEHICLE_LINK_DIVERGENCE_BLOCKED` — confirma o bloqueio server-side. Registro de teste removido e a flag do tenant revertida a `false` (estado original) ao final.
+
+### Validação
+
+`npx tsc --noEmit` **0 erros**; `npm run lint` **0 erros / 184 warnings** (baseline 174 + 10 novos — `no-unsafe-assignment`/`no-unsafe-member-access` ao desestruturar `.rpc()` sem generics, mesmo padrão já tolerado em `serviceExpenseService.ts`/`paymentInstallmentService.ts`; e `vehicleInfo` com uso reduzido em `Checklists.tsx`, efeito já antecipado nas "Observações para sessões futuras" do próprio plano); `npm run test:unit` **1084/1084** (1057 base + 27 novos); `npm run test:smoke` **6/6**; migration aplicada e validada em **DEV**; teste de inviolabilidade e de bloqueio confirmados por SQL direto. **PROD não foi tocado.**
+
+### Correção pós-implementação (mesma sessão, reportada pelo usuário) — 2026-07-20
+
+Bug corrigido: logado como Driver com veículo vinculado (Motorista Teste / DEV4D56), a tela Checklists mostrava "Nenhum veículo associado ao seu perfil." em vez do `<select>` — reproduzido com e sem o interruptor de bloqueio ligado.
+
+Causa raiz: `public.list_vehicles_for_checklist_selection()` tem `RETURNS TABLE(id UUID, ...)`, e dentro do corpo da função a linha `SELECT client_id, role INTO v_client_id, v_role FROM public.profiles WHERE id = auth.uid();` referencia `id` sem qualificar — o Postgres não consegue decidir entre `public.profiles.id` e o parâmetro `OUT id` declarado pelo `RETURNS TABLE`, e lança `column reference "id" is ambiguous`. O front-end mascarava o erro por completo: a query `driverSelectableVehicles` em `Checklists.tsx` fazia `const { data } = await supabase.rpc(...)` sem checar `error`, então a falha silenciosa virava lista vazia sem nenhum sinal no console — diferente do padrão já usado nas outras duas RPCs do mesmo arquivo (`evaluate_vehicle_link_divergence`, `get_vehicle_tire_inspection_config`), que fazem `if (error) throw error`. As 5 consultas SQL de validação da Etapa 1 confirmavam apenas a *existência* das funções (via `pg_proc`), nunca a *execução* — por isso o bug passou pela validação da sessão.
+
+Correção aplicada: (1) `WHERE id = auth.uid()` → `WHERE p.id = auth.uid()` com alias `p` explícito, no arquivo da migration e via `CREATE OR REPLACE FUNCTION` direto em **DEV** (idempotente, sem tocar dados/colunas/triggers — reconfirmado por `pg_proc` count = 4 e `has_function_privilege` = true após o replace); (2) `driverSelectableVehicles` em `Checklists.tsx` passou a checar `error` (`console.error` + `throw`) e a tela exibe "Não foi possível carregar a lista de veículos. Tente novamente." em vez de aparentar "sem veículo" quando a RPC falha. Reexecutado o teste manual via SQL simulando `auth.uid()` do Driver: a função agora retorna os veículos do tenant com `DEV4D56` em primeiro (`is_assigned_to_me: true`).
+
+Arquivos modificados: `supabase/migrations/20260722000000_add_vehicle_link_divergence.sql`, `src/pages/Checklists.tsx`. `npx tsc --noEmit` 0 erros; `npm run lint` 0 erros / mesmos 184 warnings (nenhum novo); `npm run test:unit` 1084/1084.
+
+### Validação manual pelo usuário e promoção a PROD (2026-07-20)
+
+Usuário validou o fluxo na UI real (Driver com veículo vinculado, `<select>` populado corretamente após a correção acima) e autorizou explicitamente aplicar a migration em **PROD** e fazer commit/push direto para `main`.
+
+Migration `20260722000000_add_vehicle_link_divergence.sql` (já com a correção do bug de ambiguidade) aplicada em PROD (`oajfjdadcicgoxrfrnny`) statement a statement via `supabase db query --file <stmt.sql> --linked` — não havia `SUPABASE_DB_URL` real configurada em `.env.production` (só placeholder), então a aplicação foi feita via Management API (`--linked`) autenticada pela sessão do CLI, em vez de conexão Postgres direta como em DEV. As mesmas 5 consultas SQL de validação da Etapa 1 foram reexecutadas contra PROD e bateram exatamente: 6 colunas, 1 flag, 4 funções, 2 triggers, 0 linhas de histórico tocadas. CLI relinkado de volta para DEV (`vvbnbzzhpiksacqudmfu`) ao final, para não deixar sessões futuras vinculadas a PROD por engano.
+
+### Pendências
+
+1. Novo E2E `e2e/pending/driver-vehicle-choice.spec.ts` (4 cenários) escrito e validado por `--list`, mas não executável — usuários de teste operacionais seguem deletados desde 2026-05-06 (item 0c de `docs/MEMORY.md`). Validação manual do usuário na UI real já cobre o fluxo.
+2. **Risco aceito** (é o comportamento pedido pelo usuário): Driver pode iniciar checklist/inspeção em veículo que não é o dele quando `enforce_driver_vehicle_link = false` (padrão). Mitigado por registro inviolável + visibilidade ao Assistente+ + interruptor de bloqueio por tenant.
+
+---
+
 ## Sessão — 2026-07-19 (2): Contextos de checklist "Entrega" e "Devolução" com evidência obrigatória
 
 ### O que foi implementado

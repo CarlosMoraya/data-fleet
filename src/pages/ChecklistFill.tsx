@@ -93,7 +93,7 @@ export default function ChecklistFill() {
     queryFn: async () => {
       const response = await supabase
         .from('checklists')
-        .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context), workshops(name), drivers(name)')
+        .select('*, vehicles!vehicle_id(license_plate), profiles(name), checklist_templates(name, context), workshops(name), drivers!driver_id(name), assigned_driver:drivers!vehicle_link_assigned_driver_id(name), executor_vehicle:vehicles!vehicle_link_executor_vehicle_id(license_plate)')
         .eq('id', checklistId)
         .single();
       const data = response.data as ChecklistRow | null;

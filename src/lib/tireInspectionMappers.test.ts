@@ -30,6 +30,9 @@ const baseInspectionRow: TireInspectionRow = {
     { order: 2, type: 'simples', rodagem: 'dupla', physicalAxles: 1 },
   ],
   steps_count_snapshot: 1,
+  vehicle_link_divergence_reasons: null,
+  vehicle_link_assigned_driver_id: null,
+  vehicle_link_executor_vehicle_id: null,
 };
 
 const baseResponseRow: TireInspectionResponseRow = {
@@ -125,6 +128,35 @@ describe('tireInspectionFromRow', () => {
     expect(result.longitude).toBe(-46.6333);
     expect(result.deviceInfo).toBe('iPhone 15');
     expect(result.notes).toBe('Inspeção sem anomalias');
+  });
+
+  it('mapeia os 5 campos de divergência de vínculo quando presentes', () => {
+    const rowWithDivergence: TireInspectionRow = {
+      ...baseInspectionRow,
+      vehicle_link_divergence_reasons: ['executor_has_other_vehicle'],
+      vehicle_link_assigned_driver_id: 'driver-2',
+      vehicle_link_executor_vehicle_id: 'vehicle-2',
+      assigned_driver: { name: 'Outro Motorista' },
+      executor_vehicle: { license_plate: 'XYZ9A87' },
+    };
+
+    const result = tireInspectionFromRow(rowWithDivergence);
+
+    expect(result.vehicleLinkDivergenceReasons).toEqual(['executor_has_other_vehicle']);
+    expect(result.vehicleLinkAssignedDriverId).toBe('driver-2');
+    expect(result.vehicleLinkAssignedDriverName).toBe('Outro Motorista');
+    expect(result.vehicleLinkExecutorVehicleId).toBe('vehicle-2');
+    expect(result.vehicleLinkExecutorVehiclePlate).toBe('XYZ9A87');
+  });
+
+  it('linha de histórico anterior à migration (campos novos null) mapeia para undefined sem lançar', () => {
+    const result = tireInspectionFromRow(baseInspectionRow);
+
+    expect(result.vehicleLinkDivergenceReasons).toBeUndefined();
+    expect(result.vehicleLinkAssignedDriverId).toBeUndefined();
+    expect(result.vehicleLinkAssignedDriverName).toBeUndefined();
+    expect(result.vehicleLinkExecutorVehicleId).toBeUndefined();
+    expect(result.vehicleLinkExecutorVehiclePlate).toBeUndefined();
   });
 });
 

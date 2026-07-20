@@ -1,9 +1,10 @@
-import { X, CheckCircle, XCircle, MinusCircle, Camera } from 'lucide-react';
+import { X, CheckCircle, XCircle, MinusCircle, Camera, AlertTriangle } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import { checklistResponseFromRow, type ChecklistResponseRow } from '../lib/checklistMappers';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
+import { describeDivergenceReason } from '../lib/vehicleLinkDivergence';
 
 import type { Checklist, ChecklistResponse } from '../types';
 
@@ -156,6 +157,30 @@ export default function ChecklistDetailModal({ checklist, onClose }: Props) {
                     </button>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {checklist.vehicleLinkDivergenceReasons && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-800">
+                <AlertTriangle className="h-4 w-4" />
+                Divergência de vínculo
+              </h3>
+              <ul className="mb-3 list-inside list-disc text-sm text-amber-800">
+                {checklist.vehicleLinkDivergenceReasons.map(reason => (
+                  <li key={reason}>{describeDivergenceReason(reason)}</li>
+                ))}
+              </ul>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs tracking-wide text-amber-700 uppercase">Motorista vinculado ao veículo</p>
+                  <p className="font-medium text-amber-900">{checklist.vehicleLinkAssignedDriverName ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs tracking-wide text-amber-700 uppercase">Veículo vinculado ao executor</p>
+                  <p className="font-medium text-amber-900">{checklist.vehicleLinkExecutorVehiclePlate ?? '—'}</p>
+                </div>
               </div>
             </div>
           )}

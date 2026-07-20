@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { X, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { X, CheckCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import React, { useState } from 'react';
 
+import { describeDivergenceReason } from '../lib/vehicleLinkDivergence';
 import {
   fetchTireInspectionComparison,
   fetchTireInspectionResponses,
@@ -71,6 +72,30 @@ export default function TireInspectionDetailModal({ inspection, onClose }: Props
           <MetaField label="Início" value={formatDate(inspection.startedAt)} />
           <MetaField label="Conclusão" value={formatDate(inspection.completedAt)} />
         </div>
+
+        {inspection.vehicleLinkDivergenceReasons && (
+          <div className="mx-6 mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-800">
+              <AlertTriangle className="h-4 w-4" />
+              Divergência de vínculo
+            </h3>
+            <ul className="mb-3 list-inside list-disc text-sm text-amber-800">
+              {inspection.vehicleLinkDivergenceReasons.map(reason => (
+                <li key={reason}>{describeDivergenceReason(reason)}</li>
+              ))}
+            </ul>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-xs tracking-wide text-amber-700 uppercase">Motorista vinculado ao veículo</p>
+                <p className="font-medium text-amber-900">{inspection.vehicleLinkAssignedDriverName ?? '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs tracking-wide text-amber-700 uppercase">Veículo vinculado ao executor</p>
+                <p className="font-medium text-amber-900">{inspection.vehicleLinkExecutorVehiclePlate ?? '—'}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Summary */}
         <div className="flex gap-6 border-b px-6 py-4 text-sm">

@@ -18,6 +18,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
   const [pneusDays, setPneusDays] = useState<string>('7');
   const [odometerDays, setOdometerDays] = useState<string>('');
   const [odometerTolerance, setOdometerTolerance] = useState<string>('');
+  const [enforceDriverVehicleLink, setEnforceDriverVehicleLink] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -29,6 +30,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
     setPneusDays('7');
     setOdometerDays('');
     setOdometerTolerance('');
+    setEnforceDriverVehicleLink(false);
     setIsDirty(false);
     setSaveSuccess(false);
     setSaveError(null);
@@ -39,7 +41,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
     queryFn: async () => {
       const { data, error } = await supabase
         .from('checklist_day_intervals')
-        .select('id, client_id, rotina_day_interval, seguranca_day_interval, pneus_day_interval, odometer_update_day_interval, odometer_km_tolerance_per_day')
+        .select('id, client_id, rotina_day_interval, seguranca_day_interval, pneus_day_interval, odometer_update_day_interval, odometer_km_tolerance_per_day, enforce_driver_vehicle_link')
         .eq('client_id', clientId)
         .maybeSingle();
       if (error) throw error;
@@ -56,6 +58,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
       setPneusDays(query.data?.pneus_day_interval != null ? String(query.data.pneus_day_interval) : '7');
       setOdometerDays(query.data?.odometer_update_day_interval != null ? String(query.data.odometer_update_day_interval) : '');
       setOdometerTolerance(query.data?.odometer_km_tolerance_per_day != null ? String(query.data.odometer_km_tolerance_per_day) : '');
+      setEnforceDriverVehicleLink(Boolean(query.data?.enforce_driver_vehicle_link));
       setIsDirty(false);
     }
   }, [query.data, query.isSuccess]);
@@ -80,6 +83,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
         pneus_day_interval: pneusVal,
         odometer_update_day_interval: odometerDays === '' ? null : parseInt(odometerDays, 10),
         odometer_km_tolerance_per_day: odometerTolerance === '' ? null : parseInt(odometerTolerance, 10),
+        enforce_driver_vehicle_link: enforceDriverVehicleLink,
         updated_by: userId,
         updated_at: new Date().toISOString(),
       };
@@ -237,6 +241,28 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
                 className="h-9 w-24 rounded-lg border border-zinc-200 px-3 text-right text-sm text-zinc-800 transition-colors placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500 focus:outline-none"
               />
             </label>
+          </div>
+        </div>
+
+        {/* Vínculo motorista-veículo */}
+        <div className="flex items-center justify-between py-5">
+          <div>
+            <span className="text-sm font-medium text-zinc-800">Exigir que o motorista use o veículo vinculado a ele</span>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              Quando ativado, o motorista não consegue iniciar checklist ou inspeção de pneus em veículo que não seja o dele. Quando desativado, ele pode prosseguir e a divergência fica registrada.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <input
+              type="checkbox"
+              checked={enforceDriverVehicleLink}
+              onChange={e => {
+                setEnforceDriverVehicleLink(e.target.checked);
+                setIsDirty(true);
+                setSaveSuccess(false);
+              }}
+              className="h-5 w-5 rounded border-zinc-300 text-orange-500 focus:ring-2 focus:ring-orange-500"
+            />
           </div>
         </div>
       </div>

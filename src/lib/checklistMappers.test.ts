@@ -23,6 +23,9 @@ const baseRow: ChecklistRow = {
   driver_id: null,
   cnh_photo_url: null,
   signature_url: null,
+  vehicle_link_divergence_reasons: null,
+  vehicle_link_assigned_driver_id: null,
+  vehicle_link_executor_vehicle_id: null,
 };
 
 describe('checklistFromRow', () => {
@@ -50,5 +53,36 @@ describe('checklistFromRow', () => {
     expect(checklist.driverName).toBeUndefined();
     expect(checklist.cnhPhotoUrl).toBeUndefined();
     expect(checklist.signatureUrl).toBeUndefined();
+  });
+});
+
+describe('checklistFromRow — divergência de vínculo', () => {
+  it('mapeia os 5 campos de divergência quando presentes', () => {
+    const row: ChecklistRow = {
+      ...baseRow,
+      vehicle_link_divergence_reasons: ['other_driver_assigned'],
+      vehicle_link_assigned_driver_id: 'driver-2',
+      vehicle_link_executor_vehicle_id: 'vehicle-2',
+      assigned_driver: { name: 'Outro Motorista' },
+      executor_vehicle: { license_plate: 'XYZ9A87' },
+    };
+
+    const checklist = checklistFromRow(row);
+
+    expect(checklist.vehicleLinkDivergenceReasons).toEqual(['other_driver_assigned']);
+    expect(checklist.vehicleLinkAssignedDriverId).toBe('driver-2');
+    expect(checklist.vehicleLinkAssignedDriverName).toBe('Outro Motorista');
+    expect(checklist.vehicleLinkExecutorVehicleId).toBe('vehicle-2');
+    expect(checklist.vehicleLinkExecutorVehiclePlate).toBe('XYZ9A87');
+  });
+
+  it('linha de histórico anterior à migration (campos novos null) mapeia para undefined sem lançar', () => {
+    const checklist = checklistFromRow(baseRow);
+
+    expect(checklist.vehicleLinkDivergenceReasons).toBeUndefined();
+    expect(checklist.vehicleLinkAssignedDriverId).toBeUndefined();
+    expect(checklist.vehicleLinkAssignedDriverName).toBeUndefined();
+    expect(checklist.vehicleLinkExecutorVehicleId).toBeUndefined();
+    expect(checklist.vehicleLinkExecutorVehiclePlate).toBeUndefined();
   });
 });

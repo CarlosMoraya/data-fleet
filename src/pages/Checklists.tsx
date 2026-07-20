@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle, Disc, Gauge, MapPinOff } from 'lucide-react';
-import React, { useState, useMemo } from 'react';
+import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle, AlertTriangle, Disc, Gauge, MapPinOff } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import ChecklistDetailModal from '../components/ChecklistDetailModal';
@@ -9,6 +9,7 @@ import LastKmLabel from '../components/LastKmLabel';
 import ChecklistMapLink from '../components/ChecklistMapLink';
 import SelectClientNotice from '../components/SelectClientNotice';
 import TireInspectionDetailModal from '../components/TireInspectionDetailModal';
+import VehicleLinkDivergenceModal from '../components/VehicleLinkDivergenceModal';
 import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePersistentTabState, usePersistentFilterState, useSessionUiState } from '../hooks/usePersistentUiState';
@@ -21,6 +22,14 @@ import { supabase } from '../lib/supabase';
 import { tireInspectionFromRow, type TireInspectionRow } from '../lib/tireInspectionMappers';
 import { safeParseJson } from '../lib/uiStateStorage';
 import { cn } from '../lib/utils';
+import {
+  hasVehicleLinkDivergence,
+  buildVehicleLinkDivergenceMessage,
+  buildVehicleLinkBlockedMessage,
+  resolveDefaultVehicleId,
+  type SelectableVehicle,
+  type VehicleLinkDivergence,
+} from '../lib/vehicleLinkDivergence';
 import {
   validateTireInspectionEligibility,
   createTireInspection,
@@ -98,6 +107,16 @@ export default function Checklists() {
   const [startError, setStartError] = useState<string | null>(null);
   const isOnline = useOnlineStatus();
 
+  const [divergenceModal, setDivergenceModal] = useState<{
+    message: string;
+    blocked: boolean;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const [driverSelectedVehicleId, setDriverSelectedVehicleId] = useSessionUiState<string>(
+    'checklists', 'selection', 'driver-vehicle', '',
+  );
+
   type DriverRecord = { id: string; client_id: string };
   type DriverVehicleRow = { id: string; license_plate: string | null; category: string | null };
   type AuditorVehicleRow = {
@@ -111,12 +130,27 @@ export default function Checklists() {
   type VehicleDriverIdRow = { driver_id: string | null };
   type IssueChecklistIdRow = { checklist_id: string };
   type DayIntervalRow = { pneus_day_interval: number | null };
-  type TireInspectionVehicleConfigRow = {
+  type StartedChecklistRow = { id: string };
+  type SelectableVehicleRow = {
+    id: string;
+    license_plate: string | null;
+    category: string | null;
+    status: string | null;
+    is_assigned_to_me: boolean;
+    has_other_driver: boolean;
+  };
+  type EnforceLinkRow = { enforce_driver_vehicle_link: boolean };
+  type DivergenceEvalRow = {
+    reasons: string[] | null;
+    assigned_driver_id: string | null;
+    executor_vehicle_id: string | null;
+    executor_vehicle_plate: string | null;
+  };
+  type TireInspectionConfigRpcRow = {
     axle_config: AxleConfigEntry[] | null;
     steps_count: number | null;
-    type: string | null;
+    vehicle_type: string | null;
   };
-  type StartedChecklistRow = { id: string };
 
   // ── Queries for Driver ────────────────────────────────────────────────────
   const { data: vehicleInfo, isLoading: loadingVehicleInfo } = useQuery({
@@ -145,20 +179,68 @@ export default function Checklists() {
     enabled: isDriver && !!user?.id && !!currentClient?.id
   });
 
+  const { data: driverSelectableVehicles = [], isError: driverVehiclesError } = useQuery({
+    queryKey: ['driverSelectableVehicles', currentClient?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('list_vehicles_for_checklist_selection');
+      if (error) {
+        console.error(error);
+        throw error;
+      }
+      return ((data ?? []) as SelectableVehicleRow[]).map((v): SelectableVehicle => ({
+        id: v.id,
+        licensePlate: v.license_plate ?? '',
+        category: v.category,
+        status: v.status,
+        isAssignedToMe: v.is_assigned_to_me,
+        hasOtherDriver: v.has_other_driver,
+      }));
+    },
+    enabled: isDriver && !!currentClient?.id,
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (!isDriver) return;
+    if (driverSelectableVehicles.length === 0) return;
+    const stillValid = driverSelectableVehicles.some(v => v.id === driverSelectedVehicleId);
+    if (driverSelectedVehicleId && stillValid) return;
+    setDriverSelectedVehicleId(resolveDefaultVehicleId(driverSelectableVehicles));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [driverSelectableVehicles]);
+
+  const selectedDriverVehicle = useMemo(
+    () => driverSelectableVehicles.find(v => v.id === driverSelectedVehicleId),
+    [driverSelectableVehicles, driverSelectedVehicleId],
+  );
+
+  const { data: enforceDriverVehicleLink = false } = useQuery({
+    queryKey: ['enforceDriverVehicleLink', currentClient?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('checklist_day_intervals')
+        .select('enforce_driver_vehicle_link')
+        .eq('client_id', currentClient!.id)
+        .maybeSingle();
+      return (data as EnforceLinkRow | null)?.enforce_driver_vehicle_link ?? false;
+    },
+    enabled: isDriver && !!currentClient?.id,
+  });
+
   const { data: publishedTemplates = [] } = useQuery({
-    queryKey: ['publishedTemplates', vehicleInfo?.category, currentClient?.id],
+    queryKey: ['publishedTemplates', selectedDriverVehicle?.category, currentClient?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('checklist_templates')
         .select('*')
         .eq('client_id', currentClient!.id)
-        .eq('vehicle_category', vehicleInfo.category)
+        .eq('vehicle_category', selectedDriverVehicle!.category)
         .eq('status', 'published')
         .not('context', 'in', `(${AUDITOR_ONLY_CONTEXTS.join(',')})`)
         .order('context');
       return (data ?? []).map(r => templateFromRow(r as ChecklistTemplateRow));
     },
-    enabled: isDriver && !!vehicleInfo?.category && !!currentClient?.id,
+    enabled: isDriver && !!selectedDriverVehicle?.category && !!currentClient?.id,
     // Templates publicados devem refletir imediatamente: ignorar o cache persistido
     // (o staleTime global de 3 min + persister em localStorage atrasava a aparição
     // de templates recém-publicados, exigindo refresh repetido pelo usuário).
@@ -251,7 +333,7 @@ export default function Checklists() {
     queryFn: async () => {
       const response = await supabase
         .from('checklists')
-        .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context), drivers(name)')
+        .select('*, vehicles!vehicle_id(license_plate), profiles(name), checklist_templates(name, context), drivers!driver_id(name), assigned_driver:drivers!vehicle_link_assigned_driver_id(name), executor_vehicle:vehicles!vehicle_link_executor_vehicle_id(license_plate)')
         .eq('client_id', currentClient!.id)
         .eq('filled_by', user!.id)
         .eq('status', 'in_progress')
@@ -269,7 +351,7 @@ export default function Checklists() {
     queryFn: async () => {
       let query = supabase
         .from('checklists')
-        .select('*, vehicles(license_plate), profiles(name), checklist_templates(name, context), drivers(name)')
+        .select('*, vehicles!vehicle_id(license_plate), profiles(name), checklist_templates(name, context), drivers!driver_id(name), assigned_driver:drivers!vehicle_link_assigned_driver_id(name), executor_vehicle:vehicles!vehicle_link_executor_vehicle_id(license_plate)')
         .order('started_at', { ascending: false });
 
       if (currentClient?.id) {
@@ -331,7 +413,7 @@ export default function Checklists() {
     queryFn: async () => {
       let query = supabase
         .from('tire_inspections')
-        .select('*, vehicles(license_plate), profiles(name)')
+        .select('*, vehicles!vehicle_id(license_plate), profiles(name), assigned_driver:drivers!vehicle_link_assigned_driver_id(name), executor_vehicle:vehicles!vehicle_link_executor_vehicle_id(license_plate)')
         .order('started_at', { ascending: false });
       if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
@@ -362,17 +444,15 @@ export default function Checklists() {
       const openId = await findOpenTireInspection(vehicleId);
       if (openId) return openId;
 
-      const { data: veh, error: vehErr } = await supabase
-        .from('vehicles')
-        .select('axle_config, steps_count, type')
-        .eq('id', vehicleId)
-        .single();
+      const { data: veh, error: vehErr } = await supabase.rpc('get_vehicle_tire_inspection_config', {
+        p_vehicle_id: vehicleId,
+      });
       if (vehErr) throw vehErr;
 
-      const vehicle = veh as TireInspectionVehicleConfigRow;
-      const axleConfig = vehicle.axle_config ?? [];
-      const stepsCount = vehicle.steps_count ?? 0;
-      const vehicleType = vehicle.type ?? '';
+      const vehicle = ((veh ?? []) as TireInspectionConfigRpcRow[])[0];
+      const axleConfig = vehicle?.axle_config ?? [];
+      const stepsCount = vehicle?.steps_count ?? 0;
+      const vehicleType = vehicle?.vehicle_type ?? '';
 
       await validateTireInspectionEligibility(vehicleId, axleConfig, stepsCount, vehicleType, pneusDayInterval);
 
@@ -391,7 +471,11 @@ export default function Checklists() {
       void navigate(`/inspecao-pneus/${inspectionId}`);
     },
     onError: (e: Error) => {
-      setTireInspectionError(e.message);
+      setTireInspectionError(
+        e.message?.includes('VEHICLE_LINK_DIVERGENCE_BLOCKED')
+          ? 'A sua empresa exige que o checklist seja feito no veículo vinculado a você. Selecione outro veículo.'
+          : e.message,
+      );
       setStartingTireInspection(false);
     },
   });
@@ -405,6 +489,78 @@ export default function Checklists() {
     setTireInspectionError(null);
     setStartingTireInspection(true);
     startTireInspectionMutation.mutate(vehicleId);
+  };
+
+  const checkVehicleLinkDivergence = async (
+    vehicleId: string,
+    onError: (message: string) => void,
+    proceed: () => void,
+  ) => {
+    try {
+      const { data, error } = await supabase.rpc('evaluate_vehicle_link_divergence', {
+        p_vehicle_id: vehicleId,
+        p_profile_id: user!.id,
+      });
+      if (error) throw error;
+
+      const row = ((data ?? []) as DivergenceEvalRow[])[0];
+      const divergence: VehicleLinkDivergence = {
+        reasons: (row?.reasons ?? []) as VehicleLinkDivergence['reasons'],
+        executorVehiclePlate: row?.executor_vehicle_plate ?? undefined,
+      };
+
+      if (!hasVehicleLinkDivergence(divergence)) {
+        proceed();
+        return;
+      }
+
+      if (enforceDriverVehicleLink) {
+        setDivergenceModal({
+          message: buildVehicleLinkBlockedMessage(divergence),
+          blocked: true,
+          onConfirm: () => {},
+        });
+      } else {
+        setDivergenceModal({
+          message: buildVehicleLinkDivergenceMessage(divergence),
+          blocked: false,
+          onConfirm: () => {
+            setDivergenceModal(null);
+            proceed();
+          },
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      onError('Não foi possível validar o veículo selecionado. Tente novamente.');
+    }
+  };
+
+  const handleDriverStartChecklist = (template: ChecklistTemplate) => {
+    if (!selectedDriverVehicle) return;
+    const block = getChecklistStartBlockMessage(isOnline);
+    if (block) {
+      setStartError(block);
+      return;
+    }
+    setStartError(null);
+    void checkVehicleLinkDivergence(selectedDriverVehicle.id, setStartError, () => {
+      setStarting(template.id);
+      startMutation.mutate({ template, vehicleId: selectedDriverVehicle.id });
+    });
+  };
+
+  const handleDriverStartTireInspection = (vehicleId: string) => {
+    const block = getTireInspectionStartBlockMessage(isOnline);
+    if (block) {
+      setTireInspectionError(block);
+      return;
+    }
+    setTireInspectionError(null);
+    void checkVehicleLinkDivergence(vehicleId, setTireInspectionError, () => {
+      setStartingTireInspection(true);
+      startTireInspectionMutation.mutate(vehicleId);
+    });
   };
 
   const startMutation = useMutation({
@@ -435,9 +591,12 @@ export default function Checklists() {
       setStarting(null);
       void navigate(`/checklists/preencher/${data.id}`);
     },
-    onError: (err) => {
+    onError: (err: Error) => {
       console.error(err);
       setStarting(null);
+      if (err.message?.includes('VEHICLE_LINK_DIVERGENCE_BLOCKED')) {
+        setStartError('A sua empresa exige que o checklist seja feito no veículo vinculado a você. Selecione outro veículo.');
+      }
     },
   });
 
@@ -552,11 +711,23 @@ export default function Checklists() {
               <Truck className="h-4 w-4 text-orange-500" />
               Meu veículo
             </h2>
-            {vehicleInfo ? (
+            {driverVehiclesError ? (
+              <p className="text-sm text-red-600">Não foi possível carregar a lista de veículos. Tente novamente.</p>
+            ) : driverSelectableVehicles.length > 0 ? (
               <>
                 <div className="mb-4">
-                  <p className="font-semibold text-zinc-900">{vehicleInfo.plate}</p>
-                  <p className="text-xs text-zinc-500">{vehicleInfo.category ?? 'Sem categoria'}</p>
+                  <label className="mb-1 block text-xs font-medium text-zinc-500">Veículo</label>
+                  <select
+                    value={driverSelectedVehicleId}
+                    onChange={e => setDriverSelectedVehicleId(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+                  >
+                    {driverSelectableVehicles.map(v => (
+                      <option key={v.id} value={v.id}>
+                        {v.licensePlate}{v.category ? ` (${v.category})` : ''}{v.isAssignedToMe ? ' — seu veículo' : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 {publishedTemplates.length > 0 ? (
                   <div className="space-y-2">
@@ -568,7 +739,7 @@ export default function Checklists() {
                         </div>
                         <button
                           disabled={!!openChecklist || starting === t.id}
-                          onClick={() => startChecklist(t, vehicleInfo.id)}
+                          onClick={() => handleDriverStartChecklist(t)}
                           className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-medium text-white hover:bg-orange-600 disabled:opacity-50"
                         >
                           {starting === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
@@ -578,7 +749,7 @@ export default function Checklists() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-zinc-400 italic">Nenhum template publicado para {vehicleInfo.category}</p>
+                  <p className="text-xs text-zinc-400 italic">Nenhum template publicado para {selectedDriverVehicle?.category ?? 'esta categoria'}</p>
                 )}
 
                 {startError && (
@@ -590,8 +761,8 @@ export default function Checklists() {
                 )}
                 <div className="mt-3 border-t border-zinc-100 pt-3">
                   <button
-                    disabled={startingTireInspection || !!openChecklist}
-                    onClick={() => handleStartTireInspection(vehicleInfo.id)}
+                    disabled={startingTireInspection || !!openChecklist || !driverSelectedVehicleId}
+                    onClick={() => handleDriverStartTireInspection(driverSelectedVehicleId)}
                     className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-blue-300 px-3 py-2 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
                   >
                     {startingTireInspection ? <Loader2 className="h-3 w-3 animate-spin" /> : <Disc className="h-3 w-3" />}
@@ -900,6 +1071,15 @@ export default function Checklists() {
                                         Localização negada
                                       </span>
                                     )}
+                                    {c.vehicleLinkDivergenceReasons && (
+                                      <span
+                                        className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+                                        title="Divergência de vínculo — abra o registro para ver o motorista vinculado"
+                                      >
+                                        <AlertTriangle className="h-3 w-3" />
+                                        Divergência de vínculo
+                                      </span>
+                                    )}
                                   </>
                                 ) : '—'}
                               </td>
@@ -977,6 +1157,15 @@ export default function Checklists() {
                               <Disc className="h-3.5 w-3.5 flex-shrink-0 text-blue-400" />
                               {ti.vehicleLicensePlate ?? '—'}
                             </div>
+                            {ti.vehicleLinkDivergenceReasons && (
+                              <span
+                                className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+                                title="Divergência de vínculo — abra o registro para ver o motorista vinculado"
+                              >
+                                <AlertTriangle className="h-3 w-3" />
+                                Divergência de vínculo
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-sm text-zinc-600">{ti.filledByName ?? '—'}</td>
                           <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(ti.startedAt)}</td>
@@ -1000,6 +1189,15 @@ export default function Checklists() {
             )}
           </div>
         </div>
+      )}
+
+      {divergenceModal && (
+        <VehicleLinkDivergenceModal
+          message={divergenceModal.message}
+          blocked={divergenceModal.blocked}
+          onConfirm={divergenceModal.onConfirm}
+          onCancel={() => setDivergenceModal(null)}
+        />
       )}
 
       {viewChecklist && (

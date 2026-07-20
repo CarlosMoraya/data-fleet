@@ -1,4 +1,5 @@
 import type { Checklist, ChecklistResponse, ChecklistStatus, ResponseStatus, ChecklistContext, ChecklistLocationStatus } from '../types';
+import type { VehicleLinkDivergenceReason } from './vehicleLinkDivergence';
 
 // ─── Row types (snake_case from Supabase) ─────────────────────────────────────
 
@@ -23,12 +24,17 @@ export interface ChecklistRow {
   driver_id: string | null;
   cnh_photo_url: string | null;
   signature_url: string | null;
+  vehicle_link_divergence_reasons: VehicleLinkDivergenceReason[] | null;
+  vehicle_link_assigned_driver_id: string | null;
+  vehicle_link_executor_vehicle_id: string | null;
   // join fields
   checklist_templates?: { name: string; context: string } | null;
   vehicles?: { license_plate: string } | null;
   profiles?: { name: string } | null;
   workshops?: { name: string } | null;
   drivers?: { name: string } | null;
+  assigned_driver?: { name: string } | null;
+  executor_vehicle?: { license_plate: string } | null;
 }
 
 export interface ChecklistResponseRow {
@@ -73,6 +79,11 @@ export function checklistFromRow(row: ChecklistRow): Checklist {
     driverName: row.drivers?.name ?? undefined,
     cnhPhotoUrl: row.cnh_photo_url ?? undefined,
     signatureUrl: row.signature_url ?? undefined,
+    vehicleLinkDivergenceReasons: row.vehicle_link_divergence_reasons ?? undefined,
+    vehicleLinkAssignedDriverId: row.vehicle_link_assigned_driver_id ?? undefined,
+    vehicleLinkAssignedDriverName: row.assigned_driver?.name ?? undefined,
+    vehicleLinkExecutorVehicleId: row.vehicle_link_executor_vehicle_id ?? undefined,
+    vehicleLinkExecutorVehiclePlate: row.executor_vehicle?.license_plate ?? undefined,
   };
 }
 

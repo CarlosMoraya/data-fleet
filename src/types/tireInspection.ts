@@ -1,6 +1,7 @@
 // ─── Tire Inspections ─────────────────────────────────────────────────────────
 
 import type { AxleConfigEntry } from './tire';
+import type { VehicleLinkDivergenceReason } from '../lib/vehicleLinkDivergence';
 
 export type TireInspectionStatus = 'in_progress' | 'completed';
 export type TireInspectionResponseStatus = 'conforme' | 'nao_conforme';
@@ -22,6 +23,11 @@ export interface TireInspection {
   notes?: string;
   axleConfigSnapshot: AxleConfigEntry[];
   stepsCountSnapshot: number;
+  vehicleLinkDivergenceReasons?: VehicleLinkDivergenceReason[];
+  vehicleLinkAssignedDriverId?: string;
+  vehicleLinkAssignedDriverName?: string; // from join
+  vehicleLinkExecutorVehicleId?: string;
+  vehicleLinkExecutorVehiclePlate?: string; // from join
 }
 
 export interface TireInspectionResponse {

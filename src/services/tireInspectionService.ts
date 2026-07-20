@@ -20,7 +20,7 @@ const OTHER_OPTION = 'Outros / Não é possível identificar';
 export async function fetchTireInspection(inspectionId: string): Promise<TireInspection> {
   const result = await supabase
     .from('tire_inspections')
-    .select('*, vehicles(license_plate), profiles(name)')
+    .select('*, vehicles!vehicle_id(license_plate), profiles(name), assigned_driver:drivers!vehicle_link_assigned_driver_id(name), executor_vehicle:vehicles!vehicle_link_executor_vehicle_id(license_plate)')
     .eq('id', inspectionId)
     .single();
   if (result.error) throw result.error;
@@ -30,7 +30,7 @@ export async function fetchTireInspection(inspectionId: string): Promise<TireIns
 export async function fetchTireInspections(clientId: string): Promise<TireInspection[]> {
   const { data, error } = await supabase
     .from('tire_inspections')
-    .select('*, vehicles(license_plate), profiles(name)')
+    .select('*, vehicles!vehicle_id(license_plate), profiles(name), assigned_driver:drivers!vehicle_link_assigned_driver_id(name), executor_vehicle:vehicles!vehicle_link_executor_vehicle_id(license_plate)')
     .eq('client_id', clientId)
     .order('started_at', { ascending: false });
   if (error) throw error;

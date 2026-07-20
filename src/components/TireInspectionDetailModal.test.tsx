@@ -97,14 +97,14 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-async function renderModal() {
+async function renderModal(overrideInspection: TireInspection = inspection) {
   const root = createRoot(container);
   container.__reactRoot = root;
 
   act(() => {
     root.render(
       <QueryClientProvider client={queryClient}>
-        <TireInspectionDetailModal inspection={inspection} onClose={() => {}} />
+        <TireInspectionDetailModal inspection={overrideInspection} onClose={() => {}} />
       </QueryClientProvider>,
     );
   });
@@ -178,5 +178,31 @@ describe('TireInspectionDetailModal', () => {
       expect(container.textContent).toContain(formatDate('2026-06-12T12:01:00Z'));
     });
     expect(container.textContent).not.toContain(formatDate('2026-06-08T22:41:00Z'));
+  });
+
+  it('com vehicleLinkDivergenceReasons preenchido, exibe o texto de divergência e o nome do motorista vinculado', async () => {
+    const divergentInspection: TireInspection = {
+      ...inspection,
+      vehicleLinkDivergenceReasons: ['executor_has_other_vehicle'],
+      vehicleLinkAssignedDriverName: 'Outro Motorista',
+      vehicleLinkExecutorVehiclePlate: 'XYZ9A87',
+    };
+
+    await renderModal(divergentInspection);
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Divergência de vínculo');
+    });
+    expect(container.textContent).toContain('Outro Motorista');
+  });
+
+  it('sem vehicleLinkDivergenceReasons, o bloco de divergência não é renderizado', async () => {
+    await renderModal();
+
+    await waitForAssertion(() => {
+      expect(container.querySelector(`img[src="${photoUrl}"]`)).not.toBeNull();
+    });
+
+    expect(container.textContent).not.toContain('Divergência de vínculo');
   });
 });

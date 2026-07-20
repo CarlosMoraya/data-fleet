@@ -175,4 +175,30 @@ describe('ChecklistDetailModal', () => {
 
     expect(container.textContent).not.toContain('Evidências de Entrega/Devolução');
   });
+
+  it('com vehicleLinkDivergenceReasons preenchido, exibe o texto de divergência e o nome do motorista vinculado', async () => {
+    const divergentChecklist: Checklist = {
+      ...checklist,
+      vehicleLinkDivergenceReasons: ['other_driver_assigned'],
+      vehicleLinkAssignedDriverName: 'Outro Motorista',
+      vehicleLinkExecutorVehiclePlate: 'XYZ9A87',
+    };
+
+    await renderModal(divergentChecklist);
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Divergência de vínculo');
+    });
+    expect(container.textContent).toContain('Outro Motorista');
+  });
+
+  it('sem vehicleLinkDivergenceReasons, o bloco de divergência não é renderizado', async () => {
+    await renderModal();
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Checklist Diário');
+    });
+
+    expect(container.textContent).not.toContain('Divergência de vínculo');
+  });
 });

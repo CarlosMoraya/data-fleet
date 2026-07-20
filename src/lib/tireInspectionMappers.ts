@@ -1,4 +1,5 @@
 import type { TireInspection, TireInspectionResponse, TireInspectionStatus, TireInspectionResponseStatus } from '../types';
+import type { VehicleLinkDivergenceReason } from './vehicleLinkDivergence';
 import type { AxleConfigEntry } from '../types/tire';
 
 // ─── Row types (snake_case from Supabase) ─────────────────────────────────────
@@ -18,9 +19,14 @@ export interface TireInspectionRow {
   notes: string | null;
   axle_config_snapshot: AxleConfigEntry[];
   steps_count_snapshot: number;
+  vehicle_link_divergence_reasons: VehicleLinkDivergenceReason[] | null;
+  vehicle_link_assigned_driver_id: string | null;
+  vehicle_link_executor_vehicle_id: string | null;
   // join fields
   vehicles?: { license_plate: string } | null;
   profiles?: { name: string } | null;
+  assigned_driver?: { name: string } | null;
+  executor_vehicle?: { license_plate: string } | null;
 }
 
 export interface TireInspectionResponseRow {
@@ -60,6 +66,11 @@ export function tireInspectionFromRow(row: TireInspectionRow): TireInspection {
     notes: row.notes ?? undefined,
     axleConfigSnapshot: row.axle_config_snapshot,
     stepsCountSnapshot: row.steps_count_snapshot,
+    vehicleLinkDivergenceReasons: row.vehicle_link_divergence_reasons ?? undefined,
+    vehicleLinkAssignedDriverId: row.vehicle_link_assigned_driver_id ?? undefined,
+    vehicleLinkAssignedDriverName: row.assigned_driver?.name ?? undefined,
+    vehicleLinkExecutorVehicleId: row.vehicle_link_executor_vehicle_id ?? undefined,
+    vehicleLinkExecutorVehiclePlate: row.executor_vehicle?.license_plate ?? undefined,
   };
 }
 

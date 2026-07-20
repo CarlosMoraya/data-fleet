@@ -1,3 +1,5 @@
+import type { VehicleLinkDivergenceReason } from '../lib/vehicleLinkDivergence';
+
 // ─── Checklists ───────────────────────────────────────────────────────────────
 
 export type VehicleCategory = 'Leve' | 'Médio' | 'Pesado' | 'Elétrico' | 'Semi-reboque/Implemento';
@@ -84,6 +86,11 @@ export interface Checklist {
   driverName?: string; // from join
   cnhPhotoUrl?: string;
   signatureUrl?: string;
+  vehicleLinkDivergenceReasons?: VehicleLinkDivergenceReason[];
+  vehicleLinkAssignedDriverId?: string;
+  vehicleLinkAssignedDriverName?: string; // from join
+  vehicleLinkExecutorVehicleId?: string;
+  vehicleLinkExecutorVehiclePlate?: string; // from join
 }
 
 export interface ChecklistResponse {
