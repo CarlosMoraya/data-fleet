@@ -146,6 +146,42 @@ async function syncOperationsManagerScope(params: {
   if (unitInsertError) throw new Error(unitInsertError.message);
 }
 
+async function logPasswordReset(params: {
+  supabaseAdmin: ReturnType<typeof createClient>;
+  clientId: string | null;
+  driverProfileId: string;
+  driverName: string;
+  resetById: string;
+}): Promise<void> {
+  const { supabaseAdmin, clientId, driverProfileId, driverName, resetById } = params;
+
+  try {
+    const { data: resetByProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("name")
+      .eq("id", resetById)
+      .single();
+
+    const resetByName = resetByProfile?.name ?? "—";
+
+    const { error: insertError } = await supabaseAdmin
+      .from("driver_password_reset_log")
+      .insert({
+        client_id: clientId,
+        driver_profile_id: driverProfileId,
+        driver_name: driverName,
+        reset_by_id: resetById,
+        reset_by_name: resetByName,
+      });
+
+    if (insertError) {
+      console.error(`[reset-password] Erro ao gravar auditoria: ${insertError.message}`);
+    }
+  } catch (err) {
+    console.error(`[reset-password] Erro ao gravar auditoria: ${String(err)}`);
+  }
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -286,6 +322,61 @@ serve(async (req: Request) => {
       });
 
       return json({ success: true }, 200);
+    }
+
+    if (body.action === "reset-password") {
+      const { user_id, new_password } = body;
+
+      if (!user_id || !new_password) {
+        return json({ error: "user_id e new_password são obrigatórios." }, 400);
+      }
+
+      if (new_password.length < 8) {
+        return json({ error: "A senha deve ter pelo menos 8 caracteres." }, 400);
+      }
+
+      if (callerRank < ROLE_RANK["Fleet Analyst"]) {
+        return json({ error: "Acesso negado. Apenas Fleet Analyst ou superior pode redefinir senha de motorista." }, 403);
+      }
+
+      const { data: targetProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("role, client_id, name")
+        .eq("id", user_id)
+        .single();
+
+      if (!targetProfile) return json({ error: "Usuário não encontrado." }, 404);
+
+      if (targetProfile.role !== "Driver") {
+        return json({ error: "Só é permitido redefinir a senha de motoristas." }, 403);
+      }
+
+      if (callerProfile.role !== "Admin Master" && targetProfile.client_id !== callerProfile.client_id) {
+        return json({ error: "Você não tem permissão para redefinir a senha de motoristas de outro cliente." }, 403);
+      }
+
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user_id, {
+        password: new_password,
+      });
+      if (updateError) return json({ error: updateError.message }, 400);
+
+      await logPasswordReset({
+        supabaseAdmin,
+        clientId: targetProfile.client_id,
+        driverProfileId: user_id,
+        driverName: targetProfile.name,
+        resetById: caller.id,
+      });
+
+      let email: string | null = null;
+      try {
+        const { data: userData } = await supabaseAdmin.auth.admin.getUserById(user_id);
+        email = userData?.user?.email ?? null;
+      } catch (err) {
+        console.error(`[reset-password] Erro ao buscar email: ${String(err)}`);
+      }
+
+      return json({ success: true, email }, 200);
     }
 
     const {

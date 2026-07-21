@@ -2,6 +2,52 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-21: Reset de senha de motoristas pelo time de frota, com auditoria
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão:
+
+1. **Migration** `supabase/migrations/20260727000000_create_driver_password_reset_log.sql` — tabela append-only `driver_password_reset_log` (`client_id`, `driver_profile_id`, `driver_name`, `reset_by_id`, `reset_by_name`, `created_at`; FKs `ON DELETE SET NULL`/`CASCADE`; nomes desnormalizados de propósito para o histórico sobreviver a exclusão de perfil). RLS: única policy de SELECT para rank ≥ 4 do mesmo tenant ou Admin Master; nenhuma policy de escrita — só a service role da edge function grava.
+2. **Módulo puro** `src/lib/driverPasswordReset.ts` — `canResetDriverPassword` (lista idêntica a `ROLES_CAN_EDIT` de `Drivers.tsx`, duplicação intencional e coberta por teste de paridade) e `generateDriverPassword` (CSPRNG via `crypto.getRandomValues`, alfabeto sem caracteres ambíguos, formato `BetaFleet-XXXXXX`). 8 testes novos.
+3. **Action `reset-password`** em `supabase/functions/create-user/index.ts` — reaproveita o bloco de autenticação comum do handler; 6 validações sequenciais (payload, tamanho mínimo, rank ≥ Fleet Analyst, alvo existe, alvo é Driver, mesmo tenant exceto Admin Master), troca a senha via `auth.admin.updateUserById`, grava auditoria via `logPasswordReset` (nunca reverte o reset se a auditoria falhar) e retorna o email do motorista via `auth.admin.getUserById` (não existe em nenhuma tabela acessível ao frontend).
+4. **Serviço frontend** — `resetDriverPassword` e `fetchDriverPasswordResetHistory` em `driverService.ts` (histórico retorna array vazio em erro, nunca lança). 3 testes novos.
+5. **Modal** `ResetDriverPasswordModal.tsx` — espelha `ConfirmDeleteModal.tsx`; não exibe email antes do sucesso; gerar/mostrar/copiar senha; aviso de entrega manual; bloco de sucesso com login+senha copiável; histórico das 5 últimas redefinições no rodapé; zero persistência em storage. 9 testes novos.
+6. **Botão 🔑** em `Drivers.tsx`, entre Editar e Ativar/Inativar, sob `canEdit`, com `disabled={!driver.profileId}` — motorista sem perfil não tem conta para redefinir.
+
+### Validação
+
+`npm run lint` **0 erros / 190 warnings** (184 base + 6 novos); `npm run test:unit` **1122/1122** (1102 base + 20 novos: 8 em `driverPasswordReset.test.ts`, 3 em `driverService.test.ts`, 9 em `ResetDriverPasswordModal.test.tsx`); `npm run test:smoke` **6/6**.
+
+### Migration e deploy
+
+Migration aplicada manualmente pelo usuário via SQL Editor do Dashboard no **DEV** `vvbnbzzhpiksacqudmfu`, validada com `supabase db query --linked` (4 consultas do plano: 7 colunas, RLS `true`, 1 policy de SELECT, 0 colunas de senha). Edge function `create-user` deployada manualmente pelo usuário via Dashboard. **PROD `oajfjdadcicgoxrfrnny` não foi tocado.**
+
+### Validação manual guiada (13 passos)
+
+Todos os 13 passos confirmados pelo usuário. Destaques dos passos de segurança, executados via `curl` com tokens de sessão reais extraídos do `localStorage` do navegador (chave `sb-vvbnbzzhpiksacqudmfu-auth-token`):
+
+- **Passo 12** — sessão de Fleet Assistant chamando `action: reset-password` direto na edge function → `403 {"error":"Acesso negado. Apenas Fleet Analyst ou superior pode redefinir senha de motorista."}`.
+- **Passo 13** — sessão de Admin Master apontando `user_id` para um perfil `Coordinator` (não-Driver) → `403 {"error":"Só é permitido redefinir a senha de motoristas."}`.
+- **Passo adicional do critério de conclusão** — fluxo nativo "Esqueci minha senha" testado com usuário de email real (`datastacktecnologia@gmail.com`), email de recuperação chegou e o login com a nova senha funcionou. Confirma que a nova action não interferiu no fluxo nativo do Supabase Auth.
+
+### Risco aceito
+
+Sem rate limiting na action `reset-password`, decisão expressa do usuário em 2026-07-20 (data da sessão de planejamento). Mitigado por exigir sessão autenticada de Fleet Analyst+ do próprio tenant e por cada uso ficar registrado nominalmente na auditoria.
+
+### Débito descoberto durante a sessão — ledger de migrations da CLI
+
+Ao tentar usar `supabase db push` para aplicar a migration (decisão do usuário, revertida após investigação), foi descoberto que `supabase_migrations.schema_migrations` no DEV tem uma única linha (`20260317000000`) — confirma que todo o schema real foi construído via SQL Editor, nunca via CLI. Adicionalmente: 6 pares de migrations locais compartilham o mesmo timestamp de versão (`20260622000000`, `20260624000000`, `20260711000000`, `20260719000000`, `20260721000000`, `20260722000000`), e 41 arquivos de migration usam nomenclatura legada fora do padrão `<timestamp>_nome.sql`, ignorados silenciosamente pela CLI. Decisão: não usar `db push`/`migration repair` até correção deliberada, tratada como iniciativa própria (detalhes em `project_migration_ledger_debt` na memória do agente). A migration desta sessão foi aplicada do jeito tradicional, via SQL Editor manual.
+
+### Atualização posterior — promoção a PROD (2026-07-21)
+
+Após autorização expressa do usuário, a migration `20260727000000_create_driver_password_reset_log.sql` foi aplicada manualmente no PROD `oajfjdadcicgoxrfrnny` (SQL Editor) e a edge function `create-user` atualizada foi deployada nesse ambiente. A validação via `supabase db query --linked` (link temporário trocado de DEV para PROD e revertido ao final) confirmou as mesmas 4 checagens da Etapa 1: 7 colunas, RLS `true`, 1 policy de SELECT (`dprl_select`), 0 colunas de senha.
+
+### Pendências
+
+1. Consideração para sessão futura: forçar troca de senha no primeiro acesso após reset administrativo (exige flag em `profiles` + guard de rota; rota `/conta/senha` já existe).
+2. Consideração para sessão futura: resolver o débito do ledger de migrations da CLI (duplicatas de timestamp + arquivos legados) antes de qualquer uso de `supabase db push`.
+
 ## Sessão — 2026-07-20: Regime de contratação CLT/PJ e contrato de prestação de serviços
 
 ### O que foi implementado

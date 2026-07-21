@@ -149,6 +149,35 @@ export async function deleteDriver(
   }
 }
 
+export interface DriverPasswordResetEntry {
+  id: string;
+  reset_by_name: string;
+  created_at: string;
+}
+
+export async function resetDriverPassword(
+  profileId: string,
+  newPassword: string,
+): Promise<{ success: boolean; email: string | null }> {
+  return await invokeEdgeFunction('create-user', {
+    action: 'reset-password',
+    user_id: profileId,
+    new_password: newPassword,
+  }) as { success: boolean; email: string | null };
+}
+
+export async function fetchDriverPasswordResetHistory(profileId: string): Promise<DriverPasswordResetEntry[]> {
+  const { data, error } = await supabase
+    .from('driver_password_reset_log')
+    .select('id, reset_by_name, created_at')
+    .eq('driver_profile_id', profileId)
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  if (error) return [];
+  return (data ?? []) as DriverPasswordResetEntry[];
+}
+
 // ─── Helpers internos ────────────────────────────────────────────────────────
 
 async function uploadDriverFiles(

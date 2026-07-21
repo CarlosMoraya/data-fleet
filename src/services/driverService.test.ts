@@ -17,7 +17,7 @@ vi.mock('../lib/supabase', () => ({
   },
 }));
 
-import { shouldClearServiceContract, toggleDriverActive } from './driverService';
+import { resetDriverPassword, shouldClearServiceContract, toggleDriverActive } from './driverService';
 
 import type { Driver } from '../types/driver';
 
@@ -67,6 +67,38 @@ describe('toggleDriverActive', () => {
     await toggleDriverActive(driver, 'editor-3');
 
     expect(invokeEdgeFunctionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('resetDriverPassword', () => {
+  beforeEach(() => {
+    invokeEdgeFunctionMock.mockReset();
+  });
+
+  it('chama invokeEdgeFunction com os parâmetros corretos', async () => {
+    invokeEdgeFunctionMock.mockResolvedValue({ success: true, email: 'motorista.123@x.com' });
+
+    await resetDriverPassword('p-1', 'BetaFleet-K7M4XP');
+
+    expect(invokeEdgeFunctionMock).toHaveBeenCalledWith('create-user', {
+      action: 'reset-password',
+      user_id: 'p-1',
+      new_password: 'BetaFleet-K7M4XP',
+    });
+  });
+
+  it('propaga o erro quando invokeEdgeFunction rejeita', async () => {
+    invokeEdgeFunctionMock.mockRejectedValue(new Error('falhou'));
+
+    await expect(resetDriverPassword('p-1', 'BetaFleet-K7M4XP')).rejects.toThrow('falhou');
+  });
+
+  it('repassa o retorno sem transformar', async () => {
+    invokeEdgeFunctionMock.mockResolvedValue({ success: true, email: 'motorista.123@x.com' });
+
+    const result = await resetDriverPassword('p-1', 'BetaFleet-K7M4XP');
+
+    expect(result).toEqual({ success: true, email: 'motorista.123@x.com' });
   });
 });
 

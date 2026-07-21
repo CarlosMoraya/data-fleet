@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit2, Trash2, UserCircle, Truck, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, UserCircle, Truck, Eye, ToggleLeft, ToggleRight, KeyRound } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 
@@ -7,6 +7,7 @@ import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import DriverActiveFilterBanner from '../components/DriverActiveFilterBanner';
 import DriverDetailModal from '../components/DriverDetailModal';
 import DriverForm from '../components/DriverForm';
+import ResetDriverPasswordModal from '../components/ResetDriverPasswordModal';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { usePersistentUiState, useSessionUiState } from '../hooks/usePersistentUiState';
@@ -63,6 +64,7 @@ export default function Drivers() {
   });
   const [viewingDriver, setViewingDriver] = useState<Driver | null>(null);
   const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
+  const [driverToResetPassword, setDriverToResetPassword] = useState<Driver | null>(null);
 
   const clearDriverDraft = () => {
     if (user?.id) {
@@ -538,6 +540,17 @@ export default function Drivers() {
                             <span className="sr-only">Editar</span>
                           </button>
                         )}
+                        {canEdit && (
+                          <button
+                            onClick={() => setDriverToResetPassword(driver)}
+                            disabled={!driver.profileId}
+                            title={driver.profileId ? 'Redefinir senha' : 'Este motorista não possui login no sistema'}
+                            className="text-zinc-400 transition-colors hover:text-orange-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-zinc-400"
+                          >
+                            <KeyRound className="h-5 w-5" />
+                            <span className="sr-only">Redefinir senha</span>
+                          </button>
+                        )}
                         {canToggleActive && (
                           <button
                             onClick={() => toggleActiveMutation.mutate(driver)}
@@ -609,6 +622,12 @@ export default function Drivers() {
           }
         }}
         onClose={() => setDriverToDelete(null)}
+      />
+
+      <ResetDriverPasswordModal
+        open={!!driverToResetPassword}
+        driver={driverToResetPassword}
+        onClose={() => setDriverToResetPassword(null)}
       />
     </div>
   );
