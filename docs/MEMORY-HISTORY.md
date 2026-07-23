@@ -2,6 +2,29 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-22: Vídeo em loop no fundo da tela de login + poster de fallback
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão:
+
+1. `ffmpeg` foi provisionado e o vídeo `public/videos/BetaFleet_videoLogin.mp4` foi comprimido para `public/videos/login-bg.mp4` com H.264, `-an`, `scale='min(1280,iw)':-2`, `-preset slow`, `-crf 30` e `-movflags +faststart`. O resultado tem 351 KiB, 1280×720 e somente stream de vídeo; o original foi removido.
+2. `src/pages/Login.tsx` recebeu somente `poster="/images/login-bg.jpg"` no elemento `<video>`. O `src` `/videos/login-bg.mp4`, autoplay, loop, mute, `playsInline`, fallback por erro, layout, textos e lógica de autenticação permaneceram inalterados.
+3. O snapshot `e2e/visual/visual-regression.spec.ts-snapshots/login-visual-linux.png` foi regenerado. O Playwright também reescreveu incidentalmente o snapshot de checklist durante a atualização; essa alteração foi restaurada e não faz parte da sessão.
+
+### Validação
+
+- `npx tsc --noEmit`: 0 erros.
+- `npm run lint`: 0 erros / 190 warnings.
+- `npm run test:unit`: **1122/1122**.
+- Regressão visual: login passou contra o snapshot novo; dashboard passou. `checklist-fill` falhou contra o baseline existente com 48.338 pixels divergentes (ratio 0,06), sem alteração do snapshot fora do escopo.
+- `npm run test:smoke`: **6/6**.
+- Inspeção visual do snapshot do login confirmou o fundo de mídia renderizado atrás do formulário.
+
+### Observação
+
+A divergência do baseline de `checklist-fill` é pré-existente/fora do escopo desta sessão e foi registrada sem tentativa de correção, conforme o guardrail.
+
 ## Sessão — 2026-07-21: Reset de senha de motoristas pelo time de frota, com auditoria
 
 ### O que foi implementado

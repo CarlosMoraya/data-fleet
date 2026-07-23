@@ -44,6 +44,7 @@ export default function Login() {
         loop
         muted
         playsInline
+        poster="/images/login-bg.jpg"
         onError={() => setVideoFailed(true)}
       >
         <source src="/videos/login-bg.mp4" type="video/mp4" onError={() => setVideoFailed(true)} />
