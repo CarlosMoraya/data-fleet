@@ -84,6 +84,7 @@ export interface Checklist {
   odometerPhotoUrl?: string;
   driverId?: string;
   driverName?: string; // from join
+  vehicleDriverName?: string; // motorista vinculado ao veículo (from join), distinto de driverName (motorista de entrega/devolução)
   cnhPhotoUrl?: string;
   signatureUrl?: string;
   vehicleLinkDivergenceReasons?: VehicleLinkDivergenceReason[];

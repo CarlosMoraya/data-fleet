@@ -46,6 +46,28 @@ describe('checklistFromRow', () => {
     expect(checklist.signatureUrl).toBe('https://storage.example.com/assinatura.jpg');
   });
 
+  it('mapeia o nome do motorista vinculado ao veículo quando presente', () => {
+    const row: ChecklistRow = {
+      ...baseRow,
+      vehicles: { license_plate: 'ABC1D23', driver: { name: 'Jorge Santana' } },
+    };
+
+    const checklist = checklistFromRow(row);
+
+    expect(checklist.vehicleDriverName).toBe('Jorge Santana');
+  });
+
+  it('sem motorista vinculado ao veículo resulta em undefined sem lançar erro', () => {
+    const row: ChecklistRow = {
+      ...baseRow,
+      vehicles: { license_plate: 'ABC1D23' },
+    };
+
+    const checklist = checklistFromRow(row);
+
+    expect(checklist.vehicleDriverName).toBeUndefined();
+  });
+
   it('uma linha de histórico antigo (sem os campos novos) resulta em undefined sem lançar erro', () => {
     const checklist = checklistFromRow(baseRow);
 

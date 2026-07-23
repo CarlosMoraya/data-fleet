@@ -29,7 +29,7 @@ export interface ChecklistRow {
   vehicle_link_executor_vehicle_id: string | null;
   // join fields
   checklist_templates?: { name: string; context: string } | null;
-  vehicles?: { license_plate: string } | null;
+  vehicles?: { license_plate: string; driver?: { name: string } | null } | null;
   profiles?: { name: string } | null;
   workshops?: { name: string } | null;
   drivers?: { name: string } | null;
@@ -61,6 +61,7 @@ export function checklistFromRow(row: ChecklistRow): Checklist {
     versionNumber: row.version_number,
     vehicleId: row.vehicle_id ?? undefined,
     vehicleLicensePlate: row.vehicles?.license_plate ?? undefined,
+    vehicleDriverName: row.vehicles?.driver?.name ?? undefined,
     filledBy: row.filled_by,
     filledByName: row.profiles?.name ?? undefined,
     startedAt: row.started_at,

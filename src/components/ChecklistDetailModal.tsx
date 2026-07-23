@@ -98,6 +98,12 @@ export default function ChecklistDetailModal({ checklist, onClose }: Props) {
               <p className="text-xs tracking-wide text-zinc-400 uppercase">Preenchido por</p>
               <p className="font-medium text-zinc-800">{checklist.filledByName ?? '—'}</p>
             </div>
+            {checklist.vehicleDriverName && (
+              <div>
+                <p className="text-xs tracking-wide text-zinc-400 uppercase">Motorista do veículo</p>
+                <p className="font-medium text-zinc-800">{checklist.vehicleDriverName}</p>
+              </div>
+            )}
             <div>
               <p className="text-xs tracking-wide text-zinc-400 uppercase">Concluído em</p>
               <p className="font-medium text-zinc-800">{formatDate(checklist.completedAt)}</p>

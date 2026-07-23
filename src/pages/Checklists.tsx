@@ -124,7 +124,7 @@ export default function Checklists() {
     license_plate: string | null;
     category: string | null;
     status: string | null;
-    drivers: Array<{ profiles: Array<{ name: string | null }> | null }> | null;
+    drivers: { name: string | null } | Array<{ name: string | null }> | null;
   };
   type UnassignedDriverRow = { id: string; name: string };
   type VehicleDriverIdRow = { driver_id: string | null };
@@ -253,7 +253,7 @@ export default function Checklists() {
     queryFn: async () => {
       const { data } = await supabase
         .from('vehicles')
-        .select('id, license_plate, category, status, driver_id, drivers(profiles!profile_id(name))')
+        .select('id, license_plate, category, status, driver_id, drivers(name)')
         .eq('client_id', currentClient!.id)
         .order('license_plate');
 
@@ -263,7 +263,7 @@ export default function Checklists() {
         plate: v.license_plate,
         category: v.category,
         status: v.status as VehicleStatus | null,
-        driverName: v.drivers?.[0]?.profiles?.[0]?.name ?? null,
+        driverName: Array.isArray(v.drivers) ? v.drivers[0]?.name ?? null : v.drivers?.name ?? null,
       }));
     },
     enabled: isAuditor && !!currentClient?.id
@@ -351,7 +351,7 @@ export default function Checklists() {
     queryFn: async () => {
       let query = supabase
         .from('checklists')
-        .select('*, vehicles!vehicle_id(license_plate), profiles(name), checklist_templates(name, context), drivers!driver_id(name), assigned_driver:drivers!vehicle_link_assigned_driver_id(name), executor_vehicle:vehicles!vehicle_link_executor_vehicle_id(license_plate)')
+        .select('*, vehicles!vehicle_id(license_plate, driver:drivers!driver_id(name)), profiles(name), checklist_templates(name, context), drivers!driver_id(name), assigned_driver:drivers!vehicle_link_assigned_driver_id(name), executor_vehicle:vehicles!vehicle_link_executor_vehicle_id(license_plate)')
         .order('started_at', { ascending: false });
 
       if (currentClient?.id) {

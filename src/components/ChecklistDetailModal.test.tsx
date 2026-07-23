@@ -176,6 +176,25 @@ describe('ChecklistDetailModal', () => {
     expect(container.textContent).not.toContain('Evidências de Entrega/Devolução');
   });
 
+  it('com vehicleDriverName, exibe o motorista vinculado ao veículo', async () => {
+    await renderModal({ ...checklist, vehicleDriverName: 'Jorge Santana' });
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Motorista do veículo');
+      expect(container.textContent).toContain('Jorge Santana');
+    });
+  });
+
+  it('sem vehicleDriverName, não exibe o campo do motorista vinculado ao veículo', async () => {
+    await renderModal();
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Checklist Diário');
+    });
+
+    expect(container.textContent).not.toContain('Motorista do veículo');
+  });
+
   it('com vehicleLinkDivergenceReasons preenchido, exibe o texto de divergência e o nome do motorista vinculado', async () => {
     const divergentChecklist: Checklist = {
       ...checklist,
