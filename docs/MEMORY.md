@@ -5,6 +5,11 @@ Histórico detalhado de sessões anteriores: `docs/MEMORY-HISTORY.md`.
 
 ## Estado Atual
 
+- Bug corrigido: cards do Dashboard exibindo termos sem sentido ("Total de coelhos", "Botas Disponível") em alguns computadores
+  Causa raiz: index.html declarava <html lang="en"> com conteúdo 100% em português, confundindo o tradutor automático de navegadores (Chrome/Edge) com essa opção ativa, que mistraduzia textos curtos isolados
+  Correção aplicada: lang="en" trocado para lang="pt-BR" em index.html
+  Arquivos modificados: index.html
+  Testes adicionados: teste unitário verificando lang="pt-BR" em index.html
 - Bug corrigido: Auditor não via o motorista vinculado ao veículo (seleção de checklist mostrava "Sem motorista" mesmo com vínculo existente; modal de visualização não tinha o campo)
   Causa raiz: (1) RLS de public.drivers (policy drivers_select) não incluía o papel Yard Auditor; (2) a query de seleção do Auditor resolvia o nome via duplo join drivers→profiles, e a RLS de profiles também bloqueia Yard Auditor (rank 1 < Fleet Assistant rank 3), então só corrigir (1) não bastava; (3) ChecklistDetailModal nunca teve campo para o motorista do veículo, e a query de histórico não buscava esse dado
   Correção aplicada: migration incluindo 'Yard Auditor' em drivers_select; query auditorVehicles trocada de drivers(profiles!profile_id(name)) para drivers(name), eliminando a dependência de profiles; novo embed drivers!driver_id(name) dentro de vehicles!vehicle_id(...) na query de histórico de checklists; novo campo vehicleDriverName em ChecklistRow/Checklist; novo bloco condicional "Motorista do veículo" no ChecklistDetailModal

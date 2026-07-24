@@ -2,6 +2,32 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-23: Correção de idioma do documento HTML para evitar tradução automática incorreta
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION_FIXBUG.md` desta sessão:
+
+1. `index.html` teve o idioma do documento alterado de `en` para `pt-BR` (`<html lang="pt-BR">`).
+2. Novo teste unitário `src/__tests__/htmlLang.test.ts` lê o arquivo `index.html` e assegura que a tag `<html>` contém `lang="pt-BR"`, prevenindo regressão silenciosa do valor antigo.
+
+### Validação
+
+- `npx tsc --noEmit`: 0 erros.
+- `npm run lint`: 0 erros / 190 warnings.
+- `npm run test:unit -- htmlLang`: 1/1.
+- `npm run test:unit`: 1127/1127.
+- `npm run test:smoke`: 6/6.
+
+### Validação manual
+
+Não automatizável: confirmar em navegador Chrome/Edge com tradução automática ativa que os cards do Dashboard → Visão Geral mantêm os rótulos corretos em português ("Total de Veículos", "Veículos Disponíveis", "Veículos Indisponíveis", "Disponibilidade da Frota" etc.) e não são substituídos por termos sem sentido.
+
+### Observação
+
+- `<title>My Google AI Studio App</title>` em `index.html` permanece inalterado — título genérico, não relacionado ao bug, registrado como observação para futura evolução.
+- Como reforço opcional futuro, pode-se avaliar adicionar `<meta name="google" content="notranslate">` em `index.html` como camada extra de proteção contra tradução automática indesejada.
+
 ## Sessão — 2026-07-22: Vídeo em loop no fundo da tela de login + poster de fallback
 
 ### O que foi implementado
