@@ -175,6 +175,43 @@ Se a descrição da tarefa for vaga demais para um roteamento preciso, pergunte 
 
 \#\# Verificações de saúde — execute após a leitura dos arquivos
 
+\#\# Roteamento automático de testes por impacto
+
+O agente DEVE selecionar os testes pelo impacto real da tarefa, usando os arquivos planejados e, após a implementação, `git diff --name-only`. Não deve executar testes específicos de módulos que não foram afetados.
+
+### Testes universais — sempre obrigatórios
+
+Execute sempre:
+
+```bash
+npx tsc --noEmit
+npm run lint
+npm run test:unit
+npm run test:smoke
+```
+
+### Teste E2E de navegação entre Motoristas e Veículos
+
+O agente DEVE executar o E2E abaixo se qualquer uma destas condições for verdadeira:
+
+- o escopo inclui `src/pages/Drivers.tsx` ou `src/pages/Vehicles.tsx`;
+- o escopo inclui `src/components/DriverDetailModal.tsx`, `src/components/VehicleDetailModal.tsx` ou `src/components/common/LinkedRecordLink.tsx`;
+- o escopo inclui `src/lib/linkedRecordNavigation.ts` ou altera o parâmetro `open`, deep links, navegação entre cadastros ou edição a partir de modal;
+- o escopo altera permissões de edição ou comportamento específico de Fleet Analyst/Fleet Assistant;
+- o arquivo `e2e/pending/registry-cross-navigation.spec.ts` foi criado ou modificado.
+
+Quando acionado, execute nesta ordem:
+
+```bash
+npx playwright test e2e/setup/mariana.setup.ts --project=setup-mariana
+npx playwright test e2e/setup/pedro.setup.ts --project=setup-pedro
+PLAYWRIGHT_INCLUDE_PENDING=1 npx playwright test e2e/pending/registry-cross-navigation.spec.ts --project=chromium
+```
+
+Os setups regeneram as sessões locais ignoradas pelo Git. Se as credenciais, o servidor, os usuários de teste ou os dados operacionais necessários não estiverem disponíveis, registre a validação como bloqueada — não trate `skipped` como `passed`. Informe o motivo, o risco e o comando para reexecução.
+
+Se nenhum dos gatilhos acima for atendido, não execute esse E2E específico; os testes universais continuam obrigatórios.
+
 VERIFICAÇÃO 1 — TESTES DE FUMAÇA    
 "Antes de começar o planejamento, confirme primeiro as pré-condições operacionais dos testes de fumaça. Se elas estiverem satisfeitas, execute o comando oficial \`npm run test:smoke\` e me informe o resultado. Se não estiverem, peça explicitamente as 4 confirmações obrigatórias antes de continuar. Se o projeto ainda não tiver \`test:smoke\`, registre essa ausência e trate a criação do protocolo oficial como requisito antes de considerar o smoke atendido."
 
@@ -639,39 +676,22 @@ Quando identificar padrão de mercado aplicável:
 
 \#\# Sugestão de modelo de IA
 
-Após toda a análise e discussão sobre a implementação, com base nas decisões tomadas e após a criação do IMPLEMENTATION.md, leia MODEL\_SELECTION.md e com base nas informações desse arquivo, sugira exatamente 3 modelos de IA da lista abaixo com o melhor desempenho para a execução da especificação criada.
+Após criar o IMPLEMENTATION.md, execute integralmente o protocolo de seleção definido em `docs/MODEL\_SELECTION.md`. NÃO mantenha nenhuma lista de modelos, benchmark ou preço dentro deste prompt — a fonte única de verdade é o `docs/MODEL\_SELECTION.md` e o cache `docs/model-cache.md`. Manter dados de modelos aqui cria uma fonte paralela que desatualiza e induz recomendações erradas.
 
-Os 3 modelos devem ser apresentados nesta ordem: principal → fallback técnico → fallback de budget. A escolha deve seguir os critérios de matching descritos no MODEL\_SELECTION.md (Parte 4 — domínio funcional prevalece, Parte 6 — stack/linguagem, Parte 3 — camada do sistema, Parte 9 — tie-breakers, Parte 8 — anti-patterns).
+Siga rigorosamente a Seção 2 (Como usar) do `docs/MODEL\_SELECTION.md`, nesta ordem:
 
-Lista de modelos disponíveis (todos são open-weights ou open-API):
+1\. **Passo 1 — Cache primeiro.** Leia `docs/model-cache.md` e verifique a linha `Próxima atualização obrigatória:`. Se a data ainda não chegou, use os dados do cache e vá direto ao Passo 3. Nunca acesse a web sem necessidade.
+2\. **Passo 2 — Atualizar só se necessário.** Apenas se o cache não existir, estiver vencido, ou o usuário pedir explicitamente, faça o fetch das duas fontes (Artificial Analysis + Vellum AI) usando as URLs exatas da Seção 1 e regrave `docs/model-cache.md` no formato da Seção 5.
+3\. **Passo 3 — Classifique a complexidade** do IMPLEMENTATION.md desta sessão em Trivial / Médio / Complexo / Crítico, usando a tabela do Passo 3. Considere número de arquivos, camadas afetadas, presença de RLS/Auth/dados sensíveis e o domínio funcional do plano.
+4\. **Passo 4 — Selecione os 3 modelos** aplicando o critério do nível identificado (tabela do Passo 4) e removendo antes os modelos barrados pela Seção 3 (critérios de exclusão). Ordene do melhor custo-benefício (posição 1) ao mais robusto (posição 3).
+5\. **Passo 5 — Produza a saída EXATAMENTE no formato do Passo 5** do `docs/MODEL\_SELECTION.md`: linha de complexidade, data do cache e, para cada modelo, os campos Input $/M · Output $/M · Velocidade · Contexto, seguidos da justificativa.
 
-* glm-5.1 — Z.ai — líder SWE-Bench Pro (58,4%) e CyberGym (68,7); license MIT; execução autônoma sustentada de até 8h.
-* kimi-k2.6 — Moonshot AI — líder SWE-Bench Pro entre abertos (58,6%) e LiveCodeBench (89,6%); license Modified MIT; multimodal nativo; Agent Swarm 300 sub-agents.
-* deepseek-v4-pro — DeepSeek — líder LiveCodeBench (93,5%) e Codeforces (3206 Elo); license MIT; 1M context; melhor custo-benefício até 31/05/2026.
-* qwen3.6-plus — Alibaba — líder em "vibe coding" / frontend visual; 1M context; preserve\_thinking; closed-weights via API.
-* minimax-m2.5 — MiniMax — license MIT; melhor custo absoluto entre os abertos; SWE-Bench Verified 80,2%.
-* mimo-v2.5-pro — Xiaomi — license MIT; harness awareness; Terminal-Bench 2.0 68,4%; forte em Rust/systems e tool calling intensivo.
-* mimo-v2.5 — Xiaomi — license MIT; omnimodal nativo (text, image, video, audio); 1M context; ideal quando SPEC envolve assets multimodais.
-
-Ao final da criação do IMPLEMENTATION.md, apresente exatamente o formato abaixo:
-
-"Para executar IMPLEMENTATION.md eu sugiro os modelos a seguir que tem o melhor desempenho para essa tarefa:
-
-1\. \[modelo-principal\]    
-Justificativa: \[1-2 linhas citando o domínio identificado na SPEC e o benchmark/feature do docs/MODEL\_SELECTION.md que sustenta a recomendação\]
-
-2\. \[modelo-fallback-técnico\]    
-Justificativa: \[1-2 linhas\]
-
-3\. \[modelo-fallback-budget\]    
-Justificativa: \[1-2 linhas\]"
-
-Regras de redação:    
-\- Sempre exatamente 3 modelos.    
-\- Sempre nessa ordem: principal → fallback técnico → fallback de budget.    
-\- A justificativa deve citar o domínio específico da SPEC (não termos genéricos como "boa performance em coding").    
-\- A justificativa deve citar pelo menos um benchmark ou feature distintiva do docs/MODEL\_SELECTION.md.    
-\- Nunca recomende modelo que esteja listado como anti-pattern (Parte 8 do docs/MODEL\_SELECTION.md) para o caso identificado.
+Regras de redação:
+\- Sempre exatamente 3 modelos, ordenados do melhor custo-benefício ao mais robusto.
+\- A justificativa deve citar o domínio específico do IMPLEMENTATION.md (não termos genéricos como "boa performance em coding").
+\- A justificativa deve citar pelo menos um benchmark ou dado extraído do `docs/model-cache.md`.
+\- Nunca recomende um modelo barrado pelos critérios de exclusão (Seção 3 do `docs/MODEL\_SELECTION.md`).
+\- Se o cache não puder ser lido nem atualizado (por exemplo, sem acesso à web), registre isso explicitamente e sinalize que a recomendação está sem os dados de preço/velocidade — não invente números.
 
 Responda sempre em português do Brasil.
 

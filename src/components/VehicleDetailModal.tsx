@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { X, ExternalLink, Truck } from 'lucide-react';
+import { X, ExternalLink, Truck, Edit2 } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { couplingFromRow, type VehicleCouplingRow } from '../lib/couplingMappers';
@@ -11,6 +11,7 @@ import VehicleKmHistoryTab from './VehicleKmHistoryTab';
 interface Props {
   vehicle: Vehicle;
   onClose: () => void;
+  onEdit?: () => void;
 }
 
 function DetailField({ label, value }: { label: string; value?: string | number | null }) {
@@ -64,7 +65,7 @@ function formatDate(dateStr?: string | null): string | undefined {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR');
 }
 
-export default function VehicleDetailModal({ vehicle, onClose }: Props) {
+export default function VehicleDetailModal({ vehicle, onClose, onEdit }: Props) {
   const [activeTab, setActiveTab] = useState<'general' | 'kmHistory' | 'couplingHistory'>('general');
   const isImplement = vehicle.category === 'Semi-reboque/Implemento';
   const showCouplingHistory = isImplement || vehicle.type === 'Cavalo';
@@ -99,6 +100,16 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
   });
 
   const openCoupling = couplingHistory.find((coupling) => !coupling.uncoupledAt);
+
+  const { data: trailerKm } = useQuery({
+    queryKey: ['trailerEffectiveKm', vehicle.id],
+    enabled: isImplement,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('trailer_effective_km', { p_trailer_id: vehicle.id });
+      if (error) throw error;
+      return typeof data === 'number' ? data : null;
+    },
+  });
 
   return (
     <div
@@ -194,6 +205,12 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
                   <DetailField label="Tag" value={vehicle.tag} />
                   <DetailField label="Tipo" value={vehicle.type} />
                   <DetailField label="Categoria" value={vehicle.category} />
+                  {isImplement && (
+                    <DetailField
+                      label="Km da Carreta"
+                      value={trailerKm != null ? `${trailerKm.toLocaleString('pt-BR')} km` : undefined}
+                    />
+                  )}
                 </div>
               </div>
 
@@ -330,7 +347,17 @@ export default function VehicleDetailModal({ vehicle, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end border-t border-zinc-100 px-6 py-4">
+        <div className="flex justify-end gap-3 border-t border-zinc-100 px-6 py-4">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none"
+            >
+              <Edit2 className="h-4 w-4" />
+              Editar
+            </button>
+          )}
           <button
             onClick={onClose}
             className="rounded-xl border border-zinc-200 px-5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"

@@ -2,6 +2,31 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-26: Navegação cruzada entre Veículos e Motoristas e roteamento automático de testes
+
+### O que foi implementado
+
+Conforme `IMPLEMENTATION.md` desta sessão:
+
+1. Criado o helper `src/lib/linkedRecordNavigation.ts` para construir e interpretar deep links `?open=<id>`, com validação do UUID, rotas explícitas e remoção segura do parâmetro.
+2. Criado `LinkedRecordLink` para padronizar os links entre os registros de Veículos e Motoristas.
+3. As tabelas de Veículos e Motoristas passaram a abrir o detalhe do registro indicado pelo deep link depois que a lista completa termina de carregar, removendo o parâmetro com `replace`.
+4. Os modais `DriverDetailModal` e `VehicleDetailModal` passaram a expor o botão **Editar** no rodapé, reutilizando os handlers de edição existentes e mantendo o controle de permissão. O Fleet Assistant continua somente com visualização.
+5. Adicionados testes unitários dos helpers, links e modais, além de `e2e/pending/registry-cross-navigation.spec.ts` com cenários de navegação, edição, deep link, isolamento entre tenants e restrição do Fleet Assistant.
+6. `prompts/Evolucao.md` e `prompts/Fixbugs.md` receberam o algoritmo de decisão para invocar os testes E2E específicos somente quando o impacto do diff exigir; TypeScript, lint, unit e smoke permanecem obrigatórios. Falha de ambiente é bloqueio explícito e teste pulado não conta como aprovação.
+
+Nenhuma migration, policy ou alteração de dados foi feita. A consulta de precondição no DEV confirmou as policies de UPDATE existentes em `drivers` e `vehicles`, sem ampliação de acesso.
+
+### Validação
+
+- Testes focados: **15/15**.
+- `npx tsc --noEmit`: 0 erros.
+- `npm run lint`: 0 erros.
+- `npm run test:unit`: **1142/1142**.
+- `npm run test:smoke`: **6/6**.
+- E2E `registry-cross-navigation.spec.ts`: **8/8** (setup + 7 cenários), sem skips ou falhas.
+- Validação manual guiada testada e aprovada pelo usuário.
+
 ## Sessão — 2026-07-23: Correção de idioma do documento HTML para evitar tradução automática incorreta
 
 ### O que foi implementado

@@ -9,6 +9,7 @@ import SelectClientNotice from '../components/SelectClientNotice';
 import VehicleActiveFilterBanner from '../components/VehicleActiveFilterBanner';
 import VehicleDetailModal from '../components/VehicleDetailModal';
 import VehicleForm from '../components/VehicleForm';
+import LinkedRecordLink from '../components/common/LinkedRecordLink';
 import { useAuth } from '../context/AuthContext';
 import { usePersistentUiState, useSessionUiState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection } from '../lib/clientScope';
@@ -18,6 +19,11 @@ import { fieldSettingsFromRow, defaultFieldSettings, VehicleFieldSettingsRow } f
 import { clearVehicleDraftFiles } from '../lib/offline/vehicleDraftFiles';
 import { computeUnavailableVehicleIds } from '../lib/overviewFleetFilters';
 import { filterByActive } from '../lib/registryActiveFilter';
+import {
+  buildDriverRecordLink,
+  parseOpenRecordId,
+  withoutOpenRecordParam,
+} from '../lib/linkedRecordNavigation';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import {
@@ -320,6 +326,15 @@ export default function Vehicles() {
     }
   }, [searchParams, setSearchParams]);
 
+  useEffect(() => {
+    const openId = parseOpenRecordId(searchParams);
+    if (!openId) return;
+    if (loadingVehicles) return;
+    const target = vehicles.find((candidate) => candidate.id === openId);
+    if (target) setViewingVehicle(target);
+    setSearchParams(withoutOpenRecordParam(searchParams), { replace: true });
+  }, [searchParams, setSearchParams, vehicles, loadingVehicles]);
+
   const availableShippers = logisticsData?.shippers ?? [];
   const availableOperationalUnits = logisticsData?.units ?? [];
 
@@ -488,6 +503,13 @@ export default function Vehicles() {
     clients.forEach(c => map.set(c.id, c.name));
     return map;
   }, [clients]);
+
+  const openVehicleEditor = (vehicle: Vehicle) => {
+    clearVehicleDraft();
+    void clearVehicleDraftFiles();
+    setIsFormOpen(true);
+    setEditingVehicle(vehicle);
+  };
 
   return (
     <div className="flex h-full flex-col gap-6">
@@ -678,18 +700,21 @@ export default function Vehicles() {
                       <div>{vehicle.acquisition}</div>
                     </td>
                     <td className="max-w-[140px] px-3 py-4 text-sm text-zinc-500">
-                      {vehicle.driverName ? (() => {
+                      {vehicle.driverId && vehicle.driverName ? (() => {
                         const parts = vehicle.driverName.split(' ');
                         const firstLine = parts.slice(0, 2).join(' ');
                         const secondLine = parts.slice(2).join(' ');
                         return (
-                          <div className="flex items-start gap-1.5">
-                            <User className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-orange-500" />
+                          <LinkedRecordLink
+                            to={buildDriverRecordLink(vehicle.driverId)}
+                            title={`Abrir o motorista ${vehicle.driverName}`}
+                            icon={<User className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-orange-500" />}
+                          >
                             <span className="leading-snug text-zinc-900">
                               {firstLine}
                               {secondLine && <><br />{secondLine}</>}
                             </span>
-                          </div>
+                          </LinkedRecordLink>
                         );
                       })() : (
                         <span className="text-zinc-500 italic">Sem motorista</span>
@@ -746,12 +771,7 @@ export default function Vehicles() {
                         </button>
                         {canEdit && (
                           <button
-                            onClick={() => {
-                              clearVehicleDraft();
-                              void clearVehicleDraftFiles();
-                              setIsFormOpen(true);
-                              setEditingVehicle(vehicle);
-                            }}
+                            onClick={() => openVehicleEditor(vehicle)}
                             className="text-zinc-400 transition-colors hover:text-zinc-900"
                           >
                             <Edit2 className="h-5 w-5" />
@@ -798,6 +818,11 @@ export default function Vehicles() {
         <VehicleDetailModal
           vehicle={viewingVehicle}
           onClose={() => setViewingVehicle(null)}
+          onEdit={canEdit ? () => {
+            const vehicle = viewingVehicle;
+            setViewingVehicle(null);
+            openVehicleEditor(vehicle);
+          } : undefined}
         />
       )}
 

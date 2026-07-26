@@ -146,6 +146,43 @@ Leia o texto completo antes de qualquer hipótese. Mensagens de erro geralmente 
 
 \#\# Verificações de saúde — execute após a leitura dos arquivos
 
+\#\# Roteamento automático de testes por impacto
+
+O agente DEVE selecionar os testes pelo impacto real do bug, usando os arquivos candidatos à correção e, após a implementação, `git diff --name-only`. Não deve executar testes específicos de módulos que não foram afetados.
+
+### Testes universais — sempre obrigatórios
+
+Execute sempre:
+
+```bash
+npx tsc --noEmit
+npm run lint
+npm run test:unit
+npm run test:smoke
+```
+
+### Teste E2E de navegação entre Motoristas e Veículos
+
+O agente DEVE executar o E2E abaixo se qualquer uma destas condições for verdadeira:
+
+- o bug envolve `src/pages/Drivers.tsx` ou `src/pages/Vehicles.tsx`;
+- o bug envolve `src/components/DriverDetailModal.tsx`, `src/components/VehicleDetailModal.tsx` ou `src/components/common/LinkedRecordLink.tsx`;
+- o bug envolve `src/lib/linkedRecordNavigation.ts`, o parâmetro `open`, deep links, navegação entre cadastros ou edição a partir de modal;
+- o bug envolve permissões de edição ou comportamento específico de Fleet Analyst/Fleet Assistant;
+- o arquivo `e2e/pending/registry-cross-navigation.spec.ts` foi criado ou modificado.
+
+Quando acionado, execute nesta ordem:
+
+```bash
+npx playwright test e2e/setup/mariana.setup.ts --project=setup-mariana
+npx playwright test e2e/setup/pedro.setup.ts --project=setup-pedro
+PLAYWRIGHT_INCLUDE_PENDING=1 npx playwright test e2e/pending/registry-cross-navigation.spec.ts --project=chromium
+```
+
+Os setups regeneram as sessões locais ignoradas pelo Git. Se as credenciais, o servidor, os usuários de teste ou os dados operacionais necessários não estiverem disponíveis, registre a validação como bloqueada — não trate `skipped` como `passed`. Informe o motivo, o risco e o comando para reexecução.
+
+Se nenhum dos gatilhos acima for atendido, não execute esse E2E específico; os testes universais continuam obrigatórios.
+
 VERIFICAÇÃO 1 — TESTES DE FUMAÇA  
 "Antes de diagnosticar, confirme primeiro as pré-condições operacionais dos testes de fumaça. Se elas estiverem satisfeitas, execute o comando oficial \`npm run test:smoke\` e me informe o resultado. Se não estiverem, peça explicitamente as 4 confirmações obrigatórias antes de continuar. Se o projeto ainda não tiver \`test:smoke\`, registre essa ausência e trate a criação do protocolo oficial como lacuna antes de considerar o smoke atendido. Preciso saber o estado geral do sistema antes de tocar em qualquer coisa."
 
@@ -464,40 +501,23 @@ Registre, não corrija. Use sempre a frase:
 
 \#\# Sugestão de modelo de IA
 
-Após toda a análise e diagnóstico do bug, com base nas decisões tomadas e após a criação do IMPLEMENTATION\_FIXBUG.md, leia MODEL\_SELECTION.md e com base nas informações desse arquivo, sugira exatamente 3 modelos de IA da lista abaixo com o melhor desempenho para a execução da correção criada.
+Após criar o IMPLEMENTATION\_FIXBUG.md, execute integralmente o protocolo de seleção definido em `docs/MODEL\_SELECTION.md`. NÃO mantenha nenhuma lista de modelos, benchmark ou preço dentro deste prompt — a fonte única de verdade é o `docs/MODEL\_SELECTION.md` e o cache `docs/model-cache.md`. Manter dados de modelos aqui cria uma fonte paralela que desatualiza e induz recomendações erradas.
 
-Os 3 modelos devem ser apresentados nesta ordem: principal → fallback técnico → fallback de budget. Para correção de bugs, consulte preferencialmente a Parte 7 do MODEL\_SELECTION.md (matriz por tipo de bug) e depois a Parte 4 (domínio funcional afetado). Aplique os tie-breakers da Parte 9 e descarte modelos contraindicados pela Parte 8 (anti-patterns).
+Siga rigorosamente a Seção 2 (Como usar) do `docs/MODEL\_SELECTION.md`, nesta ordem:
 
-Lista de modelos disponíveis (todos são open-weights ou open-API):
+1\. **Passo 1 — Cache primeiro.** Leia `docs/model-cache.md` e verifique a linha `Próxima atualização obrigatória:`. Se a data ainda não chegou, use os dados do cache e vá direto ao Passo 3. Nunca acesse a web sem necessidade.
+2\. **Passo 2 — Atualizar só se necessário.** Apenas se o cache não existir, estiver vencido, ou o usuário pedir explicitamente, faça o fetch das duas fontes (Artificial Analysis + Vellum AI) usando as URLs exatas da Seção 1 e regrave `docs/model-cache.md` no formato da Seção 5.
+3\. **Passo 3 — Classifique a complexidade** da correção em Trivial / Médio / Complexo / Crítico, usando a tabela do Passo 3. Pese a camada afetada (frontend / backend / database / design / infra) e o domínio do bug. Bugs que envolvem segurança, RLS, autenticação ou dados sensíveis são nível **Crítico** — nesse nível a aptidão mínima é Qualidade ≥ 50 e/ou SWE-Bench/GPQA forte para o risco do plano; entre os modelos aptos, a ordenação continua sendo **menor custo**, e maior qualidade entra apenas como desempate técnico.
+4\. **Passo 4 — Selecione 1 opção paga/fechada e 1 opção aberta** aplicando o critério do nível identificado (tabela do Passo 4) e removendo antes os modelos barrados pela Seção 3 (critérios de exclusão). Divida os candidatos aptos em dois grupos (licença `Fechado` e licença `Aberto`) e ranqueie cada grupo **separadamente**, com o mesmo filtro de aptidão e a mesma ordenação por menor custo. Se nenhum modelo aberto atingir o threshold do nível, indique mesmo assim o melhor aberto disponível e **declare o risco** — nunca substitua a opção aberta por um segundo modelo pago.
+5\. **Passo 5 — Produza a saída EXATAMENTE no formato do Passo 5** do `docs/MODEL\_SELECTION.md`: frase de abertura, linha de complexidade, linha de fontes com a data do cache e, para cada uma das duas opções, os campos Input $/M · Output $/M · Blended $/M · Velocidade · Contexto, seguidos da justificativa.
 
-* glm-5.1 — Z.ai — líder SWE-Bench Pro (58,4%) e CyberGym (68,7); license MIT; ideal para bugs de comportamento de API, regras de negócio, segurança e infra.
-* kimi-k2.6 — Moonshot AI — líder SWE-Bench Pro entre abertos (58,6%) e LiveCodeBench (89,6%); multimodal nativo (interpreta prints anexados ao bug); ideal para race conditions e bugs intermitentes.
-* deepseek-v4-pro — DeepSeek — líder LiveCodeBench (93,5%) e Codeforces (3206 Elo); license MIT; ideal para bugs de query SQL, performance e algorítmicos; melhor custo até 31/05/2026.
-* qwen3.6-plus — Alibaba — líder em UI/visual; ideal para bugs visuais, de layout, animação e design system; closed-weights via API.
-* minimax-m2.5 — MiniMax — license MIT; melhor custo absoluto; ideal para bugs simples e correções pontuais.
-* mimo-v2.5-pro — Xiaomi — license MIT; harness awareness; Terminal-Bench 2.0 68,4%; ideal para bugs em Rust/systems e ambientes complexos com muitas ferramentas.
-* mimo-v2.5 — Xiaomi — license MIT; omnimodal nativo; ideal quando o bug envolve interpretação de prints, vídeos ou assets multimodais.
-
-Ao final da criação do IMPLEMENTATION\_FIXBUG.md, apresente exatamente o formato abaixo:
-
-"Para executar IMPLEMENTATION\_FIXBUG.md eu sugiro os modelos a seguir que tem o melhor desempenho para essa tarefa:
-
-1\. \[modelo-principal\]    
-Justificativa: \[1-2 linhas citando o tipo de bug identificado e o benchmark/feature do MODEL\_SELECTION.md que sustenta a recomendação\]
-
-2\. \[modelo-fallback-técnico\]    
-Justificativa: \[1-2 linhas\]
-
-3\. \[modelo-fallback-budget\]    
-Justificativa: \[1-2 linhas\]"
-
-Regras de redação:    
-\- Sempre exatamente 3 modelos.    
-\- Sempre nessa ordem: principal → fallback técnico → fallback de budget.    
-\- A justificativa deve citar o tipo de bug específico (visual, API, regra de negócio, query, race condition, segurança, etc.) e a camada afetada (frontend, backend, database, design, infra).    
-\- A justificativa deve citar pelo menos um benchmark ou feature distintiva do MODEL\_SELECTION.md.    
-\- Para BUG DE SEGURANÇA, glm-5.1 deve sempre ser uma das três opções por liderar CyberGym (68,7).    
-\- Nunca recomende modelo que esteja listado como anti-pattern (Parte 8 do MODEL\_SELECTION.md) para o caso identificado.
+Regras de redação:
+\- Sempre exatamente 2 modelos: uma opção paga/fechada e uma opção aberta, nessa ordem.
+\- Não escolha automaticamente o modelo de maior qualidade. Vale a regra anti-overkill: um modelo mais caro só entra se houver razão objetiva no plano (segurança crítica, baixa margem para retrabalho, benchmark fraco no tipo de tarefa, contexto insuficiente ou risco explícito de falha) — e essa razão deve estar citada na justificativa.
+\- A justificativa deve citar o tipo específico do bug (visual, API, regra de negócio, query, race condition, segurança, etc.) e a camada afetada.
+\- A justificativa deve citar pelo menos um benchmark ou dado extraído do `docs/model-cache.md`.
+\- Nunca recomende um modelo barrado pelos critérios de exclusão (Seção 3 do `docs/MODEL\_SELECTION.md`).
+\- Se o cache não puder ser lido nem atualizado (por exemplo, sem acesso à web), registre isso explicitamente e sinalize que a recomendação está sem os dados de preço/velocidade — não invente números.
 
 Responda sempre em português do Brasil.
 

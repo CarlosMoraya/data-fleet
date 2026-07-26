@@ -7,6 +7,7 @@ import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import DriverActiveFilterBanner from '../components/DriverActiveFilterBanner';
 import DriverDetailModal from '../components/DriverDetailModal';
 import DriverForm from '../components/DriverForm';
+import LinkedRecordLink from '../components/common/LinkedRecordLink';
 import ResetDriverPasswordModal from '../components/ResetDriverPasswordModal';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
@@ -27,6 +28,11 @@ import {
   type DriverVehicleLink,
 } from '../lib/driverFilters';
 import { driverFromRow, DriverRow } from '../lib/driverMappers';
+import {
+  buildVehicleRecordLink,
+  parseOpenRecordId,
+  withoutOpenRecordParam,
+} from '../lib/linkedRecordNavigation';
 import { filterByActive } from '../lib/registryActiveFilter';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
@@ -116,13 +122,14 @@ export default function Drivers() {
     queryFn: async () => {
       let query = supabase
         .from('vehicles')
-        .select('driver_id, license_plate, shipper_id, operational_unit_id, shippers(name), operational_units(name)')
+        .select('id, driver_id, license_plate, shipper_id, operational_unit_id, shippers(name), operational_units(name)')
         .not('driver_id', 'is', null);
       if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
       }
       const { data } = await query;
       const map: Record<string, {
+        vehicleId: string;
         plate: string;
         shipperId: string | null;
         shipperName: string | null;
@@ -130,6 +137,7 @@ export default function Drivers() {
         unitName: string | null;
       }> = {};
       (data ?? []).forEach((row: {
+        id: string;
         driver_id: string;
         license_plate: string;
         shipper_id: string | null;
@@ -140,6 +148,7 @@ export default function Drivers() {
         const shipper = Array.isArray(row.shippers) ? row.shippers[0] : row.shippers;
         const operationalUnit = Array.isArray(row.operational_units) ? row.operational_units[0] : row.operational_units;
         map[row.driver_id] = {
+          vehicleId: row.id,
           plate: row.license_plate,
           shipperId: row.shipper_id,
           shipperName: shipper?.name ?? null,
@@ -228,6 +237,15 @@ export default function Drivers() {
       );
     }
   }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const openId = parseOpenRecordId(searchParams);
+    if (!openId) return;
+    if (loadingDrivers) return;
+    const target = drivers.find((candidate) => candidate.id === openId);
+    if (target) setViewingDriver(target);
+    setSearchParams(withoutOpenRecordParam(searchParams), { replace: true });
+  }, [searchParams, setSearchParams, drivers, loadingDrivers]);
 
   // Redirect Drivers and Yard Auditors
   if (user && !ROLES_WITH_ACCESS.includes(user.role)) {
@@ -334,6 +352,12 @@ export default function Drivers() {
     clients.forEach(c => map.set(c.id, c.name));
     return map;
   }, [clients]);
+
+  const openDriverEditor = (driver: Driver) => {
+    clearDriverDraft();
+    setEditingDriver(driver);
+    setIsFormOpen(true);
+  };
 
   return (
     <div className="flex h-full flex-col gap-6">
@@ -497,11 +521,14 @@ export default function Drivers() {
                       }
                     </td>
                     <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
-                      {driverVehicleInfo[driver.id]?.plate ? (
-                        <div className="flex items-center gap-1.5">
-                          <Truck className="h-3.5 w-3.5 flex-shrink-0 text-orange-500" />
-                          <span className="font-medium text-zinc-900">{driverVehicleInfo[driver.id]?.plate}</span>
-                        </div>
+                      {driverVehicleInfo[driver.id]?.vehicleId ? (
+                        <LinkedRecordLink
+                          to={buildVehicleRecordLink(driverVehicleInfo[driver.id].vehicleId)}
+                          title={`Abrir o veículo ${driverVehicleInfo[driver.id].plate}`}
+                          icon={<Truck className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-orange-500" />}
+                        >
+                          <span className="font-medium text-zinc-900">{driverVehicleInfo[driver.id].plate}</span>
+                        </LinkedRecordLink>
                       ) : (
                         <span className="text-zinc-400 italic">Sem veículo</span>
                       )}
@@ -529,11 +556,7 @@ export default function Drivers() {
                         </button>
                         {canEdit && (
                           <button
-                            onClick={() => {
-                              clearDriverDraft();
-                              setEditingDriver(driver);
-                              setIsFormOpen(true);
-                            }}
+                            onClick={() => openDriverEditor(driver)}
                             className="text-zinc-400 transition-colors hover:text-zinc-900"
                           >
                             <Edit2 className="h-5 w-5" />
@@ -592,6 +615,11 @@ export default function Drivers() {
           driver={viewingDriver}
           vehiclePlate={driverVehicleInfo[viewingDriver.id]?.plate}
           onClose={() => setViewingDriver(null)}
+          onEdit={canEdit ? () => {
+            const driver = viewingDriver;
+            setViewingDriver(null);
+            openDriverEditor(driver);
+          } : undefined}
         />
       )}
 
