@@ -10,15 +10,18 @@ import ChecklistMapLink from '../components/ChecklistMapLink';
 import SelectClientNotice from '../components/SelectClientNotice';
 import TireInspectionDetailModal from '../components/TireInspectionDetailModal';
 import VehicleLinkDivergenceModal from '../components/VehicleLinkDivergenceModal';
+import VehicleLoanAlert from '../components/VehicleLoanAlert';
+import DriverLoanNotifications from '../components/DriverLoanNotifications';
 import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePersistentTabState, usePersistentFilterState, useSessionUiState } from '../hooks/usePersistentUiState';
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
-import { AUDITOR_ONLY_CONTEXTS, requiresHandoverEvidence, filterTemplatesByContext, filterVehiclesForContext } from '../lib/checklistContextRules';
+import { AUDITOR_ONLY_CONTEXTS, requiresHandoverEvidence, filterTemplatesByContext, filterAuditorVehiclesForContext, shouldCreateLoanOnHandover, getAvailableContextsForDriver } from '../lib/checklistContextRules';
 import { getChecklistStartBlockMessage, getTireInspectionStartBlockMessage } from '../lib/checklistStartGuard';
 import { templateFromRow, type ChecklistTemplateRow } from '../lib/checklistTemplateMappers';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { supabase } from '../lib/supabase';
+import { getActiveVehicleLoan, getActiveLoansForVehicles, getLoanDeliveryChecklistIds } from '../services/vehicleLoanService';
 import { tireInspectionFromRow, type TireInspectionRow } from '../lib/tireInspectionMappers';
 import { safeParseJson } from '../lib/uiStateStorage';
 import { cn } from '../lib/utils';
@@ -39,6 +42,7 @@ import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicle
 import { ODOMETER_UPDATE_CONTEXT } from '../types';
 
 import type { Checklist, ChecklistContext, ChecklistTemplate, TireInspection, AxleConfigEntry } from '../types';
+import type { VehicleLoan } from '../types/vehicleLoan';
 import type { VehicleStatus } from '../types/vehicle';
 
 const STATUS_LABEL: Record<string, string> = { in_progress: 'Em andamento', completed: 'Concluído' };
@@ -124,6 +128,7 @@ export default function Checklists() {
     license_plate: string | null;
     category: string | null;
     status: string | null;
+    driver_id: string | null;
     drivers: { name: string | null } | Array<{ name: string | null }> | null;
   };
   type UnassignedDriverRow = { id: string; name: string };
@@ -214,6 +219,15 @@ export default function Checklists() {
     [driverSelectableVehicles, driverSelectedVehicleId],
   );
 
+  // Empréstimo ativo do veículo selecionado pelo motorista — usado para liberar
+  // o contexto "Auditoria" ao TITULAR enquanto o veículo está emprestado.
+  const { data: driverActiveLoan = null } = useQuery({
+    queryKey: ['activeVehicleLoan', driverSelectedVehicleId],
+    queryFn: () => getActiveVehicleLoan(driverSelectedVehicleId!),
+    enabled: isDriver && !!driverSelectedVehicleId,
+    staleTime: 0,
+  });
+
   const { data: enforceDriverVehicleLink = false } = useQuery({
     queryKey: ['enforceDriverVehicleLink', currentClient?.id],
     queryFn: async () => {
@@ -236,7 +250,6 @@ export default function Checklists() {
         .eq('client_id', currentClient!.id)
         .eq('vehicle_category', selectedDriverVehicle!.category)
         .eq('status', 'published')
-        .not('context', 'in', `(${AUDITOR_ONLY_CONTEXTS.join(',')})`)
         .order('context');
       return (data ?? []).map(r => templateFromRow(r as ChecklistTemplateRow));
     },
@@ -246,6 +259,20 @@ export default function Checklists() {
     // de templates recém-publicados, exigindo refresh repetido pelo usuário).
     staleTime: 0,
   });
+
+  // Aplica a regra de contextos visíveis ao motorista: todos os publicados
+  // exceto auditor-only; titular com empréstimo ativo ganha adicionalmente
+  // "Auditoria".
+  const driverVisibleTemplates = useMemo(() => {
+    if (!isDriver) return publishedTemplates;
+    const publishedContexts = publishedTemplates.map((t) => t.context);
+    const allowed = getAvailableContextsForDriver({
+      publishedContexts,
+      hasActiveLoan: !!driverActiveLoan,
+      isTitular: !!selectedDriverVehicle?.isAssignedToMe,
+    });
+    return publishedTemplates.filter((t) => allowed.includes(t.context));
+  }, [isDriver, publishedTemplates, driverActiveLoan, selectedDriverVehicle]);
 
   // ── Queries for Auditor ───────────────────────────────────────────────────
   const { data: auditorVehicles = [] } = useQuery({
@@ -263,19 +290,36 @@ export default function Checklists() {
         plate: v.license_plate,
         category: v.category,
         status: v.status as VehicleStatus | null,
+        driverId: v.driver_id,
         driverName: Array.isArray(v.drivers) ? v.drivers[0]?.name ?? null : v.drivers?.name ?? null,
       }));
     },
     enabled: isAuditor && !!currentClient?.id
   });
 
+  const auditorVehicleIds = useMemo(() => auditorVehicles.map((v) => v.id), [auditorVehicles]);
+
+  // Empréstimos ativos dos veículos do Auditor — usado para incluir na lista
+  // de Devolução veículos emprestados que permanecem `Available` (o empréstimo
+  // não altera vehicles.status).
+  const { data: activeLoansForAuditorVehicles = new Map<string, VehicleLoan>() } = useQuery({
+    queryKey: ['activeLoansForVehicles', 'auditor', auditorVehicleIds],
+    queryFn: () => getActiveLoansForVehicles(auditorVehicleIds),
+    enabled: isAuditor && auditorVehicleIds.length > 0,
+  });
+
+  const activeLoanVehicleIds = useMemo(
+    () => new Set<string>(activeLoansForAuditorVehicles.keys()),
+    [activeLoansForAuditorVehicles],
+  );
+
   const [selectedContext, setSelectedContext] = useSessionUiState<ChecklistContext | ''>(
     'checklists', 'selection', 'auditor-context', '',
   );
 
   const filteredAuditorVehicles = useMemo(
-    () => filterVehiclesForContext(auditorVehicles, selectedContext || undefined),
-    [auditorVehicles, selectedContext],
+    () => filterAuditorVehiclesForContext({ vehicles: auditorVehicles, context: selectedContext || undefined, activeLoanVehicleIds }),
+    [auditorVehicles, selectedContext, activeLoanVehicleIds],
   );
 
   const selectedAuditorVehicle = useMemo(() =>
@@ -311,6 +355,54 @@ export default function Checklists() {
     'checklists', 'selection', 'auditor-driver', '',
   );
 
+  // Justificativa obrigatória (>= 10 chars) quando o Auditor inicia Entrega com
+  // motorista diferente do titular. Transportada em checklists.notes até a
+  // finalização (Decisão 6 — reutiliza coluna existente).
+  const [loanNotes, setLoanNotes] = useSessionUiState<string>(
+    'checklists', 'selection', 'loan-notes', '',
+  );
+
+  // Alerta/justificativa de "será criado empréstimo" só faz sentido em Entrega
+  // (Devolução finaliza um empréstimo existente, não cria um novo).
+  const isEntregaDifferentFromTitular = useMemo(
+    () => selectedContext === 'Entrega' && !!selectedVehicleId && shouldCreateLoanOnHandover(
+      selectedDriverId || undefined,
+      selectedAuditorVehicle?.driverId ?? null,
+      selectedContext || undefined,
+    ),
+    [selectedContext, selectedVehicleId, selectedDriverId, selectedAuditorVehicle?.driverId],
+  );
+
+  // Quando o Auditor escolhe Devolução de um veículo com empréstimo ativo,
+  // pré-seleciona o motorista do empréstimo (o temporário) para que a Devolução
+  // seja devolvida ao titular correto.
+  const { data: activeDevolucaoLoan } = useQuery({
+    queryKey: ['activeVehicleLoan', selectedVehicleId],
+    queryFn: () => getActiveVehicleLoan(selectedVehicleId!),
+    enabled: isAuditor && (selectedContext === 'Devolução') && !!selectedVehicleId,
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (!isAuditor) return;
+    if (selectedContext !== 'Devolução') return;
+    if (activeDevolucaoLoan && !selectedDriverId) {
+      setSelectedDriverId(activeDevolucaoLoan.driverId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDevolucaoLoan, selectedContext]);
+
+  // Em Devolução, a justificativa só é exigida quando o Auditor trocou o
+  // motorista da devolução em relação ao motorista do empréstimo ativo. Uma
+  // devolução normal (mesmo motorista) não exige justificativa.
+  const isDevolucaoDriverChanged = useMemo(
+    () => selectedContext === 'Devolução' && !!activeDevolucaoLoan && !!selectedDriverId
+      && selectedDriverId !== activeDevolucaoLoan.driverId,
+    [selectedContext, activeDevolucaoLoan, selectedDriverId],
+  );
+
+  const requiresLoanJustification = isEntregaDifferentFromTitular || isDevolucaoDriverChanged;
+
   const { data: unassignedDrivers = [] } = useQuery({
     queryKey: ['unassignedDrivers', currentClient?.id],
     queryFn: async () => {
@@ -326,6 +418,16 @@ export default function Checklists() {
     enabled: isAuditor && !!currentClient?.id,
     staleTime: 0,
   });
+
+  // Motorista do empréstimo ativo pode não estar em `unassignedDrivers` (ele
+  // segue vinculado ao veículo via empréstimo, não "sem veículo"). Garante
+  // que apareça como opção no dropdown de Devolução, no mesmo padrão do
+  // "motorista atual" do VehicleForm.
+  const devolucaoDriverOptions = useMemo(() => {
+    if (selectedContext !== 'Devolução' || !activeDevolucaoLoan) return unassignedDrivers;
+    if (unassignedDrivers.some((d) => d.id === activeDevolucaoLoan.driverId)) return unassignedDrivers;
+    return [...unassignedDrivers, { id: activeDevolucaoLoan.driverId, name: activeDevolucaoLoan.driverName ?? 'Motorista do empréstimo' }];
+  }, [selectedContext, activeDevolucaoLoan, unassignedDrivers]);
 
   // ── Shared Queries (Driver/Auditor/History) ────────────────────────────────
   const { data: openChecklist } = useQuery({
@@ -406,6 +508,14 @@ export default function Checklists() {
     () => new Set(Array.isArray(rawIssueChecklistIds) ? rawIssueChecklistIds : []),
     [rawIssueChecklistIds]
   );
+
+  // Checklists de Entrega que geraram empréstimo — sinaliza o selo
+  // "Empréstimo" no histórico (cards do Auditor/Motorista e tabela Assistant+).
+  const { data: loanDeliveryChecklistIds = new Set<string>() } = useQuery({
+    queryKey: ['loanDeliveryChecklistIds', checklists.map((c) => c.id)],
+    queryFn: () => getLoanDeliveryChecklistIds(checklists.map((c) => c.id)),
+    enabled: checklists.length > 0,
+  });
 
   // ── Tire inspection queries ───────────────────────────────────────────────
   const { data: tireInspections = [] } = useQuery({
@@ -564,7 +674,7 @@ export default function Checklists() {
   };
 
   const startMutation = useMutation({
-    mutationFn: async ({ template, vehicleId, driverId }: { template: ChecklistTemplate; vehicleId: string; driverId?: string }) => {
+    mutationFn: async ({ template, vehicleId, driverId, notes }: { template: ChecklistTemplate; vehicleId: string; driverId?: string; notes?: string }) => {
       const response = await supabase
         .from('checklists')
         .insert({
@@ -576,6 +686,7 @@ export default function Checklists() {
           status: 'in_progress',
           device_info: navigator.userAgent,
           driver_id: driverId ?? null,
+          notes: notes || null,
         })
         .select()
         .single();
@@ -609,7 +720,7 @@ export default function Checklists() {
     }
     setStartError(null);
     setStarting(template.id);
-    startMutation.mutate({ template, vehicleId, driverId });
+    startMutation.mutate({ template, vehicleId, driverId, notes: loanNotes || undefined });
   };
 
   const deleteMutation = useMutation({
@@ -729,9 +840,9 @@ export default function Checklists() {
                     ))}
                   </select>
                 </div>
-                {publishedTemplates.length > 0 ? (
+                {driverVisibleTemplates.length > 0 ? (
                   <div className="space-y-2">
-                    {publishedTemplates.map(t => (
+                    {driverVisibleTemplates.map(t => (
                       <div key={t.id} className="flex items-center justify-between gap-3 rounded-xl border border-zinc-100 p-3 hover:bg-zinc-50">
                         <div>
                           <p className="text-sm font-medium text-zinc-900">{t.name}</p>
@@ -783,7 +894,10 @@ export default function Checklists() {
             setHistoryStatusFilter={setHistoryStatusFilter}
             onView={setViewChecklist}
             formatDate={formatDate}
+            loanDeliveryChecklistIds={loanDeliveryChecklistIds}
           />
+
+          {isDriver && user?.id && <DriverLoanNotifications profileId={user.id} />}
         </div>
       )}
 
@@ -861,6 +975,22 @@ export default function Checklists() {
               </div>
             )}
 
+            {selectedContext === 'Devolução' && activeDevolucaoLoan && (
+              <VehicleLoanAlert
+                variant="active"
+                tempDriverName={activeDevolucaoLoan.driverName}
+                startedAt={activeDevolucaoLoan.startedAt}
+              />
+            )}
+
+            {isEntregaDifferentFromTitular && (
+              <VehicleLoanAlert
+                variant="will_create"
+                tempDriverName={unassignedDrivers.find((d) => d.id === selectedDriverId)?.name}
+                titularName={selectedAuditorVehicle?.driverName ?? undefined}
+              />
+            )}
+
             {requiresHandoverEvidence(selectedContext || undefined) && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-zinc-500">Motorista da entrega/devolução</label>
@@ -870,10 +1000,26 @@ export default function Checklists() {
                   className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                 >
                   <option value="">— Selecione um motorista —</option>
-                  {unassignedDrivers.map(d => (
+                  {devolucaoDriverOptions.map(d => (
                     <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {requiresLoanJustification && (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-500">
+                  Justificativa do empréstimo <span className="text-red-500">*</span>
+                  <span className="ml-1 text-zinc-400">(mínimo 10 caracteres)</span>
+                </label>
+                <textarea
+                  value={loanNotes}
+                  onChange={(e) => setLoanNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Informe o motivo do empréstimo temporário deste veículo..."
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+                />
               </div>
             )}
 
@@ -892,7 +1038,7 @@ export default function Checklists() {
                       <p className="text-xs text-zinc-500">{t.context}</p>
                     </div>
                     <button
-                      disabled={!!openChecklist || starting === t.id || (requiresHandoverEvidence(selectedContext || undefined) && !selectedDriverId)}
+                      disabled={!!openChecklist || starting === t.id || (requiresHandoverEvidence(selectedContext || undefined) && !selectedDriverId) || (requiresLoanJustification && loanNotes.trim().length < 10)}
                       onClick={() => startChecklist(t, selectedVehicleId, selectedDriverId || undefined)}
                       className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-medium text-white hover:bg-orange-600 disabled:opacity-50"
                     >
@@ -933,6 +1079,7 @@ export default function Checklists() {
             setHistoryStatusFilter={setHistoryStatusFilter}
             onView={setViewChecklist}
             formatDate={formatDate}
+            loanDeliveryChecklistIds={loanDeliveryChecklistIds}
           />
         </div>
       )}
@@ -1052,7 +1199,14 @@ export default function Checklists() {
                                   {c.templateName ?? '—'}
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-xs text-zinc-500">{c.templateContext ?? '—'}</td>
+                              <td className="px-4 py-3 text-xs text-zinc-500">
+                                {c.templateContext ?? '—'}
+                                {loanDeliveryChecklistIds.has(c.id) && c.templateContext === 'Entrega' && (
+                                  <span className="mt-1 block w-fit rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                    Empréstimo
+                                  </span>
+                                )}
+                              </td>
                               <td className="px-4 py-3 text-sm text-zinc-600">
                                 {c.vehicleLicensePlate ? (
                                   <>
@@ -1201,7 +1355,11 @@ export default function Checklists() {
       )}
 
       {viewChecklist && (
-        <ChecklistDetailModal checklist={viewChecklist} onClose={() => setViewChecklist(null)} />
+        <ChecklistDetailModal
+          checklist={viewChecklist}
+          onClose={() => setViewChecklist(null)}
+          isLoanDelivery={loanDeliveryChecklistIds.has(viewChecklist.id) && viewChecklist.templateContext === 'Entrega'}
+        />
       )}
 
       {viewTireInspection && (
@@ -1258,9 +1416,10 @@ interface HistoryCardProps {
   setHistoryStatusFilter: (v: 'all' | 'in_progress' | 'completed') => void;
   onView: (c: Checklist) => void;
   formatDate: (iso: string) => string;
+  loanDeliveryChecklistIds: Set<string>;
 }
 
-function HistoryCard({ checklists, historySearch, setHistorySearch, historyStatusFilter, setHistoryStatusFilter, onView, formatDate }: HistoryCardProps) {
+function HistoryCard({ checklists, historySearch, setHistorySearch, historyStatusFilter, setHistoryStatusFilter, onView, formatDate, loanDeliveryChecklistIds }: HistoryCardProps) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-5">
       <h2 className="mb-3 text-sm font-semibold text-zinc-700">Histórico</h2>
@@ -1301,6 +1460,11 @@ function HistoryCard({ checklists, historySearch, setHistorySearch, historyStatu
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-zinc-900">{c.templateName}</p>
                 <p className="text-xs text-zinc-500">{c.vehicleLicensePlate && `${c.vehicleLicensePlate} · `}{c.templateContext && `${c.templateContext} · `}{formatDate(c.startedAt)}</p>
+                {loanDeliveryChecklistIds.has(c.id) && c.templateContext === 'Entrega' && (
+                  <span className="mt-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                    Empréstimo
+                  </span>
+                )}
                 <ChecklistMapLink latitude={c.latitude} longitude={c.longitude} />
               </div>
               <span className={cn('flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[c.status])}>

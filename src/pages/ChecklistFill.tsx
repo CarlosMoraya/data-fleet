@@ -24,6 +24,7 @@ import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import { autoCompleteWorkshopSchedule, autoRetireVehicleFromWorkshop } from '../lib/workshopScheduleUtils';
 import { ODOMETER_UPDATE_CONTEXT, WORKSHOP_CONTEXTS } from '../types';
+import { completeVehicleLoan, createVehicleLoan, getActiveVehicleLoan } from '../services/vehicleLoanService';
 
 import type { Checklist, ChecklistItem, ResponseStatus } from '../types';
 
@@ -60,7 +61,7 @@ type OdometerIntervalSettingsRow = {
 
 export default function ChecklistFill() {
   const { checklistId } = useParams<{ checklistId: string }>();
-  const { currentClient } = useAuth();
+  const { currentClient, user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -520,6 +521,68 @@ export default function ChecklistFill() {
           checklist.workshopId,
           checklistId,
         );
+      }
+
+      // ── Empréstimo de veículos (Entrega/Devolução) ─────────────────────
+      // Caminho online apenas: a finalização de handover exige fotos ao vivo
+      // (CNH/assinatura), o que já força o uso online. Edge case aceito: se o
+      // finalize cair no branch offline em handover, nenhum empréstimo é criado.
+
+      if (templateContext === 'Entrega' && checklist.vehicleId && checklist.driverId && checklist.clientId) {
+        // Busca o titular atual do veículo (pode ser nulo).
+        const { data: vehRow, error: vehErr } = await supabase
+          .from('vehicles')
+          .select('driver_id')
+          .eq('id', checklist.vehicleId)
+          .maybeSingle();
+        if (vehErr) throw vehErr;
+        const titularId = (vehRow as { driver_id: string | null } | null)?.driver_id ?? null;
+
+        if (checklist.driverId !== titularId) {
+          try {
+            await createVehicleLoan({
+              clientId: checklist.clientId,
+              vehicleId: checklist.vehicleId,
+              driverId: checklist.driverId,
+              checklistId,
+              notes: checklist.notes ?? '',
+            });
+          } catch (loanErr) {
+            console.error('create_vehicle_loan error:', loanErr);
+            const code = (loanErr as { message?: string }).message ?? '';
+            const friendly = code.includes('LOAN_ALREADY_ACTIVE')
+              ? 'Já existe um empréstimo ativo para este veículo.'
+              : code.includes('LOAN_NOTES_TOO_SHORT')
+                ? 'Informe uma justificativa com pelo menos 10 caracteres.'
+                : code.includes('LOAN_ONLY_AUDITOR')
+                  ? 'Apenas o Yard Auditor pode registrar empréstimo.'
+                  : 'Não foi possível registrar o empréstimo do veículo. Tente novamente pela tela do veículo.';
+            throw new Error(friendly);
+          }
+        }
+      }
+
+      if (templateContext === 'Devolução' && checklist.vehicleId && user?.id) {
+        try {
+          const activeLoan = await getActiveVehicleLoan(checklist.vehicleId);
+          if (activeLoan) {
+            const divergentReturn = !!checklist.driverId && checklist.driverId !== activeLoan.driverId;
+            await completeVehicleLoan({
+              loanId: activeLoan.id,
+              returnChecklistId: checklistId,
+              endedReason: 'return_checklist',
+              endedBy: user.id,
+              endedNotes: divergentReturn ? (checklist.notes ?? null) : null,
+            });
+          }
+        } catch (loanErr) {
+          console.error('complete_vehicle_loan error:', loanErr);
+          const code = (loanErr as { message?: string }).message ?? '';
+          const friendly = code.includes('LOAN_NOT_FOUND_OR_CLOSED')
+            ? 'Empréstimo não encontrado ou já finalizado.'
+            : 'Não foi possível finalizar o empréstimo do veículo. Tente novamente pela tela do veículo.';
+          throw new Error(friendly);
+        }
       }
     },
     onSuccess: () => {

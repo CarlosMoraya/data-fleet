@@ -11,6 +11,7 @@ import type { Checklist, ChecklistResponse } from '../types';
 interface Props {
   checklist: Checklist;
   onClose: () => void;
+  isLoanDelivery?: boolean;
 }
 
 const STATUS_ICON = {
@@ -34,7 +35,7 @@ const STATUS_BG: Record<string, string> = {
   not_applicable: 'bg-zinc-50 border-zinc-200',
 };
 
-export default function ChecklistDetailModal({ checklist, onClose }: Props) {
+export default function ChecklistDetailModal({ checklist, onClose, isLoanDelivery }: Props) {
   const [responses, setResponses] = useState<ChecklistResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -70,6 +71,9 @@ export default function ChecklistDetailModal({ checklist, onClose }: Props) {
             <p className="text-sm text-zinc-500">
               {checklist.vehicleLicensePlate ?? 'Livre'} · {formatDate(checklist.startedAt)}
             </p>
+            {isLoanDelivery && (
+              <p className="mt-1 text-xs font-medium text-amber-700">Modalidade: Empréstimo</p>
+            )}
           </div>
           <button onClick={onClose} className="rounded-lg p-2 hover:bg-zinc-100">
             <X className="h-5 w-5 text-zinc-500" />

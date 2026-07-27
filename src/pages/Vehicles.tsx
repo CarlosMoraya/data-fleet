@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Download, Plus, Search, Edit2, Trash2, Truck, User, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
@@ -9,6 +9,7 @@ import SelectClientNotice from '../components/SelectClientNotice';
 import VehicleActiveFilterBanner from '../components/VehicleActiveFilterBanner';
 import VehicleDetailModal from '../components/VehicleDetailModal';
 import VehicleForm from '../components/VehicleForm';
+import VehicleLoanChangeTitularModal from '../components/VehicleLoanChangeTitularModal';
 import LinkedRecordLink from '../components/common/LinkedRecordLink';
 import { useAuth } from '../context/AuthContext';
 import { usePersistentUiState, useSessionUiState } from '../hooks/usePersistentUiState';
@@ -42,10 +43,12 @@ import { vehicleFromRow, VehicleRow } from '../lib/vehicleMappers';
 import { XlsxVehicleProvider } from '../services/vehicleExport/xlsxVehicleProvider';
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 import { saveVehicle, deleteVehicle, toggleVehicleActive } from '../services/vehicleService';
+import { completeVehicleLoan, getActiveVehicleLoan, getActiveLoansForVehicles } from '../services/vehicleLoanService';
 import { Vehicle } from '../types';
 
 import type { VehicleExportRow } from '../lib/vehicleExportRows';
 import type { VehicleFiles } from '../services/vehicleService';
+import type { VehicleLoan } from '../types/vehicleLoan';
 
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -73,6 +76,11 @@ export default function Vehicles() {
 
   const [viewingVehicle, setViewingVehicle] = useState<Vehicle | null>(null);
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
+
+  // Confirmação de troca de titular quando há empréstimo ativo.
+  const [loanChangeTitular, setLoanChangeTitular] = useState<VehicleLoan | null>(null);
+  const [loanChangeNewTitularName, setLoanChangeNewTitularName] = useState<string | undefined>(undefined);
+  const loanChangeResolveRef = useRef<((confirmed: boolean) => void) | null>(null);
 
   const clearVehicleDraft = () => {
     if (user?.id) {
@@ -361,7 +369,52 @@ export default function Vehicles() {
     vehicle: Partial<Vehicle>,
     files: VehicleFiles
   ): Promise<void> => {
+    // Gate de empréstimo ativo: ao trocar o titular de um veículo com
+    // empréstimo ativo, exigir confirmação e justificativa antes de salvar.
+    if (editingVehicle?.id && vehicle.driverId !== editingVehicle.driverId) {
+      try {
+        const active = await getActiveVehicleLoan(editingVehicle.id);
+        if (active) {
+          const newTitularName = vehicle.driverId
+            ? availableDrivers.find((d) => d.id === vehicle.driverId)?.name ?? undefined
+            : undefined;
+          const confirmed = await new Promise<boolean>((resolve) => {
+            loanChangeResolveRef.current = resolve;
+            setLoanChangeTitular(active);
+            setLoanChangeNewTitularName(newTitularName);
+          });
+          if (!confirmed) return;
+        }
+      } catch (err) {
+        console.error('Falha ao verificar empréstimo ativo antes de trocar titular:', err);
+        // Não bloquear a feature por falha de leitura; prossegue com o save.
+      }
+    }
     await saveMutation.mutateAsync({ vehicle, files });
+  };
+
+  const handleConfirmLoanChange = async (justificativa: string): Promise<void> => {
+    const loan = loanChangeTitular;
+    if (!loan || !loanChangeResolveRef.current || !user?.id) return;
+    await completeVehicleLoan({
+      loanId: loan.id,
+      returnChecklistId: null,
+      endedReason: 'driver_changed',
+      endedBy: user.id,
+      endedNotes: justificativa,
+    });
+    void queryClient.invalidateQueries({ queryKey: ['activeLoansForVehicles'] });
+    setLoanChangeTitular(null);
+    setLoanChangeNewTitularName(undefined);
+    loanChangeResolveRef.current(true);
+    loanChangeResolveRef.current = null;
+  };
+
+  const handleCancelLoanChange = () => {
+    setLoanChangeTitular(null);
+    setLoanChangeNewTitularName(undefined);
+    loanChangeResolveRef.current?.(false);
+    loanChangeResolveRef.current = null;
   };
 
   const deleteMutation = useMutation({
@@ -487,6 +540,14 @@ export default function Vehicles() {
     queryKey: ['vehicleLastKmMap', 'vehicles', vehicleIds],
     queryFn: () => getVehicleLastKmMap(vehicleIds),
     enabled: vehicleIds.length > 0,
+  });
+
+  // Empréstimos ativos dos veículos visíveis (1 query em lote; sem N+1).
+  const { data: activeLoansMap = new Map<string, VehicleLoan>() } = useQuery({
+    queryKey: ['activeLoansForVehicles', vehicleIds],
+    queryFn: () => getActiveLoansForVehicles(vehicleIds),
+    enabled: vehicleIds.length > 0,
+    staleTime: 0,
   });
 
   const vehicleDeleteBlockedReason = useMemo(() => {
@@ -719,6 +780,11 @@ export default function Vehicles() {
                       })() : (
                         <span className="text-zinc-500 italic">Sem motorista</span>
                       )}
+                      {activeLoansMap.get(vehicle.id)?.driverName && (
+                        <span className="mt-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          Emprestado ao Motorista {activeLoansMap.get(vehicle.id)?.driverName}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
                       {vehicle.shipperName ? (
@@ -857,6 +923,15 @@ export default function Vehicles() {
         }}
         onClose={() => setVehicleToDelete(null)}
       />
+
+      {loanChangeTitular && (
+        <VehicleLoanChangeTitularModal
+          loan={loanChangeTitular}
+          newTitularName={loanChangeNewTitularName}
+          onConfirm={handleConfirmLoanChange}
+          onCancel={handleCancelLoanChange}
+        />
+      )}
     </div>
   );
 }

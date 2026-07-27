@@ -5,8 +5,11 @@ import React, { useState } from 'react';
 import { couplingFromRow, type VehicleCouplingRow } from '../lib/couplingMappers';
 import { supabase } from '../lib/supabase';
 import { Vehicle } from '../types';
+import type { VehicleLoan } from '../types/vehicleLoan';
 
 import VehicleKmHistoryTab from './VehicleKmHistoryTab';
+import VehicleLoanHistory from './VehicleLoanHistory';
+import VehicleLoanDetail from './VehicleLoanDetail';
 
 interface Props {
   vehicle: Vehicle;
@@ -66,7 +69,8 @@ function formatDate(dateStr?: string | null): string | undefined {
 }
 
 export default function VehicleDetailModal({ vehicle, onClose, onEdit }: Props) {
-  const [activeTab, setActiveTab] = useState<'general' | 'kmHistory' | 'couplingHistory'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'kmHistory' | 'couplingHistory' | 'loans'>('general');
+  const [selectedLoan, setSelectedLoan] = useState<VehicleLoan | null>(null);
   const isImplement = vehicle.category === 'Semi-reboque/Implemento';
   const showCouplingHistory = isImplement || vehicle.type === 'Cavalo';
 
@@ -187,6 +191,19 @@ export default function VehicleDetailModal({ vehicle, onClose, onEdit }: Props) 
                 Histórico de Engates
               </button>
             ) : null}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'loans'}
+              onClick={() => setActiveTab('loans')}
+              className={`rounded-t-xl px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'loans'
+                  ? 'border-b-2 border-orange-500 text-orange-600'
+                  : 'text-zinc-500 hover:text-zinc-800'
+              }`}
+            >
+              Empréstimos
+            </button>
           </div>
 
           {activeTab === 'general' ? (
@@ -315,6 +332,11 @@ export default function VehicleDetailModal({ vehicle, onClose, onEdit }: Props) 
             </>
           ) : activeTab === 'kmHistory' ? (
             <VehicleKmHistoryTab vehicleId={vehicle.id} />
+          ) : activeTab === 'loans' ? (
+            <VehicleLoanHistory
+              vehicleId={vehicle.id}
+              onSelect={(loan) => setSelectedLoan(loan)}
+            />
           ) : (
             <div className="space-y-3">
               {couplingHistory.length === 0 ? (
@@ -366,6 +388,10 @@ export default function VehicleDetailModal({ vehicle, onClose, onEdit }: Props) 
           </button>
         </div>
       </div>
+
+      {selectedLoan && (
+        <VehicleLoanDetail loan={selectedLoan} onClose={() => setSelectedLoan(null)} />
+      )}
     </div>
   );
 }

@@ -5,6 +5,9 @@ import {
   vehicleStatusFilterFor,
   isHandoverGateBlocked,
   isAuditorOnlyContext,
+  getAvailableContextsForDriver,
+  shouldCreateLoanOnHandover,
+  filterAuditorVehiclesForContext,
 } from './checklistContextRules';
 import type { ChecklistContext } from '../types/checklist';
 
@@ -107,6 +110,136 @@ describe('checklistContextRules', () => {
 
     it('AUDITOR_ONLY_CONTEXTS contém exatamente Auditoria, Entrega e Devolução', () => {
       expect(AUDITOR_ONLY_CONTEXTS).toEqual(['Auditoria', 'Entrega', 'Devolução']);
+    });
+  });
+
+  describe('getAvailableContextsForDriver', () => {
+    const published: ChecklistContext[] = [
+      'Rotina',
+      'Auditoria',
+      'Entrega',
+      'Devolução',
+      'Segurança',
+      'Atualização de Hodômetro',
+    ];
+
+    it('sem empréstimo ativo: retorna apenas contextos não auditor-only (sem Auditoria)', () => {
+      const result = getAvailableContextsForDriver({ publishedContexts: published, hasActiveLoan: false, isTitular: true });
+      expect(result).not.toContain('Auditoria');
+      expect(result).not.toContain('Entrega');
+      expect(result).not.toContain('Devolução');
+      expect(result).toContain('Rotina');
+      expect(result).toContain('Segurança');
+    });
+
+    it('com empréstimo ativo + titular: inclui Auditoria adicionalmente', () => {
+      const result = getAvailableContextsForDriver({ publishedContexts: published, hasActiveLoan: true, isTitular: true });
+      expect(result).toContain('Auditoria');
+      expect(result).not.toContain('Entrega');
+      expect(result).not.toContain('Devolução');
+    });
+
+    it('com empréstimo ativo + NÃO titular (temporário): NÃO inclui Auditoria', () => {
+      const result = getAvailableContextsForDriver({ publishedContexts: published, hasActiveLoan: true, isTitular: false });
+      expect(result).not.toContain('Auditoria');
+    });
+
+    it('Entrega e Devolução nunca aparecem para o motorista, em nenhuma condição', () => {
+      for (const isTitular of [true, false]) {
+        for (const hasActiveLoan of [true, false]) {
+          const result = getAvailableContextsForDriver({ publishedContexts: published, hasActiveLoan, isTitular });
+          expect(result).not.toContain('Entrega');
+          expect(result).not.toContain('Devolução');
+        }
+      }
+    });
+
+    it('quando Auditoria não está publicado, titular com empréstimo não adiciona nada', () => {
+      const subset: ChecklistContext[] = ['Rotina', 'Auditoria'];
+      // Removemos Auditoria do publicado e esperamos que não seja adicionada
+      const publishedSemAuditoria = subset.filter((c) => c !== 'Auditoria');
+      const result = getAvailableContextsForDriver({ publishedContexts: publishedSemAuditoria, hasActiveLoan: true, isTitular: true });
+      expect(result).not.toContain('Auditoria');
+    });
+  });
+
+  describe('shouldCreateLoanOnHandover', () => {
+    it('retorna false para contexto não-handover (Rotina)', () => {
+      expect(shouldCreateLoanOnHandover('d1', 'd2', 'Rotina')).toBe(false);
+      expect(shouldCreateLoanOnHandover('d1', 'd2', 'Auditoria')).toBe(false);
+    });
+
+    it('retorna false quando não há driverId selecionado', () => {
+      expect(shouldCreateLoanOnHandover(undefined, 'd2', 'Entrega')).toBe(false);
+      expect(shouldCreateLoanOnHandover('', 'd2', 'Entrega')).toBe(false);
+    });
+
+    it('retorna true quando driver difere do titular em Entrega', () => {
+      expect(shouldCreateLoanOnHandover('d-temp', 'd-titular', 'Entrega')).toBe(true);
+      expect(shouldCreateLoanOnHandover('d-temp', 'd-titular', 'Devolução')).toBe(true);
+    });
+
+    it('retorna false quando driver == titular em handover', () => {
+      expect(shouldCreateLoanOnHandover('d1', 'd1', 'Entrega')).toBe(false);
+    });
+
+    it('titular nulo conta como diferente (empréstimo criado)', () => {
+      expect(shouldCreateLoanOnHandover('d1', null, 'Entrega')).toBe(true);
+      expect(shouldCreateLoanOnHandover('d1', undefined, 'Entrega')).toBe(true);
+    });
+  });
+
+  describe('filterAuditorVehiclesForContext', () => {
+    const vehicles = [
+      { id: 'v1', status: 'Available' as const },
+      { id: 'v2', status: 'In Use' as const },
+      { id: 'v3', status: 'Available' as const },
+      { id: 'v4', status: 'Maintenance' as const },
+    ];
+
+    it('Devolução inclui veículo com empréstimo ativo mesmo estando Available', () => {
+      const result = filterAuditorVehiclesForContext({
+        vehicles,
+        context: 'Devolução',
+        activeLoanVehicleIds: new Set(['v1']),
+      });
+      expect(result.map((v) => v.id)).toContain('v1');
+    });
+
+    it('Devolução inclui In Use sem empréstimo (comportamento legado)', () => {
+      const result = filterAuditorVehiclesForContext({
+        vehicles,
+        context: 'Devolução',
+        activeLoanVehicleIds: new Set(),
+      });
+      expect(result.map((v) => v.id)).toEqual(['v2']);
+    });
+
+    it('Devolução é a união de empréstimo ativo + In Use, sem duplicar', () => {
+      const result = filterAuditorVehiclesForContext({
+        vehicles,
+        context: 'Devolução',
+        activeLoanVehicleIds: new Set(['v1', 'v2']),
+      });
+      expect(result.map((v) => v.id).sort()).toEqual(['v1', 'v2']);
+    });
+
+    it('Entrega continua filtrando só Available (empréstimo ativo não afeta)', () => {
+      const result = filterAuditorVehiclesForContext({
+        vehicles,
+        context: 'Entrega',
+        activeLoanVehicleIds: new Set(['v2']),
+      });
+      expect(result.map((v) => v.id).sort()).toEqual(['v1', 'v3']);
+    });
+
+    it('contexto sem handover (ex.: Auditoria) permanece inalterado', () => {
+      const result = filterAuditorVehiclesForContext({
+        vehicles,
+        context: 'Auditoria',
+        activeLoanVehicleIds: new Set(['v1']),
+      });
+      expect(result).toEqual(vehicles);
     });
   });
 });
