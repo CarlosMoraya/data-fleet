@@ -39,6 +39,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'Controle de carretas', to: '/controle-carretas', icon: Link2, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Plano de Ação', to: '/acoes', icon: ClipboardList, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Agendamentos', to: '/agendamentos', icon: CalendarClock, roles: ['Driver', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
+  { name: 'Minha Oficina', to: '/minha-oficina', icon: Wrench, roles: ['Workshop'] },
   { name: 'Manutenção', to: '/manutencao', icon: Wrench, roles: ['Workshop', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Financeiro', to: '/financeiro', icon: Wallet, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master', 'Workshop', 'Financeiro'] },
   { name: 'Revisões de Garantia', to: '/revisoes-garantia', icon: ShieldCheck, roles: ['Fleet Analyst', 'Supervisor', 'Coordinator', 'Manager', 'Director', 'Admin Master'] },

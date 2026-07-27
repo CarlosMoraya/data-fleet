@@ -7,6 +7,7 @@ import MaintenanceDetailModal from '../components/MaintenanceDetailModal';
 import MaintenanceForm from '../components/MaintenanceForm';
 import MultiSelectDropdown from '../components/MultiSelectDropdown';
 import SelectClientNotice from '../components/SelectClientNotice';
+import WorkshopProfileBanner from '../components/WorkshopProfileBanner';
 import { useAuth } from '../context/AuthContext';
 import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection } from '../lib/clientScope';
@@ -14,10 +15,11 @@ import { formatDate } from '../lib/dateUtils';
 import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, matchesMaintenanceCard, countVehiclesNotWithdrawn, BUDGET_STATUS_FILTER_OPTIONS } from '../lib/maintenanceFilters';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
 import { canWorkshopFillOrder } from '../lib/maintenanceWorkshop';
-import { canEditWorkshopOrder, isOperationsManager } from '../lib/rolePermissions';
+import { isOperationsManager } from '../lib/rolePermissions';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import { cn } from '../lib/utils';
+import { canWorkshopActOnOrders } from '../lib/workshopProfile';
 import { savePendingPartPhotos, type PartPhotoDraft } from '../services/maintenancePartPhotoService';
 import {
   saveMaintenanceOrder,
@@ -25,9 +27,9 @@ import {
   cancelMaintenanceOrder,
 } from '../services/maintenanceService';
 
+import type { MaintenanceCardKey } from '../lib/maintenanceFilters';
 import type { Role } from '../types';
 import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus } from '../types/maintenance';
-import type { MaintenanceCardKey } from '../lib/maintenanceFilters';
 
 // Re-export para compatibilidade com componentes que importam daqui
 export type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus };
@@ -130,13 +132,13 @@ export function shouldEnableMaintenanceOrdersQuery(params: {
 }
 
 export default function Maintenance() {
-  const { currentClient, user: profile, clients } = useAuth();
+  const { currentClient, user: profile, clients, workshopAccount } = useAuth();
   const isWorkshopUser = profile?.role === 'Workshop';
   const isAdminMaster = profile?.role === 'Admin Master';
   const blockWrite = requiresClientSelection(profile?.role, currentClient?.id);
   const operationsManager = isOperationsManager(profile?.role);
   const canWriteMaintenance = !operationsManager && !isWorkshopUser && !blockWrite;
-  const canFillWorkshop = canEditWorkshopOrder(profile?.role);
+  const canFillWorkshop = canWorkshopActOnOrders(profile?.role, workshopAccount);
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = usePersistentFilterState<string[]>('maintenance', 'statuses', []);
   const [search, setSearch] = usePersistentFilterState<string>('maintenance', 'search', '');
@@ -358,6 +360,7 @@ export default function Maintenance() {
 
   return (
     <div className="flex h-full flex-col gap-6">
+      <WorkshopProfileBanner />
       {blockWrite && <SelectClientNotice />}
       {/* Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">

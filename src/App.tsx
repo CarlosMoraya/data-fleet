@@ -26,6 +26,7 @@ const ChecklistFill = lazy(() => import('./pages/ChecklistFill'));
 const ChecklistTemplates = lazy(() => import('./pages/ChecklistTemplates'));
 const ActionPlans = lazy(() => import('./pages/ActionPlans'));
 const Maintenance = lazy(() => import('./pages/Maintenance'));
+const MyWorkshop = lazy(() => import('./pages/MyWorkshop'));
 const AdminClients = lazy(() => import('./pages/AdminClients'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const Users = lazy(() => import('./pages/Users'));
@@ -113,6 +114,7 @@ export default function App() {
                 <Route path="acoes" element={<ActionPlans />} />
                 <Route path="agendamentos" element={<WorkshopSchedules />} />
                 <Route path="manutencao" element={<Maintenance />} />
+                <Route path="minha-oficina" element={<MyWorkshop />} />
                 <Route path="financeiro" element={<Financeiro />} />
                 <Route path="conta/senha" element={<ChangePassword />} />
                 <Route path="revisoes-garantia" element={<WarrantyRevisions />} />

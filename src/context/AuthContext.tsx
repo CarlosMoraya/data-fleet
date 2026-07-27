@@ -4,6 +4,7 @@ import { queryClient, persister } from '../lib/react-query';
 import { isOperationsManager } from '../lib/rolePermissions';
 import { supabase } from '../lib/supabase';
 import { clearCurrentUserUiState } from '../lib/uiStateStorage';
+import { workshopAccountFromRow, WorkshopAccountRow } from '../lib/workshopAccountMappers';
 import { User, Role, Client, WorkshopAccount, WorkshopPartnership } from '../types';
 
 interface AuthContextType {
@@ -22,6 +23,7 @@ interface AuthContextType {
   workshopAccount: WorkshopAccount | null;
   workshopPartnerships: WorkshopPartnership[];
   activeWorkshopId: string | null; // legacy_workshop_id da partnership ativa
+  refreshWorkshopAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -65,39 +67,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (profile.workshop_account_id) {
           const { data: waData } = await supabase
             .from('workshop_accounts')
-            .select('id, profile_id, name, cnpj, phone, email, contact_person, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_zip, specialties, notes, active')
+            .select('id, profile_id, name, cnpj, phone, email, contact_person, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_zip, specialties, notes, active, created_at, updated_at')
             .eq('id', profile.workshop_account_id)
             .single();
 
           if (waData) {
-            type WaRow = { id: string; profile_id: string; name: string; cnpj: string; phone: string | null; email: string | null; contact_person: string | null; address_street: string | null; address_number: string | null; address_complement: string | null; address_neighborhood: string | null; address_city: string | null; address_state: string | null; address_zip: string | null; specialties: string[] | null; notes: string | null; active: boolean };
-            const wa = waData as WaRow;
-            const account: WorkshopAccount = {
-              id: wa.id,
-              profileId: wa.profile_id,
-              name: wa.name,
-              cnpj: wa.cnpj,
-              phone: wa.phone ?? undefined,
-              email: wa.email ?? undefined,
-              contactPerson: wa.contact_person ?? undefined,
-              addressStreet: wa.address_street ?? undefined,
-              addressNumber: wa.address_number ?? undefined,
-              addressComplement: wa.address_complement ?? undefined,
-              addressNeighborhood: wa.address_neighborhood ?? undefined,
-              addressCity: wa.address_city ?? undefined,
-              addressState: wa.address_state ?? undefined,
-              addressZip: wa.address_zip ?? undefined,
-              specialties: wa.specialties ?? undefined,
-              notes: wa.notes ?? undefined,
-              active: wa.active,
-            };
+            const account = workshopAccountFromRow(waData as WorkshopAccountRow);
             setWorkshopAccount(account);
 
             // Buscar partnerships ativas com dados dos clientes
             const { data: partnershipsData } = await supabase
               .from('workshop_partnerships')
               .select('id, workshop_account_id, client_id, legacy_workshop_id, status, invited_at, accepted_at, clients(id, name, logo_url)')
-              .eq('workshop_account_id', wa.id)
+              .eq('workshop_account_id', account.id)
               .eq('status', 'active');
 
             if (partnershipsData && partnershipsData.length > 0) {
@@ -339,6 +321,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user?.role === 'Admin Master' ||
       (user?.role === 'Workshop' && workshopPartnerships.length > 1));
 
+  // Re-lê a conta da oficina logada e atualiza o estado (após self-service de cadastro)
+  const refreshWorkshopAccount = async (): Promise<void> => {
+    if (!workshopAccount) return;
+    try {
+      const { data } = await supabase
+        .from('workshop_accounts')
+        .select('id, profile_id, name, cnpj, phone, email, contact_person, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_zip, specialties, notes, active, created_at, updated_at')
+        .eq('id', workshopAccount.id)
+        .single();
+      if (data) {
+        setWorkshopAccount(workshopAccountFromRow(data as WorkshopAccountRow));
+      }
+    } catch (err) {
+      console.error('refreshWorkshopAccount error:', err);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -356,6 +355,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         workshopAccount,
         workshopPartnerships,
         activeWorkshopId,
+        refreshWorkshopAccount,
       }}
     >
       {children}

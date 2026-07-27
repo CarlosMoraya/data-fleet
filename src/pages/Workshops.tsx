@@ -374,6 +374,7 @@ export default function Workshops() {
 
       {isFormOpen && (
         <WorkshopForm
+          mode="client"
           workshop={editingWorkshop}
           onClose={() => {
             setIsFormOpen(false);

@@ -1,4 +1,6 @@
-import { WorkshopPartnership, WorkshopInvitation } from '../types';
+import { WorkshopAccount, WorkshopPartnership, WorkshopInvitation } from '../types';
+
+import { normalizeTrim, normalizeUpper } from './inputHelpers';
 
 // ─── Tipos espelho do banco (snake_case) ─────────────────────────────────────
 
@@ -53,6 +55,51 @@ export interface WorkshopInvitationRow {
 }
 
 // ─── Conversores: banco → frontend ───────────────────────────────────────────
+
+export function workshopAccountFromRow(row: WorkshopAccountRow): WorkshopAccount {
+  return {
+    id: row.id,
+    profileId: row.profile_id,
+    name: row.name,
+    cnpj: row.cnpj,
+    phone: row.phone ?? undefined,
+    email: row.email ?? undefined,
+    contactPerson: row.contact_person ?? undefined,
+    addressStreet: row.address_street ?? undefined,
+    addressNumber: row.address_number ?? undefined,
+    addressComplement: row.address_complement ?? undefined,
+    addressNeighborhood: row.address_neighborhood ?? undefined,
+    addressCity: row.address_city ?? undefined,
+    addressState: row.address_state ?? undefined,
+    addressZip: row.address_zip ?? undefined,
+    specialties: row.specialties ?? undefined,
+    notes: row.notes ?? undefined,
+    active: row.active,
+  };
+}
+
+// ─── Conversor: frontend → banco ────────────────────────────────────────────
+// Security contract: identity/immutable keys (`id`, `profile_id`, `cnpj`,
+// `active`, `created_at`, `updated_at`) are NEVER emitted in the returned
+// payload. Complements the DB trigger `protect_workshop_account_self_update`.
+
+export function workshopAccountToRow(account: Partial<WorkshopAccount>): Partial<WorkshopAccountRow> {
+  return {
+    name: normalizeTrim(account.name),
+    phone: normalizeTrim(account.phone) || null,
+    email: normalizeTrim(account.email) || null,
+    contact_person: normalizeTrim(account.contactPerson) || null,
+    address_street: normalizeTrim(account.addressStreet) || null,
+    address_number: normalizeTrim(account.addressNumber) || null,
+    address_complement: normalizeTrim(account.addressComplement) || null,
+    address_neighborhood: normalizeTrim(account.addressNeighborhood) || null,
+    address_city: normalizeTrim(account.addressCity) || null,
+    address_state: normalizeUpper(account.addressState) || null,
+    address_zip: normalizeTrim(account.addressZip) || null,
+    specialties: account.specialties?.length ? account.specialties : null,
+    notes: normalizeTrim(account.notes) || null,
+  };
+}
 
 export function workshopPartnershipFromRow(row: WorkshopPartnershipRow): WorkshopPartnership {
   return {

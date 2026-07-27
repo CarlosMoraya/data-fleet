@@ -1,7 +1,7 @@
 import { X, Wrench, AlertCircle } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
-import { isValidCNPJ } from '../lib/cnpjValidator';
+import { isValidCNPJ, formatCNPJ } from '../lib/cnpjValidator';
 import { filterText, filterCNPJ, filterPhone, filterCEP, filterAlpha } from '../lib/inputHelpers';
 import { supabase } from '../lib/supabase';
 import { WORKSHOP_SPECIALTIES } from '../lib/workshopMappers';
@@ -32,6 +32,8 @@ interface WorkshopFormProps {
   workshop: Workshop | null;
   onClose: () => void;
   onSave: (workshop: Partial<Workshop>) => Promise<void>;
+  /** 'client' (default): carrier creates/edits a workshop. 'self': workshop completes its own profile. */
+  mode?: 'client' | 'self';
 }
 
 // ─── Filtros por campo ────────────────────────────────────────────────────────
@@ -46,10 +48,14 @@ const FIELD_FILTERS: Record<string, (v: string) => string> = {
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
-export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopFormProps) {
+export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client' }: WorkshopFormProps) {
+  const isSelfMode = mode === 'self';
+  // Self mode uses a separate draft key so the workshop's draft never collides
+  // with the carrier's draft on the same machine.
+  const storageKey = isSelfMode ? 'workshopSelfFormData' : 'workshopFormData';
   const [formData, setFormData] = useState<Partial<Workshop>>(() => {
     try {
-      const saved = sessionStorage.getItem('workshopFormData');
+      const saved = sessionStorage.getItem(storageKey);
       return saved ? JSON.parse(saved) as Partial<Workshop> : {};
     } catch {
       return {};
@@ -65,8 +71,8 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
       ? { ...workshop }
       : { active: true, specialties: [] };
     setFormData(initial);
-    sessionStorage.setItem('workshopFormData', JSON.stringify(initial));
-  }, [workshop]);
+    sessionStorage.setItem(storageKey, JSON.stringify(initial));
+  }, [workshop, storageKey]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -74,12 +80,13 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
     const filtered = filter ? filter(value) : value;
     setFormData((prev) => {
       const next = { ...prev, [name]: filtered };
-      sessionStorage.setItem('workshopFormData', JSON.stringify(next));
+      sessionStorage.setItem(storageKey, JSON.stringify(next));
       return next;
     });
 
     // Verificar se CNPJ já existe globalmente (em workshop_accounts) ao criar nova oficina
-    if (name === 'cnpj' && !workshop && filtered.length === 14 && isValidCNPJ(filtered)) {
+    // (não roda em modo 'self' — o CNPJ da própria oficina é imutável neste modal)
+    if (name === 'cnpj' && !workshop && !isSelfMode && filtered.length === 14 && isValidCNPJ(filtered)) {
       supabase
         .from('workshop_accounts')
         .select('id')
@@ -94,7 +101,7 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
   const handleActiveToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => {
       const next = { ...prev, active: e.target.checked };
-      sessionStorage.setItem('workshopFormData', JSON.stringify(next));
+      sessionStorage.setItem(storageKey, JSON.stringify(next));
       return next;
     });
   };
@@ -106,7 +113,7 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
         ? current.filter((s) => s !== specialty)
         : [...current, specialty];
       const updated = { ...prev, specialties: next };
-      sessionStorage.setItem('workshopFormData', JSON.stringify(updated));
+      sessionStorage.setItem(storageKey, JSON.stringify(updated));
       return updated;
     });
   };
@@ -114,12 +121,17 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
   const handleClose = () => {
     sessionStorage.removeItem('workshopFormOpen');
     sessionStorage.removeItem('workshopFormEditing');
-    sessionStorage.removeItem('workshopFormData');
+    sessionStorage.removeItem(storageKey);
     onClose();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // HTML `required` does not cover a checkbox group — explicit validation in self mode.
+    if (isSelfMode && !(formData.specialties?.length)) {
+      setError('Selecione ao menos uma especialidade.');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -146,7 +158,7 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
               <Wrench className="h-4 w-4 text-orange-600" />
             </div>
             <h2 className="text-base font-semibold text-zinc-900">
-              {workshop ? 'Editar Oficina' : 'Nova Oficina'}
+              {isSelfMode ? 'Complete o cadastro da sua oficina' : workshop ? 'Editar Oficina' : 'Nova Oficina'}
             </h2>
           </div>
           <button onClick={handleClose} className="rounded-lg p-1 transition-colors hover:bg-zinc-100">
@@ -178,13 +190,20 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
                   <Label htmlFor="cnpj" required>CNPJ</Label>
                   <input
                     id="cnpj" name="cnpj" type="text" required
-                    value={formData.cnpj ?? ''}
+                    value={isSelfMode ? formatCNPJ(formData.cnpj ?? '') : formData.cnpj ?? ''}
                     onChange={handleChange}
                     className={inputClass}
                     placeholder="Somente números (14 dígitos)"
                     maxLength={14}
+                    readOnly={isSelfMode}
+                    disabled={isSelfMode}
                   />
-                  {!workshop && cnpjGlobalExists && (
+                  {isSelfMode && (
+                    <p className="mt-1.5 text-xs text-zinc-500">
+                      O CNPJ identifica sua oficina nas parcerias e não pode ser alterado aqui.
+                    </p>
+                  )}
+                  {!isSelfMode && !workshop && cnpjGlobalExists && (
                     <div className="mt-1.5 flex items-start gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
                       <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
                       <p className="text-xs text-blue-700">
@@ -194,9 +213,10 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="phone">Telefone</Label>
+                  <Label htmlFor="phone" required={isSelfMode}>Telefone</Label>
                   <input
                     id="phone" name="phone" type="text"
+                    required={isSelfMode}
                     value={formData.phone ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -205,9 +225,10 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
                   />
                 </div>
                 <div>
-                  <Label htmlFor="email">E-mail</Label>
+                  <Label htmlFor="email" required={isSelfMode}>E-mail</Label>
                   <input
                     id="email" name="email" type="email"
+                    required={isSelfMode}
                     value={formData.email ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -215,9 +236,10 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
                   />
                 </div>
                 <div>
-                  <Label htmlFor="contactPerson">Pessoa de Contato</Label>
+                  <Label htmlFor="contactPerson" required={isSelfMode}>Pessoa de Contato</Label>
                   <input
                     id="contactPerson" name="contactPerson" type="text"
+                    required={isSelfMode}
                     value={formData.contactPerson ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -234,9 +256,10 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
               </h3>
               <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-6">
                 <div className="sm:col-span-4">
-                  <Label htmlFor="addressStreet">Logradouro</Label>
+                  <Label htmlFor="addressStreet" required={isSelfMode}>Logradouro</Label>
                   <input
                     id="addressStreet" name="addressStreet" type="text"
+                    required={isSelfMode}
                     value={formData.addressStreet ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -244,9 +267,10 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <Label htmlFor="addressNumber">Número</Label>
+                  <Label htmlFor="addressNumber" required={isSelfMode}>Número</Label>
                   <input
                     id="addressNumber" name="addressNumber" type="text"
+                    required={isSelfMode}
                     value={formData.addressNumber ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -264,27 +288,30 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
                   />
                 </div>
                 <div className="sm:col-span-3">
-                  <Label htmlFor="addressNeighborhood">Bairro</Label>
+                  <Label htmlFor="addressNeighborhood" required={isSelfMode}>Bairro</Label>
                   <input
                     id="addressNeighborhood" name="addressNeighborhood" type="text"
+                    required={isSelfMode}
                     value={formData.addressNeighborhood ?? ''}
                     onChange={handleChange}
                     className={inputClass}
                   />
                 </div>
                 <div className="sm:col-span-3">
-                  <Label htmlFor="addressCity">Cidade</Label>
+                  <Label htmlFor="addressCity" required={isSelfMode}>Cidade</Label>
                   <input
                     id="addressCity" name="addressCity" type="text"
+                    required={isSelfMode}
                     value={formData.addressCity ?? ''}
                     onChange={handleChange}
                     className={inputClass}
                   />
                 </div>
                 <div className="sm:col-span-1">
-                  <Label htmlFor="addressState">UF</Label>
+                  <Label htmlFor="addressState" required={isSelfMode}>UF</Label>
                   <input
                     id="addressState" name="addressState" type="text"
+                    required={isSelfMode}
                     value={formData.addressState ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -293,9 +320,10 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <Label htmlFor="addressZip">CEP</Label>
+                  <Label htmlFor="addressZip" required={isSelfMode}>CEP</Label>
                   <input
                     id="addressZip" name="addressZip" type="text"
+                    required={isSelfMode}
                     value={formData.addressZip ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -313,7 +341,7 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
               </h3>
               <div className="space-y-4">
                 <div>
-                  <Label>Especialidades</Label>
+                  <Label required={isSelfMode}>Especialidades</Label>
                   <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {WORKSHOP_SPECIALTIES.map((specialty) => (
                       <label
@@ -344,23 +372,25 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
                   />
                 </div>
 
-                <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-                  <input
-                    id="active"
-                    type="checkbox"
-                    checked={formData.active ?? true}
-                    onChange={handleActiveToggle}
-                    className="h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
-                  />
-                  <div>
-                    <label htmlFor="active" className="block cursor-pointer text-sm font-medium text-zinc-700">
-                      Oficina ativa
-                    </label>
-                    <p className="mt-0.5 text-xs text-zinc-500">
-                      Oficinas inativas não aparecem para seleção em manutenções.
-                    </p>
+                {!isSelfMode && (
+                  <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+                    <input
+                      id="active"
+                      type="checkbox"
+                      checked={formData.active ?? true}
+                      onChange={handleActiveToggle}
+                      className="h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+                    />
+                    <div>
+                      <label htmlFor="active" className="block cursor-pointer text-sm font-medium text-zinc-700">
+                        Oficina ativa
+                      </label>
+                      <p className="mt-0.5 text-xs text-zinc-500">
+                        Oficinas inativas não aparecem para seleção em manutenções.
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -388,7 +418,7 @@ export default function WorkshopForm({ workshop, onClose, onSave }: WorkshopForm
               disabled={saving}
               className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-60"
             >
-              {saving ? 'Salvando...' : workshop ? 'Salvar Alterações' : 'Cadastrar Oficina'}
+              {saving ? 'Salvando...' : isSelfMode ? 'Salvar cadastro' : workshop ? 'Salvar Alterações' : 'Cadastrar Oficina'}
             </button>
           </div>
         </div>

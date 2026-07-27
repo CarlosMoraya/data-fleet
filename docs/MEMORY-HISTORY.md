@@ -2,6 +2,164 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-07-27: Oficinas — self-service de cadastro completo pela oficina convidada
+
+### Contexto
+
+Sessão Tipo 4 (mudança estrutural), plano fechado em `IMPLEMENTATION.md`. Até então, o cadastro de uma oficina parceira era feito inteiramente pela transportadora que a convidava; a própria oficina não tinha como completar/corrigir seus dados. Esta sessão deu à oficina um modal próprio de self-service, reutilizando o `WorkshopForm` existente, e tornou o preenchimento obrigatório na prática (bloqueio de ações em Manutenção enquanto incompleto).
+
+### O que foi implementado (escopo fechado)
+
+1. **`src/lib/workshopProfile.ts`** (novo, função pura, sem React/Supabase): `REQUIRED_WORKSHOP_PROFILE_FIELDS` (11 campos), `WORKSHOP_PROFILE_FIELD_LABELS`, `missingWorkshopProfileFields`, `isWorkshopProfileComplete`, `canWorkshopActOnOrders` (compõe `canEditWorkshopOrder` existente). `notes` e `addressComplement` são opcionais. Testado em `workshopProfile.test.ts` (cenário feliz, 1 teste por campo obrigatório, `specialties`, espaços em branco, `account === null`, composição do gate).
+2. **Migration `supabase/migrations/20260727000000_workshop_self_service_profile.sql`**: (a) amplia o CHECK de `workshop_partnership_audit.action` com `'workshop_name_changed'`; (b) `protect_workshop_account_self_update()` — trigger `BEFORE UPDATE` que força `NEW.cnpj`/`NEW.active`/`NEW.profile_id` a manterem `OLD.*` quando `auth.uid() = OLD.profile_id` (a Edge Function de aceite de convite usa service role, `auth.uid()` nulo, e não é afetada); (c) `sync_workshop_account_to_legacy()` — trigger `AFTER UPDATE` que propaga campos cadastrais (nome, contato, endereço, especialidades, observações) para todos os `workshops` das parcerias ativas, **proibido propagar `active`/`cnpj`/`client_id`/`profile_id`/`id`** (decisão: `active` é decisão por transportadora); (d) `audit_workshop_account_name_change()` — trigger `AFTER UPDATE` que insere em `workshop_partnership_audit` uma linha por parceria ativa quando o nome muda, com `performed_by = COALESCE(auth.uid(), NEW.profile_id)`. Nenhuma policy existente foi alterada.
+3. **`src/lib/workshopAccountMappers.ts`**: adicionados `workshopAccountFromRow`/`workshopAccountToRow` (o segundo omite `id`/`profile_id`/`cnpj`/`active`/`created_at`/`updated_at` do payload — defesa em duas camadas junto com o trigger). Testado em `workshopAccountMappers.test.ts`, incluindo o cenário de segurança de contrato.
+4. **`src/context/AuthContext.tsx`**: `fetchProfile` passou a usar `workshopAccountFromRow` (eliminando conversão inline duplicada); novo método `refreshWorkshopAccount()` no contrato do contexto, para recarregar a conta após o self-service salvar.
+5. **`src/components/WorkshopForm.tsx`**: nova prop `mode?: 'client' | 'self'` (default `'client'`, comportamento antigo intacto). Em `'self'`: título "Complete o cadastro da sua oficina", CNPJ `readOnly`/`disabled` com texto explicativo (sem checar `cnpjGlobalExists`), sem o bloco "Oficina ativa", todos os campos obrigatórios marcados, validação explícita de especialidade antes do submit, botão "Salvar cadastro", chave de `sessionStorage` própria (`workshopSelfFormData`) para não colidir com o rascunho da transportadora. Testado em `WorkshopForm.test.tsx` (regressão do modo `'client'` + os 4 cenários do modo `'self'`).
+6. **`src/pages/MyWorkshop.tsx`** (novo): página exclusiva do papel `Workshop`, hospeda `WorkshopForm mode="self"`, salva via `workshop_accounts.update(workshopAccountToRow(...))`, chama `refreshWorkshopAccount()` + invalida `['maintenance']`/`['workshops']` e navega para `/manutencao`.
+7. **`src/App.tsx`** / **`src/components/Sidebar.tsx`**: rota `minha-oficina` + item de menu "Minha Oficina" (ícone `Wrench`, só papel `Workshop`), posicionado imediatamente antes de "Manutenção". Testado em `Sidebar.test.tsx` (visibilidade por papel + regressão de contagem para Admin Master).
+8. **`src/components/WorkshopProfileBanner.tsx`** (novo): faixa âmbar na Manutenção, visível só para `Workshop` com cadastro incompleto, lista os campos faltantes e leva a `/minha-oficina`. Testado em `WorkshopProfileBanner.test.tsx`.
+9. **`src/pages/Maintenance.tsx`**: `canFillWorkshop` passou de `canEditWorkshopOrder(profile?.role)` para `canWorkshopActOnOrders(profile?.role, workshopAccount)`; `<WorkshopProfileBanner />` renderizado no topo da página.
+10. **`src/pages/WorkshopJoin.tsx`**: aviso de compartilhamento de dados (LGPD) no passo "Já tenho conta", informando que os dados cadastrais já preenchidos serão compartilhados com a nova transportadora.
+11. **`src/pages/Workshops.tsx`**: `<WorkshopForm mode="client" />` explícito no ponto de uso da transportadora.
+
+### Decisões tomadas
+
+Propagação por trigger (não reescrita de consultas); `active` não é propagado (decisão por transportadora); nome é editável com auditoria (CNPJ trava a identidade); Complemento e Observações opcionais; `ROLES_CAN_EDIT` de `Workshops.tsx` **não** foi ampliada para `Fleet Assistant` (permanece Fleet Analyst+); nenhum fluxo de aprovação da transportadora sobre os dados da oficina — a transportadora mantém controle via desativação da parceria.
+
+### Validação automatizada
+
+`npx tsc --noEmit` 0 erros; `npx eslint src/` 0 erros / 224 warnings (dentro dos padrões já tolerados de `react-hooks/rules-of-hooks` e `no-unsafe-*`); `npm run test:unit` **1226/1226**; `npm run test:smoke` **6/6**.
+
+### Validação por SQL no DEV (Etapa 9)
+
+Executada com o usuário de teste `workshop@demo.betafleet.local` (`workshop_accounts.id = 138972b8-27d7-403d-aad6-87c7b222f244`, parceria ativa com `legacy_workshop_id = e0073990-e1cf-46cd-a498-48f8e95ac272`), via `curl` contra a REST API do Supabase DEV, usando um token de sessão real obtido por `POST /auth/v1/token?grant_type=password` (não `service_role`), para que `auth.uid()` ficasse preenchido dentro dos triggers:
+
+- **9.1** (crítico): PATCH simultâneo de `cnpj`, `active` e `phone` autenticado como a própria oficina → `phone` atualizado, `cnpj`/`active` preservados. **PASSOU**.
+- **9.2**: `UPDATE workshop_accounts.address_city` → propagado para o `workshops` legado da parceria ativa. **PASSOU**.
+- **9.3** (crítico, a regressão mais perigosa): legado desativado manualmente (`workshops.active = false`), depois oficina edita `phone` → `active` do legado permanece `false` (não foi sobrescrito pelo trigger de sincronização). **PASSOU**.
+- **9.4**: `UPDATE workshop_accounts.name` → nova linha em `workshop_partnership_audit` com `action = 'workshop_name_changed'`, `details.from`/`details.to` corretos, `performed_by` coerente. **PASSOU**.
+- **9.5**: todos os valores de teste (`name`, `phone`, `address_city` da conta; `active` do legado) restaurados aos originais ao final.
+
+### Validação manual guiada (Etapa 10)
+
+Os 10 passos foram confirmados pelo usuário.
+
+### Promoção a PROD
+
+Migration `20260727000000_workshop_self_service_profile.sql` aplicada pelo usuário em PROD (`oajfjdadcicgoxrfrnny`) em 2026-07-27, com autorização expressa, após validação completa em DEV (Etapas 9 e 10).
+
+### Pendências
+
+- `docs/SPEC.md` não documenta ainda o ciclo de vida `workshop_accounts` (fonte de verdade) × `workshops` (cópia por tenant).
+- Edge Function `workshop-accept-invitation` duplica a lista de colunas cadastrais em dois pontos — candidata a simplificação futura agora que o trigger de sincronização existe.
+- `WorkshopForm.tsx` segue usando `sessionStorage` direto (fora da convenção `bf:v1:ui`); esta sessão só acrescentou mais uma chave (`workshopSelfFormData`) por consistência interna com o padrão já existente no arquivo.
+- Sem rate limiting no update do cadastro pela própria oficina (risco aceito, registrado em `docs/MEMORY.md`).
+
+## Sessão — 2026-07-26 (correção): Vehicle Loans — nomes de "Criado por"/"Finalizado por" e datas de checklist no detalhe do empréstimo
+
+### Contexto
+
+Sessão de correção pós-implementação, escopo fechado no `IMPLEMENTATION.md` (seção "CORREÇÃO PÓS-IMPLEMENTAÇÃO — 2026-07-26"). Sintoma (reportado pelo usuário, perfil Coordinator): no modal "Detalhes do empréstimo" (`VehicleLoanDetail`), os campos "Criado por"/"Finalizado por" exibiam o UUID do perfil em vez do nome, e "Motivo da finalização" exibia o valor cru `driver_changed`. Causa raiz: o plano original resolveu apenas o nome do motorista; os nomes de `created_by`/`ended_by` (referenciam `profiles.id`) nunca foram resolvidos. Resolver via embed de `profiles` no cliente não funciona, pois o histórico também é visível ao Yard Auditor (rank 1), bloqueado pela RLS de `profiles` (mesmo problema do MEMORY 2026-07-24).
+
+### O que foi implementado (escopo fechado)
+
+1. **Migration nova** `supabase/migrations/20260726130000_vehicle_loan_history_names.sql`:
+   - `CREATE OR REPLACE FUNCTION public.get_vehicle_loans_by_vehicle(p_vehicle_id UUID) RETURNS TABLE(...)`, `SECURITY DEFINER`, `SET search_path = public`: retorna todas as colunas de `vehicle_loans` do veículo (tenant do chamador; Admin Master isento) + `driver_name` (LEFT JOIN `drivers`) + `created_by_name` (LEFT JOIN `profiles pc ON pc.id = vl.created_by`) + `ended_by_name` (LEFT JOIN `profiles pe ON pe.id = vl.ended_by`) + `delivery_checklist_at` (`COALESCE(dc.completed_at, dc.started_at)`) + `return_checklist_at` (`COALESCE(rc.completed_at, rc.started_at)`), ordenado por `started_at DESC`. Colunas qualificadas (`vl.`, `d.`, `pc.`, `pe.`, `dc.`, `rc.`) para evitar `ambiguous`. `GRANT EXECUTE` a `authenticated`.
+   - `CREATE OR REPLACE FUNCTION public.get_active_vehicle_loan(p_vehicle_id UUID)`: mesmos LEFT JOINs adicionados ao retorno (sem alterar a lógica de filtro `status='active'` e isolamento por tenant).
+2. `src/types/vehicleLoan.ts`: adicionados `createdByName?: string | null;`, `endedByName?: string | null;`, `deliveryChecklistAt?: string | null;`, `returnChecklistAt?: string | null;` à interface `VehicleLoan`.
+3. `src/lib/vehicleLoanMappers.ts`: `VehicleLoanRpcRow` estendido; `vehicleLoanFromRpcRow` mapeia os 4 novos campos (null-safe).
+4. `src/services/vehicleLoanService.ts`: `listVehicleLoansByVehicle` trocou de `select` direto para `supabase.rpc('get_vehicle_loans_by_vehicle', { p_vehicle_id: vehicleId })`, mapeando cada linha com `vehicleLoanFromRpcRow`. `getActiveLoan` passa a receber os nomes já resolvidos. `getActiveLoansForVehicles` (destaque na lista) permanece com `select` direto, pois só precisa do nome do motorista — não dos nomes de `profiles`.
+5. `src/lib/vehicleLoanStatus.ts`: adicionado `getVehicleLoanEndedReasonLabel(reason?)` com 5 rótulos legíveis (`return_checklist` → "Devolução por checklist"; `driver_changed` → "Troca de motorista titular"; `cancelled` → "Cancelado"; `other` → "Outro"; nulo/indefinido → "—").
+6. `src/components/VehicleLoanDetail.tsx`:
+   - "Criado por" / "Finalizado por": exibem `loan.createdByName ?? loan.createdBy ?? '—'` e `loan.endedByName ?? loan.endedBy ?? '—'`. Rótulos trocados de "Criado por (perfil)"/"Finalizado por (perfil)" para "Criado por"/"Finalizado por". O fallback ao ID permanece defensivo (caso a RPC retorne nulo para algum perfil).
+   - "Motivo da finalização": exibe `getVehicleLoanEndedReasonLabel(loan.endedReason)` em vez do valor cru.
+   - "Checklist de Entrega"/"Checklist de Devolução": exibem a data formatada (`loan.deliveryChecklistAt`/`returnChecklistAt`) em vez do UUID; "—" quando não houver. Helper de data `fmt` reutilizado, sem duplicação.
+7. Testes atualizados/adicionados:
+   - `src/lib/vehicleLoanMappers.test.ts`: cobre `created_by_name`/`ended_by_name`/`delivery_checklist_at`/`return_checklist_at` mapeados; trata nomes/datas nulos.
+   - `src/lib/vehicleLoanStatus.test.ts`: cobre os 5 rótulos de `getVehicleLoanEndedReasonLabel`.
+   - `src/components/VehicleLoanHistory.test.tsx`: mock trocado de `supabase.from` para `supabase.rpc` (reflexo da mudança do service).
+   - `src/components/VehicleLoanDetail.test.tsx` (novo): render dos nomes resolvidos por RPC; rótulo legível do motivo (garante que `driver_changed` cru NÃO aparece); data da entrega formatada em pt-BR (não o UUID); fallback ao ID quando `createdByName`/`endedByName` vierem nulos (caso Auditor/RLS de `profiles`).
+
+### Restrição respeitada
+
+NÃO foi alterada a RLS de `profiles` — a resolução de nomes é exclusivamente via RPCs `SECURITY DEFINER`. NÃO tocado em outras partes do fluxo de empréstimos.
+
+### Ajuste durante a aplicação em DEV
+
+Ao aplicar a migration pela primeira vez no DEV, o Supabase retornou `ERROR: 42P13: cannot change return type of existing function` para `get_active_vehicle_loan`. Causa: `CREATE OR REPLACE` não permite mudar o tipo de retorno (OUT params) de uma função existente. Correção aplicada na própria migration `20260726130000_vehicle_loan_history_names.sql`: adicionado `DROP FUNCTION IF EXISTS public.get_active_vehicle_loan(UUID)` antes de recriar com o novo retorno, e re-`GRANT EXECUTE` no final (o DROP remove os grants). `get_vehicle_loans_by_vehicle` permaneceu `CREATE OR REPLACE` (é função nova, sem retorno prévio a colidir). Aplicada com sucesso no DEV após o ajuste.
+
+### Validação automatizada final
+
+- `npx tsc --noEmit`: **0 erros**.
+- `npm run lint`: **0 erros / 222 warnings** (221 base + 1 novo — tolerados).
+- `npm run test:unit`: **1180/1180** (1169 base + 11 novos desta correção).
+- `npm run test:smoke`: **6/6**.
+
+### Pendências
+
+- Aplicar `20260726130000_vehicle_loan_history_names.sql` em DEV e validar por SQL (a função retorna os 3 nomes e as 2 datas de checklist para um empréstimo de teste finalizado por troca de titular). Só promover a PROD com autorização expressa do usuário.
+- Validação manual: com perfil Coordinator, abrir o detalhe de um empréstimo finalizado por troca de titular → "Criado por"/"Finalizado por" mostram NOMES; "Motivo da finalização" mostra "Troca de motorista titular"; "Checklist de Entrega" mostra a DATA do checklist (não o UUID) e "Checklist de Devolução" mostra "—" quando não houve devolução.
+
+## Sessão — 2026-07-26: Sistema de Empréstimo Temporário de Veículos (Vehicle Loans)
+
+### Contexto
+
+Implementar `IMPLEMENTATION.md` desta sessão: rastreabilidade formal de **empréstimo temporário de veículo** criado quando o Yard Auditor conclui um checklist de Entrega com motorista diferente do titular, finalizado por Devolução ou pela troca do motorista titular. Tipo 4 — mudança estrutural/crítica (nova tabela + 4 RPCs `SECURITY DEFINER`, RLS, dois fluxos em produção). Nenhuma decisão de arquitetura além do especificado.
+
+### O que foi implementado
+
+**Etapa 0 — Health checks + diagnóstico RLS do Auditor** (sem migration). Resultado consolidado: SELECT em `checklists` pelo Auditor é parcial (só `filled_by`), suficiente para o fluxo; INSERT/UPDATE em checklists de Entrega/Devolução liberados; SELECT em `drivers` liberado (inclui 'Yard Auditor'); SELECT em `vehicles` liberado via `vehicles_select_auditor` (observação: expõe colunas sensíveis — risco pré-existente, não corrigido); SELECT em `profiles` bloqueado, mas o nome do motorista vem de `drivers.name`. Conclusão: a migration de desbloqueio não foi necessária.
+
+**Etapa 1 — Migration**: `supabase/migrations/20260726110000_create_vehicle_loans.sql` (`vehicle_loans` + `vehicle_loan_notifications`, 4 índices incl. único parcial `idx_vehicle_loans_active_unique` ON (vehicle_id) WHERE status='active', trigger reutilizando `public.set_updated_at()`, RLS habilitado, SELECT por `client_id` + Admin Master, sem policies de escrita diretas).
+
+**Etapa 2 — RPCs**: `supabase/migrations/20260726120000_vehicle_loan_rpcs.sql` com 4 funções `SECURITY DEFINER SET search_path = public`: `create_vehicle_loan` (gate Yard Auditor + justificativa ≥10 + singleton + notifica o titular), `complete_vehicle_loan` (finaliza ativo, notifica temporário quando `driver_changed`, acréscimo de `p_ended_notes` opcional retrocompatível), `get_active_vehicle_loan` (JOIN drivers, qualifica colunas para evitar ambíguas), `mark_vehicle_loan_notification_read` (só o motorista destinatário via `drivers.profile_id = auth.uid()`). `GRANT EXECUTE` a `authenticated`.
+
+**Etapa 3 — Tipos/mappers/service/teste**: `src/types/vehicleLoan.ts`, `src/lib/vehicleLoanMappers.ts` (`vehicleLoanFromRow`, `vehicleLoanFromRpcRow`, `vehicleLoanNotificationFromRow`), `src/services/vehicleLoanService.ts` (todas as 6 funções, cada uma checa `error` e faz `throw`). Teste unitário do mapper cobre row completa, drivers como objeto, drivers como array, campos nulos.
+
+**Etapa 4 — Regra de contexto do motorista**: `src/lib/checklistContextRules.ts` ganhou `getAvailableContextsForDriver` (libera **só** Auditoria ao titular com empréstimo ativo; nunca Entrega/Devolução; nada ao temporário) e `shouldCreateLoanOnHandover` (titular nulo conta como diferente — Decisão 4). Testes unitários estendidos.
+
+**Etapa 5 — Componentes visuais + tags**: `src/lib/vehicleLoanStatus.ts` (`getVehicleLoanStatusTag` com 4 estados — Ativo/Concluído/Concluído (Automático) âmbar para `driver_changed`/Cancelado), `src/components/VehicleLoanAlert.tsx` (variantes `will_create`/`active`), `src/components/VehicleLoanHistory.tsx` (tabela com filtro client-side e `onSelect`), `src/components/VehicleLoanDetail.tsx` (modal timeline + envolvidos + checklists + justificativas). Testes unitários de status e history.
+
+**Etapa 6 — Hook**: `src/hooks/useVehicleLoan.ts` (`useVehicleLoan(vehicleId?)` com `activeLoan`, `createLoan`, `completeLoan`, invalidação de queries).
+
+**Etapa 7 — Visão do Auditor em `Checklists.tsx`**: `AuditorVehicleRow` ganhou `driver_id`; cálculo de `isDifferentFromTitular` (titular nulo conta); `VehicleLoanAlert` `will_create` + textarea obrigatório (≥10) em `useSessionUiState('checklists','selection','loan-notes')`; botão "Iniciar" desabilitado até a justificativa; Devolução pré-seleciona o motorista do empréstimo ativo; `startMutation.insert` ganhou `notes: loanNotes || null`.
+
+**Etapa 8 — Finalização em `ChecklistFill.tsx`**: no caminho online, após `update` completed: se Entrega e `driverId` ≠ titular, chama `createVehicleLoan` (erros `LOAN_*` traduzidos para amigáveis, propagados via `throw`, checklist já concluído não é revertido); se Devolução, chama `getActiveVehicleLoan` + `completeVehicleLoan` com `ended_reason='return_checklist'` e `ended_notes` quando o motorista diverge. Caminho offline não cria/finaliza empréstimo (edge case aceito — handover exige câmera ao vivo).
+
+**Etapa 9 — Troca de titular em `Vehicles.tsx`/`VehicleForm.tsx`**: `handleSave` checa empréstimo ativo ao alterar `driverId` de um veículo em edição; se ativo, abre `VehicleLoanChangeTitularModal` (novo componente) com dados do empréstimo, destaque quando novo titular == temporário, justificativa obrigatória; ao confirmar, `completeVehicleLoan` com `ended_reason='driver_changed'` e só então prossegue para `saveVehicle`. Teste do modal cubre a renderização, o destaque, o gate de justificativa e o cancelamento.
+
+**Etapa 10 — Destaque na lista + aba no modal de veículo**: `Vehicles.tsx` ganhou query em lote `['activeLoansForVehicles', vehicleIds]` via `getActiveLoansForVehicles` (1 query, sem N+1); célula Motorista renderiza badge âmbar "Emprestado ao Motorista {nome}". `VehicleDetailModal.tsx` ganhou aba `'loans'` com `<VehicleLoanHistory>` + `<VehicleLoanDetail>`. Teste focado de render do destaque criado (`src/pages/Vehicles.test.tsx`).
+
+**Etapa 11 — Indicador de notificação do motorista + validação manual guiada**: `src/components/DriverLoanNotifications.tsx` na visão do Driver em `Checklists.tsx` (contador de não-lidas, lista colapsável, marcar como lida via `markNotificationRead`). A regra `getAvailableContextsForDriver` também foi integrada à query de templates do Driver (antes filtrava `.not('context','in', AUDITOR_ONLY_CONTEXTS)`; agora busca tudo e filtra client-side, liberando Auditoria ao titular com empréstimo ativo).
+
+### Validação automatizada final
+
+- `npx tsc --noEmit`: **0 erros**.
+- `npm run lint`: **0 erros / 221 warnings** (194 base + 27 novos — tolerados).
+- `npm run test:unit`: **1169/1169** (1142 base + 27 novos em 5 novos `.test.tsx`/`.test.ts` + extensão dos testes de `checklistContextRules`).
+- `npm run test:smoke`: **6/6**.
+
+### Decisões tomadas nesta sessão
+
+1. Notificações in-app mínimas (`vehicle_loan_notifications` + indicador) — sem biblioteca de toast.
+2. Histórico como aba no `VehicleDetailModal` (padrão do projeto), não rota por veículo.
+3. A única mudança real de contextos do motorista é liberar **Auditoria** ao titular com empréstimo ativo.
+4. Titular nulo em Entrega conta como diferente → empréstimo criado (Decisão de negócio 1).
+5. `complete_vehicle_loan` ganhou `p_ended_notes` opcional e `vehicle_loans` ganhou `ended_notes` (retrocompatível).
+6. Justificativa transportada em `checklists.notes` (coluna existente reutilizada) do início até a finalização.
+
+### Riscos aceitos (2026-07-26)
+
+- Notificação in-app com `temp_driver_name` no payload (mesmo padrão da Fila de Ação).
+- Exposição pré-existente de colunas sensíveis em `vehicles`/`drivers` ao Yard Auditor — registrada, não agravada nesta sessão.
+
+### Pendências
+
+- Aplicar as 2 migrations em DEV e validar por SQL (tabelas/índices/RLS/4 RPCs/testes de erro) — usuário aplica no SQL Editor.
+- Promover a PROD somente com autorização expressa.
+- E2E `e2e/pending/vehicle-loans-flow.spec.ts` depende do recadastro dos usuários de teste Yard Auditor/Driver (pendência 0c do MEMORY).
+- Validação manual guiada dos 8 passos pendente de confirmação do usuário após aplicação em DEV.
+
 ## Sessão — 2026-07-26: Navegação cruzada entre Veículos e Motoristas e roteamento automático de testes
 
 ### O que foi implementado
@@ -2815,6 +2973,17 @@ Causa raiz: Tipo B — a query 'workshopPartnerIds' (Workshops.tsx) retorna um S
 Correção aplicada: removida a chave 'workshopPartnerIds' da PERSIST_ALLOWLIST (Set nunca deve ser persistido) e bump do buster do cache 'v2'→'v3' para descartar blobs já corrompidos de usuários afetados.
 Arquivos modificados: src/lib/cachePolicy.ts, src/App.tsx, src/lib/cachePolicy.test.ts.
 Testes adicionados: cachePolicy.test.ts — "does not persist Set-returning queries (workshopPartnerIds)".
+
+## Arquivamento — 2026-07-27 (pré self-service de cadastro de oficina)
+
+Conteúdo integral de `docs/MEMORY.md` arquivado nesta data por compactação (Etapa 1 da sessão "Oficina convidada completa o próprio cadastro pelo modal Nova Oficina"). Preservado sem reescrita.
+
+### Estado Atual (arquivado)
+
+- **Cadastros → Veículos — selo de Disponibilidade na coluna Status + export XLSX (implementado em 2026-07-16, 100% frontend, sem migration)**: coluna Status agora exibe um segundo selo (Disponível/Indisponível), abaixo do Ativo/Inativo, em todas as linhas — mesmo conceito de `computeUnavailableVehicleIds` já usado no Dashboard, derivado de uma nova query `vehicles-active-maintenance`. Nova coluna de checkbox por linha + "selecionar todos" e botão **Baixar XLSX** (liberado a todos os `ROLES_WITH_ACCESS`, sem gating de papel) exportam todos os veículos filtrados (sem seleção) ou apenas os selecionados, via `resolveExportSelection` (novo helper genérico em `src/lib/exportSelection.ts`) e `XlsxVehicleProvider` (espelha `XlsxPaymentProvider`, 17 colunas definidas em `src/lib/vehicleExportRows.ts`, SSOT). Validação: `npx tsc --noEmit` 0 erros; `npm run lint` 0 erros / 162 warnings (159 base + 3 novos `react-hooks/rules-of-hooks`, mesmo padrão pré-existente do arquivo por causa do early-return de `Vehicles.tsx`); `npm run test:unit` 978/978 (969 base + 9 novos); `npm run test:smoke` 6/6; validação manual guiada via Playwright script (333 veículos, 325 Disponível/8 Indisponível, download real do XLSX confirmado).
+- **Manutenção — filtro por Status do Orçamento + motivo de reprovação; Financeiro — export XLSX (Pagamentos e Extras) + Centro de Custo em Extra (implementado em 2026-07-14, migration NÃO aplicada em nenhum banco ainda)**: (1) novo dropdown "Status do Orçamento" na Manutenção (`BUDGET_STATUS_FILTER_OPTIONS` em `maintenanceFilters.ts`), dimensão independente do filtro de status da OS — necessário porque reprovar um orçamento reverte a OS para "Aguardando orçamento", tornando `budget_status` a única fonte confiável; (2) reprovação de orçamento em `BudgetApprovals.tsx` agora exige motivo obrigatório via modal (nova coluna `maintenance_orders.budget_rejection_reason`, limpa ao aprovar ou ao reenviar orçamento), exibido em `MaintenanceDetailModal.tsx`; (3) export **XLSX** em Pagamentos (`XlsxPaymentProvider`, lib `write-excel-file`, import dinâmico via **`write-excel-file/browser`** — o pacote não expõe export `"."` no `package.json`, só `/browser`, `/node`, `/universal`, `/utility`, então o import bare `'write-excel-file'` não compila; o layout das 10 colunas foi extraído para `paymentTemplateRows.ts` (SSOT), consumido por `SpreadsheetPaymentProvider` (CSV, refatorado, saída idêntica) e `XlsxPaymentProvider` (novo); (4) CSV + XLSX também em Pagamentos Extras (`extraPaymentExportSelection.ts` seleciona parcelas pelas requisições visíveis); (5) campo "Centro de Custo" em `ExtraPaymentFormModal.tsx`, gravado na parcela via `centroCusto` (já existia em `createExtraPaymentInstallmentsBatch`). Validação: `npm run test:unit` **969/969** (953 base + 16 novos); `npx tsc --noEmit` 0 erros; `npm run lint` **0 erros / 159 warnings** (sem novos erros); `npm run test:smoke` **6/6**. **Pendência obrigatória**: aplicar `20260714000000_add_budget_rejection_reason_to_maintenance_orders.sql` no Supabase **DEV**, validar por SQL, só então promover a **PROD** com autorização expressa do usuário.
+- **Dashboard → Visão Geral — rosca de disponibilidade + reorganização do "Mapa da Frota" (implementado em 2026-07-13, ajustado em 2026-07-13)**: gráfico `FleetAvailabilityDonutChart` (Disponíveis × Indisponíveis) participa do mesmo sistema de filtros client-side da aba, como dimensão fora de `OVERVIEW_DIMENSIONS` (composição separada via helpers em `overviewFleetFilters.ts`: `computeUnavailableVehicleIds`, `applyAvailabilityFilter`, `toggleAvailabilityValue`, `buildAvailabilityChartData`). `OverviewPanel.tsx` deriva os 8 cards KPI de `finalVehicles` (após o passo extra de disponibilidade). **Ajuste desta sessão**: (1) `unavailableIds` passou a ser calculado uma única vez sobre TODOS os veículos (`vehicles`), não mais sobre o subconjunto já filtrado por atributo — evita recomputar por dimensão e mantém a condição "está indisponível" estável independente do filtro ativo; (2) `chartDataByDimension` (que alimenta TODOS os `VehicleTypeBarChart`) agora também passa pelo `applyAvailabilityFilter` além do `filtersExcept` por dimensão — antes, clicar na rosca só refiltrava os cards KPI, deixando os gráficos de barra (Categoria, Tipo, Modelo, Aquisição, Embarcador, Unidade Operacional) alheios à seleção de disponibilidade; agora todo o painel reage de forma consistente. Layout do "Mapa da Frota": linha 1 = rosca + Frota por Embarcador; linha 2 = Frota por Unidade Operacional em largura total; linha 3 = Categoria/Tipo/Modelo/Aquisição. 100% client-side, sem alteração de query/RLS/migration. `npm run test:unit` **953/953** (930 base + 23 novos); `npm run lint` **0 erros / 153 warnings**. `npm run test:smoke` **não executado nesta sessão** — pendente validação do usuário antes de dar a feature como concluída.
+- **Financeiro — Pagamentos Extras / Serviços Avulsos (implementado em 2026-07-12, migration **aplicada em DEV e PROD**, verificado por SQL em 2026-07-19 (10/10 objetos); módulo em uso em produção (17 parcelas de manutenção + 1 de pagamento extra))**: novo domínio para despesas operacionais sem vínculo obrigatório com OS (guincho, chaveiro, borracheiro, Uber/táxi, frete de apoio). Nova tabela `extra_payment_requests` (cabeçalho) + generalização de `payment_installments` por `source_type` (`maintenance_order`|`extra_payment`), sem criar segunda tabela de parcelas. `Fleet Assistant+` lança (parcela única ou lote, Pix/boleto); `Coordinator+` aprova/reprova em aba própria (`Aprovação de Extras`); `Financeiro` só vê extras aprovados/pagos, baixa CSV e marca como pago, com auditoria completa via RPC `get_extra_payment_auditors`. Novos arquivos: migration `20260712000000_create_extra_payment_requests.sql`, `src/types/serviceExpense.ts`, `src/lib/serviceExpenseMappers.ts`, `src/lib/serviceExpenseFilters.ts`, `src/services/serviceExpenseService.ts`, `src/components/financeiro/ExtraPaymentFormModal.tsx`, `ExtraPaymentsTab.tsx`, `ExtraPaymentViewModal.tsx`, `ExtraPaymentApprovalsTab.tsx`. Estendidos: `payment.ts`, `paymentMappers.ts`, `paymentInstallmentService.ts`, `rolePermissions.ts`, `PaymentsTab.tsx` (filtro/coluna de origem), `PaymentInstallmentViewModal.tsx` (bloco Origem), `spreadsheetPaymentProvider.ts` (CSV usa fornecedor/documento/categoria do extra), `paymentPendingDocs.ts`, `Financeiro.tsx` (2 abas novas). Validação local: `npm run test:unit` **930/930** (883 base + 47 novos); `npx tsc --noEmit` 0 erros; `npm run lint` **0 erros / 147 warnings** (baseline 137 + 10 novos — 3 são o padrão já tolerado de `no-unsafe-assignment`/`no-unsafe-member-access` ao desestruturar retorno de RPC em `serviceExpenseService.ts`, mesmo padrão usado em `paymentInstallmentService.ts`; os demais são pré-existentes de arquivos não tocados por esta sessão); `npm run test:smoke` **6/6**. E2E novo `e2e/pending/extra-payments-flow.spec.ts` (8 cenários, listagem `--list` sem erro de sintaxe). **Pendências obrigatórias antes de considerar a feature pronta para uso**: (1) aplicar a migration `20260712000000_create_extra_payment_requests.sql` no Supabase **DEV** — não foi aplicada nesta sessão porque o CLI do Supabase local estava vinculado ao projeto de **PROD** (`oajfjdadcicgoxrfrnny`/data-fleet) no momento da implementação, e rodar qualquer comando de banco nesse estado seria arriscado sem confirmação explícita do usuário; (2) validar por SQL em DEV (tabela existe, RLS ativo, colunas de origem em `payment_installments`); (3) só então promover a PROD com autorização expressa; (4) executar a validação manual guiada do fluxo completo (Etapa 11 do `IMPLEMENTATION.md` desta sessão).
 
 ## Correção de bug — Veículos Indisponíveis contabiliza "Veículo retirado" (2026-06-24)
 

@@ -357,6 +357,13 @@ export default function WorkshopJoin() {
                 </p>
               )}
 
+              <div className="flex items-start gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
+                <p className="text-xs text-blue-700">
+                  Ao aceitar, os dados cadastrais da sua oficina (contato, endereço e especialidades) serão compartilhados com {clientName}.
+                </p>
+              </div>
+
               <button
                 type="submit" disabled={loading}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-60"

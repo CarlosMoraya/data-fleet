@@ -129,4 +129,58 @@ describe('Sidebar', () => {
 
     expect(container.textContent).toContain('Controle de carretas');
   });
+
+  it('papel Workshop vê o item "Minha Oficina"', () => {
+    authState = {
+      user: {
+        id: 'u4',
+        name: 'Workshop User',
+        email: 'workshop@example.com',
+        role: 'Workshop',
+        clientId: 'c1',
+        budgetApprovalLimit: 0,
+      },
+      logout: async () => {},
+    };
+
+    renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
+
+    expect(container.textContent).toContain('Minha Oficina');
+  });
+
+  it('papel Admin Master não vê o item "Minha Oficina"', () => {
+    authState = {
+      user: {
+        id: 'u5',
+        name: 'Admin User',
+        email: 'admin@example.com',
+        role: 'Admin Master',
+        clientId: 'c1',
+        budgetApprovalLimit: 0,
+      },
+      logout: async () => {},
+    };
+
+    renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
+
+    expect(container.textContent).not.toContain('Minha Oficina');
+  });
+
+  it('regressão: contagem de itens visíveis para Admin Master permanece 11', () => {
+    authState = {
+      user: {
+        id: 'u6',
+        name: 'Admin User',
+        email: 'admin@example.com',
+        role: 'Admin Master',
+        clientId: 'c1',
+        budgetApprovalLimit: 0,
+      },
+      logout: async () => {},
+    };
+
+    renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
+
+    expect(container.querySelectorAll('nav a')).toHaveLength(11);
+  });
 });
