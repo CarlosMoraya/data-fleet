@@ -14,6 +14,8 @@ import {
   ShieldCheck,
   Link2,
   Wallet,
+  Siren,
+  MessagesSquare,
 } from 'lucide-react';
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
@@ -39,6 +41,8 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'Controle de carretas', to: '/controle-carretas', icon: Link2, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Plano de Ação', to: '/acoes', icon: ClipboardList, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Agendamentos', to: '/agendamentos', icon: CalendarClock, roles: ['Driver', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
+  { name: 'S.O.S.', to: '/sos', icon: Siren, roles: ['Driver'] },
+  { name: 'Chamados', to: '/chamados', icon: MessagesSquare, roles: ['Yard Auditor', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Minha Oficina', to: '/minha-oficina', icon: Wrench, roles: ['Workshop'] },
   { name: 'Manutenção', to: '/manutencao', icon: Wrench, roles: ['Workshop', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Financeiro', to: '/financeiro', icon: Wallet, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master', 'Workshop', 'Financeiro'] },
@@ -66,7 +70,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const visibleNavItems = userRole === 'Coupling Agent'
     ? NAV_ITEMS.filter((item) => item.to === '/controle-carretas')
     : isOperationsManager(userRole)
-      ? NAV_ITEMS.filter((item) => item.to === '/agendamentos' || item.to === '/manutencao')
+      ? NAV_ITEMS.filter((item) => item.to === '/agendamentos' || item.to === '/manutencao' || item.to === '/chamados')
       : NAV_ITEMS.filter((item) => {
           if (!userRole) return false;
           return item.roles.includes(userRole);

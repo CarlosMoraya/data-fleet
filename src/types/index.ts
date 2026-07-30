@@ -75,3 +75,18 @@ export type {
   WarrantyRevisionEvent,
   WarrantyRevisionEventRow,
 } from './warrantyRevision';
+export type {
+  FleetTicketSource,
+  FleetTicketSosType,
+  FleetTicketCriticality,
+  FleetTicketStatus,
+  FleetTicketLocationStatus,
+  FleetTicketCardFilter,
+  FleetTicketEventType,
+  FleetTicket,
+  FleetTicketEvent,
+  ClientTelegramSettings,
+  FleetTicketCounts,
+  CreateSosTicketInput,
+  CreateFleetTicketReportInput,
+} from './fleetTicket';

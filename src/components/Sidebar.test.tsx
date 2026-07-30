@@ -166,7 +166,7 @@ describe('Sidebar', () => {
     expect(container.textContent).not.toContain('Minha Oficina');
   });
 
-  it('regressão: contagem de itens visíveis para Admin Master permanece 11', () => {
+  it('regressão: contagem de itens visíveis para Admin Master inclui Chamados', () => {
     authState = {
       user: {
         id: 'u6',
@@ -181,6 +181,6 @@ describe('Sidebar', () => {
 
     renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
 
-    expect(container.querySelectorAll('nav a')).toHaveLength(11);
+    expect(container.querySelectorAll('nav a')).toHaveLength(12);
   });
 });

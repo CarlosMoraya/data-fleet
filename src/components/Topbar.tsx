@@ -4,6 +4,8 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getRoleLabel } from '../lib/rolePermissions';
 
+import FleetTicketBell from './FleetTicketBell';
+
 interface TopbarProps {
   onMenuClick: () => void;
 }
@@ -74,6 +76,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
       </div>
 
       <div className="flex items-center gap-4">
+        <FleetTicketBell />
         <div className="flex items-center gap-3 border-l border-zinc-200 pl-4">
           <div className="flex flex-col items-end">
             <span className="text-sm font-medium text-zinc-900">{user?.name}</span>

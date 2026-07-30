@@ -238,6 +238,57 @@ export async function getFinancialDocumentSignedUrl(path: string): Promise<strin
 }
 
 // ─────────────────────────────────────────────────────────────
+// Fleet Tickets (private attachments)
+// Bucket: fleet-ticket-attachments (PRIVADO)
+// Path: {clientId}/fleet-tickets/{ticketId}/{filename}
+// ─────────────────────────────────────────────────────────────
+
+const FLEET_TICKET_BUCKET = 'fleet-ticket-attachments';
+
+export function buildFleetTicketAttachmentPath(
+  clientId: string,
+  ticketId: string,
+  fileName: string,
+): string {
+  return `${clientId}/fleet-tickets/${ticketId}/${fileName}`;
+}
+
+/** Uploads a private ticket attachment and returns its storage path. */
+export async function uploadFleetTicketAttachment(
+  clientId: string,
+  ticketId: string,
+  file: File,
+): Promise<string> {
+  validateFile(file);
+
+  const prepared = await prepareFile(file);
+  const ext = prepared.type === 'application/pdf' ? 'pdf' : 'jpg';
+  const fileName = `attachment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const path = buildFleetTicketAttachmentPath(clientId, ticketId, fileName);
+
+  const { error } = await supabase.storage
+    .from(FLEET_TICKET_BUCKET)
+    .upload(path, prepared, { upsert: false, contentType: prepared.type });
+
+  if (error) throw new Error(`Erro ao enviar anexo do chamado: ${error.message}`);
+
+  return path;
+}
+
+/** Generates a short-lived (1h) signed URL for a private ticket attachment. */
+export async function getFleetTicketAttachmentSignedUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from(FLEET_TICKET_BUCKET)
+    .createSignedUrl(path, 3600);
+
+  if (error || !data) {
+    throw new Error(`Erro ao gerar URL do anexo: ${error?.message ?? 'desconhecido'}`);
+  }
+
+  return data.signedUrl;
+}
+
+// ─────────────────────────────────────────────────────────────
 // Driver Documents
 // Bucket: driver-documents
 // Mesma lógica de validação/compressão dos documentos de veículo

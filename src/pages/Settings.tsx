@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Truck, UserCircle, Gauge, CalendarDays } from 'lucide-react';
+import { Bell, Loader2, Truck, UserCircle, Gauge, CalendarDays } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 
 import ChecklistDayIntervalSettings from '../components/ChecklistDayIntervalSettings';
+import TelegramSettingsPanel from '../components/TelegramSettingsPanel';
 import VehicleKmIntervalSettings from '../components/VehicleKmIntervalSettings';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -27,7 +28,7 @@ import { VehicleFieldSettings, DriverFieldSettings } from '../types';
 const ROLES_CAN_MANAGE_FIELDS = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_ACCESS_SETTINGS = ['Coordinator', 'Manager', 'Director', 'Admin Master'];
 
-type TabType = 'vehicles' | 'drivers' | 'revisoes' | 'checklists';
+type TabType = 'vehicles' | 'drivers' | 'revisoes' | 'checklists' | 'telegram';
 type TabDefinition = { id: TabType; name: string; icon: React.ComponentType<{ className?: string }> };
 
 export default function Settings() {
@@ -255,10 +256,12 @@ export default function Settings() {
         { id: 'drivers', name: 'Motoristas', icon: UserCircle },
         { id: 'revisoes', name: 'Revisões', icon: Gauge },
         { id: 'checklists', name: 'Checklists', icon: CalendarDays },
+        { id: 'telegram', name: 'Telegram', icon: Bell },
       ]
     : [
         { id: 'revisoes', name: 'Revisões', icon: Gauge },
         { id: 'checklists', name: 'Checklists', icon: CalendarDays },
+        { id: 'telegram', name: 'Telegram', icon: Bell },
       ];
 
   return (
@@ -487,6 +490,10 @@ export default function Settings() {
 
       {activeTab === 'checklists' && currentClient?.id && user && (
         <ChecklistDayIntervalSettings clientId={currentClient.id} userId={user.id} />
+      )}
+
+      {activeTab === 'telegram' && currentClient?.id && user && (
+        <TelegramSettingsPanel clientId={currentClient.id} userId={user.id} />
       )}
       </div>
     </div>
