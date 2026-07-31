@@ -12,6 +12,15 @@ O **βetaFleet** segue uma arquitetura de Single Page Application (SPA) com Back
 3.  **Local Storage**: Dexie (IndexedDB) para fila de sincronização offline.
 4.  **BaaS**: Supabase (PostgreSQL, Auth, Storage, Edge Functions).
 
+## Integração externa — clima local
+
+- Open-Meteo é usada para a previsão do tempo local exibida na Topbar.
+- A integração é client-side, sem API key e sem Edge Function.
+- São consultadas coordenadas aproximadas do navegador ou, para Driver, o fallback por cidade/UF da unidade operacional do veículo titular.
+- Os dados não são persistidos em banco, `localStorage` ou IndexedDB.
+- O cache de queries de clima não entra no `PERSIST_ALLOWLIST`.
+- A severidade é derivada da previsão e não representa um alerta meteorológico oficial.
+
 ---
 
 ## 📂 Modelo de Dados (Schema)

@@ -44,3 +44,10 @@ O dashboard utiliza o princípio de "Progressive Disclosure", mostrando KPIs ger
 - Bordas arredondadas (`rounded-2xl`).
 - Sombra sutil (`shadow-sm`).
 - Border de 1px (`border-zinc-200`).
+
+### Topbar — chip de clima
+
+- A Topbar possui um chip global de clima com estado normal em zinc neutro.
+- Atenção usa amber; severidade usa red/amber suave.
+- O popover aplica progressive disclosure e exibe previsão de 3 dias.
+- Em mobile, o chip reduz o texto para preservar a Topbar.

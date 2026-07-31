@@ -3106,3 +3106,17 @@ Causa raiz: ausência total de validação (frontend, serviço e banco) impedind
 Correção aplicada (só frontend, por decisão do usuário): nova função pura getVehicleIdsWithOpenMaintenance + constante MAINTENANCE_TERMINAL_STATUSES ('Veículo retirado','Cancelado' — Concluído BLOQUEIA) em maintenanceFilters.ts; Maintenance.tsx deriva o conjunto de veículos bloqueados de `orders` e o passa ao MaintenanceForm; MaintenanceForm oculta esses veículos do dropdown (modo criação) e bloqueia o submit como rede de segurança. Sem migration/trigger. Duplicatas pré-existentes não saneadas.
 Arquivos modificados: src/lib/maintenanceFilters.ts, src/pages/Maintenance.tsx, src/components/MaintenanceForm.tsx
 Testes adicionados: src/lib/maintenanceFilters.test.ts (6 cenários de getVehicleIdsWithOpenMaintenance)
+
+## Sessão — 2026-07-31: Chip global de previsão do tempo na Topbar
+
+Implementado o escopo fechado de `IMPLEMENTATION.md`: chip global de previsão do tempo na Topbar autenticada, com consentimento pelo prompt nativo do navegador, integração client-side com Open-Meteo sem API key, cache React Query somente em memória, previsão de 3 dias em popover e severidade operacional derivada da previsão. Usuários Driver que negarem ou não conseguirem obter GPS tentam fallback por cidade/UF da unidade operacional do veículo titular; demais falhas ocultam o chip silenciosamente.
+
+Arquivos criados: `src/types/weather.ts`, `src/lib/weatherSeverity.ts`, `src/lib/weatherSeverity.test.ts`, `src/services/weatherService.ts`, `src/services/weatherService.test.ts`, `src/services/driverWeatherFallbackService.ts`, `src/services/driverWeatherFallbackService.test.ts`, `src/hooks/useLocalWeather.ts`, `src/hooks/useLocalWeather.test.tsx`, `src/components/LocalWeatherChip.tsx`, `src/components/LocalWeatherChip.test.tsx`, `src/components/Topbar.test.tsx`.
+
+Arquivos modificados: `src/components/Topbar.tsx`, `docs/SPEC.md`, `docs/DESIGN.md`, `docs/MEMORY.md`, `docs/MEMORY-HISTORY.md`.
+
+Decisões registradas: Open-Meteo é chamada diretamente pelo frontend; nenhuma API key, variável de ambiente, dependência npm, migration, tabela, RPC ou Edge Function foi criada; coordenadas não são persistidas em banco, storage ou cache persistido; as query keys de clima não entram no `PERSIST_ALLOWLIST`; nenhum identificador de usuário, cliente, veículo, motorista, placa ou unidade é enviado ao serviço externo; severidade é heurística derivada da previsão e não é alerta meteorológico oficial.
+
+Validação: `npx tsc --noEmit` passou; `npm run lint` passou com exit 0 e 286 warnings pré-existentes; `npm run test:unit` passou com 1358/1358; `npm run test:smoke` passou com 6/6; testes focados da feature passaram com 31/31.
+
+Risco aceito: envio de coordenadas aproximadas para Open-Meteo mediante consentimento do navegador, sem persistência ou telemetria.
