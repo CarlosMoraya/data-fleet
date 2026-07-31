@@ -89,6 +89,51 @@ describe('fleetTicketFromRow', () => {
     expect(ticket.openedByNameSnapshot).toBe('Nome histórico');
     expect(ticket.driverNameSnapshot).toBe('Motorista histórico');
   });
+
+  it('maps ticket number, odometer and vehicle snapshots', () => {
+    const ticket = fleetTicketFromRow(makeRow({
+      ticket_number: 'CH-2607-4821',
+      odometer_km: '92400',
+      vehicle_model_snapshot: 'Volvo FH 540',
+      vehicle_owner_snapshot: 'Transportadora Beta',
+      shipper_name_snapshot: 'Embarcador X',
+      operational_unit_name_snapshot: 'Base Sul',
+    }));
+
+    expect(ticket).toMatchObject({
+      ticketNumber: 'CH-2607-4821',
+      odometerKm: 92400,
+      vehicleModelSnapshot: 'Volvo FH 540',
+      vehicleOwnerSnapshot: 'Transportadora Beta',
+      shipperNameSnapshot: 'Embarcador X',
+      operationalUnitNameSnapshot: 'Base Sul',
+    });
+    expect(ticket.odometerKm).toBe(92400);
+  });
+
+  it('maps a legacy ticket without the new columns to undefined fields', () => {
+    const row = makeRow();
+    delete row.ticket_number;
+    delete row.odometer_km;
+    delete row.vehicle_model_snapshot;
+    delete row.vehicle_owner_snapshot;
+    delete row.shipper_name_snapshot;
+    delete row.operational_unit_name_snapshot;
+
+    const ticket = fleetTicketFromRow(row);
+
+    expect(ticket.ticketNumber).toBeUndefined();
+    expect(ticket.odometerKm).toBeUndefined();
+    expect(ticket.vehicleModelSnapshot).toBeUndefined();
+    expect(ticket.vehicleOwnerSnapshot).toBeUndefined();
+    expect(ticket.shipperNameSnapshot).toBeUndefined();
+    expect(ticket.operationalUnitNameSnapshot).toBeUndefined();
+  });
+
+  it('maps odometer_km of 0 to the number 0, not undefined', () => {
+    const ticket = fleetTicketFromRow(makeRow({ odometer_km: 0 }));
+    expect(ticket.odometerKm).toBe(0);
+  });
 });
 
 describe('fleetTicketEventFromRow', () => {

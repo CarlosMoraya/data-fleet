@@ -1,21 +1,29 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Loader2, MapPin, Upload } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, Loader2, MapPin } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
+import CameraCapture from '../components/CameraCapture';
+import LastKmLabel from '../components/LastKmLabel';
 import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { capturePosition } from '../lib/geolocation';
-import { canOpenSosTicket } from '../lib/fleetTicketRules';
+import { canOpenSosTicket, evaluateFleetTicketOdometer } from '../lib/fleetTicketRules';
+import { supabase } from '../lib/supabase';
 import {
   createSosTicket,
   listVehiclesForSos,
 } from '../services/fleetTicketService';
+import { getVehicleLastKmMap } from '../services/vehicleOdometerService';
 
 import type {
   FleetTicketLocationStatus,
   FleetTicketSosType,
 } from '../types/fleetTicket';
+
+interface OdometerIntervalSettingsRow {
+  odometer_km_tolerance_per_day: number | null;
+}
 
 const SOS_TYPES: Array<{ value: FleetTicketSosType; label: string }> = [
   { value: 'breakdown', label: 'Veículo enguiçado' },
@@ -41,7 +49,9 @@ export default function SosTicket() {
   const [locationStatus, setLocationStatus] = useState<FleetTicketLocationStatus>('unavailable');
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
+  const [kmInput, setKmInput] = useState('');
   const [files, setFiles] = useState<File[]>([]);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -52,6 +62,26 @@ export default function SosTicket() {
     queryKey: ['sosVehicles', currentClient?.id],
     queryFn: listVehiclesForSos,
     enabled: canOpenSosTicket(user?.role) && !!currentClient?.id,
+  });
+
+  const lastKmQuery = useQuery({
+    queryKey: ['vehicleLastKmMap', vehicleId],
+    queryFn: () => getVehicleLastKmMap([vehicleId]),
+    enabled: !!vehicleId,
+  });
+
+  const odometerIntervalQuery = useQuery({
+    queryKey: ['checklistDayIntervals', currentClient?.id, 'odometer'],
+    queryFn: async () => {
+      const { data, error: queryError } = await supabase
+        .from('checklist_day_intervals')
+        .select('odometer_km_tolerance_per_day, odometer_update_day_interval')
+        .eq('client_id', currentClient!.id)
+        .maybeSingle();
+      if (queryError) throw queryError;
+      return data as OdometerIntervalSettingsRow | null;
+    },
+    enabled: !!currentClient?.id,
   });
 
   useEffect(() => {
@@ -73,12 +103,22 @@ export default function SosTicket() {
 
   const requiresManualLocation = locationStatus === 'denied' || locationStatus === 'unavailable';
 
-  const handleFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = Array.from(event.target.files ?? []);
-    setFiles(selected.slice(0, 3));
-    if (selected.length > 3) {
-      setWarning('Somente os três primeiros anexos serão enviados.');
-    }
+  const lastKmInfo = lastKmQuery.data?.get(vehicleId) ?? null;
+  const odometerAdvice = evaluateFleetTicketOdometer({
+    rawValue: kmInput,
+    lastOfficialKm: lastKmInfo?.value ?? null,
+    lastReadingAt: null,
+    tolerancePerDay: odometerIntervalQuery.data?.odometer_km_tolerance_per_day ?? null,
+  });
+  const kmBlocking = odometerAdvice.level === 'empty' || odometerAdvice.level === 'invalid';
+
+  const handleKmChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setKmInput(event.target.value.replace(/\D/g, ''));
+  };
+
+  const handlePhotoCapture = (file: File) => {
+    setFiles((prev) => [...prev, file].slice(0, 3));
+    setCameraOpen(false);
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -103,6 +143,14 @@ export default function SosTicket() {
       setValidationError('Informe o local manualmente quando a localização do dispositivo não estiver disponível.');
       return;
     }
+    if (kmBlocking) {
+      setValidationError(odometerAdvice.level === 'invalid' ? odometerAdvice.message : 'Informe o Km atual do veículo.');
+      return;
+    }
+    if (files.length === 0) {
+      setValidationError('A foto é obrigatória para o S.O.S.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -116,6 +164,9 @@ export default function SosTicket() {
         longitude,
         locationStatus: requiresManualLocation && locationText.trim() ? 'manual' : locationStatus,
         files,
+        odometerKm: odometerAdvice.level === 'ok' || odometerAdvice.level === 'below' || odometerAdvice.level === 'above'
+          ? odometerAdvice.value
+          : 0,
       });
       await queryClient.invalidateQueries({ queryKey: ['fleetTickets'] });
       setSubmittedTicketId(result.ticketId);
@@ -247,13 +298,38 @@ export default function SosTicket() {
         </div>
 
         <div>
-          <label htmlFor="sos-files" className="mb-2 block text-sm font-medium text-zinc-800">Fotos ou documentos (opcional, até 3)</label>
-          <label htmlFor="sos-files" className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-4 text-sm text-zinc-600 transition-colors hover:border-orange-400 hover:bg-orange-50">
-            <Upload className="h-4 w-4" />
-            Selecionar anexos
-          </label>
-          <input id="sos-files" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple onChange={handleFiles} className="sr-only" disabled={isSubmitting} />
-          {files.length > 0 && <p className="mt-2 text-xs text-zinc-500">{files.length} anexo(s) selecionado(s).</p>}
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <label htmlFor="sos-km" className="text-sm font-medium text-zinc-800">Km atual</label>
+            <LastKmLabel info={lastKmInfo} />
+          </div>
+          <input
+            id="sos-km"
+            inputMode="numeric"
+            value={kmInput}
+            onChange={handleKmChange}
+            disabled={isSubmitting}
+            className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-3 text-sm text-zinc-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+          />
+          {(odometerAdvice.level === 'below' || odometerAdvice.level === 'above') && (
+            <p className="mt-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{odometerAdvice.message}</p>
+          )}
+          {odometerAdvice.level === 'invalid' && (
+            <p className="mt-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{odometerAdvice.message}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium text-zinc-800">Foto (obrigatória)</label>
+          <button
+            type="button"
+            onClick={() => setCameraOpen(true)}
+            disabled={isSubmitting || files.length >= 3}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-4 text-sm text-zinc-600 transition-colors hover:border-orange-400 hover:bg-orange-50 disabled:opacity-50"
+          >
+            <Camera className="h-4 w-4" />
+            Tirar foto
+          </button>
+          {files.length > 0 && <p className="mt-2 text-xs text-zinc-500">{files.length} foto(s) capturada(s).</p>}
         </div>
 
         {warning && !submittedTicketId && (
@@ -269,6 +345,14 @@ export default function SosTicket() {
           {isSubmitting ? 'Enviando...' : 'Enviar S.O.S.'}
         </button>
       </form>
+
+      {cameraOpen && (
+        <CameraCapture
+          requireLiveCapture
+          onClose={() => setCameraOpen(false)}
+          onCapture={(file) => handlePhotoCapture(file)}
+        />
+      )}
     </div>
   );
 }

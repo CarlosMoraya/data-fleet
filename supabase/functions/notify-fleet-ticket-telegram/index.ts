@@ -50,6 +50,12 @@ type TicketRow = {
   latitude: number | null;
   longitude: number | null;
   location_text: string | null;
+  ticket_number: string | null;
+  odometer_km: number | string | null;
+  vehicle_model_snapshot: string | null;
+  vehicle_owner_snapshot: string | null;
+  shipper_name_snapshot: string | null;
+  operational_unit_name_snapshot: string | null;
 };
 
 type TelegramSettingsRow = {
@@ -109,14 +115,24 @@ function mapsUrl(ticket: TicketRow): string | null {
   return `https://maps.google.com/?q=${ticket.latitude},${ticket.longitude}`;
 }
 
+function formatKm(value: TicketRow["odometer_km"]): string {
+  return value != null ? `${Number(value).toLocaleString("pt-BR")}` : "Não informado";
+}
+
 function buildTicketMessage(ticket: TicketRow, reason: TicketReason, appUrl: string): string {
   const openUrl = `${appUrl.replace(/\/$/, "")}/chamados?ticket=${ticket.id}`;
   if (reason === "sos_created") {
     const map = mapsUrl(ticket);
     return [
       "🚨 S.O.S. — EMERGÊNCIA",
+      `Chamado: ${ticket.ticket_number ?? "Não informado"}`,
       "",
       `Veículo: ${ticket.vehicle_license_plate_snapshot}`,
+      `Modelo: ${ticket.vehicle_model_snapshot ?? "Não informado"}`,
+      `Proprietário: ${ticket.vehicle_owner_snapshot ?? "Não informado"}`,
+      `Embarcador: ${ticket.shipper_name_snapshot ?? "Não informado"}`,
+      `Base: ${ticket.operational_unit_name_snapshot ?? "Não informado"}`,
+      `Km: ${formatKm(ticket.odometer_km)}`,
       `Motorista: ${ticket.driver_name_snapshot ?? "Não informado"}`,
       `Tipo: ${ticket.sos_type ? sosLabels[ticket.sos_type] : "Não informado"}`,
       `Descrição: ${ticket.description ?? "Não informado"}`,
@@ -129,8 +145,14 @@ function buildTicketMessage(ticket: TicketRow, reason: TicketReason, appUrl: str
 
   return [
     "🔴 Chamado crítico classificado",
+    `Chamado: ${ticket.ticket_number ?? "Não informado"}`,
     "",
     `Veículo: ${ticket.vehicle_license_plate_snapshot}`,
+    `Modelo: ${ticket.vehicle_model_snapshot ?? "Não informado"}`,
+    `Proprietário: ${ticket.vehicle_owner_snapshot ?? "Não informado"}`,
+    `Embarcador: ${ticket.shipper_name_snapshot ?? "Não informado"}`,
+    `Base: ${ticket.operational_unit_name_snapshot ?? "Não informado"}`,
+    `Km: ${formatKm(ticket.odometer_km)}`,
     `Aberto por: ${ticket.opened_by_name_snapshot}`,
     `Título: ${ticket.title}`,
     `Descrição: ${ticket.description ?? "Não informado"}`,
@@ -246,7 +268,7 @@ serve(async (req: Request) => {
 
     const { data: ticket, error: ticketError } = await supabaseAdmin
       .from("fleet_tickets")
-      .select("id, client_id, source, opened_by, opened_by_role, opened_by_name_snapshot, driver_name_snapshot, vehicle_license_plate_snapshot, sos_type, title, description, criticality, latitude, longitude, location_text")
+      .select("id, client_id, source, opened_by, opened_by_role, opened_by_name_snapshot, driver_name_snapshot, vehicle_license_plate_snapshot, sos_type, title, description, criticality, latitude, longitude, location_text, ticket_number, odometer_km, vehicle_model_snapshot, vehicle_owner_snapshot, shipper_name_snapshot, operational_unit_name_snapshot")
       .eq("id", body.ticketId)
       .single();
     if (ticketError || !ticket) return json({ error: "Chamado não encontrado." }, 404);

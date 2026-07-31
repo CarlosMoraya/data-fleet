@@ -107,6 +107,7 @@ export async function createSosTicket(input: CreateSosTicketInput): Promise<{
     p_latitude: input.latitude ?? null,
     p_longitude: input.longitude ?? null,
     p_location_status: input.locationStatus,
+    p_odometer_km: input.odometerKm,
   });
   if (error) throw error;
 
@@ -127,6 +128,8 @@ export async function createFleetTicketReport(input: CreateFleetTicketReportInpu
     p_vehicle_id: input.vehicleId,
     p_title: input.title,
     p_description: input.description,
+    p_odometer_km: input.odometerKm,
+    p_criticality: input.criticality,
   });
   if (error) throw error;
 

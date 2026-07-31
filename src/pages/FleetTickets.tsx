@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardList, Loader2, Plus, Search } from 'lucide-react';
+import { ClipboardList, Eye, Loader2, Pencil, Plus, Search } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -10,7 +10,20 @@ import LastKmLabel from '../components/LastKmLabel';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { usePersistentFilterState } from '../hooks/usePersistentUiState';
-import { canOpenFleetTicketReport, fleetTicketCriticalityColor, fleetTicketCriticalityLabel, fleetTicketSourceLabel, fleetTicketStatusColor, fleetTicketStatusLabel, filterFleetTicketsByCard, getFleetTicketCounts, sortFleetTicketsByUrgency } from '../lib/fleetTicketRules';
+import {
+  buildFleetTicketFilterOptions,
+  canOpenFleetTicketReport,
+  filterFleetTicketsByCard,
+  filterFleetTicketsByVehicleAttributes,
+  fleetTicketCriticalityColor,
+  fleetTicketCriticalityLabel,
+  fleetTicketSourceLabel,
+  fleetTicketStatusColor,
+  fleetTicketStatusLabel,
+  getFleetTicketCounts,
+  isFleetTicketReadOnly,
+  sortFleetTicketsByUrgency,
+} from '../lib/fleetTicketRules';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { cn } from '../lib/utils';
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
@@ -32,6 +45,10 @@ export default function FleetTickets() {
   const [searchParams, setSearchParams] = useSearchParams();
   const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
   const [activeFilter, setActiveFilter] = usePersistentFilterState<FleetTicketCardFilter>('fleet-tickets', 'card', 'all', { validator: isFleetTicketCardFilter });
+  const [modelFilter, setModelFilter] = usePersistentFilterState('fleet-tickets', 'model', '');
+  const [ownerFilter, setOwnerFilter] = usePersistentFilterState('fleet-tickets', 'owner', '');
+  const [shipperFilter, setShipperFilter] = usePersistentFilterState('fleet-tickets', 'shipper', '');
+  const [unitFilter, setUnitFilter] = usePersistentFilterState('fleet-tickets', 'unit', '');
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -50,15 +67,26 @@ export default function FleetTickets() {
     enabled: vehicleIds.length > 0,
   });
 
+  const modelOptions = useMemo(() => buildFleetTicketFilterOptions(tickets, 'vehicleModelSnapshot'), [tickets]);
+  const ownerOptions = useMemo(() => buildFleetTicketFilterOptions(tickets, 'vehicleOwnerSnapshot'), [tickets]);
+  const shipperOptions = useMemo(() => buildFleetTicketFilterOptions(tickets, 'shipperNameSnapshot'), [tickets]);
+  const unitOptions = useMemo(() => buildFleetTicketFilterOptions(tickets, 'operationalUnitNameSnapshot'), [tickets]);
+
   const filteredTickets = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     const byCard = filterFleetTicketsByCard(tickets, activeFilter);
     const searched = normalizedSearch
-      ? byCard.filter((ticket) => [ticket.vehicleLicensePlateSnapshot, ticket.title, ticket.description, ticket.openedByNameSnapshot, ticket.driverNameSnapshot]
+      ? byCard.filter((ticket) => [ticket.vehicleLicensePlateSnapshot, ticket.title, ticket.description, ticket.openedByNameSnapshot, ticket.driverNameSnapshot, ticket.ticketNumber]
           .some((value) => value?.toLowerCase().includes(normalizedSearch)))
       : byCard;
-    return sortFleetTicketsByUrgency(searched);
-  }, [tickets, activeFilter, search]);
+    const byVehicleAttributes = filterFleetTicketsByVehicleAttributes(searched, {
+      model: modelFilter,
+      owner: ownerFilter,
+      shipper: shipperFilter,
+      unit: unitFilter,
+    });
+    return sortFleetTicketsByUrgency(byVehicleAttributes);
+  }, [tickets, activeFilter, search, modelFilter, ownerFilter, shipperFilter, unitFilter]);
 
   const selectedTicket = selectedTicketId ? tickets.find((ticket) => ticket.id === selectedTicketId) ?? null : null;
 
@@ -99,9 +127,27 @@ export default function FleetTickets() {
 
       <FleetTicketCriticalityCards counts={counts} activeFilter={activeFilter} onChange={setActiveFilter} />
 
-      <div className="relative w-full sm:ml-auto sm:w-80">
-        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por placa, título ou autor..." className="w-full rounded-xl border border-zinc-300 bg-white py-2.5 pr-3 pl-9 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-100 focus:outline-none" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+        <select value={modelFilter} onChange={(event) => setModelFilter(event.target.value)} className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-100 focus:outline-none">
+          <option value="">Modelo: Todos</option>
+          {modelOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <select value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-100 focus:outline-none">
+          <option value="">Proprietário: Todos</option>
+          {ownerOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <select value={shipperFilter} onChange={(event) => setShipperFilter(event.target.value)} className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-100 focus:outline-none">
+          <option value="">Embarcador: Todos</option>
+          {shipperOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <select value={unitFilter} onChange={(event) => setUnitFilter(event.target.value)} className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-100 focus:outline-none">
+          <option value="">Base: Todas</option>
+          {unitOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por placa, número, título ou autor..." className="w-full rounded-xl border border-zinc-300 bg-white py-2.5 pr-3 pl-9 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-100 focus:outline-none" />
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
@@ -116,22 +162,45 @@ export default function FleetTickets() {
             <table className="min-w-full divide-y divide-zinc-100">
               <thead className="sticky top-0 z-10 bg-zinc-50">
                 <tr>
-                  {['Tipo', 'Veículo', 'Criticidade', 'Status', 'Aberto por', 'Responsável', 'Criado em', 'Ação'].map((heading) => <th key={heading} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">{heading}</th>)}
+                  {['Tipo', 'Veículo', 'Criticidade', 'Status', 'Aberto por', 'Responsável', 'Ação'].map((heading) => <th key={heading} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">{heading}</th>)}
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-50">
-                {filteredTickets.map((ticket: FleetTicket) => (
-                  <tr key={ticket.id} onClick={() => { setSelectedTicketId(ticket.id); const next = new URLSearchParams(searchParams); next.set('ticket', ticket.id); setSearchParams(next, { replace: true }); }} className="cursor-pointer transition-colors hover:bg-zinc-50">
-                    <td className="px-4 py-3">{ticket.source === 'sos' ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">S.O.S.</span> : <span className="text-sm text-zinc-600">{fleetTicketSourceLabel(ticket.source)}</span>}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-zinc-900"><div>{ticket.vehicleLicensePlateSnapshot}</div><LastKmLabel info={lastKmQuery.data?.get(ticket.vehicleId)} /></td>
-                    <td className="px-4 py-3"><span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', fleetTicketCriticalityColor(ticket.criticality))}>{fleetTicketCriticalityLabel(ticket.criticality)}</span></td>
-                    <td className="px-4 py-3"><span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', fleetTicketStatusColor(ticket.status))}>{fleetTicketStatusLabel(ticket.status)}</span></td>
-                    <td className="px-4 py-3 text-sm text-zinc-600">{ticket.openedByNameSnapshot}</td>
-                    <td className="px-4 py-3 text-sm text-zinc-600">{ticket.assignedToNameSnapshot ?? <span className="text-zinc-400">—</span>}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-zinc-400">{formatDate(ticket.createdAt)}</td>
-                    <td className="px-4 py-3 text-xs font-medium text-orange-600">Abrir</td>
-                  </tr>
-                ))}
+                {filteredTickets.map((ticket: FleetTicket) => {
+                  const readOnly = isFleetTicketReadOnly(ticket.status);
+                  const openTicket = () => { setSelectedTicketId(ticket.id); const next = new URLSearchParams(searchParams); next.set('ticket', ticket.id); setSearchParams(next, { replace: true }); };
+                  const vehicleMeta = [ticket.vehicleModelSnapshot, ticket.vehicleOwnerSnapshot].filter(Boolean).join(' · ');
+                  return (
+                    <tr key={ticket.id} onClick={openTicket} className="cursor-pointer transition-colors hover:bg-zinc-50">
+                      <td className="px-4 py-3">
+                        {ticket.source === 'sos' ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">S.O.S.</span> : <span className="text-sm text-zinc-600">{fleetTicketSourceLabel(ticket.source)}</span>}
+                        <div className="text-xs text-zinc-400">{ticket.ticketNumber ?? '—'}</div>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-zinc-900">
+                        <div>{ticket.vehicleLicensePlateSnapshot}</div>
+                        <LastKmLabel info={lastKmQuery.data?.get(ticket.vehicleId)} />
+                        {vehicleMeta && <div className="text-xs text-zinc-400">{vehicleMeta}</div>}
+                      </td>
+                      <td className="px-4 py-3"><span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', fleetTicketCriticalityColor(ticket.criticality))}>{fleetTicketCriticalityLabel(ticket.criticality)}</span></td>
+                      <td className="px-4 py-3"><span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', fleetTicketStatusColor(ticket.status))}>{fleetTicketStatusLabel(ticket.status)}</span></td>
+                      <td className="px-4 py-3 text-sm text-zinc-600">
+                        <div>{ticket.openedByNameSnapshot}</div>
+                        <div className="text-xs text-zinc-400">{formatDate(ticket.createdAt)}</div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-zinc-600">{ticket.assignedToNameSnapshot ?? <span className="text-zinc-400">—</span>}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={(event) => { event.stopPropagation(); openTicket(); }}
+                          aria-label={readOnly ? 'Visualizar chamado' : 'Editar chamado'}
+                          className="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-orange-600"
+                        >
+                          {readOnly ? <Eye className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

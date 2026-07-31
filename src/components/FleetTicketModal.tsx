@@ -10,18 +10,22 @@ import {
   listFleetTicketEvents,
   updateFleetTicketStatus,
 } from '../services/fleetTicketService';
+import { getVehicleLastKmMap } from '../services/vehicleOdometerService';
 import {
-  canClassifyFleetTicket,
+  FLEET_TICKET_CRITICALITY_DESCRIPTIONS,
+  canEditFleetTicketCriticality,
   canHandleFleetTicket,
   fleetTicketCriticalityColor,
   fleetTicketCriticalityLabel,
   fleetTicketSosTypeLabel,
   fleetTicketStatusColor,
   fleetTicketStatusLabel,
+  isFleetTicketReadOnly,
 } from '../lib/fleetTicketRules';
 import { cn } from '../lib/utils';
+import LastKmLabel from './LastKmLabel';
 
-import type { FleetTicket, FleetTicketCriticality, FleetTicketStatus } from '../types/fleetTicket';
+import type { FleetTicket, FleetTicketCriticality, FleetTicketEvent, FleetTicketStatus } from '../types/fleetTicket';
 
 interface FleetTicketModalProps {
   ticket: FleetTicket;
@@ -45,6 +49,16 @@ function formatDate(value?: string): string {
   return value ? new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 }
 
+function eventLabel(event: FleetTicketEvent): string {
+  if (event.eventType === 'status_changed') {
+    const to = event.payload.to;
+    if (typeof to === 'string') {
+      return `Status alterado para ${fleetTicketStatusLabel(to as FleetTicketStatus)}`;
+    }
+  }
+  return EVENT_LABELS[event.eventType] ?? event.eventType;
+}
+
 export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTicketModalProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -64,6 +78,10 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
     queryFn: () => getFleetTicketAttachmentUrls(ticket.attachmentPaths),
     enabled: ticket.attachmentPaths.length > 0,
   });
+  const lastKmQuery = useQuery({
+    queryKey: ['vehicleLastKmMap', ticket.vehicleId],
+    queryFn: () => getVehicleLastKmMap([ticket.vehicleId]),
+  });
 
   useEffect(() => {
     setCriticality(ticket.criticality ?? '');
@@ -73,8 +91,9 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
     setWarning(null);
   }, [ticket]);
 
-  const canClassify = canClassifyFleetTicket(user?.role) && ticket.source === 'report';
-  const canHandle = canHandleFleetTicket(user?.role);
+  const canEditCriticality = canEditFleetTicketCriticality(user?.role) && ticket.source === 'report' && !isFleetTicketReadOnly(ticket.status);
+  const canHandle = canHandleFleetTicket(user?.role) && !isFleetTicketReadOnly(ticket.status);
+  const lastKmInfo = lastKmQuery.data?.get(ticket.vehicleId) ?? null;
 
   const runAction = async (action: () => Promise<{ telegramWarning?: string } | void>) => {
     setSaving(true);
@@ -121,6 +140,7 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
               <h2 className="text-base font-semibold text-zinc-900">{ticket.title}</h2>
               {ticket.source === 'sos' && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">S.O.S.</span>}
               <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', fleetTicketCriticalityColor(ticket.criticality))}>{fleetTicketCriticalityLabel(ticket.criticality)}</span>
+              <span className="text-xs text-zinc-500">{ticket.ticketNumber ? `Chamado ${ticket.ticketNumber}` : '—'}</span>
             </div>
             <p className="mt-1 text-xs text-zinc-500">Criado em {formatDate(ticket.createdAt)}</p>
           </div>
@@ -140,9 +160,23 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
             <div><p className="text-xs uppercase tracking-wide text-zinc-400">Responsável</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.assignedToNameSnapshot ?? '—'}</p></div>
             {ticket.driverNameSnapshot && <div><p className="text-xs uppercase tracking-wide text-zinc-400">Motorista</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.driverNameSnapshot}</p></div>}
             {ticket.source === 'sos' && ticket.sosType && <div><p className="text-xs uppercase tracking-wide text-zinc-400">Tipo de emergência</p><p className="mt-0.5 text-sm text-zinc-800">{fleetTicketSosTypeLabel(ticket.sosType)}</p></div>}
+            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Km informado</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.odometerKm != null ? `${ticket.odometerKm.toLocaleString('pt-BR')} km` : '—'}</p></div>
+            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Último Km oficial</p><LastKmLabel info={lastKmInfo} className="mt-0.5 text-sm text-zinc-800" /></div>
+            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Modelo</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.vehicleModelSnapshot ?? '—'}</p></div>
+            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Proprietário</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.vehicleOwnerSnapshot ?? '—'}</p></div>
+            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Embarcador</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.shipperNameSnapshot ?? '—'}</p></div>
+            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Base</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.operationalUnitNameSnapshot ?? '—'}</p></div>
           </div>
 
           {ticket.description && <div><h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Descrição</h3><p className="mt-1 whitespace-pre-wrap text-sm text-zinc-800">{ticket.description}</p></div>}
+
+          {ticket.resolutionNotes && (
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Notas de Resolução</h3>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-emerald-900">{ticket.resolutionNotes}</p>
+              <p className="mt-1.5 text-xs text-emerald-700">{ticket.resolvedByNameSnapshot ?? 'Sistema'} · {formatDate(ticket.resolvedAt)}</p>
+            </div>
+          )}
 
           {(mapUrl || ticket.locationText) && (
             <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
@@ -165,9 +199,9 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
             </div>
           )}
 
-          {canClassify && (
+          {canEditCriticality && (
             <div className="rounded-xl border border-zinc-200 p-4">
-              <label htmlFor="ticket-criticality" className="mb-2 block text-sm font-medium text-zinc-800">Classificar criticidade</label>
+              <label htmlFor="ticket-criticality" className="mb-2 block text-sm font-medium text-zinc-800">Alterar criticidade</label>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <select id="ticket-criticality" value={criticality} onChange={(event) => setCriticality(event.target.value as FleetTicketCriticality | '')} disabled={saving} className="flex-1 rounded-xl border border-zinc-300 px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-100 focus:outline-none">
                   <option value="">Selecione...</option>
@@ -175,6 +209,7 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
                 </select>
                 <button type="button" onClick={handleClassify} disabled={saving} className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50">Classificar</button>
               </div>
+              {criticality && <p className="mt-1.5 text-xs text-zinc-500">{FLEET_TICKET_CRITICALITY_DESCRIPTIONS[criticality]}</p>}
             </div>
           )}
 
@@ -201,7 +236,7 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
             <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Histórico</h3>
             {eventsQuery.isLoading ? <div className="mt-2 flex items-center gap-2 text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" /> Carregando histórico...</div> : (
               <ol className="mt-2 space-y-2 border-l border-zinc-200 pl-4">
-                {(eventsQuery.data ?? []).map((event) => <li key={event.id} className="text-sm"><p className="font-medium text-zinc-800">{EVENT_LABELS[event.eventType] ?? event.eventType}</p><p className="text-xs text-zinc-400">{event.actorNameSnapshot ?? 'Sistema'} · {formatDate(event.createdAt)}</p></li>)}
+                {(eventsQuery.data ?? []).map((event) => <li key={event.id} className="text-sm"><p className="font-medium text-zinc-800">{eventLabel(event)}</p><p className="text-xs text-zinc-400">{event.actorNameSnapshot ?? 'Sistema'} · {formatDate(event.createdAt)}</p></li>)}
               </ol>
             )}
           </div>

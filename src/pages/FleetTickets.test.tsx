@@ -33,10 +33,13 @@ let queryClient: QueryClient;
 
 const rows = [
   {
-    id: 'sos-1', clientId: 'client-1', source: 'sos', openedBy: 'driver-1', openedByRole: 'Driver', openedByNameSnapshot: 'João', driverId: 'driver-1', driverNameSnapshot: 'João', vehicleId: 'vehicle-1', vehicleLicensePlateSnapshot: 'ABC1D23', sosType: 'breakdown', title: 'S.O.S.', description: 'Falha', criticality: 'critical', status: 'open', attachmentPaths: [], createdAt: '2026-07-29T10:00:00Z', updatedAt: '2026-07-29T10:00:00Z',
+    id: 'sos-1', clientId: 'client-1', source: 'sos', openedBy: 'driver-1', openedByRole: 'Driver', openedByNameSnapshot: 'João', driverId: 'driver-1', driverNameSnapshot: 'João', vehicleId: 'vehicle-1', vehicleLicensePlateSnapshot: 'ABC1D23', sosType: 'breakdown', title: 'S.O.S.', description: 'Falha', criticality: 'critical', status: 'open', attachmentPaths: [], createdAt: '2026-07-29T10:00:00Z', updatedAt: '2026-07-29T10:00:00Z', ticketNumber: 'CH-2607-4821', vehicleModelSnapshot: 'Volvo FH',
   },
   {
-    id: 'report-1', clientId: 'client-1', source: 'report', openedBy: 'auditor-1', openedByRole: 'Yard Auditor', openedByNameSnapshot: 'Maria', vehicleId: 'vehicle-2', vehicleLicensePlateSnapshot: 'XYZ9K88', title: 'Pneu danificado', description: 'Descrição do problema', status: 'open', attachmentPaths: [], createdAt: '2026-07-29T09:00:00Z', updatedAt: '2026-07-29T09:00:00Z',
+    id: 'report-1', clientId: 'client-1', source: 'report', openedBy: 'auditor-1', openedByRole: 'Yard Auditor', openedByNameSnapshot: 'Maria', vehicleId: 'vehicle-2', vehicleLicensePlateSnapshot: 'XYZ9K88', title: 'Pneu danificado', description: 'Descrição do problema', status: 'open', attachmentPaths: [], createdAt: '2026-07-29T09:00:00Z', updatedAt: '2026-07-29T09:00:00Z', vehicleModelSnapshot: 'Scania R450',
+  },
+  {
+    id: 'closed-1', clientId: 'client-1', source: 'report', openedBy: 'auditor-1', openedByRole: 'Yard Auditor', openedByNameSnapshot: 'Maria', vehicleId: 'vehicle-3', vehicleLicensePlateSnapshot: 'DEF4G56', title: 'Chamado encerrado', description: 'Já resolvido', criticality: 'low', status: 'closed', attachmentPaths: [], createdAt: '2026-07-28T09:00:00Z', updatedAt: '2026-07-28T09:00:00Z',
   },
 ];
 
@@ -118,6 +121,53 @@ describe('FleetTickets', () => {
     const root = await renderPage('/chamados?ticket=sos-1');
     await waitForText('S.O.S.');
     expect(container.textContent).toContain('S.O.S.');
+    act(() => root.unmount());
+  });
+
+  it('renders an edit button for active tickets', async () => {
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    expect(container.querySelector('button[aria-label="Editar chamado"]')).not.toBeNull();
+    act(() => root.unmount());
+  });
+
+  it('renders a view button (not edit) for closed tickets', async () => {
+    const root = await renderPage();
+    await waitForText('DEF4G56');
+    const row = Array.from(container.querySelectorAll('tbody tr')).find((tr) => tr.textContent?.includes('DEF4G56'))!;
+    expect(row.querySelector('button[aria-label="Visualizar chamado"]')).not.toBeNull();
+    expect(row.querySelector('button[aria-label="Editar chamado"]')).toBeNull();
+    act(() => root.unmount());
+  });
+
+  it('shows the ticket number in the Tipo cell', async () => {
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    expect(container.textContent).toContain('CH-2607-4821');
+    act(() => root.unmount());
+  });
+
+  it('no longer has a "Criado em" column and shows the date under "Aberto por"', async () => {
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    const headers = Array.from(container.querySelectorAll('th')).map((th) => th.textContent);
+    expect(headers).not.toContain('Criado em');
+    const row = Array.from(container.querySelectorAll('tbody tr')).find((tr) => tr.textContent?.includes('João'))!;
+    expect(row.textContent).toContain('João');
+    act(() => root.unmount());
+  });
+
+  it('reduces displayed rows when a Modelo filter is selected', async () => {
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    const modelSelect = Array.from(container.querySelectorAll('select')).find((select) => select.textContent?.includes('Modelo'))!;
+    const setSelectValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    act(() => {
+      setSelectValue?.call(modelSelect, 'Volvo FH');
+      modelSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(container.textContent).toContain('ABC1D23');
+    expect(container.textContent).not.toContain('XYZ9K88');
     act(() => root.unmount());
   });
 });

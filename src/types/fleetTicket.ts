@@ -48,6 +48,12 @@ export interface FleetTicket {
   telegramLastError?: string;
   createdAt: string;
   updatedAt: string;
+  ticketNumber?: string;
+  odometerKm?: number;
+  vehicleModelSnapshot?: string;
+  vehicleOwnerSnapshot?: string;
+  shipperNameSnapshot?: string;
+  operationalUnitNameSnapshot?: string;
 }
 
 export interface FleetTicketEvent {
@@ -92,6 +98,7 @@ export interface CreateSosTicketInput {
   longitude?: number | null;
   locationStatus: FleetTicketLocationStatus;
   files?: File[];
+  odometerKm: number;
 }
 
 export interface CreateFleetTicketReportInput {
@@ -100,4 +107,6 @@ export interface CreateFleetTicketReportInput {
   title: string;
   description: string;
   files?: File[];
+  odometerKm: number;
+  criticality: FleetTicketCriticality;
 }

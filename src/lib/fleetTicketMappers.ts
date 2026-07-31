@@ -47,6 +47,12 @@ export interface FleetTicketRow {
   telegram_last_error?: string | null;
   created_at: string;
   updated_at: string;
+  ticket_number?: string | null;
+  odometer_km?: number | string | null;
+  vehicle_model_snapshot?: string | null;
+  vehicle_owner_snapshot?: string | null;
+  shipper_name_snapshot?: string | null;
+  operational_unit_name_snapshot?: string | null;
 }
 
 export interface FleetTicketEventRow {
@@ -107,6 +113,12 @@ export function fleetTicketFromRow(row: FleetTicketRow): FleetTicket {
     telegramLastError: row.telegram_last_error ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    ticketNumber: normalizeTrim(row.ticket_number) || undefined,
+    odometerKm: row.odometer_km != null ? Number(row.odometer_km) : undefined,
+    vehicleModelSnapshot: normalizeTrim(row.vehicle_model_snapshot) || undefined,
+    vehicleOwnerSnapshot: normalizeTrim(row.vehicle_owner_snapshot) || undefined,
+    shipperNameSnapshot: normalizeTrim(row.shipper_name_snapshot) || undefined,
+    operationalUnitNameSnapshot: normalizeTrim(row.operational_unit_name_snapshot) || undefined,
   };
 }
 

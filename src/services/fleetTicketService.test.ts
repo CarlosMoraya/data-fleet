@@ -21,6 +21,7 @@ vi.mock('../lib/invokeEdgeFn', () => ({ invokeEdgeFunction: invokeMock }));
 
 import {
   classifyFleetTicket,
+  createFleetTicketReport,
   createSosTicket,
   getFleetTicketAttachmentUrls,
   listFleetTickets,
@@ -78,6 +79,7 @@ describe('createSosTicket', () => {
     longitude: -46.6,
     locationStatus: 'captured' as const,
     files: [new File([new Uint8Array([1])], 'photo.pdf', { type: 'application/pdf' })],
+    odometerKm: 92400,
   };
 
   it('calls the create RPC before uploading and registers uploaded paths', async () => {
@@ -89,6 +91,7 @@ describe('createSosTicket', () => {
     const result = await createSosTicket(input);
 
     expect(rpcMock.mock.calls[0][0]).toBe('create_sos_ticket');
+    expect(rpcMock.mock.calls[0][1]).toMatchObject({ p_odometer_km: 92400 });
     expect(uploadMock).toHaveBeenCalledWith('client-1', 'ticket-1', input.files[0]);
     expect(rpcMock.mock.calls[1][0]).toBe('append_fleet_ticket_attachments');
     expect(invokeMock).toHaveBeenCalledWith('notify-fleet-ticket-telegram', {
@@ -116,6 +119,27 @@ describe('createSosTicket', () => {
 
     expect(result.ticketId).toBe('ticket-1');
     expect(result.telegramWarning).toBe('Telegram indisponível');
+  });
+});
+
+describe('createFleetTicketReport', () => {
+  it('sends odometer and criticality to the create RPC', async () => {
+    rpcMock
+      .mockResolvedValueOnce({ data: 'ticket-2', error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+
+    await createFleetTicketReport({
+      clientId: 'client-1',
+      vehicleId: 'vehicle-1',
+      title: 'Pneu furado',
+      description: 'Pneu dianteiro furado',
+      files: [],
+      odometerKm: 50000,
+      criticality: 'medium',
+    });
+
+    expect(rpcMock.mock.calls[0][0]).toBe('create_fleet_ticket_report');
+    expect(rpcMock.mock.calls[0][1]).toMatchObject({ p_odometer_km: 50000, p_criticality: 'medium' });
   });
 });
 

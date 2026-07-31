@@ -1,18 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildFleetTicketFilterOptions,
   canClassifyFleetTicket,
+  canEditFleetTicketCriticality,
   canHandleFleetTicket,
   canManageTelegramSettings,
   canOpenFleetTicketReport,
   canOpenSosTicket,
+  evaluateFleetTicketOdometer,
   filterFleetTicketsByCard,
+  filterFleetTicketsByVehicleAttributes,
   fleetTicketCriticalityColor,
   fleetTicketCriticalityLabel,
   fleetTicketSourceLabel,
   fleetTicketStatusLabel,
   getFleetTicketCounts,
+  isFleetTicketReadOnly,
   isUrgentFleetTicket,
+  requiresFleetTicketPhoto,
   sortFleetTicketsByUrgency,
 } from './fleetTicketRules';
 
@@ -96,5 +102,170 @@ describe('fleet ticket urgency and permissions', () => {
     expect(canHandleFleetTicket('Operations Manager')).toBe(false);
     expect(canManageTelegramSettings('Coordinator')).toBe(true);
     expect(canManageTelegramSettings('Fleet Analyst')).toBe(false);
+  });
+});
+
+describe('canEditFleetTicketCriticality', () => {
+  it('excludes Operations Manager (regression fixed this session)', () => {
+    expect(canEditFleetTicketCriticality('Operations Manager')).toBe(false);
+  });
+
+  it('excludes Yard Auditor', () => {
+    expect(canEditFleetTicketCriticality('Yard Auditor')).toBe(false);
+  });
+
+  it('allows Fleet Assistant and above', () => {
+    expect(canEditFleetTicketCriticality('Fleet Assistant')).toBe(true);
+    expect(canEditFleetTicketCriticality('Fleet Analyst')).toBe(true);
+    expect(canEditFleetTicketCriticality('Coordinator')).toBe(true);
+    expect(canEditFleetTicketCriticality('Admin Master')).toBe(true);
+  });
+
+  it('denies missing role', () => {
+    expect(canEditFleetTicketCriticality(null)).toBe(false);
+    expect(canEditFleetTicketCriticality(undefined)).toBe(false);
+  });
+});
+
+describe('isFleetTicketReadOnly', () => {
+  it('is false for active statuses', () => {
+    expect(isFleetTicketReadOnly('open')).toBe(false);
+    expect(isFleetTicketReadOnly('in_analysis')).toBe(false);
+    expect(isFleetTicketReadOnly('in_progress')).toBe(false);
+  });
+
+  it('is true for terminal statuses', () => {
+    expect(isFleetTicketReadOnly('resolved')).toBe(true);
+    expect(isFleetTicketReadOnly('closed')).toBe(true);
+    expect(isFleetTicketReadOnly('cancelled')).toBe(true);
+  });
+});
+
+describe('requiresFleetTicketPhoto', () => {
+  it('requires photo for S.O.S. or critical reports', () => {
+    expect(requiresFleetTicketPhoto('sos', 'critical')).toBe(true);
+    expect(requiresFleetTicketPhoto('report', 'critical')).toBe(true);
+  });
+
+  it('does not require photo for non-critical reports', () => {
+    expect(requiresFleetTicketPhoto('report', 'high')).toBe(false);
+    expect(requiresFleetTicketPhoto('report', undefined)).toBe(false);
+  });
+});
+
+describe('evaluateFleetTicketOdometer', () => {
+  it('accepts a value within tolerance', () => {
+    expect(evaluateFleetTicketOdometer({
+      rawValue: '92400',
+      lastOfficialKm: 91800,
+      lastReadingAt: null,
+      tolerancePerDay: null,
+    })).toEqual({ level: 'ok', value: 92400 });
+  });
+
+  it('rejects non-numeric input', () => {
+    expect(evaluateFleetTicketOdometer({
+      rawValue: 'abc',
+      lastOfficialKm: null,
+      lastReadingAt: null,
+      tolerancePerDay: null,
+    })).toMatchObject({ level: 'invalid' });
+  });
+
+  it('flags empty input', () => {
+    expect(evaluateFleetTicketOdometer({
+      rawValue: '  ',
+      lastOfficialKm: null,
+      lastReadingAt: null,
+      tolerancePerDay: null,
+    })).toEqual({ level: 'empty' });
+  });
+
+  it('warns when the value is below the last official reading', () => {
+    const advice = evaluateFleetTicketOdometer({
+      rawValue: '90000',
+      lastOfficialKm: 91800,
+      lastReadingAt: null,
+      tolerancePerDay: null,
+    });
+    expect(advice.level).toBe('below');
+    expect((advice as { message: string }).message).toContain('91.800');
+  });
+
+  it('warns when the value exceeds the expected tolerance for the period', () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 86400000).toISOString();
+    const advice = evaluateFleetTicketOdometer({
+      rawValue: '95000',
+      lastOfficialKm: 91800,
+      lastReadingAt: twoDaysAgo,
+      tolerancePerDay: 500,
+    });
+    expect(advice.level).toBe('above');
+  });
+
+  it('never flags divergence without a reference reading', () => {
+    expect(evaluateFleetTicketOdometer({
+      rawValue: '92400',
+      lastOfficialKm: null,
+      lastReadingAt: null,
+      tolerancePerDay: null,
+    })).toEqual({ level: 'ok', value: 92400 });
+  });
+});
+
+describe('buildFleetTicketFilterOptions', () => {
+  const tickets = [
+    ticket({ id: 'a', vehicleModelSnapshot: 'Volvo FH' }),
+    ticket({ id: 'b', vehicleModelSnapshot: 'Scania R450' }),
+    ticket({ id: 'c', vehicleModelSnapshot: 'Volvo FH' }),
+    ticket({ id: 'd', vehicleModelSnapshot: undefined }),
+  ];
+
+  it('removes duplicates, removes undefined and sorts with correct accentuation', () => {
+    expect(buildFleetTicketFilterOptions(tickets, 'vehicleModelSnapshot')).toEqual(['Scania R450', 'Volvo FH']);
+  });
+});
+
+describe('filterFleetTicketsByVehicleAttributes', () => {
+  const tickets = [
+    ticket({
+      id: 'a',
+      vehicleModelSnapshot: 'Volvo FH',
+      vehicleOwnerSnapshot: 'Transportadora Beta',
+      shipperNameSnapshot: 'Embarcador X',
+      operationalUnitNameSnapshot: 'Base Sul',
+    }),
+    ticket({
+      id: 'b',
+      vehicleModelSnapshot: 'Scania R450',
+      vehicleOwnerSnapshot: 'Transportadora Beta',
+      shipperNameSnapshot: 'Embarcador Y',
+      operationalUnitNameSnapshot: 'Base Norte',
+    }),
+  ];
+
+  it('returns everything when all filters are empty', () => {
+    expect(filterFleetTicketsByVehicleAttributes(tickets, { model: '', owner: '', shipper: '', unit: '' }))
+      .toHaveLength(2);
+  });
+
+  it('reduces the list with a single filter', () => {
+    const result = filterFleetTicketsByVehicleAttributes(tickets, { model: 'Volvo FH', owner: '', shipper: '', unit: '' });
+    expect(result.map((item) => item.id)).toEqual(['a']);
+  });
+
+  it('combines two filters with logical AND', () => {
+    const result = filterFleetTicketsByVehicleAttributes(tickets, {
+      model: '',
+      owner: 'Transportadora Beta',
+      shipper: 'Embarcador Y',
+      unit: '',
+    });
+    expect(result.map((item) => item.id)).toEqual(['b']);
+  });
+
+  it('returns an empty array when nothing matches', () => {
+    const result = filterFleetTicketsByVehicleAttributes(tickets, { model: 'Inexistente', owner: '', shipper: '', unit: '' });
+    expect(result).toEqual([]);
   });
 });
