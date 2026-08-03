@@ -250,7 +250,7 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
                   )}
                 </div>
                 {budgetItems.length > 0 && (
-                  <BudgetItemsTable items={budgetItems} readOnly />
+                  <BudgetItemsTable items={budgetItems} readOnly orderDiscount={order.budgetDiscount ?? 0} />
                 )}
               </div>
             </section>

@@ -17,7 +17,7 @@ import LastKmLabel from '../components/LastKmLabel';
 import { useAuth } from '../context/AuthContext';
 import {
   budgetItemFromRow,
-  calcBudgetSubtotal,
+  calcBudgetTotals,
   type BudgetItem,
   type MaintenanceBudgetItemRow,
 } from '../lib/maintenanceMappers';
@@ -57,6 +57,7 @@ interface PendingOrder {
   currentKm?: number;
   createdBy: string;
   createdAt: string;
+  budgetDiscount: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -97,8 +98,8 @@ function OrderRow({ order, user, onApprove, onReject, approving, lastKmInfo }: O
     },
   });
 
-  const subtotal = calcBudgetSubtotal(items);
-  const withinLimit = canApprove(user, subtotal, {
+  const totals = calcBudgetTotals(items, order.budgetDiscount);
+  const withinLimit = canApprove(user, totals.total, {
     itemsLoading: loadingItems,
     hasItems: items.length > 0,
   });
@@ -142,7 +143,7 @@ function OrderRow({ order, user, onApprove, onReject, approving, lastKmInfo }: O
             <span className={cn(
               withinLimit || isAlwaysApprover ? 'text-green-700' : 'text-red-600'
             )}>
-              {formatCurrency(subtotal)}
+              {formatCurrency(totals.total)}
             </span>
           ) : (
             <span className="text-xs text-zinc-400">—</span>
@@ -198,7 +199,7 @@ function OrderRow({ order, user, onApprove, onReject, approving, lastKmInfo }: O
             ) : items.length === 0 ? (
               <p className="text-sm text-zinc-400">Nenhum item cadastrado no orçamento.</p>
             ) : (
-              <BudgetItemsTable items={items} readOnly />
+              <BudgetItemsTable items={items} readOnly orderDiscount={order.budgetDiscount ?? 0} />
             )}
           </td>
         </tr>
@@ -236,7 +237,7 @@ export default function BudgetApprovals() {
         .from('maintenance_orders')
         .select(`
           id, os_number, entry_date, workshop_os_number, current_km,
-          budget_pdf_url, created_at, vehicle_id,
+          budget_pdf_url, created_at, vehicle_id, budget_discount,
           vehicles(license_plate),
           workshops(name),
           profiles!created_by_id(name)
@@ -254,7 +255,7 @@ export default function BudgetApprovals() {
       type OrderQueryRow = {
         id: string; os_number: string; entry_date: string; workshop_os_number: string | null;
         current_km: number | null; budget_pdf_url: string | null; created_at: string;
-        vehicle_id: string | null;
+        vehicle_id: string | null; budget_discount: number | null;
         vehicles: { license_plate: string } | null;
         workshops: { name: string } | null;
         profiles: { name: string } | null;
@@ -271,6 +272,7 @@ export default function BudgetApprovals() {
         currentKm: row.current_km ?? undefined,
         createdBy: row.profiles?.name ?? '—',
         createdAt: row.created_at,
+        budgetDiscount: Number(row.budget_discount ?? 0),
       }));
     },
   });
@@ -298,16 +300,19 @@ export default function BudgetApprovals() {
       if (approve) {
         const { data: itemRows, error: itemsError } = await supabase
           .from('maintenance_budget_items')
-          .select('quantity, value')
+          .select('quantity, value, discount')
           .eq('maintenance_order_id', id);
         if (itemsError) throw itemsError;
         if (!ALWAYS_APPROVE_ROLES.includes(user!.role) && (!itemRows || itemRows.length === 0)) {
           throw new Error('Não é possível aprovar: orçamento sem itens cadastrados.');
         }
-        total = (itemRows ?? []).reduce(
-          (sum, r) => sum + Number(r.quantity) * Number(r.value),
-          0,
-        );
+        total = calcBudgetTotals(
+          (itemRows ?? []).map(r => ({
+            itemName: '', system: '', sortOrder: 0,
+            quantity: Number(r.quantity), value: Number(r.value), discount: Number(r.discount ?? 0),
+          })),
+          orders.find(o => o.id === id)?.budgetDiscount ?? 0,
+        ).total;
         if (!ALWAYS_APPROVE_ROLES.includes(user!.role) && (total <= 0 || total > user!.budgetApprovalLimit)) {
           throw new Error(
             `Não é possível aprovar: valor (${formatCurrency(total)}) excede sua alçada (${formatCurrency(user!.budgetApprovalLimit)}).`,

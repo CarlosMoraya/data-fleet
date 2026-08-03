@@ -27,6 +27,7 @@ export interface MaintenanceOrder {
   currentKm?: number;
   budgetPdfUrl?: string;
   budgetStatus?: BudgetStatus;
+  budgetDiscount?: number;
   budgetReviewedBy?: string;
   budgetReviewedAt?: string;
   budgetRejectionReason?: string;
@@ -48,6 +49,7 @@ export interface BudgetItem {
   system: string;
   quantity: number;
   value: number;
+  discount?: number;
   sortOrder: number;
 }
 
@@ -74,6 +76,7 @@ export interface MaintenanceOrderRow {
   current_km: number | null;
   budget_pdf_url: string | null;
   budget_status: BudgetStatus | null;
+  budget_discount: number;
   budget_reviewed_by: string | null;
   budget_reviewed_at: string | null;
   budget_rejection_reason: string | null;
@@ -99,6 +102,7 @@ export interface MaintenanceBudgetItemRow {
   system: string | null;
   quantity: number;
   value: number;
+  discount: number;
   sort_order: number;
   created_at: string;
 }

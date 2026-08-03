@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { extractBudgetData } from '../lib/budgetOcr';
 import { isKnownBudgetSystem } from '../lib/budgetSystems';
 import { validateMaintenanceCurrentKm } from '../lib/maintenanceKmValidation';
-import { budgetItemFromRow, type MaintenanceBudgetItemRow, BudgetItem } from '../lib/maintenanceMappers';
+import { budgetItemFromRow, calcBudgetSubtotal, type MaintenanceBudgetItemRow, BudgetItem } from '../lib/maintenanceMappers';
 import { validateFile } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
@@ -23,6 +23,28 @@ const inputClass =
   'focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500';
 
 const labelClass = 'block text-sm font-medium text-zinc-700';
+
+export function validateBudgetDiscounts(items: BudgetItem[], orderDiscount: number): string | null {
+  for (const item of items) {
+    if (item.discount != null && item.discount > item.quantity * item.value) {
+      return `O desconto do item "${item.itemName}" não pode ser maior que o valor da linha.`;
+    }
+    if (item.discount != null && item.discount < 0) {
+      return 'O desconto não pode ser negativo.';
+    }
+  }
+  if (orderDiscount < 0) {
+    return 'O desconto não pode ser negativo.';
+  }
+  const hasItemDiscount = items.some(item => (item.discount ?? 0) > 0);
+  if (hasItemDiscount && orderDiscount > 0) {
+    return 'Use desconto por item ou desconto geral — nunca os dois.';
+  }
+  if (orderDiscount > calcBudgetSubtotal(items)) {
+    return 'O desconto geral não pode ser maior que o subtotal do orçamento.';
+  }
+  return null;
+}
 
 function Label({ htmlFor, required, children }: { htmlFor?: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -241,6 +263,8 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
     return items.some(item => item.itemName.trim().length > 0 && !isKnownBudgetSystem(item.system));
   };
 
+  const discountsLocked = order?.budgetStatus === 'aprovado' || order?.budgetStatus === 'reprovado';
+
   const selectableVehicles = useMemo(
     () => (order ? vehicles : vehicles.filter((v) => !(blockedVehicleIds?.has(v.id)))),
     [order, vehicles, blockedVehicleIds],
@@ -250,6 +274,11 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
     e.preventDefault();
     if (hasBudgetItemWithoutSystem(budgetItems)) {
       setError('Selecione o sistema dos itens do orçamento ou use Outros.');
+      return;
+    }
+    const discountError = validateBudgetDiscounts(budgetItems, formData.budgetDiscount ?? 0);
+    if (discountError) {
+      setError(discountError);
       return;
     }
     if (isWorkshopMode) {
@@ -295,7 +324,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl">
+      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-xl">
         {/* Header */}
         <div className="flex flex-shrink-0 items-center justify-between border-b border-zinc-200 px-6 py-4">
           <div className="flex items-center gap-2">
@@ -428,6 +457,9 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
                       items={budgetItems}
                       onChange={setBudgetItems}
                       extracting={extracting}
+                      orderDiscount={formData.budgetDiscount ?? 0}
+                      onOrderDiscountChange={(value) => setFormData(prev => ({ ...prev, budgetDiscount: value }))}
+                      discountsLocked={discountsLocked}
                     />
 
                     {order?.id && user?.id && order.clientId && (
@@ -654,6 +686,9 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
                       items={budgetItems}
                       onChange={setBudgetItems}
                       extracting={extracting}
+                      orderDiscount={formData.budgetDiscount ?? 0}
+                      onOrderDiscountChange={(value) => setFormData(prev => ({ ...prev, budgetDiscount: value }))}
+                      discountsLocked={discountsLocked}
                     />
                   </div>
 

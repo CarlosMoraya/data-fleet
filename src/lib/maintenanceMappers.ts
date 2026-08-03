@@ -27,8 +27,33 @@ export function budgetItemFromRow(row: MaintenanceBudgetItemRow): BudgetItem {
     system: normalizeBudgetSystem(row.system),
     quantity: Number(row.quantity),
     value: Number(row.value),
+    discount: Number(row.discount ?? 0),
     sortOrder: row.sort_order,
   };
+}
+
+export function calcBudgetItemNet(item: Pick<BudgetItem, 'quantity' | 'value' | 'discount'>): number {
+  const gross = item.quantity * item.value;
+  const discount = Math.min(Math.max(item.discount ?? 0, 0), gross);
+  return gross - discount;
+}
+
+export interface BudgetTotals {
+  subtotal: number;
+  itemsDiscount: number;
+  orderDiscount: number;
+  total: number;
+}
+
+export function calcBudgetTotals(items: BudgetItem[], orderDiscount?: number): BudgetTotals {
+  const subtotal = calcBudgetSubtotal(items);
+  const itemsDiscount = items.reduce((sum, item) => {
+    const gross = item.quantity * item.value;
+    return sum + Math.min(Math.max(item.discount ?? 0, 0), gross);
+  }, 0);
+  const appliedOrderDiscount = Math.min(Math.max(orderDiscount ?? 0, 0), Math.max(0, subtotal - itemsDiscount));
+  const total = Math.max(0, subtotal - itemsDiscount - appliedOrderDiscount);
+  return { subtotal, itemsDiscount, orderDiscount: appliedOrderDiscount, total };
 }
 
 export function partPhotoFromRow(row: MaintenancePartPhotoRow): MaintenancePartPhoto {
@@ -78,6 +103,7 @@ export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
     currentKm: row.current_km !== null && row.current_km !== undefined ? Number(row.current_km) : undefined,
     budgetPdfUrl: row.budget_pdf_url || undefined,
     budgetStatus: row.budget_status || 'sem_orcamento',
+    budgetDiscount: Number(row.budget_discount ?? 0),
     budgetReviewedBy: row.budget_reviewer?.name || undefined,
     budgetReviewedAt: row.budget_reviewed_at || undefined,
     budgetRejectionReason: row.budget_rejection_reason || undefined,

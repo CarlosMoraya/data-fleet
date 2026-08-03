@@ -1787,8 +1787,8 @@ describe('buildCostBySystemData', () => {
       { id: 'os1', approved_cost: 1000, status: 'Orçamento aprovado' },
     ];
     const budgetItems: BudgetItemForCost[] = [
-      { maintenance_order_id: 'os1', system: 'Motor', value: 600 },
-      { maintenance_order_id: 'os1', system: 'Sistema de Freio', value: 400 },
+      { maintenance_order_id: 'os1', system: 'Motor', quantity: 1, value: 600, discount: 0 },
+      { maintenance_order_id: 'os1', system: 'Sistema de Freio', quantity: 1, value: 400, discount: 0 },
     ];
 
     const result = buildCostBySystemData(orders, budgetItems);
@@ -1803,7 +1803,7 @@ describe('buildCostBySystemData', () => {
       { id: 'os1', approved_cost: 500, status: 'Orçamento aprovado' },
     ];
     const budgetItems: BudgetItemForCost[] = [
-      { maintenance_order_id: 'os1', system: null, value: 500 },
+      { maintenance_order_id: 'os1', system: null, quantity: 1, value: 500, discount: 0 },
     ];
 
     const result = buildCostBySystemData(orders, budgetItems);
@@ -1827,15 +1827,45 @@ describe('buildCostBySystemData', () => {
       { id: 'os3', approved_cost: 200, status: 'Cancelado' },
     ];
     const budgetItems: BudgetItemForCost[] = [
-      { maintenance_order_id: 'os1', system: 'Motor', value: 700 },
-      { maintenance_order_id: 'os1', system: 'Suspensão', value: 300 },
-      { maintenance_order_id: 'os2', system: 'Motor', value: 500 },
+      { maintenance_order_id: 'os1', system: 'Motor', quantity: 1, value: 700, discount: 0 },
+      { maintenance_order_id: 'os1', system: 'Suspensão', quantity: 1, value: 300, discount: 0 },
+      { maintenance_order_id: 'os2', system: 'Motor', quantity: 1, value: 500, discount: 0 },
     ];
 
     const result = buildCostBySystemData(orders, budgetItems);
     const totalSystemCost = result.reduce((sum, item) => sum + item.value, 0);
     const expectedTotal = sumApprovedMaintenanceCost(orders);
     expect(Math.abs(totalSystemCost - expectedTotal)).toBeLessThan(0.01);
+  });
+
+  it('desconto por item reduz a fatia daquele sistema', () => {
+    const orders = [
+      { id: 'os1', approved_cost: 900, status: 'Orçamento aprovado' },
+    ];
+    const budgetItems: BudgetItemForCost[] = [
+      { maintenance_order_id: 'os1', system: 'Motor', quantity: 1, value: 600, discount: 100 },
+      { maintenance_order_id: 'os1', system: 'Sistema de Freio', quantity: 1, value: 400, discount: 0 },
+    ];
+
+    const result = buildCostBySystemData(orders, budgetItems);
+    expect(result).toEqual([
+      { name: 'Motor', value: 500 },
+      { name: 'Sistema de Freio', value: 400 },
+    ]);
+  });
+
+  it('invariante mantida com desconto: a soma das fatias continua igual ao approved_cost', () => {
+    const orders = [
+      { id: 'os1', approved_cost: 900, status: 'Orçamento aprovado' },
+    ];
+    const budgetItems: BudgetItemForCost[] = [
+      { maintenance_order_id: 'os1', system: 'Motor', quantity: 1, value: 600, discount: 100 },
+      { maintenance_order_id: 'os1', system: 'Sistema de Freio', quantity: 1, value: 400, discount: 0 },
+    ];
+
+    const result = buildCostBySystemData(orders, budgetItems);
+    const totalSystemCost = result.reduce((sum, item) => sum + item.value, 0);
+    expect(totalSystemCost).toBeCloseTo(900, 2);
   });
 });
 

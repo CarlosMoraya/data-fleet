@@ -107,4 +107,106 @@ describe('BudgetItemsTable', () => {
     const texts = Array.from(cells).map(td => td.textContent);
     expect(texts).toContain('Sistema de Freio');
   });
+
+  it('editable table renders the Desc. (R$) column header', () => {
+    renderWithAct(
+      <BudgetItemsTable items={sampleItems} readOnly={false} onChange={() => {}} />
+    );
+
+    const headers = Array.from(container.querySelectorAll('th')).map(th => th.textContent);
+    expect(headers.some(h => h?.includes('Desc. (R$)'))).toBe(true);
+  });
+
+  it('disables item discount inputs when there is a general discount', () => {
+    renderWithAct(
+      <BudgetItemsTable
+        items={sampleItems}
+        readOnly={false}
+        onChange={() => {}}
+        orderDiscount={100}
+        onOrderDiscountChange={() => {}}
+      />
+    );
+
+    // Number inputs for item discount sit in the 5th cell of each row.
+    // Identify them by their placeholder "0,00" plus being type=number — but quantity/
+    // value also use number inputs, so locate by column index instead.
+    const rows = container.querySelectorAll('tbody tr');
+    rows.forEach((row) => {
+      const cells = row.querySelectorAll('td');
+      // cells: 0 Item, 1 Sistema, 2 Qtd, 3 Valor, 4 Desc, 5 Total, 6 trash
+      const discountInput = cells[4]?.querySelector('input[type="number"]') as HTMLInputElement | null;
+      expect(discountInput).not.toBeNull();
+      expect(discountInput!.disabled).toBe(true);
+    });
+  });
+
+  it('disables the general discount field when some item has a discount', () => {
+    const itemsWithDiscount: BudgetItem[] = [
+      { itemName: 'Pastilha', system: 'Sistema de Freio', quantity: 1, value: 100, discount: 50, sortOrder: 0 },
+      { itemName: 'Bateria', system: 'Sistema Elétrico', quantity: 1, value: 200, sortOrder: 1 },
+    ];
+
+    renderWithAct(
+      <BudgetItemsTable
+        items={itemsWithDiscount}
+        readOnly={false}
+        onChange={() => {}}
+        orderDiscount={0}
+        onOrderDiscountChange={() => {}}
+      />
+    );
+
+    const labels = Array.from(container.querySelectorAll('label'));
+    const generalLabel = labels.find((l) => l.textContent?.includes('Desconto geral (R$)'));
+    const generalInput = generalLabel?.querySelector('input[type="number"]') as HTMLInputElement | null;
+    expect(generalInput).not.toBeNull();
+    expect(generalInput!.disabled).toBe(true);
+  });
+
+  it('renders the Discount row and net Total in the editable footer when there is a general discount', () => {
+    const items: BudgetItem[] = [
+      { itemName: 'Item', system: 'Motor', quantity: 1, value: 1000, sortOrder: 0 },
+    ];
+
+    renderWithAct(
+      <BudgetItemsTable
+        items={items}
+        readOnly={false}
+        onChange={() => {}}
+        orderDiscount={200}
+        onOrderDiscountChange={() => {}}
+      />
+    );
+
+    const footerText = container.textContent ?? '';
+    // Net total = 1000 − 200 = 800
+    expect(footerText).toContain('800,00');
+    expect(footerText).toContain('Desconto');
+  });
+
+  it('discountsLocked disables both item discount and general discount inputs', () => {
+    renderWithAct(
+      <BudgetItemsTable
+        items={sampleItems}
+        readOnly={false}
+        onChange={() => {}}
+        orderDiscount={0}
+        onOrderDiscountChange={() => {}}
+        discountsLocked
+      />
+    );
+
+    const rows = container.querySelectorAll('tbody tr');
+    const firstRowCells = rows[0].querySelectorAll('td');
+    const itemDiscountInput = firstRowCells[4]?.querySelector('input[type="number"]') as HTMLInputElement | null;
+    expect(itemDiscountInput).not.toBeNull();
+    expect(itemDiscountInput!.disabled).toBe(true);
+
+    const labels = Array.from(container.querySelectorAll('label'));
+    const generalLabel = labels.find((l) => l.textContent?.includes('Desconto geral (R$)'));
+    const generalInput = generalLabel?.querySelector('input[type="number"]') as HTMLInputElement | null;
+    expect(generalInput).not.toBeNull();
+    expect(generalInput!.disabled).toBe(true);
+  });
 });

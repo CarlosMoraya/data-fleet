@@ -26,7 +26,9 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
 }));
 
-import BudgetApprovals from './BudgetApprovals';
+import BudgetApprovals, { canApprove } from './BudgetApprovals';
+
+import type { User } from '../types';
 
 type ReactContainer = HTMLDivElement & { __reactRoot?: ReturnType<typeof createRoot> };
 let container: ReactContainer;
@@ -42,6 +44,7 @@ const orderRows = [
     budget_pdf_url: null,
     created_at: '2026-07-01T10:00:00Z',
     vehicle_id: 'vehicle-1',
+    budget_discount: 0,
     vehicles: { license_plate: 'ABC1D23' },
     workshops: { name: 'Oficina Central' },
     profiles: { name: 'João' },
@@ -55,6 +58,7 @@ const orderRows = [
     budget_pdf_url: null,
     created_at: '2026-07-02T10:00:00Z',
     vehicle_id: 'vehicle-2',
+    budget_discount: 0,
     vehicles: { license_plate: 'XYZ9K88' },
     workshops: { name: 'Oficina Central' },
     profiles: { name: 'João' },
@@ -242,6 +246,103 @@ describe('BudgetApprovals — motivo de reprovação', () => {
       expect.objectContaining({
         budget_status: 'reprovado',
         budget_rejection_reason: 'Valor acima do combinado',
+      }),
+    );
+  });
+});
+
+describe('BudgetApprovals — desconto e total líquido', () => {
+  it('canApprove recebe o total líquido: 12.000 com desconto geral de 3.000 é aprovável por alçada de 10.000', () => {
+    const user = {
+      id: 'u1',
+      name: 'Analyst',
+      email: 'a@b.com',
+      role: 'Fleet Analyst',
+      clientId: 'c1',
+      budgetApprovalLimit: 10000,
+    } as unknown as User;
+
+    // 12000 bruto - 3000 de desconto geral = 9000 líquido
+    expect(canApprove(user, 9000, { itemsLoading: false, hasItems: true })).toBe(true);
+    // Confirma que passar o bruto rejeitaria — eixo do motivo do desconto
+    expect(canApprove(user, 12000, { itemsLoading: false, hasItems: true })).toBe(false);
+  });
+
+  it('aprovação grava approved_cost líquido (desconto por item + desconto geral)', async () => {
+    // Mock o from para devolver itens com discount e a OS com budget_discount
+    const itemRows = [
+      { quantity: 2, value: 6000, discount: 0 },
+      { quantity: 1, value: 2000, discount: 1000 },
+    ];
+
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'maintenance_orders') {
+        return {
+          select: () => ({
+            eq: () => ({
+              order: () => ({
+                eq: () => Promise.resolve({
+                  data: [{
+                    ...orderRows[0],
+                    budget_discount: 3000,
+                  }],
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+          update: updateMock,
+        };
+      }
+      if (table === 'maintenance_budget_items') {
+        // A query da OrderRow usa select('*').eq(...).order('sort_order');
+        // a mutation usa select('quantity, value, discount').eq(...) direto.
+        // O mesmo shape precisa servir aos dois padrões.
+        const makePromise = () => {
+          const p: Promise<{ data: unknown; error: unknown }> = Promise.resolve({ data: itemRows, error: null });
+          (p as unknown as { order: () => Promise<{ data: unknown; error: unknown }> }).order = () =>
+            Promise.resolve({ data: itemRows, error: null });
+          return p;
+        };
+        return {
+          select: () => ({
+            eq: () => makePromise(),
+          }),
+        };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    const root = createRoot(container);
+    container.__reactRoot = root;
+
+    act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <BudgetApprovals />
+        </QueryClientProvider>,
+      );
+    });
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('OS-001');
+    });
+
+    const approveButton = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.includes('Aprovar'));
+    await act(async () => {
+      approveButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Bruto = 2*6000 + 1*2000 = 14000
+    // Descontos: item 1000 + geral 3000 = 4000
+    // Líquido = 10000
+    expect(updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        budget_status: 'aprovado',
+        approved_cost: 10000,
       }),
     );
   });

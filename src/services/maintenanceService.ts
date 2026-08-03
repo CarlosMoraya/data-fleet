@@ -58,6 +58,7 @@ export async function saveMaintenanceOrder(
     workshop_os_number: data.workshopOs ?? null,
     current_km: data.currentKm ?? null,
     warranty_revision_event_id: data.warrantyRevisionEventId ?? null,
+    budget_discount: 0,
   };
 
   let orderId: string;
@@ -114,6 +115,7 @@ export async function saveMaintenanceOrder(
         system: item.itemName.trim().length > 0 ? normalizeBudgetSystem(item.system) : null,
         quantity: item.quantity,
         value: item.value,
+        discount: item.discount ?? 0,
         sort_order: idx,
       }));
       const { error } = await supabase
@@ -121,6 +123,15 @@ export async function saveMaintenanceOrder(
         .insert(rows);
       if (error) throw error;
     }
+  }
+
+  const finalBudgetDiscount = data.budgetDiscount ?? 0;
+  if (finalBudgetDiscount > 0) {
+    const { error } = await supabase
+      .from('maintenance_orders')
+      .update({ budget_discount: finalBudgetDiscount })
+      .eq('id', orderId);
+    if (error) throw error;
   }
 
   return orderId;

@@ -120,7 +120,9 @@ export function calculateCostPerKm(input: {
 export interface BudgetItemForCost {
   maintenance_order_id: string;
   system: string | null;
+  quantity: number;
   value: number;
+  discount: number;
 }
 
 export interface VehicleFinancialRankingRow {
@@ -177,13 +179,17 @@ export function buildCostBySystemData(
   for (const order of filteredOrders) {
     if (order.status === 'Cancelado' || order.approved_cost == null || order.approved_cost <= 0) continue;
     const items = itemsByOrder.get(order.id) ?? [];
-    const sumItems = items.reduce((sum, item) => sum + (item.value > 0 ? item.value : 0), 0);
+    const sumItems = items.reduce((sum, item) => {
+      const weight = Math.max(0, item.quantity * item.value - item.discount);
+      return sum + (weight > 0 ? weight : 0);
+    }, 0);
 
     if (sumItems > 0) {
       for (const item of items) {
-        if (item.value <= 0) continue;
+        const weight = Math.max(0, item.quantity * item.value - item.discount);
+        if (weight <= 0) continue;
         const system = normalizeBudgetSystem(item.system);
-        totals.set(system, (totals.get(system) ?? 0) + order.approved_cost * (item.value / sumItems));
+        totals.set(system, (totals.get(system) ?? 0) + order.approved_cost * (weight / sumItems));
       }
     } else {
       totals.set('Outros', (totals.get('Outros') ?? 0) + order.approved_cost);

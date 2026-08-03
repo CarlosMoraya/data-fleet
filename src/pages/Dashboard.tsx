@@ -445,7 +445,7 @@ export default function Dashboard() {
     queryFn: async () => {
       let query = supabase
         .from('maintenance_budget_items')
-        .select('maintenance_order_id, system, value, maintenance_orders!inner(entry_date, status, client_id)')
+        .select('maintenance_order_id, system, value, quantity, discount, maintenance_orders!inner(entry_date, status, client_id)')
         .gte('maintenance_orders.entry_date', dateRange.from)
         .lte('maintenance_orders.entry_date', dateRange.to)
         .neq('maintenance_orders.status', 'Cancelado');
@@ -458,6 +458,8 @@ export default function Dashboard() {
         maintenance_order_id: row.maintenance_order_id as string,
         system: row.system != null ? (row.system as string) : null,
         value: row.value != null ? Number(row.value) : 0,
+        quantity: row.quantity != null ? Number(row.quantity) : 1,
+        discount: row.discount != null ? Number(row.discount) : 0,
       }));
     },
     enabled: !!user && activeTab === 'custos',

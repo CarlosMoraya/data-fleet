@@ -130,7 +130,7 @@ const MODULE_ALLOWLISTS: Record<string, Set<string>> = {
   maintenance: new Set([
     'vehicleId', 'description', 'status', 'priority', 'maintenanceType',
     'scheduledDate', 'startDate', 'completionDate', 'notes', 'cost',
-    'supplier', 'workshopId', 'items',
+    'supplier', 'workshopId', 'items', 'budgetDiscount',
   ]),
   tires: new Set([
     'brand', 'model', 'size', 'dot', 'purchaseDate', 'active',
