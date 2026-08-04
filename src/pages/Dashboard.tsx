@@ -32,6 +32,7 @@ import {
   getExpiredGrVehiclePlates,
   countVehiclesWithoutDriver,
   getVehiclesWithoutDriverPlates,
+  getVehiclesWithoutTrackerPlates,
   countOpenOrders,
   getEndOfWeekIso,
   countActiveOrdersExitingByEndOfWeek,
@@ -813,6 +814,11 @@ export default function Dashboard() {
     [activeMaintenanceOrders, plateByVehicleId]
   );
 
+  const vehiclesWithoutTrackerPlates = useMemo(
+    () => getVehiclesWithoutTrackerPlates(activeVehicles),
+    [activeVehicles]
+  );
+
   const operationalActionItems = useMemo<OperationalActionItem[]>(
     () =>
       buildOperationalActionQueue({
@@ -837,6 +843,7 @@ export default function Dashboard() {
           getActiveOrdersDueWithinDaysVehicleIds(activeMaintenanceOrders, today, 7),
           plateByVehicleId
         ),
+        vehiclesWithoutTracker: vehiclesWithoutTrackerPlates,
       }),
     [
       activeMaintenanceOrders,
@@ -849,6 +856,7 @@ export default function Dashboard() {
       today,
       unavailableVehiclePlates,
       activeVehicles,
+      vehiclesWithoutTrackerPlates,
     ]
   );
 

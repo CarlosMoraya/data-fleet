@@ -321,7 +321,8 @@ export type OperationalActionCategory =
   | 'checklist_overdue'
   | 'action_plans_open'
   | 'os_pending_budget'
-  | 'os_due_soon';
+  | 'os_due_soon'
+  | 'tracker_missing';
 
 export interface OperationalActionItem {
   category: OperationalActionCategory;
@@ -588,6 +589,7 @@ export function buildOperationalActionQueue(input: {
   osPendingBudget: string[];
   actionPlansOpen: string[];
   osDueSoon: string[];
+  vehiclesWithoutTracker: string[];
 }): OperationalActionItem[] {
   const items: OperationalActionItem[] = [
     { category: 'vehicles_unavailable', label: 'Veículos indisponíveis', count: input.vehiclesUnavailable.length, severity: 'high', details: input.vehiclesUnavailable },
@@ -599,6 +601,7 @@ export function buildOperationalActionQueue(input: {
     { category: 'os_pending_budget', label: 'OS aguardando orçamento', count: input.osPendingBudget.length, severity: 'medium', details: input.osPendingBudget },
     { category: 'action_plans_open', label: 'Planos de ação de checklist abertos', count: input.actionPlansOpen.length, severity: 'medium', details: input.actionPlansOpen },
     { category: 'os_due_soon', label: 'OS vencendo nos próximos 7 dias', count: input.osDueSoon.length, severity: 'medium', details: input.osDueSoon },
+    { category: 'tracker_missing', label: 'Veículos sem cobertura de rastreador', count: input.vehiclesWithoutTracker.length, severity: 'medium', details: input.vehiclesWithoutTracker },
   ];
 
   return items.filter((item) => item.count > 0);
@@ -763,10 +766,39 @@ export function calculateInsuranceCoverageRate(vehicles: Pick<VehicleRow, 'has_i
   return Math.max(0, Math.min(100, Math.round((covered / vehicles.length) * 100)));
 }
 
-export function calculateTrackerCoverageRate(vehicles: Pick<VehicleRow, 'tracker'>[]): number {
+export const IMPLEMENT_VEHICLE_CATEGORY = 'Semi-reboque/Implemento';
+
+export const IMPLEMENT_VEHICLE_TYPES = ['Semirreboque', 'Reboque', 'Dolly'] as const;
+
+export interface TrackerCoverageCandidate {
+  tracker?: string | null;
+  type?: string | null;
+  category?: string | null;
+}
+
+export function isImplementVehicle(vehicle: Pick<TrackerCoverageCandidate, 'type' | 'category'>): boolean {
+  return vehicle.category === IMPLEMENT_VEHICLE_CATEGORY || IMPLEMENT_VEHICLE_TYPES.some((type) => type === vehicle.type);
+}
+
+export function lacksTrackerCoverage(vehicle: TrackerCoverageCandidate): boolean {
+  if (isImplementVehicle(vehicle)) return false;
+  return isBlank(vehicle.tracker);
+}
+
+export function getVehiclesWithoutTrackerPlates(
+  vehicles: (TrackerCoverageCandidate & { license_plate?: string | null })[]
+): string[] {
+  return vehicles
+    .filter((vehicle) => lacksTrackerCoverage(vehicle) && vehicle.license_plate)
+    .map((vehicle) => vehicle.license_plate);
+}
+
+export function calculateTrackerCoverageRate(vehicles: TrackerCoverageCandidate[]): number {
   if (vehicles.length === 0) return 0;
-  const covered = vehicles.filter((vehicle) => typeof vehicle.tracker === 'string' && vehicle.tracker.trim().length > 0).length;
-  return Math.max(0, Math.min(100, Math.round((covered / vehicles.length) * 100)));
+  const eligible = vehicles.filter((vehicle) => !isImplementVehicle(vehicle));
+  if (eligible.length === 0) return 100;
+  const covered = eligible.filter((vehicle) => !isBlank(vehicle.tracker)).length;
+  return Math.max(0, Math.min(100, Math.round((covered / eligible.length) * 100)));
 }
 
 export function buildFleetCountByKey(

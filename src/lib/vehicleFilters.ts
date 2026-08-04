@@ -1,8 +1,8 @@
-import { isBlank, isCrlvExpired, isWithinExpiryWindow } from './dashboardKpi';
+import { isBlank, isCrlvExpired, isWithinExpiryWindow, lacksTrackerCoverage } from './dashboardKpi';
 
 import type { Vehicle } from '../types';
 
-export const PENDENCY_VALUES = ['crlv_expired', 'crlv_expiring', 'gr_expiring', 'gr_expired', 'crlv_missing', 'gr_missing', 'insurance_missing', 'maintenance_contract_missing', 'no_driver', 'checklist_overdue'] as const;
+export const PENDENCY_VALUES = ['crlv_expired', 'crlv_expiring', 'gr_expiring', 'gr_expired', 'crlv_missing', 'gr_missing', 'insurance_missing', 'maintenance_contract_missing', 'no_driver', 'checklist_overdue', 'tracker_missing'] as const;
 
 export type VehiclePendency = typeof PENDENCY_VALUES[number];
 
@@ -17,6 +17,7 @@ export const PENDENCY_LABELS: Record<VehiclePendency, string> = {
   maintenance_contract_missing: 'Sem contrato de manutenção',
   no_driver: 'Sem motorista',
   checklist_overdue: 'Checklist vencido',
+  tracker_missing: 'Sem rastreador',
 };
 
 export const LEGACY_VEHICLE_ISSUE_VALUES: Record<string, VehiclePendency> = {
@@ -119,6 +120,8 @@ export function vehicleMatchesPendency(vehicle: Vehicle, pendency: VehiclePenden
       return !vehicle.driverId;
     case 'checklist_overdue':
       return ctx.overdueChecklistVehicleIds.has(vehicle.id);
+    case 'tracker_missing':
+      return lacksTrackerCoverage(vehicle);
   }
 }
 

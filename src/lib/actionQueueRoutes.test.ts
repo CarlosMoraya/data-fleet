@@ -100,6 +100,7 @@ describe('actionQueueRoutes', () => {
       'action_plans_open',
       'os_pending_budget',
       'os_due_soon',
+      'tracker_missing',
     ]);
   });
 
@@ -107,6 +108,7 @@ describe('actionQueueRoutes', () => {
     expect(OPERATIONAL_QUEUE_ROUTES.vehicles_no_driver).toBe('/cadastros/veiculos?issue=no_driver');
     expect(OPERATIONAL_QUEUE_ROUTES.checklist_overdue).toBe('/cadastros/veiculos?issue=checklist_overdue');
     expect(OPERATIONAL_QUEUE_ROUTES.os_pending_approval).toBe('/aprovacao-orcamentos');
+    expect(OPERATIONAL_QUEUE_ROUTES.tracker_missing).toBe('/cadastros/veiculos?issue=tracker_missing');
   });
 
   it('uses absolute app routes in the operational queue', () => {

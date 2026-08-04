@@ -36,6 +36,7 @@ export const OPERATIONAL_QUEUE_ROUTES: Record<OperationalActionCategory, string>
   action_plans_open: '/acoes',
   os_pending_budget: '/manutencao',
   os_due_soon: '/manutencao',
+  tracker_missing: '/cadastros/veiculos?issue=tracker_missing',
 };
 
 export const COMPLIANCE_ACTION_ROUTES: Record<ComplianceActionCategory, string> = {

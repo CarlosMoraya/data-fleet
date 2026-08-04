@@ -15,6 +15,7 @@ import {
   getEndOfWeekIso,
   countVehiclesWithoutDriver,
   getVehiclesWithoutDriverPlates,
+  getVehiclesWithoutTrackerPlates,
   countOpenOrders,
   countActiveOrdersExitingByEndOfWeek,
   getActiveOrdersExitingByEndOfWeekVehicleIds,
@@ -67,6 +68,8 @@ import {
   getVehiclesMissingInsurancePlates,
   getVehiclesMissingMaintenanceContractPlates,
   isBlank,
+  isImplementVehicle,
+  lacksTrackerCoverage,
   normalizeCostFilterValue,
   sumApprovedMaintenanceCost,
   isDriverDocumentallyIrregular,
@@ -481,6 +484,83 @@ describe('calculateTrackerCoverageRate', () => {
   it('retorna 0 quando a lista está vazia', () => {
     expect(calculateTrackerCoverageRate([])).toBe(0);
   });
+
+  it('exclui semirreboques e implementos do denominador', () => {
+    expect(calculateTrackerCoverageRate([
+      { tracker: 'Sascar', type: 'Truck' },
+      { tracker: 'Sascar', type: 'Cavalo' },
+      { tracker: null, type: 'Semirreboque' },
+      { tracker: null, category: 'Semi-reboque/Implemento', type: 'Truck' },
+    ])).toBe(100);
+  });
+
+  it('retorna 100 quando a frota só tem implementos', () => {
+    expect(calculateTrackerCoverageRate([{ tracker: null, type: 'Semirreboque' }])).toBe(100);
+  });
+});
+
+describe('isImplementVehicle', () => {
+  it('reconhece implemento por categoria', () => {
+    expect(isImplementVehicle({ category: 'Semi-reboque/Implemento', type: 'Truck' })).toBe(true);
+  });
+
+  it('reconhece implemento por tipo, sem categoria', () => {
+    expect(isImplementVehicle({ type: 'Semirreboque' })).toBe(true);
+    expect(isImplementVehicle({ type: 'Reboque' })).toBe(true);
+    expect(isImplementVehicle({ type: 'Dolly' })).toBe(true);
+  });
+
+  it('reconhece veículo comum', () => {
+    expect(isImplementVehicle({ type: 'Cavalo', category: 'Pesado' })).toBe(false);
+  });
+
+  it('retorna false sem type e sem category', () => {
+    expect(isImplementVehicle({})).toBe(false);
+  });
+});
+
+describe('lacksTrackerCoverage', () => {
+  it('reconhece veículo comum sem rastreador', () => {
+    expect(lacksTrackerCoverage({ tracker: null, type: 'Cavalo' })).toBe(true);
+  });
+
+  it('reconhece rastreador vazio', () => {
+    expect(lacksTrackerCoverage({ tracker: '', type: 'Truck' })).toBe(true);
+  });
+
+  it('reconhece rastreador só com espaços', () => {
+    expect(lacksTrackerCoverage({ tracker: '   ', type: 'Truck' })).toBe(true);
+  });
+
+  it('retorna false quando há rastreador', () => {
+    expect(lacksTrackerCoverage({ tracker: 'Omnilink', type: 'Truck' })).toBe(false);
+  });
+
+  it('exclui semirreboque sem rastreador', () => {
+    expect(lacksTrackerCoverage({ tracker: null, type: 'Semirreboque' })).toBe(false);
+  });
+
+  it('exclui implemento identificado por categoria', () => {
+    expect(lacksTrackerCoverage({ tracker: null, category: 'Semi-reboque/Implemento', type: 'Truck' })).toBe(false);
+  });
+});
+
+describe('getVehiclesWithoutTrackerPlates', () => {
+  it('extrai apenas as placas de veículos comuns sem rastreador', () => {
+    expect(getVehiclesWithoutTrackerPlates([
+      { license_plate: 'AAA1A11', tracker: null, type: 'Truck' },
+      { license_plate: 'BBB2B22', tracker: 'Sascar', type: 'Truck' },
+      { license_plate: 'CCC3C33', tracker: null, type: 'Semirreboque' },
+    ])).toEqual(['AAA1A11']);
+  });
+
+  it('descarta veículo sem rastreador e sem placa', () => {
+    expect(getVehiclesWithoutTrackerPlates([{ license_plate: null, tracker: null, type: 'Truck' }])).toEqual([]);
+  });
+
+  it('retorna lista vazia para entrada vazia', () => {
+    expect(getVehiclesWithoutTrackerPlates([])).toEqual([]);
+  });
 });
 
 describe('buildFleetCountByKey', () => {
@@ -676,7 +756,7 @@ describe('countPendingBudgetOrders / getPendingBudgetVehicleIds', () => {
 });
 
 describe('buildOperationalActionQueue', () => {
-  it('mantém a ordem fixa dos 9 itens quando todos têm dados', () => {
+  it('mantém a ordem fixa dos 10 itens quando todos têm dados', () => {
     const result = buildOperationalActionQueue({
       vehiclesUnavailable: ['ABC1D23'],
       vehiclesNoDriver: ['DEF4G56'],
@@ -687,6 +767,7 @@ describe('buildOperationalActionQueue', () => {
       osPendingBudget: ['VWX9Y01'],
       actionPlansOpen: ['ZAB2C34'],
       osDueSoon: ['CDE5F67'],
+      vehiclesWithoutTracker: ['FGH8I90'],
     });
 
     expect(result.map((item) => item.category)).toEqual([
@@ -699,6 +780,7 @@ describe('buildOperationalActionQueue', () => {
       'os_pending_budget',
       'action_plans_open',
       'os_due_soon',
+      'tracker_missing',
     ]);
   });
 
@@ -713,6 +795,7 @@ describe('buildOperationalActionQueue', () => {
       osPendingBudget: [],
       actionPlansOpen: [],
       osDueSoon: [],
+      vehiclesWithoutTracker: [],
     });
 
     expect(result).toHaveLength(2);
@@ -732,6 +815,7 @@ describe('buildOperationalActionQueue', () => {
         osPendingBudget: [],
         actionPlansOpen: [],
         osDueSoon: [],
+        vehiclesWithoutTracker: [],
       })
     ).toEqual([]);
   });

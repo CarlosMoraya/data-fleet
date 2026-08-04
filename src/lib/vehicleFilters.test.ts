@@ -107,6 +107,7 @@ describe('vehicleFilters', () => {
     expect(isVehiclePendency('maintenance_contract_missing')).toBe(true);
     expect(isVehiclePendency('no_driver')).toBe(true);
     expect(isVehiclePendency('checklist_overdue')).toBe(true);
+    expect(isVehiclePendency('tracker_missing')).toBe(true);
     expect(isVehiclePendency(null)).toBe(false);
     expect(isVehiclePendency('desconhecida')).toBe(false);
   });
@@ -179,6 +180,25 @@ describe('vehicleFilters', () => {
   it('aplica pendência checklist_overdue', () => {
     expect(vehicleMatchesPendency(vehicle({ id: 'v-overdue' }), 'checklist_overdue', ctx)).toBe(true);
     expect(vehicleMatchesPendency(vehicle({ id: 'v-ok' }), 'checklist_overdue', ctx)).toBe(false);
+  });
+
+  it('aplica pendência tracker_missing', () => {
+    expect(vehicleMatchesPendency(vehicle({ tracker: '' }), 'tracker_missing', ctx)).toBe(true);
+    expect(vehicleMatchesPendency(vehicle({ tracker: 'Sascar' }), 'tracker_missing', ctx)).toBe(false);
+  });
+
+  it('não marca semirreboque/implemento como sem rastreador', () => {
+    expect(vehicleMatchesPendency(vehicle({ tracker: '', type: 'Semirreboque' }), 'tracker_missing', ctx)).toBe(false);
+    expect(vehicleMatchesPendency(vehicle({ tracker: '', category: 'Semi-reboque/Implemento' }), 'tracker_missing', ctx)).toBe(false);
+  });
+
+  it('aceita issue=tracker_missing vindo da URL', () => {
+    expect(parseVehicleFiltersFromParams(new URLSearchParams('issue=tracker_missing')).pendency).toBe('tracker_missing');
+  });
+
+  it('serializa tracker_missing de volta para a URL', () => {
+    const parsed = parseVehicleFiltersFromParams(new URLSearchParams('issue=tracker_missing'));
+    expect(serializeVehicleFiltersToParams(parsed).toString()).toBe('issue=tracker_missing');
   });
 
   it('busca por placa, modelo e chassi sem diferenciar maiúsculas', () => {
