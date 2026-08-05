@@ -424,6 +424,7 @@ export default function PaymentInstallmentFormModal({
               <label className="mb-1 block text-sm font-medium text-zinc-700">Categoria</label>
               <input
                 type="text"
+                name="financeiro-categoria"
                 value={categoria}
                 onChange={(e) => setCategoria(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
@@ -433,6 +434,7 @@ export default function PaymentInstallmentFormModal({
               <label className="mb-1 block text-sm font-medium text-zinc-700">Centro de Custo</label>
               <input
                 type="text"
+                name="financeiro-centro-custo"
                 value={centroCusto}
                 onChange={(e) => setCentroCusto(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
@@ -451,6 +453,7 @@ export default function PaymentInstallmentFormModal({
               <label className="mb-1 block text-sm font-medium text-zinc-700">Descrição</label>
               <input
                 type="text"
+                name="financeiro-descricao"
                 value={descricao}
                 onChange={(e) => setDescricao(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"

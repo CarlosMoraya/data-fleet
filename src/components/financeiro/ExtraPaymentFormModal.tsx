@@ -416,6 +416,7 @@ export default function ExtraPaymentFormModal({
               </label>
               <input
                 type="text"
+                name="financeiro-fornecedor"
                 value={supplierName}
                 onChange={(e) => handleSupplierNameChange(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
@@ -425,6 +426,7 @@ export default function ExtraPaymentFormModal({
               <label className="mb-1 block text-sm font-medium text-zinc-700">CPF/CNPJ do fornecedor</label>
               <input
                 type="text"
+                name="financeiro-fornecedor-documento"
                 value={supplierDocument}
                 onChange={(e) => setSupplierDocument(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
@@ -468,6 +470,7 @@ export default function ExtraPaymentFormModal({
               <label className="mb-1 block text-sm font-medium text-zinc-700">Descrição</label>
               <input
                 type="text"
+                name="financeiro-descricao"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
@@ -477,6 +480,7 @@ export default function ExtraPaymentFormModal({
               <label className="mb-1 block text-sm font-medium text-zinc-700">Centro de Custo</label>
               <input
                 type="text"
+                name="financeiro-centro-custo"
                 value={centroCusto}
                 onChange={(e) => setCentroCusto(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
@@ -486,6 +490,7 @@ export default function ExtraPaymentFormModal({
               <label className="mb-1 block text-sm font-medium text-zinc-700">Justificativa</label>
               <input
                 type="text"
+                name="financeiro-justificativa"
                 value={justification}
                 onChange={(e) => setJustification(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
@@ -495,6 +500,7 @@ export default function ExtraPaymentFormModal({
               <label className="mb-1 block text-sm font-medium text-zinc-700">Observações</label>
               <input
                 type="text"
+                name="financeiro-observacoes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
