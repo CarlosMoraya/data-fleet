@@ -210,7 +210,11 @@ function OrderRow({ order, user, onApprove, onReject, approving, lastKmInfo }: O
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function BudgetApprovals() {
+interface BudgetApprovalsProps {
+  embedded?: boolean;
+}
+
+export default function BudgetApprovals({ embedded = false }: BudgetApprovalsProps = {}) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -348,15 +352,17 @@ export default function BudgetApprovals() {
   if (!user || rank < 3) return null;
 
   return (
-    <div className="mx-auto flex h-full max-w-7xl flex-col gap-6 p-6">
+    <div className={cn('flex h-full flex-col gap-6', !embedded && 'mx-auto max-w-7xl p-6')}>
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <BadgeCheck className="h-6 w-6 text-orange-500" />
-        <div>
-          <h1 className="text-xl font-bold text-zinc-900">Aprovação de Orçamentos</h1>
-          <p className="text-sm text-zinc-500">Orçamentos aguardando revisão — ordem de chegada</p>
+      {!embedded && (
+        <div className="flex items-center gap-3">
+          <BadgeCheck className="h-6 w-6 text-orange-500" />
+          <div>
+            <h1 className="text-xl font-bold text-zinc-900">Aprovação de Orçamentos</h1>
+            <p className="text-sm text-zinc-500">Orçamentos aguardando revisão — ordem de chegada</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Limit info for non-always-approvers */}
       {!ALWAYS_APPROVE_ROLES.includes(user.role) && (

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Eye, FileText, KeyRound, Pencil, Plus } from 'lucide-react';
+import { Download, Eye, FileText, KeyRound, Pencil, Plus, ReceiptText } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
@@ -431,9 +431,10 @@ export default function PaymentsTab(): React.ReactElement {
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Orçamento"
+                              aria-label="Orçamento"
                               className="text-zinc-500 hover:text-orange-600"
                             >
-                              📄
+                              <FileText className="h-3.5 w-3.5" />
                             </a>
                           )}
                           {/* Boleto via signed URL */}
@@ -442,14 +443,17 @@ export default function PaymentsTab(): React.ReactElement {
                               type="button"
                               onClick={() => { void openSignedUrl(i.boletoUrl!); }}
                               title="Boleto"
+                              aria-label="Boleto"
                               className="text-zinc-500 hover:text-blue-600"
                             >
-                              📃
+                              <ReceiptText className="h-3.5 w-3.5" />
                             </button>
                           )}
                           {/* Pix key */}
                           {i.paymentMethod === 'pix' && i.pixKey && (
-                            <span title={`Pix: ${i.pixKey}`} className="text-zinc-500">🔑</span>
+                            <span title={`Pix: ${i.pixKey}`} aria-label={`Pix: ${i.pixKey}`} className="text-zinc-500">
+                              <KeyRound className="h-3.5 w-3.5" />
+                            </span>
                           )}
                           {/* Nota fiscal via signed URL */}
                           {i.notaFiscalUrl && (
@@ -457,9 +461,10 @@ export default function PaymentsTab(): React.ReactElement {
                               type="button"
                               onClick={() => { void openSignedUrl(i.notaFiscalUrl!); }}
                               title="Nota fiscal"
+                              aria-label="Nota fiscal"
                               className="text-zinc-500 hover:text-green-600"
                             >
-                              🧾
+                              <FileText className="h-3.5 w-3.5" />
                             </button>
                           )}
                           {/* Nota fiscal (2º documento) via signed URL */}
@@ -468,9 +473,10 @@ export default function PaymentsTab(): React.ReactElement {
                               type="button"
                               onClick={() => { void openSignedUrl(i.notaFiscalUrl2!); }}
                               title="Nota fiscal (2º documento)"
+                              aria-label="Nota fiscal (2º documento)"
                               className="text-zinc-500 hover:text-green-600"
                             >
-                              🧾
+                              <FileText className="h-3.5 w-3.5" />
                             </button>
                           )}
                           {/* Editar (só parcela pendente) */}
@@ -478,6 +484,7 @@ export default function PaymentsTab(): React.ReactElement {
                             type="button"
                             onClick={() => setViewing(i)}
                             title="Visualizar parcela"
+                            aria-label="Visualizar parcela"
                             className="text-zinc-500 hover:text-blue-600"
                           >
                             <Eye className="h-3.5 w-3.5" />
@@ -487,6 +494,7 @@ export default function PaymentsTab(): React.ReactElement {
                               type="button"
                               onClick={() => setEditing(i)}
                               title="Editar parcela"
+                              aria-label="Editar parcela"
                               className="text-zinc-500 hover:text-orange-600"
                             >
                               <Pencil className="h-3.5 w-3.5" />

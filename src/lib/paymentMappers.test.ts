@@ -49,6 +49,7 @@ describe('paymentInstallmentFromRow', () => {
       maintenance_orders: {
         os_number: 'OS-1',
         budget_pdf_url: 'https://public/budget.pdf',
+        approved_cost: null,
         workshops: null,
         budget_reviewer: { name: 'Fulano Aprovador' },
       },
@@ -81,6 +82,22 @@ describe('paymentInstallmentFromRow', () => {
     const result = paymentInstallmentFromRow(baseRow({ invoice_number: null }));
 
     expect(result.invoiceNumber).toBeUndefined();
+  });
+
+  it('mapeia maintenance_orders.approved_cost para maintenanceOrderApprovedCost', () => {
+    const withCost = paymentInstallmentFromRow(baseRow({
+      maintenance_orders: {
+        os_number: 'OS-1',
+        budget_pdf_url: null,
+        approved_cost: 1500.5,
+        workshops: null,
+        budget_reviewer: null,
+      },
+    }));
+    expect(withCost.maintenanceOrderApprovedCost).toBe(1500.5);
+
+    const withoutOrder = paymentInstallmentFromRow(baseRow());
+    expect(withoutOrder.maintenanceOrderApprovedCost).toBeUndefined();
   });
 
   it('mapeia parcela de manutenção como antes (sourceType maintenance_order)', () => {

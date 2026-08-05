@@ -21,7 +21,7 @@ export const OPERATIONAL_ACTION_ROUTES: Record<ActionItem['category'], string> =
   cnh: '/cadastros/motoristas?issue=cnh_expired',
   cnh_expiring: '/cadastros/motoristas?issue=cnh_expiring',
   os_overdue: '/manutencao',
-  os_pending_approval: '/aprovacao-orcamentos',
+  os_pending_approval: '/financeiro?tab=budget',
   gr_driver_expiring: '/cadastros/motoristas?issue=gr_expiring',
 };
 
@@ -31,7 +31,7 @@ export const OPERATIONAL_QUEUE_ROUTES: Record<OperationalActionCategory, string>
   os_open: '/manutencao',
   os_overdue: '/manutencao',
   os_exit_this_week: '/manutencao',
-  os_pending_approval: '/aprovacao-orcamentos',
+  os_pending_approval: '/financeiro?tab=budget',
   checklist_overdue: '/cadastros/veiculos?issue=checklist_overdue',
   action_plans_open: '/acoes',
   os_pending_budget: '/manutencao',

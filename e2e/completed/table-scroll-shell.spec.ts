@@ -10,7 +10,7 @@ const ROUTES: TableRoute[] = [
   { name: 'Veículos', path: '/cadastros/veiculos', heading: 'Veículos' },
   { name: 'Checklists', path: '/checklists', heading: 'Checklists' },
   { name: 'Agendamentos', path: '/agendamentos', heading: 'Agendamentos' },
-  { name: 'Aprovação de Orçamentos', path: '/aprovacao-orcamentos', heading: 'Aprovação de Orçamentos' },
+  { name: 'Aprovação de Orçamentos', path: '/financeiro?tab=budget', heading: 'Aprovação de Orçamentos' },
   { name: 'Manutenção', path: '/manutencao', heading: /Manuten/i },
 ];
 

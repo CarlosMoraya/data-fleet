@@ -36,7 +36,7 @@ async function signIn(emailEnv: string, passwordEnv: string) {
 }
 
 async function profileByEmail(email: string) {
-  const users = await adminClient().auth.admin.listUsers();
+  const users = await adminClient().auth.admin.listUsers({ perPage: 1000 });
   if (users.error) throw users.error;
   const profileId = users.data.users.find((user) => user.email === email)?.id;
   if (!profileId) throw new Error(`Auth user not found for ${email}`);
@@ -54,6 +54,14 @@ async function createProbeInstallment(clientId: string): Promise<{ osId: string;
   const supabase = adminClient();
   const suffix = String(Date.now()).slice(-6);
 
+  const workshop = await supabase.from('workshops').select('id').eq('client_id', clientId).eq('active', true).limit(1).maybeSingle();
+  if (workshop.error) throw workshop.error;
+  if (!workshop.data) throw new Error(`Nenhuma oficina ativa encontrada para o tenant ${clientId}.`);
+
+  const creator = await supabase.from('profiles').select('id').eq('client_id', clientId).limit(1).maybeSingle();
+  if (creator.error) throw creator.error;
+  if (!creator.data) throw new Error(`Nenhum profile encontrado para o tenant ${clientId}.`);
+
   const vehicle = await supabase.from('vehicles').insert({
     client_id: clientId,
     license_plate: `RLFI${suffix}`,
@@ -68,6 +76,7 @@ async function createProbeInstallment(clientId: string): Promise<{ osId: string;
   const os = await supabase.from('maintenance_orders').insert({
     client_id: clientId,
     vehicle_id: vehicle.data.id,
+    workshop_id: workshop.data.id,
     os_number: `OS-RLFI-${suffix}`,
     entry_date: new Date().toISOString().split('T')[0],
     type: 'Corretiva',
@@ -75,6 +84,7 @@ async function createProbeInstallment(clientId: string): Promise<{ osId: string;
     estimated_cost: 1000,
     approved_cost: 1000,
     budget_status: 'aprovado',
+    created_by_id: creator.data.id,
   }).select('id').single();
   if (os.error) throw os.error;
 
@@ -110,19 +120,22 @@ test.describe.serial('RLS cross-tenant — payment_installments', () => {
     const assistantProfile = await profileByEmail(getEnv('TEST_ASSISTANT_EMAIL'));
     tenantA = assistantProfile.client_id;
 
-    const other = await adminClient()
-      .from('clients')
-      .select('id, name')
-      .neq('id', tenantA)
+    // Precisa de um tenant alheio que também tenha oficina ativa (workshop_id é
+    // NOT NULL em maintenance_orders) para poder criar a parcela-isca.
+    const otherWorkshop = await adminClient()
+      .from('workshops')
+      .select('client_id')
+      .neq('client_id', tenantA)
+      .eq('active', true)
       .limit(1)
       .maybeSingle();
 
-    if (other.error || !other.data) {
+    if (otherWorkshop.error || !otherWorkshop.data) {
       tenantB = '';
       return;
     }
 
-    tenantB = other.data.id as string;
+    tenantB = otherWorkshop.data.client_id as string;
     const probe = await createProbeInstallment(tenantB);
     probeOsId = probe.osId;
     probeVehicleId = probe.vehicleId;
@@ -181,5 +194,52 @@ test.describe.serial('RLS cross-tenant — payment_installments', () => {
       .eq('id', probeInstallmentId)
       .select();
     expect(res.data?.length ?? 0).toBe(0);
+  });
+
+  test('05 — RPC approve_maintenance_payment_group rejeita lote com ID cross-tenant/cross-OS e não aprova as linhas legítimas', async () => {
+    if (!tenantB) {
+      test.skip(true, 'Apenas 1 tenant no banco de dev — cross-tenant RLS exige >=2 clients.');
+      return;
+    }
+
+    let coordinatorClient: ReturnType<typeof anonClient>;
+    let legitOsId = '';
+    let legitVehicleId = '';
+    let legitInstallmentId = '';
+    try {
+      const coordinatorProfile = await profileByEmail(getEnv('TEST_COORDINATOR_EMAIL'));
+      coordinatorClient = await signIn('TEST_COORDINATOR_EMAIL', 'TEST_COORDINATOR_PASSWORD');
+
+      const legit = await createProbeInstallment(coordinatorProfile.client_id);
+      legitOsId = legit.osId;
+      legitVehicleId = legit.vehicleId;
+      legitInstallmentId = legit.installmentId;
+
+      const before = await adminClient()
+        .from('payment_installments')
+        .select('status, updated_at')
+        .eq('id', legitInstallmentId)
+        .single();
+
+      // Mistura a parcela legítima da própria OS (tenant do coordinator) com a
+      // parcela-isca de outra OS/tenant — a RPC deve abortar o lote inteiro.
+      const rpcResult = await coordinatorClient.rpc('approve_maintenance_payment_group', {
+        p_maintenance_order_id: legitOsId,
+        p_installment_ids: [legitInstallmentId, probeInstallmentId],
+        p_installment_updated_ats: [before.data?.updated_at, before.data?.updated_at],
+      });
+      expect(rpcResult.error).toBeTruthy();
+
+      const after = await adminClient()
+        .from('payment_installments')
+        .select('status')
+        .eq('id', legitInstallmentId)
+        .single();
+      expect(after.data?.status).toBe('pendente_aprovacao');
+    } finally {
+      if (legitInstallmentId) await adminClient().from('payment_installments').delete().eq('id', legitInstallmentId);
+      if (legitOsId) await adminClient().from('maintenance_orders').delete().eq('id', legitOsId);
+      if (legitVehicleId) await adminClient().from('vehicles').delete().eq('id', legitVehicleId);
+    }
   });
 });

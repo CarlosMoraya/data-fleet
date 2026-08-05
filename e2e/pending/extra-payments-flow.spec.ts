@@ -46,7 +46,7 @@ async function loginAs(browser: Browser, email: string, password: string): Promi
 
 async function profileByEmail(email: string) {
   const supabase = adminClient();
-  const users = await supabase.auth.admin.listUsers();
+  const users = await supabase.auth.admin.listUsers({ perPage: 1000 });
   if (users.error) throw users.error;
   const profileId = users.data.users.find((u) => u.email === email)?.id;
   if (!profileId) throw new Error(`Auth user not found for ${email}`);
@@ -142,11 +142,11 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
       await page.getByRole('tab', { name: 'Pagamentos Extras' }).click();
 
       await page.getByRole('button', { name: /Novo Pagamento Extra/i }).click();
-      await expect(page.getByText('Novo Pagamento Extra')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('heading', { name: 'Novo Pagamento Extra' })).toBeVisible({ timeout: 10000 });
 
       await page.getByLabel('Data do serviço').fill(new Date().toISOString().split('T')[0]);
       await page.getByLabel('Fornecedor').fill('Guincho E2E LTDA');
-      await page.getByLabel('Veículo').selectOption({ label: new RegExp(vehiclePlate) });
+      await page.getByLabel('Veículo').selectOption(vehicleId);
 
       const driverSelect = page.getByLabel('Motorista');
       await expect(driverSelect).not.toHaveValue('');
@@ -158,7 +158,7 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
       await expect(page.getByText(/1 parcela\(s\)/)).toBeVisible({ timeout: 10000 });
       await page.getByRole('button', { name: /Salvar 1 parcela/ }).click();
 
-      await expect(page.getByText('Novo Pagamento Extra')).not.toBeVisible({ timeout: 15000 });
+      await expect(page.getByRole('heading', { name: 'Novo Pagamento Extra' })).not.toBeVisible({ timeout: 15000 });
       await expect(page.getByText('Guincho E2E LTDA').first()).toBeVisible({ timeout: 15000 });
     } finally {
       await page.context().close();
@@ -193,14 +193,14 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
       await expect(page.getByText(/3 parcela\(s\)/)).toBeVisible({ timeout: 10000 });
       await page.getByRole('button', { name: /Salvar 3 parcela/ }).click();
 
-      await expect(page.getByText('Novo Pagamento Extra')).not.toBeVisible({ timeout: 15000 });
+      await expect(page.getByRole('heading', { name: 'Novo Pagamento Extra' })).not.toBeVisible({ timeout: 15000 });
       await expect(page.getByText('Frete de Apoio E2E').first()).toBeVisible({ timeout: 15000 });
     } finally {
       await page.context().close();
     }
   });
 
-  test('03 — Coordinator aprova pagamento extra pendente', async ({ browser }) => {
+  test('03 — Coordinator aprova pedido extra e todas as suas parcelas pelo cabeçalho', async ({ browser }) => {
     const email = optionalEnv('TEST_COORDINATOR_EMAIL');
     const password = optionalEnv('TEST_COORDINATOR_PASSWORD');
     if (!email || !password) {
@@ -211,16 +211,21 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
     const page = await loginAs(browser, email, password);
     try {
       await page.goto('/financeiro');
-      await expect(page.getByRole('tab', { name: 'Aprovação de Extras' })).toBeVisible({ timeout: 15000 });
-      await page.getByRole('tab', { name: 'Aprovação de Extras' }).click();
+      await expect(page.getByRole('tab', { name: 'Aprovações' })).toBeVisible({ timeout: 15000 });
+      await page.getByRole('tab', { name: 'Aprovações' }).click();
+      await expect(page.getByRole('tab', { name: 'Extras' })).toBeVisible({ timeout: 15000 });
+      await page.getByRole('tab', { name: 'Extras' }).click();
 
-      const row = page.locator('tr', { hasText: 'Guincho E2E LTDA' }).first();
-      if (await row.count() === 0) {
+      const card = page.locator('div', { hasText: 'Guincho E2E LTDA' }).filter({ has: page.getByRole('button', { name: 'Aprovar pedido e parcelas' }) }).first();
+      if (await card.count() === 0) {
         test.skip(true, 'Fixture do cenário 01 indisponível.');
         return;
       }
-      await row.getByRole('button', { name: 'Aprovar' }).click();
-      await expect(row).not.toBeVisible({ timeout: 15000 });
+      await card.getByRole('button', { name: 'Aprovar pedido e parcelas' }).click();
+      await expect(page.getByRole('dialog', { name: 'Aprovar pagamento extra' })).toBeVisible({ timeout: 10000 });
+      await page.getByRole('button', { name: 'Confirmar aprovação' }).click();
+
+      await expect(page.locator('div', { hasText: 'Guincho E2E LTDA' })).toHaveCount(0, { timeout: 15000 });
     } finally {
       await page.context().close();
     }
@@ -237,14 +242,15 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
     const page = await loginAs(browser, email, password);
     try {
       await page.goto('/financeiro');
-      await page.getByRole('tab', { name: 'Aprovação de Extras' }).click();
+      await page.getByRole('tab', { name: 'Aprovações' }).click();
+      await page.getByRole('tab', { name: 'Extras' }).click();
 
-      const row = page.locator('tr', { hasText: 'Frete de Apoio E2E' }).first();
-      if (await row.count() === 0) {
+      const card = page.locator('div', { hasText: 'Frete de Apoio E2E' }).filter({ has: page.getByRole('button', { name: 'Reprovar' }) }).first();
+      if (await card.count() === 0) {
         test.skip(true, 'Fixture do cenário 02 indisponível.');
         return;
       }
-      await row.getByRole('button', { name: 'Reprovar' }).click();
+      await card.getByRole('button', { name: 'Reprovar' }).click();
 
       const confirmButton = page.getByRole('button', { name: 'Confirmar reprovação' });
       await expect(confirmButton).toBeDisabled();
@@ -253,7 +259,7 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
       await expect(confirmButton).toBeEnabled();
       await confirmButton.click();
 
-      await expect(row).not.toBeVisible({ timeout: 15000 });
+      await expect(page.locator('div', { hasText: 'Frete de Apoio E2E' })).toHaveCount(0, { timeout: 15000 });
     } finally {
       await page.context().close();
     }
@@ -270,7 +276,7 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
     const page = await loginAs(browser, email, password);
     try {
       await expect(page).toHaveURL('/financeiro', { timeout: 15000 });
-      await page.getByRole('tab', { name: 'Pagamentos' }).click();
+      await page.getByRole('tab', { name: 'Pagamentos', exact: true }).click();
       await page.getByLabel('Todas as formas').selectOption('');
 
       await expect(page.getByText('Guincho E2E LTDA').first()).toBeVisible({ timeout: 15000 });
@@ -291,12 +297,17 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
     const page = await loginAs(browser, email, password);
     try {
       await page.goto('/financeiro');
-      await page.getByRole('tab', { name: 'Pagamentos' }).click();
+      await page.getByRole('tab', { name: 'Pagamentos', exact: true }).click();
 
       const downloadPromise = page.waitForEvent('download');
       await page.getByRole('button', { name: /Baixar CSV/ }).click();
       const download = await downloadPromise;
       expect(download.suggestedFilename()).toMatch(/pagamentos_.*\.csv/);
+
+      // Exportação existe somente em Pagamentos; Pagamentos Extras não tem CSV/XLSX.
+      await page.getByRole('tab', { name: 'Pagamentos Extras' }).click();
+      await expect(page.getByRole('button', { name: /Baixar CSV/ })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: /Baixar XLSX/ })).toHaveCount(0);
     } finally {
       await page.context().close();
     }
@@ -313,7 +324,7 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
     const page = await loginAs(browser, email, password);
     try {
       await page.goto('/financeiro');
-      await page.getByRole('tab', { name: 'Pagamentos' }).click();
+      await page.getByRole('tab', { name: 'Pagamentos', exact: true }).click();
 
       const row = page.locator('tr', { hasText: 'Guincho E2E LTDA' }).first();
       if (await row.count() === 0) {
@@ -340,7 +351,7 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
     try {
       await page.goto('/financeiro');
       await expect(page.getByRole('tab', { name: 'Pagamentos Extras' })).not.toBeVisible({ timeout: 10000 });
-      await expect(page.getByRole('tab', { name: 'Aprovação de Extras' })).not.toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('tab', { name: 'Aprovações' })).not.toBeVisible({ timeout: 10000 });
     } finally {
       await page.context().close();
     }
@@ -359,7 +370,7 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
       await page.goto('/financeiro');
       await page.getByRole('tab', { name: 'Pagamentos Extras' }).click();
       await page.getByRole('button', { name: /Novo Pagamento Extra/i }).click();
-      await expect(page.getByText('Novo Pagamento Extra')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('heading', { name: 'Novo Pagamento Extra' })).toBeVisible({ timeout: 10000 });
 
       await page.getByLabel('Data do serviço').fill(new Date().toISOString().split('T')[0]);
       await page.getByLabel('Fornecedor').fill('Boleto Único E2E');
@@ -383,7 +394,7 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
       }
 
       await page.getByRole('button', { name: /Salvar 3 parcela/ }).click();
-      await expect(page.getByText('Novo Pagamento Extra')).not.toBeVisible({ timeout: 15000 });
+      await expect(page.getByRole('heading', { name: 'Novo Pagamento Extra' })).not.toBeVisible({ timeout: 15000 });
       await expect(page.getByText('Boleto Único E2E').first()).toBeVisible({ timeout: 15000 });
     } finally {
       await page.context().close();

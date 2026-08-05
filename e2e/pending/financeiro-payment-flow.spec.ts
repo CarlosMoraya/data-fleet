@@ -47,7 +47,7 @@ async function loginAs(browser: Browser, email: string, password: string): Promi
 
 async function profileByEmail(email: string) {
   const supabase = adminClient();
-  const users = await supabase.auth.admin.listUsers();
+  const users = await supabase.auth.admin.listUsers({ perPage: 1000 });
   if (users.error) throw users.error;
   const profileId = users.data.users.find((u) => u.email === email)?.id;
   if (!profileId) throw new Error(`Auth user not found for ${email}`);
@@ -155,13 +155,13 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
     const page = await loginAs(browser, email, password);
     try {
       await page.goto('/financeiro');
-      await expect(page.getByRole('tab', { name: 'Pagamentos' })).toBeVisible({ timeout: 15000 });
-      await page.getByRole('tab', { name: 'Pagamentos' }).click();
+      await expect(page.getByRole('tab', { name: 'Pagamentos', exact: true })).toBeVisible({ timeout: 15000 });
+      await page.getByRole('tab', { name: 'Pagamentos', exact: true }).click();
 
       await page.getByRole('button', { name: /Cadastrar Pagamento/i }).click();
       await expect(page.getByText('Ordem de Serviço (orçamento aprovado)')).toBeVisible({ timeout: 10000 });
 
-      await page.locator('select').first().selectOption({ label: new RegExp(osNumber) });
+      await page.locator('select').first().selectOption(osId);
       await page.getByLabel('Nº de parcelas').fill('3');
       await page.getByLabel('1º vencimento').fill(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
       await page.getByRole('button', { name: 'Gerar parcelas' }).click();
@@ -176,7 +176,7 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
     }
   });
 
-  test('02 — Coordinator aprova a parcela na aba Aprovação de Pagamentos', async ({ browser }) => {
+  test('02 — Coordinator aprova todas as parcelas da OS em um único grupo, na aba Aprovações', async ({ browser }) => {
     const email = optionalEnv('TEST_COORDINATOR_EMAIL');
     const password = optionalEnv('TEST_COORDINATOR_PASSWORD');
     if (!email || !password || !osId) {
@@ -187,13 +187,23 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
     const page = await loginAs(browser, email, password);
     try {
       await page.goto('/financeiro');
-      await expect(page.getByRole('tab', { name: 'Aprovação de Pagamentos' })).toBeVisible({ timeout: 15000 });
-      await page.getByRole('tab', { name: 'Aprovação de Pagamentos' }).click();
+      await expect(page.getByRole('tab', { name: 'Aprovações' })).toBeVisible({ timeout: 15000 });
+      await page.getByRole('tab', { name: 'Aprovações' }).click();
+      const segmentedControl = page.getByRole('tablist', { name: 'Segmentos de aprovação' });
+      await expect(segmentedControl).toBeVisible({ timeout: 15000 });
+      await segmentedControl.getByRole('tab', { name: 'Pagamentos', exact: true }).click();
 
-      const row = page.locator('tr', { hasText: osNumber }).first();
-      await expect(row).toBeVisible({ timeout: 15000 });
-      await row.getByRole('button', { name: 'Aprovar' }).click();
-      await expect(row).not.toBeVisible({ timeout: 15000 });
+      // Um único card por OS agrupa as 3 parcelas cadastradas no teste 01.
+      const card = page.locator('div', { hasText: osNumber }).filter({ has: page.getByRole('button', { name: 'Aprovar todas' }) }).first();
+      await expect(card).toBeVisible({ timeout: 15000 });
+      await expect(card.getByText('3 parcela(s) pendente(s)')).toBeVisible();
+      await expect(page.getByText('Já processados')).toHaveCount(0);
+
+      await card.getByRole('button', { name: 'Aprovar todas' }).click();
+      await expect(page.getByRole('dialog', { name: 'Aprovar parcelas' })).toBeVisible({ timeout: 10000 });
+      await page.getByRole('button', { name: 'Confirmar aprovação' }).click();
+
+      await expect(page.locator('div', { hasText: osNumber })).toHaveCount(0, { timeout: 15000 });
     } finally {
       await page.context().close();
     }
@@ -270,7 +280,7 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
       await page.goto('/financeiro');
       await expect(page.getByRole('tablist')).toBeVisible({ timeout: 15000 });
       await expect(page.getByRole('tab', { name: 'Orçamento' })).toHaveCount(0);
-      await expect(page.getByRole('tab', { name: 'Pagamentos' })).toBeVisible();
+      await expect(page.getByRole('tab', { name: 'Pagamentos', exact: true })).toBeVisible();
     } finally {
       await page.context().close();
     }
@@ -305,11 +315,11 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
     const page = await loginAs(browser, email, password);
     try {
       await page.goto('/financeiro');
-      await page.getByRole('tab', { name: 'Pagamentos' }).click();
+      await page.getByRole('tab', { name: 'Pagamentos', exact: true }).click();
       await page.getByRole('button', { name: /Cadastrar Pagamento/i }).click();
       await expect(page.getByText('Ordem de Serviço (orçamento aprovado)')).toBeVisible({ timeout: 10000 });
 
-      await page.locator('select').first().selectOption({ label: new RegExp(osNumber) });
+      await page.locator('select').first().selectOption(osId);
       await page.getByLabel('Nº de parcelas').fill('1');
       await page.getByLabel('1º vencimento').fill(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
       await page.getByRole('button', { name: 'Gerar parcelas' }).click();
@@ -350,7 +360,7 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
     const page = await loginAs(browser, email, password);
     try {
       await page.goto('/financeiro');
-      await page.getByRole('tab', { name: 'Pagamentos' }).click();
+      await page.getByRole('tab', { name: 'Pagamentos', exact: true }).click();
       const row = page.locator('tr', { hasText: osNumber }).first();
       await expect(row).toBeVisible({ timeout: 15000 });
       await row.getByTitle('Editar parcela').click();
@@ -363,7 +373,7 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
     }
   });
 
-  test('10 — aba Aprovação exibe colunas de orçamento e aprovador do orçamento', async ({ browser }) => {
+  test('10 — modal "Ver orçamento" exibe itens/desconto/total e PDF sem sair da tela', async ({ browser }) => {
     const email = optionalEnv('TEST_COORDINATOR_EMAIL');
     const password = optionalEnv('TEST_COORDINATOR_PASSWORD');
     if (!email || !password || !osId) {
@@ -374,11 +384,19 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
     const page = await loginAs(browser, email, password);
     try {
       await page.goto('/financeiro');
-      await page.getByRole('tab', { name: 'Aprovação de Pagamentos' }).click();
-      await expect(page.getByText('Orçamento aprovado por')).toBeVisible({ timeout: 15000 });
+      await page.getByRole('tab', { name: 'Aprovações' }).click();
+      const segmentedControl = page.getByRole('tablist', { name: 'Segmentos de aprovação' });
+      await expect(segmentedControl).toBeVisible({ timeout: 15000 });
+      await segmentedControl.getByRole('tab', { name: 'Pagamentos', exact: true }).click();
 
-      const row = page.locator('tr', { hasText: osNumber }).first();
-      await expect(row).toBeVisible({ timeout: 15000 });
+      const card = page.locator('div', { hasText: osNumber }).filter({ has: page.getByRole('button', { name: 'Ver orçamento' }) }).first();
+      await expect(card).toBeVisible({ timeout: 15000 });
+      await card.getByRole('button', { name: 'Ver orçamento' }).click();
+
+      await expect(page.getByRole('dialog', { name: new RegExp(`Orçamento.*${osNumber}`) })).toBeVisible({ timeout: 15000 });
+      await expect(page.getByRole('tab', { name: 'Itens' })).toBeVisible();
+      await page.getByRole('tab', { name: 'PDF' }).click();
+      await page.getByRole('tab', { name: 'Itens' }).click();
     } finally {
       await page.context().close();
     }
@@ -425,7 +443,7 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
 
       // Recarrega para fechar o modal sem depender de um seletor frágil do botão X.
       await page.reload();
-      await page.getByRole('tab', { name: 'Pagamentos' }).click();
+      await page.getByRole('tab', { name: 'Pagamentos', exact: true }).click();
       await expect(page.getByText(osNumber).first()).toBeVisible({ timeout: 15000 });
 
       const downloadPromise = page.waitForEvent('download');

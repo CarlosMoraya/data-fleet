@@ -251,6 +251,43 @@ describe('BudgetApprovals — motivo de reprovação', () => {
   });
 });
 
+describe('BudgetApprovals — embedded', () => {
+  it('modo standalone (default) mantém o header próprio', async () => {
+    const root = createRoot(container);
+    container.__reactRoot = root;
+
+    act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <BudgetApprovals />
+        </QueryClientProvider>,
+      );
+    });
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Aprovação de Orçamentos');
+    });
+  });
+
+  it('modo embedded remove o header próprio', async () => {
+    const root = createRoot(container);
+    container.__reactRoot = root;
+
+    act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <BudgetApprovals embedded />
+        </QueryClientProvider>,
+      );
+    });
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('OS-001');
+    });
+    expect(container.textContent).not.toContain('Aprovação de Orçamentos');
+  });
+});
+
 describe('BudgetApprovals — desconto e total líquido', () => {
   it('canApprove recebe o total líquido: 12.000 com desconto geral de 3.000 é aprovável por alçada de 10.000', () => {
     const user = {

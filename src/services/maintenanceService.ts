@@ -1,8 +1,9 @@
 import { normalizeBudgetSystem } from '../lib/budgetSystems';
+import { budgetItemFromRow } from '../lib/maintenanceMappers';
 import { uploadMaintenanceBudget } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 
-import type { MaintenanceOrder, BudgetItem } from '../types/maintenance';
+import type { MaintenanceOrder, BudgetItem, MaintenanceBudgetItemRow } from '../types/maintenance';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -12,6 +13,16 @@ export interface SaveMaintenancePayload {
   budgetFile: File | null;
   profileId: string;
   currentClientId?: string;
+}
+
+export interface MaintenanceBudgetApprovalDetails {
+  maintenanceOrderId: string;
+  osNumber: string;
+  approvedCost: number;
+  budgetDiscount: number;
+  budgetPdfUrl?: string;
+  workshopName: string;
+  items: BudgetItem[];
 }
 
 // ─── Funções de serviço ──────────────────────────────────────────────────────
@@ -135,6 +146,46 @@ export async function saveMaintenanceOrder(
   }
 
   return orderId;
+}
+
+/**
+ * Carrega cabeçalho e itens do orçamento aprovado de uma OS, para uso no
+ * modal de consulta Itens/PDF das telas de Aprovações financeiras.
+ */
+export async function getMaintenanceBudgetApprovalDetails(
+  maintenanceOrderId: string,
+): Promise<MaintenanceBudgetApprovalDetails> {
+  const { data: order, error: orderError } = await supabase
+    .from('maintenance_orders')
+    .select('os_number, approved_cost, budget_discount, budget_pdf_url, workshops(name)')
+    .eq('id', maintenanceOrderId)
+    .single();
+  if (orderError) throw orderError;
+
+  const { data: itemRows, error: itemsError } = await supabase
+    .from('maintenance_budget_items')
+    .select('*')
+    .eq('maintenance_order_id', maintenanceOrderId)
+    .order('sort_order');
+  if (itemsError) throw itemsError;
+
+  const row = order as unknown as {
+    os_number: string;
+    approved_cost: number | null;
+    budget_discount: number | null;
+    budget_pdf_url: string | null;
+    workshops: { name: string } | null;
+  };
+
+  return {
+    maintenanceOrderId,
+    osNumber: row.os_number,
+    approvedCost: Number(row.approved_cost ?? 0),
+    budgetDiscount: Number(row.budget_discount ?? 0),
+    budgetPdfUrl: row.budget_pdf_url ?? undefined,
+    workshopName: row.workshops?.name ?? '—',
+    items: (itemRows as MaintenanceBudgetItemRow[]).map(budgetItemFromRow),
+  };
 }
 
 /**

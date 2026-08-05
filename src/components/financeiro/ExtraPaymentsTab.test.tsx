@@ -73,6 +73,7 @@ beforeEach(() => {
   document.body.appendChild(container);
 
   authState.role = 'Fleet Assistant';
+  useQueryMock.mockClear();
   useQueryClientMock.mockReturnValue({ invalidateQueries: vi.fn().mockResolvedValue(undefined) });
   useMutationMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
   listExtraPaymentRequestsMock.mockReset();
@@ -131,5 +132,18 @@ describe('ExtraPaymentsTab', () => {
     renderTab([]);
     const buttons = Array.from(container.querySelectorAll('button')).map((b) => b.textContent);
     expect(buttons.some((t) => t?.includes('Novo Pagamento Extra'))).toBe(false);
+  });
+
+  it('não exibe botões de exportação CSV/XLSX, mesmo para Financeiro/Admin Master', () => {
+    authState.role = 'Admin Master';
+    renderTab([baseRequest()]);
+    const buttons = Array.from(container.querySelectorAll('button')).map((b) => b.textContent);
+    expect(buttons.some((t) => t?.includes('CSV'))).toBe(false);
+    expect(buttons.some((t) => t?.includes('XLSX'))).toBe(false);
+  });
+
+  it('faz apenas uma consulta (a de pedidos); não há query de parcelas de exportação', () => {
+    renderTab([baseRequest()]);
+    expect(useQueryMock).toHaveBeenCalledTimes(1);
   });
 });

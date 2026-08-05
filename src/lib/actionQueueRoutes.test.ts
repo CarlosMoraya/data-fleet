@@ -26,7 +26,7 @@ describe('actionQueueRoutes', () => {
   });
 
   it('preserves intentional non-vehicle destinations', () => {
-    expect(OPERATIONAL_ACTION_ROUTES.os_pending_approval).toBe('/aprovacao-orcamentos');
+    expect(OPERATIONAL_ACTION_ROUTES.os_pending_approval).toBe('/financeiro?tab=budget');
     expect(GENERAL_ACTION_ROUTES.os_pending_approval).toBe('/manutencao');
     expect(GENERAL_ACTION_ROUTES.cnh).toBe('/cadastros/motoristas?issue=cnh_expired');
     expect(GENERAL_ACTION_ROUTES.cnh_expiring).toBe('/cadastros/motoristas?issue=cnh_expiring');
@@ -107,13 +107,25 @@ describe('actionQueueRoutes', () => {
   it('maps the required operational queue deep links and routes', () => {
     expect(OPERATIONAL_QUEUE_ROUTES.vehicles_no_driver).toBe('/cadastros/veiculos?issue=no_driver');
     expect(OPERATIONAL_QUEUE_ROUTES.checklist_overdue).toBe('/cadastros/veiculos?issue=checklist_overdue');
-    expect(OPERATIONAL_QUEUE_ROUTES.os_pending_approval).toBe('/aprovacao-orcamentos');
+    expect(OPERATIONAL_QUEUE_ROUTES.os_pending_approval).toBe('/financeiro?tab=budget');
     expect(OPERATIONAL_QUEUE_ROUTES.tracker_missing).toBe('/cadastros/veiculos?issue=tracker_missing');
   });
 
   it('uses absolute app routes in the operational queue', () => {
     for (const route of Object.values(OPERATIONAL_QUEUE_ROUTES)) {
       expect(route.startsWith('/')).toBe(true);
+    }
+  });
+
+  it('rota removida /aprovacao-orcamentos foi substituída pelo deep link do módulo Financeiro', () => {
+    expect(OPERATIONAL_ACTION_ROUTES.os_pending_approval).toBe('/financeiro?tab=budget');
+    expect(OPERATIONAL_QUEUE_ROUTES.os_pending_approval).toBe('/financeiro?tab=budget');
+    for (const route of [
+      ...Object.values(OPERATIONAL_ACTION_ROUTES),
+      ...Object.values(OPERATIONAL_QUEUE_ROUTES),
+      ...Object.values(GENERAL_ACTION_ROUTES),
+    ]) {
+      expect(route).not.toBe('/aprovacao-orcamentos');
     }
   });
 });

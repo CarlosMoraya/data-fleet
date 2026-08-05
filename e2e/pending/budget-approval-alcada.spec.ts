@@ -23,8 +23,8 @@ test.describe.serial('Budget Approval — Alçada de Aprovação', () => {
   let page: Page | undefined;
 
   test.beforeAll(async ({ browser }) => {
-    const email = requireEnv('TEST_FLEET_ASSISTANT_EMAIL');
-    const password = requireEnv('TEST_FLEET_ASSISTANT_PASSWORD');
+    const email = requireEnv('TEST_ASSISTANT_EMAIL');
+    const password = requireEnv('TEST_ASSISTANT_PASSWORD');
     page = await loginAs(browser, email, password);
   });
 
@@ -34,7 +34,7 @@ test.describe.serial('Budget Approval — Alçada de Aprovação', () => {
 
   test('cenário 1: OS sem itens — botão Aprovar desabilitado com tooltip "sem itens cadastrados"', async () => {
     if (!page) test.skip();
-    await page!.goto('/aprovacao-orcamentos');
+    await page!.goto('/financeiro?tab=budget');
     await page!.waitForSelector('table', { timeout: 10000 });
 
     const rowWithNoItems = page!.locator('tr:has-text("—")').first();
@@ -45,13 +45,15 @@ test.describe.serial('Budget Approval — Alçada de Aprovação', () => {
     const approveBtn = rowWithNoItems.locator('button:has-text("Aprovar")');
     await expect(approveBtn).toBeDisabled();
 
-    const tooltip = await approveBtn.getAttribute('title');
-    expect(tooltip).toContain('sem itens cadastrados');
+    // A tooltip inicial reflete o carregamento assíncrono dos itens; espera
+    // estabilizar no texto final antes de afirmar. Timeout maior porque o
+    // DEV pode ter muitas OS pendentes disparando consultas em paralelo.
+    await expect(approveBtn).toHaveAttribute('title', /sem itens cadastrados/, { timeout: 30000 });
   });
 
   test('cenário 2: OS com subtotal > R$ 1.500 — botão Aprovar desabilitado com tooltip de limite', async () => {
     if (!page) test.skip();
-    await page!.goto('/aprovacao-orcamentos');
+    await page!.goto('/financeiro?tab=budget');
     await page!.waitForSelector('table', { timeout: 10000 });
 
     const rowWithOverLimit = page!.locator('tr').filter({ hasText: /R\$\s*1[,.]5\d{2}/ }).first();
@@ -68,7 +70,7 @@ test.describe.serial('Budget Approval — Alçada de Aprovação', () => {
 
   test('cenário 3: OS com subtotal ≤ R$ 1.500 — botão Aprovar habilitado', async () => {
     if (!page) test.skip();
-    await page!.goto('/aprovacao-orcamentos');
+    await page!.goto('/financeiro?tab=budget');
     await page!.waitForSelector('table', { timeout: 10000 });
 
     const approveButtons = page!.locator('button:has-text("Aprovar"):not([disabled])');

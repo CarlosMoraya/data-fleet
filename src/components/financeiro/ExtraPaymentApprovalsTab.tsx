@@ -1,15 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Eye, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
-import { cn } from '../../lib/utils';
+import { listExtraPaymentInstallments } from '../../services/paymentInstallmentService';
 import {
-  approveExtraPaymentRequest,
+  approveExtraPaymentRequestGroup,
   listExtraPaymentRequests,
   rejectExtraPaymentRequest,
 } from '../../services/serviceExpenseService';
 
+import ExtraPaymentViewModal from './ExtraPaymentViewModal';
+import FinancialApprovalConfirmModal from './FinancialApprovalConfirmModal';
+
+import type { PaymentInstallment } from '../../types/payment';
 import type { ExtraPaymentCategory, ExtraPaymentRequest } from '../../types/serviceExpense';
 
 const CATEGORY_LABELS: Record<ExtraPaymentCategory, string> = {
@@ -22,23 +26,97 @@ const CATEGORY_LABELS: Record<ExtraPaymentCategory, string> = {
   outro: 'Outro',
 };
 
-const STATUS_BADGE: Record<string, string> = {
-  aprovado: 'bg-blue-100 text-blue-700',
-  reprovado: 'bg-red-100 text-red-700',
-};
-
 function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function formatDate(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString('pt-BR');
+function sumInstallments(installments: PaymentInstallment[]): number {
+  const cents = installments.reduce((sum, i) => sum + Math.round(i.value * 100), 0);
+  return cents / 100;
 }
 
-function formatDateTime(iso?: string): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('pt-BR');
+interface RequestCardProps {
+  request: ExtraPaymentRequest;
+  installments: PaymentInstallment[];
+  processing: boolean;
+  onViewDetails: (request: ExtraPaymentRequest) => void;
+  onApprove: (request: ExtraPaymentRequest, installments: PaymentInstallment[]) => void;
+  onReject: (request: ExtraPaymentRequest) => void;
 }
+
+function RequestCard({
+  request,
+  installments,
+  processing,
+  onViewDetails,
+  onApprove,
+  onReject,
+}: RequestCardProps): React.ReactElement {
+  const sum = sumInstallments(installments);
+  const hasInstallments = installments.length > 0;
+  const sumMatches = hasInstallments && sum === request.amount;
+  const canApprove = hasInstallments && sumMatches;
+
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-5 py-4 shadow-sm">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm font-semibold text-zinc-800">{request.requestNumber}</span>
+            <span className="text-sm text-zinc-500">{CATEGORY_LABELS[request.category]}</span>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+            <span>{request.supplierName}{request.supplierDocument && ` · ${request.supplierDocument}`}</span>
+            <span>{request.vehicleLicensePlate ?? '—'}{request.driverName && ` · ${request.driverName}`}</span>
+            <span>Valor do pedido: <strong className="text-zinc-700">{formatCurrency(request.amount)}</strong></span>
+            <span>{installments.length} parcela(s) — soma: <strong className="text-zinc-700">{formatCurrency(sum)}</strong></span>
+          </div>
+          {!hasInstallments && (
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-700">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Este pedido não possui parcelas e não pode ser aprovado.
+            </div>
+          )}
+          {hasInstallments && !sumMatches && (
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-700">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              A soma das parcelas ({formatCurrency(sum)}) não corresponde ao valor do pedido ({formatCurrency(request.amount)}).
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onViewDetails(request)}
+            className="flex items-center gap-1 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Ver detalhes
+          </button>
+          <button
+            type="button"
+            disabled={processing || !canApprove}
+            title={canApprove ? undefined : 'Pedido sem parcelas ou com soma divergente.'}
+            onClick={() => onApprove(request, installments)}
+            className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
+          >
+            <ThumbsUp className="h-3.5 w-3.5" />
+            Aprovar pedido e parcelas
+          </button>
+          <button
+            type="button"
+            disabled={processing}
+            onClick={() => onReject(request)}
+            className="flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-200 disabled:opacity-50"
+          >
+            <ThumbsDown className="h-3.5 w-3.5" />
+            Reprovar
+          </button>
+        </div>
+    </div>
+  );
+}
+
+const CONFLICT_MESSAGE = 'Este pedido foi alterado. Nada foi aprovado; revise novamente.';
 
 export default function ExtraPaymentApprovalsTab(): React.ReactElement {
   const { currentClient } = useAuth();
@@ -46,10 +124,18 @@ export default function ExtraPaymentApprovalsTab(): React.ReactElement {
 
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<ExtraPaymentRequest | null>(null);
+  const [viewing, setViewing] = useState<ExtraPaymentRequest | null>(null);
+  const [confirming, setConfirming] = useState<{ request: ExtraPaymentRequest; installments: PaymentInstallment[] } | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ['extraPaymentRequests', 'approvals', currentClient?.id],
     queryFn: () => listExtraPaymentRequests({ clientId: currentClient?.id }),
+  });
+
+  const { data: allInstallments = [] } = useQuery({
+    queryKey: ['paymentInstallments', 'extraApprovals', currentClient?.id],
+    queryFn: () => listExtraPaymentInstallments({ clientId: currentClient?.id }),
   });
 
   const pending = useMemo(
@@ -58,28 +144,17 @@ export default function ExtraPaymentApprovalsTab(): React.ReactElement {
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     [requests],
   );
-  const processed = useMemo(
-    () => requests
-      .filter((r) => r.status === 'aprovado' || r.status === 'reprovado')
-      .sort((a, b) => (b.approvedAt ?? b.rejectedAt ?? '').localeCompare(a.approvedAt ?? a.rejectedAt ?? '')),
-    [requests],
-  );
 
-  const approveMutation = useMutation({
-    mutationFn: async (id: string) => {
-      setProcessingId(id);
-      await approveExtraPaymentRequest(id);
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['extraPaymentRequests'] });
-      await queryClient.invalidateQueries({ queryKey: ['paymentInstallments'] });
-    },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : 'Falha ao aprovar o pagamento extra.';
-      window.alert(msg);
-    },
-    onSettled: () => setProcessingId(null),
-  });
+  const installmentsByRequest = useMemo(() => {
+    const map = new Map<string, PaymentInstallment[]>();
+    for (const installment of allInstallments) {
+      if (!installment.extraPaymentRequestId) continue;
+      const list = map.get(installment.extraPaymentRequestId) ?? [];
+      list.push(installment);
+      map.set(installment.extraPaymentRequestId, list);
+    }
+    return map;
+  }, [allInstallments]);
 
   const rejectMutation = useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
@@ -98,123 +173,53 @@ export default function ExtraPaymentApprovalsTab(): React.ReactElement {
     onSettled: () => setProcessingId(null),
   });
 
+  const approveGroupMutation = useMutation({
+    mutationFn: ({ request, installments }: { request: ExtraPaymentRequest; installments: PaymentInstallment[] }) =>
+      approveExtraPaymentRequestGroup(
+        request.id,
+        request.updatedAt,
+        installments.map((i) => ({ id: i.id, updatedAt: i.updatedAt })),
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['extraPaymentRequests'] });
+      await queryClient.invalidateQueries({ queryKey: ['paymentInstallments'] });
+      setConfirming(null);
+      setConfirmError(null);
+    },
+    onError: async (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Não foi possível aprovar o pagamento extra.';
+      setConfirmError(msg);
+      if (msg === CONFLICT_MESSAGE) {
+        await queryClient.invalidateQueries({ queryKey: ['extraPaymentRequests'] });
+        await queryClient.invalidateQueries({ queryKey: ['paymentInstallments'] });
+      }
+    },
+  });
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6">
-      {/* Pending */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        <div className="border-b border-zinc-100 px-5 py-4">
-          <h2 className="text-base font-semibold text-zinc-900">Pagamentos extras aguardando aprovação</h2>
-          <p className="mt-0.5 text-sm text-zinc-500">Lançamentos em ordem de chegada</p>
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-orange-500" />
         </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-orange-500" />
-          </div>
-        ) : pending.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-zinc-400">
-            <CheckCircle2 className="h-10 w-10 text-green-400" />
-            <p className="text-sm font-medium">Nenhum pagamento extra pendente de aprovação.</p>
-          </div>
-        ) : (
-          <div className="flex-1 overflow-auto">
-            <table className="min-w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-zinc-50">
-                <tr className="border-b border-zinc-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Número</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Categoria</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Fornecedor</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Veículo/Motorista</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Valor</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Data do serviço</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Ação</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100 bg-white">
-                {pending.map((r) => (
-                  <tr key={r.id} className="hover:bg-zinc-50">
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-zinc-700">{r.requestNumber}</td>
-                    <td className="px-4 py-3 text-zinc-600">{CATEGORY_LABELS[r.category]}</td>
-                    <td className="px-4 py-3 text-zinc-600">
-                      {r.supplierName}
-                      {r.supplierDocument && <span className="ml-1 text-xs text-zinc-400">· {r.supplierDocument}</span>}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-600">
-                      {r.vehicleLicensePlate ?? '—'}
-                      {r.driverName && <span className="ml-1 text-xs text-zinc-400">· {r.driverName}</span>}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-zinc-800">{formatCurrency(r.amount)}</td>
-                    <td className="px-4 py-3 text-zinc-600">{formatDate(r.serviceDate)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <button
-                          disabled={processingId === r.id}
-                          onClick={() => approveMutation.mutate(r.id)}
-                          className="flex items-center gap-1 rounded-lg bg-green-100 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-200 disabled:opacity-50"
-                        >
-                          <ThumbsUp className="h-3.5 w-3.5" />
-                          Aprovar
-                        </button>
-                        <button
-                          disabled={processingId === r.id}
-                          onClick={() => setRejecting(r)}
-                          className="flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-200 disabled:opacity-50"
-                        >
-                          <ThumbsDown className="h-3.5 w-3.5" />
-                          Reprovar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Processed */}
-      <div className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        <div className="border-b border-zinc-100 px-5 py-4">
-          <h2 className="text-base font-semibold text-zinc-900">Já processados</h2>
+      ) : pending.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-zinc-200 bg-white py-16 text-zinc-400 shadow-sm">
+          <CheckCircle2 className="h-10 w-10 text-green-400" />
+          <p className="text-sm font-medium">Nenhum pagamento extra pendente de aprovação.</p>
         </div>
-        {processed.length === 0 ? (
-          <div className="px-5 py-8 text-center text-sm text-zinc-400">
-            Nenhum pagamento extra processado ainda.
-          </div>
-        ) : (
-          <div className="max-h-[280px] overflow-auto">
-            <table className="min-w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-zinc-50">
-                <tr className="border-b border-zinc-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Número</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Valor</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Aprovador</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Em</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100 bg-white">
-                {processed.map((r) => (
-                  <tr key={r.id} className="hover:bg-zinc-50">
-                    <td className="px-4 py-2.5 font-mono text-xs font-semibold text-zinc-700">{r.requestNumber}</td>
-                    <td className="px-4 py-2.5 font-medium text-zinc-800">{formatCurrency(r.amount)}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STATUS_BADGE[r.status])}>
-                        {r.status === 'aprovado' ? 'Aprovado' : 'Reprovado'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-zinc-600">{r.approvedByName ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-zinc-500">
-                      {formatDateTime(r.approvedAt ?? r.rejectedAt)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      ) : (
+        pending.map((request) => (
+          <RequestCard
+            key={request.id}
+            request={request}
+            installments={installmentsByRequest.get(request.id) ?? []}
+            processing={processingId === request.id || approveGroupMutation.isPending}
+            onViewDetails={(r) => setViewing(r)}
+            onApprove={(r, installments) => { setConfirming({ request: r, installments }); setConfirmError(null); }}
+            onReject={(r) => { setRejecting(r); }}
+          />
+        ))
+      )}
 
       {rejecting && (
         <RejectReasonModal
@@ -222,6 +227,25 @@ export default function ExtraPaymentApprovalsTab(): React.ReactElement {
           submitting={rejectMutation.isPending}
           onCancel={() => setRejecting(null)}
           onConfirm={(reason) => rejectMutation.mutate({ id: rejecting.id, reason })}
+        />
+      )}
+
+      {viewing && (
+        <ExtraPaymentViewModal open request={viewing} onClose={() => setViewing(null)} />
+      )}
+
+      {confirming && (
+        <FinancialApprovalConfirmModal
+          open
+          title="Aprovar pagamento extra"
+          entityLabel={`Pedido ${confirming.request.requestNumber}`}
+          installmentCount={confirming.installments.length}
+          totalValue={sumInstallments(confirming.installments)}
+          confirmLabel="Confirmar aprovação"
+          submitting={approveGroupMutation.isPending}
+          error={confirmError}
+          onConfirm={() => approveGroupMutation.mutate(confirming)}
+          onClose={() => { if (!approveGroupMutation.isPending) { setConfirming(null); setConfirmError(null); } }}
         />
       )}
     </div>

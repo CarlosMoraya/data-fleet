@@ -47,6 +47,7 @@ export interface PaymentInstallment {
   workshopName?: string;
   workshopCnpj?: string;
   maintenanceOrderOs?: string;
+  maintenanceOrderApprovedCost?: number;
   // Campos derivados de origem extra (Pagamentos Extras / Serviços Avulsos)
   extraPaymentNumber?: string;
   extraPaymentCategory?: string;
@@ -92,6 +93,7 @@ export interface PaymentInstallmentRow {
   maintenance_orders?: {
     os_number: string;
     budget_pdf_url: string | null;
+    approved_cost: number | null;
     workshops: { name: string; cnpj: string | null } | null;
     budget_reviewer: { name: string } | null;
   } | null;
@@ -112,6 +114,16 @@ export interface PaymentInstallmentAuditors {
   budgetApprovedByName?: string;
   paymentApprovedByName?: string;
   paidByName?: string;
+}
+
+export interface PaymentApprovalSnapshot {
+  id: string;
+  updatedAt: string;
+}
+
+export interface PaymentApprovalResult {
+  approvedCount: number;
+  approvedIds: string[];
 }
 
 export interface InstallmentDraft {

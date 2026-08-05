@@ -1,6 +1,7 @@
 import { extraPaymentRequestFromRow, extraPaymentRequestToInsert } from '../lib/serviceExpenseMappers';
 import { supabase } from '../lib/supabase';
 
+import type { PaymentApprovalResult, PaymentApprovalSnapshot } from '../types/payment';
 import type {
   ExtraPaymentAuditors,
   ExtraPaymentDriverOption,
@@ -141,15 +142,37 @@ export async function createExtraPaymentRequest(input: CreateExtraPaymentRequest
 }
 
 /**
- * Aprova um Pagamento Extra (status → aprovado). O trigger grava autor + timestamp
- * e propaga a aprovação para as parcelas vinculadas.
+ * Aprova atomicamente o cabeçalho de um Pagamento Extra e suas parcelas via
+ * RPC `approve_extra_payment_request_group`. Fail closed: qualquer
+ * divergência de tenant/origem/ID/status/versão/soma aborta o grupo inteiro.
  */
-export async function approveExtraPaymentRequest(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('extra_payment_requests')
-    .update({ status: 'aprovado' })
-    .eq('id', id);
-  if (error) throw error;
+export async function approveExtraPaymentRequestGroup(
+  requestId: string,
+  requestUpdatedAt: string,
+  installments: PaymentApprovalSnapshot[],
+): Promise<PaymentApprovalResult> {
+  if (installments.length === 0) {
+    throw new Error('Este pedido não possui parcelas e não pode ser aprovado.');
+  }
+
+  const { data, error } = (await supabase.rpc('approve_extra_payment_request_group', {
+    p_extra_payment_request_id: requestId,
+    p_request_updated_at: requestUpdatedAt,
+    p_installment_ids: installments.map((i) => i.id),
+    p_installment_updated_ats: installments.map((i) => i.updatedAt),
+  })) as {
+    data: { approved_count: number; approved_installment_ids: string[] }[] | null;
+    error: { message: string } | null;
+  };
+  if (error) throw new Error(error.message);
+
+  const rows = data ?? [];
+  const row = rows[0];
+  if (!row || row.approved_count !== installments.length) {
+    throw new Error('Não foi possível aprovar o pagamento extra.');
+  }
+
+  return { approvedCount: row.approved_count, approvedIds: row.approved_installment_ids };
 }
 
 /**

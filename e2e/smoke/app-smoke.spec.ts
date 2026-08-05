@@ -107,6 +107,28 @@ test.describe('Smoke', () => {
       await page.getByRole('link', { name: 'Veículos' }).click();
       await expectTabContent(page, '/cadastros/veiculos', 'Veículos');
     });
+
+    test('Financeiro: quatro abas visíveis e alterna segmentos de Aprovações sem erro', async ({ page }) => {
+      await page.goto('/financeiro');
+      await expect(page).not.toHaveURL(/\/login(?:\?|$)/, { timeout: 15000 });
+      await expect(mainHeading(page, 'Financeiro')).toBeVisible({ timeout: 15000 });
+
+      const tablist = page.getByRole('tablist').first();
+      await expect(tablist.getByRole('tab', { name: 'Aprovação de Orçamentos', exact: true })).toBeVisible();
+      await expect(tablist.getByRole('tab', { name: 'Pagamentos', exact: true })).toBeVisible();
+      await expect(tablist.getByRole('tab', { name: 'Aprovações', exact: true })).toBeVisible();
+      await expect(tablist.getByRole('tab', { name: 'Pagamentos Extras', exact: true })).toBeVisible();
+
+      await tablist.getByRole('tab', { name: 'Aprovações', exact: true }).click();
+      await expect(page).toHaveURL(/tab=approvals/);
+
+      const segmentedControl = page.getByRole('tablist', { name: 'Segmentos de aprovação' });
+      await expect(segmentedControl).toBeVisible({ timeout: 15000 });
+      await segmentedControl.getByRole('tab', { name: 'Extras', exact: true }).click();
+      await expect(page).toHaveURL(/segment=extras/);
+      await segmentedControl.getByRole('tab', { name: 'Pagamentos', exact: true }).click();
+      await expect(page).toHaveURL(/segment=payments/);
+    });
   });
 
   test.describe('Coordinator Cadastros regression', () => {

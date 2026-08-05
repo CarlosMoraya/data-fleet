@@ -42,6 +42,8 @@ export function paymentInstallmentFromRow(row: PaymentInstallmentRow): PaymentIn
     workshopCnpj:
       row.maintenance_orders?.workshops?.cnpj ?? row.extra_payment_requests?.supplier_document ?? undefined,
     maintenanceOrderOs: row.maintenance_orders?.os_number ?? undefined,
+    maintenanceOrderApprovedCost:
+      row.maintenance_orders?.approved_cost != null ? Number(row.maintenance_orders.approved_cost) : undefined,
     extraPaymentNumber: row.extra_payment_requests?.request_number ?? undefined,
     extraPaymentCategory: row.extra_payment_requests?.category ?? undefined,
     extraPaymentSupplierName: row.extra_payment_requests?.supplier_name ?? undefined,

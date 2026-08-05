@@ -13,6 +13,7 @@ vi.mock('../lib/supabase', () => ({
 }));
 
 import {
+  approveExtraPaymentRequestGroup,
   createExtraPaymentRequest,
   getNextExtraPaymentRequestNumber,
   listExtraPaymentDrivers,
@@ -63,6 +64,57 @@ describe('createExtraPaymentRequest', () => {
     expect(insertedPayload).not.toHaveProperty('paid_by');
     expect(insertedPayload.status).toBe('pendente_aprovacao');
     expect(insertedPayload.request_number).toBe('PE-2607-0001');
+  });
+});
+
+describe('approveExtraPaymentRequestGroup', () => {
+  it('rejeita array vazio antes de chamar a RPC', async () => {
+    await expect(approveExtraPaymentRequestGroup('epr-1', '2026-08-01T00:00:00Z', [])).rejects.toThrow(
+      'Este pedido não possui parcelas e não pode ser aprovado.',
+    );
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it('monta o payload da RPC com request/installments snapshot', async () => {
+    rpcMock.mockResolvedValue({
+      data: [{ approved_count: 1, approved_installment_ids: ['i1'] }],
+      error: null,
+    });
+
+    await approveExtraPaymentRequestGroup('epr-1', '2026-08-01T00:00:00Z', [
+      { id: 'i1', updatedAt: '2026-08-01T00:01:00Z' },
+    ]);
+
+    expect(rpcMock).toHaveBeenCalledWith('approve_extra_payment_request_group', {
+      p_extra_payment_request_id: 'epr-1',
+      p_request_updated_at: '2026-08-01T00:00:00Z',
+      p_installment_ids: ['i1'],
+      p_installment_updated_ats: ['2026-08-01T00:01:00Z'],
+    });
+  });
+
+  it('mapeia o retorno da RPC para camelCase', async () => {
+    rpcMock.mockResolvedValue({
+      data: [{ approved_count: 2, approved_installment_ids: ['i1', 'i2'] }],
+      error: null,
+    });
+
+    const result = await approveExtraPaymentRequestGroup('epr-1', '2026-08-01T00:00:00Z', [
+      { id: 'i1', updatedAt: '2026-08-01T00:01:00Z' },
+      { id: 'i2', updatedAt: '2026-08-01T00:02:00Z' },
+    ]);
+
+    expect(result).toEqual({ approvedCount: 2, approvedIds: ['i1', 'i2'] });
+  });
+
+  it('propaga o erro retornado pelo Supabase', async () => {
+    rpcMock.mockResolvedValue({ data: null, error: { message: 'boom' } });
+
+    await expect(
+      approveExtraPaymentRequestGroup('epr-1', '2026-08-01T00:00:00Z', [
+        { id: 'i1', updatedAt: '2026-08-01T00:01:00Z' },
+      ]),
+    ).rejects.toBeTruthy();
   });
 });
 

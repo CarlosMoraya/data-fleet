@@ -29,6 +29,7 @@ O **βetaFleet** é um sistema de gestão de frotas de alta performance, projeta
 - Aprovação de orçamentos com limites de alçada por usuário.
 - Extração automática de dados de orçamentos (OCR).
 - Pagamentos Extras / Serviços Avulsos: despesas operacionais sem vínculo obrigatório com OS de manutenção (guincho, chaveiro, borracheiro, Uber/táxi, frete de apoio), com lançamento por `Fleet Assistant+`, aprovação por `Coordinator+` e visão restrita do `Financeiro` a extras aprovados/pagos.
+- Aprovação financeira agrupada: o módulo Financeiro separa inbox (pendências) de histórico (ledgers). Parcelas de pagamento de uma mesma OS de manutenção são aprovadas em uma única ação atômica; pedidos de Pagamento Extra são aprovados uma vez pelo cabeçalho e a aprovação propaga para todas as suas parcelas. Conflitos de concorrência (dados alterados por outro usuário) abortam o lote inteiro sem aprovação parcial.
 
 ### 4. Gestão de Pneus
 - Controle individualizado por código de fogo.

@@ -13,6 +13,7 @@ vi.mock('../lib/supabase', () => ({
 }));
 
 import {
+  approveMaintenancePaymentGroup,
   createExtraPaymentInstallmentsBatch,
   createPaymentInstallmentsBatch,
   getPaymentInstallmentAuditors,
@@ -270,6 +271,73 @@ describe('createExtraPaymentInstallmentsBatch', () => {
         status: 'pendente_aprovacao',
       }),
     ]);
+  });
+});
+
+describe('approveMaintenancePaymentGroup', () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    fromMock.mockReset();
+  });
+
+  it('lança erro sem chamar a RPC quando o array de parcelas é vazio', async () => {
+    await expect(approveMaintenancePaymentGroup('mo-1', [])).rejects.toThrow(
+      'Nenhuma parcela pendente foi informada para aprovação.',
+    );
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it('monta o payload da RPC com ids e updatedAts alinhados', async () => {
+    rpcMock.mockResolvedValue({
+      data: [{ approved_count: 2, approved_ids: ['i1', 'i2'] }],
+      error: null,
+    });
+
+    await approveMaintenancePaymentGroup('mo-1', [
+      { id: 'i1', updatedAt: '2026-08-01T00:00:00Z' },
+      { id: 'i2', updatedAt: '2026-08-02T00:00:00Z' },
+    ]);
+
+    expect(rpcMock).toHaveBeenCalledWith('approve_maintenance_payment_group', {
+      p_maintenance_order_id: 'mo-1',
+      p_installment_ids: ['i1', 'i2'],
+      p_installment_updated_ats: ['2026-08-01T00:00:00Z', '2026-08-02T00:00:00Z'],
+    });
+  });
+
+  it('mapeia o retorno da RPC para camelCase', async () => {
+    rpcMock.mockResolvedValue({
+      data: [{ approved_count: 1, approved_ids: ['i1'] }],
+      error: null,
+    });
+
+    const result = await approveMaintenancePaymentGroup('mo-1', [
+      { id: 'i1', updatedAt: '2026-08-01T00:00:00Z' },
+    ]);
+
+    expect(result).toEqual({ approvedCount: 1, approvedIds: ['i1'] });
+  });
+
+  it('lança erro de consistência quando a quantidade retornada diverge do input', async () => {
+    rpcMock.mockResolvedValue({
+      data: [{ approved_count: 1, approved_ids: ['i1'] }],
+      error: null,
+    });
+
+    await expect(
+      approveMaintenancePaymentGroup('mo-1', [
+        { id: 'i1', updatedAt: '2026-08-01T00:00:00Z' },
+        { id: 'i2', updatedAt: '2026-08-02T00:00:00Z' },
+      ]),
+    ).rejects.toThrow('Não foi possível aprovar as parcelas. Tente novamente.');
+  });
+
+  it('propaga o erro retornado pelo Supabase', async () => {
+    rpcMock.mockResolvedValue({ data: null, error: { message: 'boom' } });
+
+    await expect(
+      approveMaintenancePaymentGroup('mo-1', [{ id: 'i1', updatedAt: '2026-08-01T00:00:00Z' }]),
+    ).rejects.toBeTruthy();
   });
 });
 

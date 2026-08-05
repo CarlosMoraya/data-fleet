@@ -1,5 +1,6 @@
-import { Wallet } from 'lucide-react';
-import React, { Suspense, lazy, useMemo } from 'react';
+import { BadgeCheck, ClipboardCheck, Truck, Wallet } from 'lucide-react';
+import React, { Suspense, lazy, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import RouteFallback from '../components/RouteFallback';
 import { useAuth } from '../context/AuthContext';
@@ -14,106 +15,123 @@ import {
 import { cn } from '../lib/utils';
 
 import type { Role } from '../types';
+import type { LucideIcon } from 'lucide-react';
 
 const BudgetApprovals = lazy(() => import('./BudgetApprovals'));
 const PaymentsTab = lazy(() => import('../components/financeiro/PaymentsTab'));
-const PaymentApprovalsTab = lazy(
-  () => import('../components/financeiro/PaymentApprovalsTab'),
-);
+const ApprovalsTab = lazy(() => import('../components/financeiro/ApprovalsTab'));
 const ExtraPaymentsTab = lazy(() => import('../components/financeiro/ExtraPaymentsTab'));
-const ExtraPaymentApprovalsTab = lazy(
-  () => import('../components/financeiro/ExtraPaymentApprovalsTab'),
-);
 
-type TabId = 'budget' | 'payments' | 'approvals' | 'extras' | 'extra-approvals';
+type TabId = 'budget' | 'payments' | 'approvals' | 'extras';
 
 interface TabDef {
   id: TabId;
   label: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
   canAccess: (role: Role | undefined | null) => boolean;
-  render: () => React.ReactNode;
+  render: (legacySegment?: 'extras') => React.ReactNode;
 }
+
+const TAB_DEFS: TabDef[] = [
+  {
+    id: 'budget',
+    label: 'Aprovação de Orçamentos',
+    title: 'Aprovação de Orçamentos',
+    description: 'OS aguardando revisão — ordem de chegada',
+    icon: BadgeCheck,
+    canAccess: canViewBudgetTab,
+    render: () => (
+      <Suspense fallback={<RouteFallback />}>
+        <BudgetApprovals embedded />
+      </Suspense>
+    ),
+  },
+  {
+    id: 'payments',
+    label: 'Pagamentos',
+    title: 'Pagamentos',
+    description: 'Cadastre, consulte, exporte e marque parcelas como pagas',
+    icon: Wallet,
+    canAccess: canViewPayments,
+    render: () => (
+      <Suspense fallback={<RouteFallback />}>
+        <PaymentsTab />
+      </Suspense>
+    ),
+  },
+  {
+    id: 'approvals',
+    label: 'Aprovações',
+    title: 'Aprovações',
+    description: 'Revise e autorize pagamentos e despesas extras',
+    icon: ClipboardCheck,
+    canAccess: (role) => canApprovePayments(role) || canApproveExtraPayments(role),
+    render: (legacySegment) => (
+      <Suspense fallback={<RouteFallback />}>
+        <ApprovalsTab initialSegment={legacySegment} />
+      </Suspense>
+    ),
+  },
+  {
+    id: 'extras',
+    label: 'Pagamentos Extras',
+    title: 'Pagamentos Extras',
+    description: 'Guincho, borracheiro, chaveiro e outros',
+    icon: Truck,
+    canAccess: canViewExtraPayments,
+    render: () => (
+      <Suspense fallback={<RouteFallback />}>
+        <ExtraPaymentsTab />
+      </Suspense>
+    ),
+  },
+];
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function Financeiro() {
   const { user } = useAuth();
   const role = user?.role;
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const tabs = useMemo<TabDef[]>(() => {
-    return [
-      {
-        id: 'budget',
-        label: 'Orçamento',
-        canAccess: canViewBudgetTab,
-        render: () => (
-          <Suspense fallback={<RouteFallback />}>
-            <BudgetApprovals />
-          </Suspense>
-        ),
-      },
-      {
-        id: 'payments',
-        label: 'Pagamentos',
-        canAccess: canViewPayments,
-        render: () => (
-          <Suspense fallback={<RouteFallback />}>
-            <PaymentsTab />
-          </Suspense>
-        ),
-      },
-      {
-        id: 'approvals',
-        label: 'Aprovação de Pagamentos',
-        canAccess: canApprovePayments,
-        render: () => (
-          <Suspense fallback={<RouteFallback />}>
-            <PaymentApprovalsTab />
-          </Suspense>
-        ),
-      },
-      {
-        id: 'extras',
-        label: 'Pagamentos Extras',
-        canAccess: canViewExtraPayments,
-        render: () => (
-          <Suspense fallback={<RouteFallback />}>
-            <ExtraPaymentsTab />
-          </Suspense>
-        ),
-      },
-      {
-        id: 'extra-approvals',
-        label: 'Aprovação de Extras',
-        canAccess: canApproveExtraPayments,
-        render: () => (
-          <Suspense fallback={<RouteFallback />}>
-            <ExtraPaymentApprovalsTab />
-          </Suspense>
-        ),
-      },
-    ];
-  }, []);
+  const allowedTabs = useMemo(() => TAB_DEFS.filter((t) => t.canAccess(role)), [role]);
 
-  const allowedTabs = useMemo(() => tabs.filter((t) => t.canAccess(role)), [tabs, role]);
+  const [persistedTab, setPersistedTab] = usePersistentTabState('financeiro', 'activeTab', '');
 
-  const [activeTab, setActiveTab] = usePersistentTabState(
-    'financeiro',
-    'activeTab',
-    '',
-  );
+  const isLegacyExtraApprovals = persistedTab === 'extra-approvals';
+  const normalizedPersisted: TabId | '' = isLegacyExtraApprovals ? 'approvals' : (persistedTab as TabId);
 
-  // Garante que a aba ativa é permitida; se não for, cai na primeira permitida.
-  const currentId: TabId | '' = (activeTab && allowedTabs.some((t) => t.id === activeTab))
-    ? (activeTab as TabId)
-    : '';
-  const resolvedId = currentId || (allowedTabs[0]?.id ?? '');
-
-  React.useEffect(() => {
-    if (activeTab !== resolvedId && resolvedId) {
-      setActiveTab(resolvedId);
+  useEffect(() => {
+    if (isLegacyExtraApprovals) {
+      setPersistedTab('approvals');
     }
-  }, [activeTab, resolvedId, setActiveTab]);
+  }, [isLegacyExtraApprovals, setPersistedTab]);
+
+  const urlTab = searchParams.get('tab');
+  const isAllowed = (id: string | null): id is TabId => allowedTabs.some((t) => t.id === id);
+
+  const resolvedId: TabId | '' =
+    (isAllowed(urlTab) ? urlTab : undefined)
+    ?? (isAllowed(normalizedPersisted) ? normalizedPersisted : undefined)
+    ?? (allowedTabs[0]?.id ?? '');
+
+  useEffect(() => {
+    if (resolvedId && normalizedPersisted !== resolvedId) {
+      setPersistedTab(resolvedId);
+    }
+  }, [resolvedId, normalizedPersisted, setPersistedTab]);
+
+  function selectTab(id: TabId) {
+    setPersistedTab(id);
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', id);
+    if (id !== 'approvals') {
+      next.delete('segment');
+    }
+    setSearchParams(next);
+  }
 
   if (allowedTabs.length === 0 || !resolvedId) {
     return (
@@ -125,22 +143,26 @@ export default function Financeiro() {
   }
 
   const active = allowedTabs.find((t) => t.id === resolvedId) ?? allowedTabs[0];
+  const ActiveIcon = active.icon;
 
   return (
-    <div className="mx-auto flex h-full max-w-7xl flex-col gap-6 p-6">
+    <div className="flex h-full flex-col gap-6 p-4 sm:p-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Wallet className="h-6 w-6 text-orange-500" />
         <div>
           <h1 className="text-xl font-bold text-zinc-900">Financeiro</h1>
           <p className="text-sm text-zinc-500">
-            Orçamentos, pagamentos, extras e aprovação
+            Orçamentos, pagamentos, aprovações e despesas extras
           </p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-zinc-200" role="tablist">
+      <div
+        className="flex gap-1 overflow-x-auto border-b border-zinc-200 whitespace-nowrap"
+        role="tablist"
+      >
         {allowedTabs.map((t) => {
           const isActive = t.id === active.id;
           return (
@@ -149,7 +171,7 @@ export default function Financeiro() {
               type="button"
               role="tab"
               aria-selected={isActive}
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => selectTab(t.id)}
               className={cn(
                 'rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
                 isActive
@@ -163,8 +185,19 @@ export default function Financeiro() {
         })}
       </div>
 
+      {/* Compact header of the active tab */}
+      <div className="flex items-center gap-2">
+        <ActiveIcon className="h-5 w-5 text-orange-500" />
+        <div>
+          <h2 className="text-base font-semibold text-zinc-900">{active.title}</h2>
+          <p className="text-sm text-zinc-500">{active.description}</p>
+        </div>
+      </div>
+
       {/* Active tab content */}
-      <div className="flex min-h-0 flex-1 flex-col">{active.render()}</div>
+      <div className="flex min-h-0 flex-1 flex-col">
+        {active.render(isLegacyExtraApprovals && active.id === 'approvals' ? 'extras' : undefined)}
+      </div>
     </div>
   );
 }
