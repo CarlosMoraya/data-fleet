@@ -7,6 +7,7 @@ import InviteWorkshopModal from '../components/InviteWorkshopModal';
 import WorkshopDetailModal from '../components/WorkshopDetailModal';
 import WorkshopForm from '../components/WorkshopForm';
 import { useAuth } from '../context/AuthContext';
+import { matchesNameOrDocument } from '../lib/registrySearch';
 import { supabase } from '../lib/supabase';
 import { workshopFromRow, workshopToRow, formatCNPJ, WorkshopRow } from '../lib/workshopMappers';
 import { Workshop } from '../types';
@@ -149,14 +150,7 @@ export default function Workshops() {
   };
 
   const filteredWorkshops = useMemo(() => {
-    return workshops.filter((w) => {
-      if (!search) return true;
-      const q = search.toLowerCase();
-      return (
-        w.name.toLowerCase().includes(q) ||
-        w.cnpj.includes(q.replace(/\D/g, ''))
-      );
-    });
+    return workshops.filter((w) => matchesNameOrDocument(w.name, w.cnpj, search));
   }, [workshops, search]);
 
   return (

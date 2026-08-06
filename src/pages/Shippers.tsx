@@ -5,6 +5,7 @@ import { Navigate } from 'react-router-dom';
 
 import ShipperForm from '../components/ShipperForm';
 import { useAuth } from '../context/AuthContext';
+import { matchesNameOrDocument } from '../lib/registrySearch';
 import { shipperFromRow, shipperToRow, formatCNPJ, ShipperRow } from '../lib/shipperMappers';
 import { supabase } from '../lib/supabase';
 import { Shipper } from '../types';
@@ -129,14 +130,7 @@ export default function Shippers() {
   };
 
   const filteredShippers = useMemo(() => {
-    return shippers.filter((s) => {
-      if (!search) return true;
-      const q = search.toLowerCase();
-      return (
-        s.name.toLowerCase().includes(q) ||
-        (s.cnpj ?? '').includes(q.replace(/\D/g, ''))
-      );
-    });
+    return shippers.filter((s) => matchesNameOrDocument(s.name, s.cnpj, search));
   }, [shippers, search]);
 
   return (
