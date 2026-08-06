@@ -170,4 +170,35 @@ describe('FleetTickets', () => {
     expect(container.textContent).not.toContain('XYZ9K88');
     act(() => root.unmount());
   });
+
+  it('filters tickets by status', async () => {
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    const statusSelect = container.querySelector('select[aria-label="Filtrar chamados por status"]') as HTMLSelectElement;
+    const setSelectValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    act(() => {
+      setSelectValue?.call(statusSelect, 'closed');
+      statusSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(container.textContent).toContain('DEF4G56');
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+    act(() => root.unmount());
+  });
+
+  it('combines the status filter with the criticality card', async () => {
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    const criticalCard = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Crítico'))!;
+    act(() => criticalCard.click());
+    await waitForText('ABC1D23');
+    const statusSelect = container.querySelector('select[aria-label="Filtrar chamados por status"]') as HTMLSelectElement;
+    const setSelectValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    act(() => {
+      setSelectValue?.call(statusSelect, 'open');
+      statusSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+    expect(container.textContent).toContain('ABC1D23');
+    act(() => root.unmount());
+  });
 });

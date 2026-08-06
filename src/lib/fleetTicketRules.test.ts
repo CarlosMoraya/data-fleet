@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  FLEET_TICKET_STATUS_FILTER_OPTIONS,
   buildFleetTicketFilterOptions,
   canClassifyFleetTicket,
   canEditFleetTicketCriticality,
@@ -10,6 +11,7 @@ import {
   canOpenSosTicket,
   evaluateFleetTicketOdometer,
   filterFleetTicketsByCard,
+  filterFleetTicketsByStatus,
   filterFleetTicketsByVehicleAttributes,
   fleetTicketCriticalityColor,
   fleetTicketCriticalityLabel,
@@ -17,6 +19,7 @@ import {
   fleetTicketStatusLabel,
   getFleetTicketCounts,
   isFleetTicketReadOnly,
+  isFleetTicketStatusFilter,
   isUrgentFleetTicket,
   requiresFleetTicketPhoto,
   sortFleetTicketsByUrgency,
@@ -267,5 +270,48 @@ describe('filterFleetTicketsByVehicleAttributes', () => {
   it('returns an empty array when nothing matches', () => {
     const result = filterFleetTicketsByVehicleAttributes(tickets, { model: 'Inexistente', owner: '', shipper: '', unit: '' });
     expect(result).toEqual([]);
+  });
+});
+
+describe('filterFleetTicketsByStatus', () => {
+  const list = [
+    ticket({ id: 'a', status: 'open' }),
+    ticket({ id: 'b', status: 'closed' }),
+  ];
+
+  it('reduces the list to a single matching status', () => {
+    expect(filterFleetTicketsByStatus(list, 'open').map((item) => item.id)).toEqual(['a']);
+  });
+
+  it('returns all tickets when the filter is empty', () => {
+    expect(filterFleetTicketsByStatus(list, '')).toHaveLength(2);
+  });
+
+  it('returns an empty array for a status with no occurrences', () => {
+    expect(filterFleetTicketsByStatus(list, 'cancelled')).toHaveLength(0);
+  });
+
+  it('handles an empty list gracefully', () => {
+    expect(filterFleetTicketsByStatus([], 'open')).toEqual([]);
+  });
+});
+
+describe('isFleetTicketStatusFilter', () => {
+  it('accepts empty string and all valid statuses', () => {
+    expect(isFleetTicketStatusFilter('')).toBe(true);
+    expect(FLEET_TICKET_STATUS_FILTER_OPTIONS.every(isFleetTicketStatusFilter)).toBe(true);
+  });
+
+  it('rejects unknown strings', () => {
+    expect(isFleetTicketStatusFilter('aberto')).toBe(false);
+    expect(isFleetTicketStatusFilter('archived')).toBe(false);
+    expect(isFleetTicketStatusFilter('ALL')).toBe(false);
+  });
+
+  it('rejects non-string values', () => {
+    expect(isFleetTicketStatusFilter(null)).toBe(false);
+    expect(isFleetTicketStatusFilter(undefined)).toBe(false);
+    expect(isFleetTicketStatusFilter(0)).toBe(false);
+    expect(isFleetTicketStatusFilter({})).toBe(false);
   });
 });

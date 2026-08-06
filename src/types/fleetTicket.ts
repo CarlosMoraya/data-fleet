@@ -4,6 +4,7 @@ export type FleetTicketCriticality = 'critical' | 'high' | 'medium' | 'low';
 export type FleetTicketStatus = 'open' | 'in_analysis' | 'in_progress' | 'resolved' | 'closed' | 'cancelled';
 export type FleetTicketLocationStatus = 'captured' | 'denied' | 'unavailable' | 'manual';
 export type FleetTicketCardFilter = 'sos' | 'unclassified' | 'critical' | 'high' | 'medium' | 'low' | 'all';
+export type FleetTicketStatusFilter = '' | FleetTicketStatus;
 export type FleetTicketEventType =
   | 'created'
   | 'attachments_added'

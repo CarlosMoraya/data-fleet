@@ -9,6 +9,7 @@ import type {
   FleetTicketSource,
   FleetTicketSosType,
   FleetTicketStatus,
+  FleetTicketStatusFilter,
 } from '../types/fleetTicket';
 import type { Role } from '../types/role';
 
@@ -240,4 +241,25 @@ export function filterFleetTicketsByVehicleAttributes(
     if (filters.unit && ticket.operationalUnitNameSnapshot !== filters.unit) return false;
     return true;
   });
+}
+
+export const FLEET_TICKET_STATUS_FILTER_OPTIONS: readonly FleetTicketStatus[] = [
+  'open',
+  'in_analysis',
+  'in_progress',
+  'resolved',
+  'closed',
+  'cancelled',
+];
+
+export function isFleetTicketStatusFilter(value: unknown): value is FleetTicketStatusFilter {
+  return value === '' || FLEET_TICKET_STATUS_FILTER_OPTIONS.includes(value as FleetTicketStatus);
+}
+
+export function filterFleetTicketsByStatus(
+  tickets: FleetTicket[],
+  status: FleetTicketStatusFilter,
+): FleetTicket[] {
+  if (status === '') return tickets;
+  return tickets.filter((ticket) => ticket.status === status);
 }

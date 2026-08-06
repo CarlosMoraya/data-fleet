@@ -2,6 +2,24 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-08-06: Filtro por status na tela Chamados (`/chamados`)
+
+Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 3, alteração em funcionalidade existente), nas 4 etapas do plano.
+
+**Frontend (Etapas 1–3)**: `FleetTicketStatusFilter = '' | FleetTicketStatus` em `src/types/fleetTicket.ts`. `FLEET_TICKET_STATUS_FILTER_OPTIONS` (ordem por ciclo de vida: Aberto → Cancelado), `isFleetTicketStatusFilter` (type guard para validar estado persistido do `sessionStorage`) e `filterFleetTicketsByStatus` (pure function, retorna array original sem cópia quando filtro é `''`) em `src/lib/fleetTicketRules.ts`. Novo `<select>` "Status: Todos" como primeiro filtro na linha de filtros de `FleetTickets.tsx`, com `usePersistentFilterState<FleetTicketStatusFilter>` persistido na sessão (`fleet-tickets/status`), validador, inserido na cadeia de filtering entre `byCard` e busca. Combinação em E lógico com todos os demais filtros, cartões de criticidade e busca textual.
+
+**Testes**: 7 unitários em `src/lib/fleetTicketRules.test.ts` (`filterFleetTicketsByStatus`: cenário feliz, sem filtro, edge case sem ocorrências, lista vazia; `isFleetTicketStatusFilter`: aceita `''` e todos os status válidos, rejeita strings desconhecidas e não-string) + 2 de integração em `src/pages/FleetTickets.test.tsx` (`filters tickets by status`, `combines the status filter with the criticality card`).
+
+**Documentação (Etapa 4)**: `docs/SPEC.md` linha 179 atualizada com "filtro por status (seleção única, persistido na sessão)".
+
+**Validação automatizada**: `npx tsc --noEmit` 0 erros; `npm run lint` 0 erros / 195 warnings (baseline 285, queda de 90 por `lint:fix`); `npm run test:unit` **1503/1503** (1494 baseline + 9); `npm run test:smoke` — setup bloqueado (app não rodando localmente). Validação manual guiada de 4 passos confirmada e aprovada pelo usuário.
+
+**Arquivos modificados**: `src/types/fleetTicket.ts`, `src/lib/fleetTicketRules.ts`, `src/lib/fleetTicketRules.test.ts`, `src/pages/FleetTickets.tsx`, `src/pages/FleetTickets.test.tsx`, `docs/SPEC.md` — exatamente os 6 previstos. Nenhum arquivo criado.
+
+**Decisões**: seleção única (não múltipla); função nova `filterFleetTicketsByStatus` em vez de estender `filterFleetTicketsByVehicleAttributes`; cartões de criticidade não reagem ao filtro de status; sem deep link por URL; `aria-label` apenas no seletor novo; ordem dos status por ciclo de vida.
+
+**Sugestão de commit (a executar pelo usuário)**: ver `IMPLEMENTATION.md` § "Após a implementação".
+
 ## Sessão — 2026-08-04: Financeiro — 4 abas, inbox única de Aprovações e aprovação agrupada (com migration, testes SQL e validação de frontend em DEV)
 
 Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 4, mudança estrutural), nas 7 etapas do plano.

@@ -10,10 +10,13 @@ import LastKmLabel from '../components/LastKmLabel';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { usePersistentFilterState } from '../hooks/usePersistentUiState';
+import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import {
+  FLEET_TICKET_STATUS_FILTER_OPTIONS,
   buildFleetTicketFilterOptions,
   canOpenFleetTicketReport,
   filterFleetTicketsByCard,
+  filterFleetTicketsByStatus,
   filterFleetTicketsByVehicleAttributes,
   fleetTicketCriticalityColor,
   fleetTicketCriticalityLabel,
@@ -22,14 +25,14 @@ import {
   fleetTicketStatusLabel,
   getFleetTicketCounts,
   isFleetTicketReadOnly,
+  isFleetTicketStatusFilter,
   sortFleetTicketsByUrgency,
 } from '../lib/fleetTicketRules';
-import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { cn } from '../lib/utils';
-import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 import { listFleetTickets } from '../services/fleetTicketService';
+import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 
-import type { FleetTicket, FleetTicketCardFilter } from '../types/fleetTicket';
+import type { FleetTicket, FleetTicketCardFilter, FleetTicketStatusFilter } from '../types/fleetTicket';
 
 function isFleetTicketCardFilter(value: unknown): value is FleetTicketCardFilter {
   return value === 'sos' || value === 'unclassified' || value === 'critical' || value === 'high' || value === 'medium' || value === 'low' || value === 'all';
@@ -49,6 +52,7 @@ export default function FleetTickets() {
   const [ownerFilter, setOwnerFilter] = usePersistentFilterState('fleet-tickets', 'owner', '');
   const [shipperFilter, setShipperFilter] = usePersistentFilterState('fleet-tickets', 'shipper', '');
   const [unitFilter, setUnitFilter] = usePersistentFilterState('fleet-tickets', 'unit', '');
+  const [statusFilter, setStatusFilter] = usePersistentFilterState<FleetTicketStatusFilter>('fleet-tickets', 'status', '', { validator: isFleetTicketStatusFilter });
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -75,10 +79,11 @@ export default function FleetTickets() {
   const filteredTickets = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     const byCard = filterFleetTicketsByCard(tickets, activeFilter);
+    const byStatus = filterFleetTicketsByStatus(byCard, statusFilter);
     const searched = normalizedSearch
-      ? byCard.filter((ticket) => [ticket.vehicleLicensePlateSnapshot, ticket.title, ticket.description, ticket.openedByNameSnapshot, ticket.driverNameSnapshot, ticket.ticketNumber]
+      ? byStatus.filter((ticket) => [ticket.vehicleLicensePlateSnapshot, ticket.title, ticket.description, ticket.openedByNameSnapshot, ticket.driverNameSnapshot, ticket.ticketNumber]
           .some((value) => value?.toLowerCase().includes(normalizedSearch)))
-      : byCard;
+      : byStatus;
     const byVehicleAttributes = filterFleetTicketsByVehicleAttributes(searched, {
       model: modelFilter,
       owner: ownerFilter,
@@ -86,7 +91,7 @@ export default function FleetTickets() {
       unit: unitFilter,
     });
     return sortFleetTicketsByUrgency(byVehicleAttributes);
-  }, [tickets, activeFilter, search, modelFilter, ownerFilter, shipperFilter, unitFilter]);
+  }, [tickets, activeFilter, statusFilter, search, modelFilter, ownerFilter, shipperFilter, unitFilter]);
 
   const selectedTicket = selectedTicketId ? tickets.find((ticket) => ticket.id === selectedTicketId) ?? null : null;
 
@@ -128,6 +133,17 @@ export default function FleetTickets() {
       <FleetTicketCriticalityCards counts={counts} activeFilter={activeFilter} onChange={setActiveFilter} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+        <select
+          aria-label="Filtrar chamados por status"
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value as FleetTicketStatusFilter)}
+          className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-100 focus:outline-none"
+        >
+          <option value="">Status: Todos</option>
+          {FLEET_TICKET_STATUS_FILTER_OPTIONS.map((status) => (
+            <option key={status} value={status}>{fleetTicketStatusLabel(status)}</option>
+          ))}
+        </select>
         <select value={modelFilter} onChange={(event) => setModelFilter(event.target.value)} className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-100 focus:outline-none">
           <option value="">Modelo: Todos</option>
           {modelOptions.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -162,7 +178,7 @@ export default function FleetTickets() {
             <table className="min-w-full divide-y divide-zinc-100">
               <thead className="sticky top-0 z-10 bg-zinc-50">
                 <tr>
-                  {['Tipo', 'Veículo', 'Criticidade', 'Status', 'Aberto por', 'Responsável', 'Ação'].map((heading) => <th key={heading} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">{heading}</th>)}
+                  {['Tipo', 'Veículo', 'Criticidade', 'Status', 'Aberto por', 'Responsável', 'Ação'].map((heading) => <th key={heading} className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">{heading}</th>)}
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-50">

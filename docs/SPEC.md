@@ -176,7 +176,7 @@ O bucket `fleet-ticket-attachments` é privado. Os paths seguem `<client_id>/fle
 ### Frontend
 
 - `/sos`: formulário mobile-first para Driver, com GPS, localização manual quando necessário, descrição mínima de 5 caracteres e anexos opcionais.
-- `/chamados`: cards de S.O.S., não classificados e criticidade, busca, ordenação por urgência, tabela, modal com localização/mapa, anexos, histórico e ações condicionadas ao papel.
+- `/chamados`: cards de S.O.S., não classificados e criticidade, busca, filtro por status (seleção única, persistido na sessão), ordenação por urgência, tabela, modal com localização/mapa, anexos, histórico e ações condicionadas ao papel.
 - Topbar: sininho com até cinco urgências ativas e polling de 60 segundos; sem realtime nesta versão.
 - Configurações: aba Telegram para Coordinator+, com ativação, `chat_id`, flags, instruções e mensagem de teste.
 
