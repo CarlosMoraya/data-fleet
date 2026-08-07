@@ -322,3 +322,7 @@ export function canViewPartPhotos(role: Role | undefined | null): boolean {
 export function canManagePartPhotos(role: Role | undefined | null): boolean {
   return getRoleRank(role ?? undefined) >= ROLE_RANK['Fleet Assistant'];
 }
+
+export function canExportMaintenanceSpreadsheet(role: Role | undefined | null): boolean {
+  return getRoleRank(role ?? undefined) >= ROLE_RANK['Fleet Assistant'];
+}

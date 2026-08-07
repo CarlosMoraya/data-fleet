@@ -2,6 +2,32 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-08-07: Exportação XLSX da lista de Manutenção para Fleet Assistant e papéis superiores
+
+Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 2, adição com integração ao sistema existente), nas 6 etapas do plano.
+
+**Etapa 1 — Permissão por rank**: `canExportMaintenanceSpreadsheet(role)` em `src/lib/rolePermissions.ts` (logo após `canManagePartPhotos`), implementação `getRoleRank(role ?? undefined) >= ROLE_RANK['Fleet Assistant']`. Acesso concedido a Fleet Assistant (3)+; negado a Workshop (2), Yard Auditor (1), Financeiro (1), Driver (0), Coupling Agent (0). A exclusão do papel Workshop é intencional — planilha é dado consolidado da frota do cliente, não da oficina parceira. 3 testes unitários em `rolePermissions.test.ts` (bloco `describe('canExportMaintenanceSpreadsheet')`): cenário feliz, negação, edge case undefined/null.
+
+**Etapa 2 — Mover `daysInWorkshop`**: função movida de declaração local em `src/pages/Maintenance.tsx` para exportação pública em `src/lib/maintenanceFilters.ts`. Corpo idêntico, sem alteração de lógica. Import atualizado em `Maintenance.tsx`. 2 testes unitários em `maintenanceFilters.test.ts` (bloco `describe('daysInWorkshop')`): data 5 dias atrás, data de hoje.
+
+**Etapa 3 — Módulo puro de colunas**: `src/lib/maintenanceExportRows.ts` com 21 cabeçalhos exatos (`MAINTENANCE_EXPORT_HEADERS`), tipo `MaintenanceExportRow = MaintenanceOrder & { clientDisplayName: string }` e função `buildMaintenanceExportCells`. Funções auxiliares privadas: `formatExportDate` (wrapping `formatDate`, troca `'—'` por `''`), `formatExportMoney` (`toLocaleString('pt-BR')`). Constante `BUDGET_STATUS_EXPORT_LABELS` derivada de `BUDGET_STATUS_FILTER_OPTIONS` via `reduce` (single source of truth, sem redigitar rótulos). 6 testes unitários em `maintenanceExportRows.test.ts`: headers exatos, 1 célula por header, ordem completa preenchida, campos ausentes, budgetDiscount zero, entryDate vazia.
+
+**Etapa 4 — Provider XLSX**: `src/services/maintenanceExport/xlsxMaintenanceProvider.ts`, classe `XlsxMaintenanceProvider implements ExportProvider` com `code = 'manutencoes-xlsx'`, import dinâmico de `write-excel-file/browser`, cabeçalho tipado `String` + linhas com `buildMaintenanceExportCells`. Sem teste próprio (provider não tem ramificação lógica; coberto pela validação manual e pelo teste de colunas da Etapa 3).
+
+**Etapa 5 — Helper compartilhado de download**: `src/lib/downloadBlobFile.ts`, função `downloadBlobFile(blob, filename)` com sequência `createObjectURL → createElement('a') → append → click → remove → revokeObjectURL`. Usado apenas por `Maintenance.tsx`; Veículos e PaymentsTab seguem com cópia inline (débito registrado). 2 testes unitários em `downloadBlobFile.test.ts`.
+
+**Etapa 6 — Botão na tela**: `src/pages/Maintenance.tsx` ganhou handler `handleExportXlsx` (monta `MaintenanceExportRow[]` a partir do array `filtered` + `clientNameMap`, instancia provider, chama `downloadBlobFile`) e botão "Baixar XLSX" no cabeçalho (ícone `Download` do Lucide), à esquerda de "Nova Manutenção", dentro de `<div className="flex items-center gap-3">`, visível apenas quando `canExportSpreadsheet`. 2 testes de tela em `Maintenance.exportButton.test.tsx`: Fleet Assistant vê o botão; Workshop não vê.
+
+**Validação automatizada**: `npx tsc --noEmit` 0 erros; `npm run lint` 0 erros / 197 warnings (baseline 195 + 2 aceitos dos novos arquivos de teste); `npm run test:unit` **1518/1518** (1503 baseline + 15 novos), 177 arquivos de teste, 0 falhas; `npm run test:smoke` **7/7** passando.
+
+**Arquivos criados**: `src/lib/maintenanceExportRows.ts`, `src/lib/maintenanceExportRows.test.ts`, `src/lib/downloadBlobFile.ts`, `src/lib/downloadBlobFile.test.ts`, `src/services/maintenanceExport/xlsxMaintenanceProvider.ts`, `src/pages/Maintenance.exportButton.test.tsx` — 6 arquivos.
+
+**Arquivos modificados**: `src/lib/rolePermissions.ts`, `src/lib/rolePermissions.test.ts`, `src/lib/maintenanceFilters.ts`, `src/lib/maintenanceFilters.test.ts`, `src/pages/Maintenance.tsx` — 5 arquivos.
+
+**Decisões**: exportação de Manutenção mais restritiva que Veículos (trava de papel, sem trava em Veículos — divergência intencional); sem seleção de linhas (exporta lista filtrada inteira); coluna "Cliente" sempre presente (Admin Master vê várias transportadoras); `downloadBlobFile` criado mas aplicado só na tela nova (Veículos e PaymentsTab seguem duplicados — débito); `formatExportMoney` não reutiliza `formatValueCell` do módulo financeiro (função privada, exportar exigiria modificar arquivo fora do escopo).
+
+**Débitos registrados**: download de blob duplicado em Veículos e PaymentsTab; sem cobertura E2E de download de arquivo em nenhum módulo; padrão de exportação já se repete 3× (veículos, financeiro, manutenção) e um provider XLSX genérico eliminaria as classes quase idênticas.
+
 ## Sessão — 2026-08-06: Filtro por status na tela Chamados (`/chamados`)
 
 Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 3, alteração em funcionalidade existente), nas 4 etapas do plano.

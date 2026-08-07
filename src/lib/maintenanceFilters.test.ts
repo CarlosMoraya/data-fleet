@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 
-import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, countVehiclesNotWithdrawn, matchesMaintenanceCard } from './maintenanceFilters';
-import type { BudgetStatus } from '../types/maintenance';
+import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, countVehiclesNotWithdrawn, matchesMaintenanceCard, daysInWorkshop } from './maintenanceFilters';
 
-import type { MaintenanceOrder } from '../types/maintenance';
+import type { BudgetStatus , MaintenanceOrder } from '../types/maintenance';
+
 
 function makeOrder(
   overrides: Partial<Pick<MaintenanceOrder, 'status' | 'shipperName' | 'operationalUnitName' | 'workshop'>> = {},
@@ -370,5 +370,18 @@ describe('matchesMaintenanceCard', () => {
   it('nao-retirados: matches status Concluído and does not match Veículo retirado', () => {
     expect(matchesMaintenanceCard(makeCardOrder({ status: 'Concluído' }), 'nao-retirados')).toBe(true);
     expect(matchesMaintenanceCard(makeCardOrder({ status: 'Veículo retirado' }), 'nao-retirados')).toBe(false);
+  });
+});
+
+describe('daysInWorkshop', () => {
+  it('returns the correct number of days for a past date', () => {
+    const fiveDaysAgo = new Date(Date.now() - 5 * 86400000);
+    const dateStr = fiveDaysAgo.toISOString().slice(0, 10);
+    expect(daysInWorkshop(dateStr)).toBe(5);
+  });
+
+  it('returns 0 for today', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    expect(daysInWorkshop(today)).toBe(0);
   });
 });

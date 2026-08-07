@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, Ban, RotateCcw, X } from 'lucide-react';
+import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, Ban, RotateCcw, X, Download } from 'lucide-react';
 import React from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 
@@ -12,14 +12,16 @@ import { useAuth } from '../context/AuthContext';
 import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection } from '../lib/clientScope';
 import { formatDate } from '../lib/dateUtils';
-import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, matchesMaintenanceCard, countVehiclesNotWithdrawn, BUDGET_STATUS_FILTER_OPTIONS } from '../lib/maintenanceFilters';
+import { downloadBlobFile } from '../lib/downloadBlobFile';
+import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, matchesMaintenanceCard, countVehiclesNotWithdrawn, BUDGET_STATUS_FILTER_OPTIONS, daysInWorkshop } from '../lib/maintenanceFilters';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
 import { canWorkshopFillOrder } from '../lib/maintenanceWorkshop';
-import { isOperationsManager } from '../lib/rolePermissions';
+import { isOperationsManager, canExportMaintenanceSpreadsheet } from '../lib/rolePermissions';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import { cn } from '../lib/utils';
 import { canWorkshopActOnOrders } from '../lib/workshopProfile';
+import { XlsxMaintenanceProvider } from '../services/maintenanceExport/xlsxMaintenanceProvider';
 import { savePendingPartPhotos, type PartPhotoDraft } from '../services/maintenancePartPhotoService';
 import {
   saveMaintenanceOrder,
@@ -27,6 +29,7 @@ import {
   cancelMaintenanceOrder,
 } from '../services/maintenanceService';
 
+import type { MaintenanceExportRow } from '../lib/maintenanceExportRows';
 import type { MaintenanceCardKey } from '../lib/maintenanceFilters';
 import type { Role } from '../types';
 import type { MaintenanceOrder, MaintenanceStatus, MaintenanceType, BudgetStatus } from '../types/maintenance';
@@ -97,12 +100,6 @@ function typeColor(type: MaintenanceType) {
   }
 }
 
-function daysInWorkshop(entryDate: string) {
-  const entry = new Date(entryDate);
-  const today = new Date();
-  return Math.floor((today.getTime() - entry.getTime()) / 86400000);
-}
-
 function computeMaintenanceCounts(list: MaintenanceOrder[]) {
   return {
     all: list.filter(o => o.status !== 'Veículo retirado' && o.status !== 'Cancelado').length,
@@ -139,6 +136,7 @@ export default function Maintenance() {
   const operationsManager = isOperationsManager(profile?.role);
   const canWriteMaintenance = !operationsManager && !isWorkshopUser && !blockWrite;
   const canFillWorkshop = canWorkshopActOnOrders(profile?.role, workshopAccount);
+  const canExportSpreadsheet = canExportMaintenanceSpreadsheet(profile?.role);
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = usePersistentFilterState<string[]>('maintenance', 'statuses', []);
   const [search, setSearch] = usePersistentFilterState<string>('maintenance', 'search', '');
@@ -353,6 +351,28 @@ export default function Maintenance() {
     return map;
   }, [clients]);
 
+  const handleExportXlsx = async () => {
+    try {
+      const exportRows: MaintenanceExportRow[] = filtered.map(o => ({
+        ...o,
+        clientDisplayName: (o.clientId ? clientNameMap.get(o.clientId) : undefined) ?? o.clientName ?? '',
+      }));
+      if (exportRows.length === 0) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      const provider = new XlsxMaintenanceProvider();
+      const result = await provider.exportData(currentClient?.id ?? '', exportRows);
+      if (!result.success || !result.blob) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      downloadBlobFile(result.blob, `manutencoes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Falha ao gerar XLSX.');
+    }
+  };
+
   const handleComplete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     updateStatusMutation.mutate({ id, status: 'Veículo retirado' });
@@ -372,17 +392,31 @@ export default function Maintenance() {
           <p className="mt-1 text-sm text-zinc-500">Acompanhe as ordens de serviço e o status dos veículos em manutenção</p>
         </div>
 
-        {canWriteMaintenance && (
-          <button
-            onClick={() => {
-              setOrderToEdit(null);
-              setIsFormOpen(true);
-            }}
-            className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 sm:py-2"
-          >
-            <Plus className="h-4 w-4" />
-            Nova Manutenção
-          </button>
+        {(canExportSpreadsheet || canWriteMaintenance) && (
+          <div className="flex items-center gap-3">
+            {canExportSpreadsheet && (
+              <button
+                type="button"
+                onClick={() => { void handleExportXlsx(); }}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+              >
+                <Download className="h-4 w-4" />
+                Baixar XLSX
+              </button>
+            )}
+            {canWriteMaintenance && (
+              <button
+                onClick={() => {
+                  setOrderToEdit(null);
+                  setIsFormOpen(true);
+                }}
+                className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 sm:py-2"
+              >
+                <Plus className="h-4 w-4" />
+                Nova Manutenção
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -393,8 +427,8 @@ export default function Maintenance() {
           onClick={() => toggleCard('total')}
           aria-pressed={activeCard === 'total'}
           className={cn(
-            'cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm w-full',
-            activeCard === 'total' ? 'ring-2 ring-orange-400 border-orange-300' : 'border-zinc-200',
+            'w-full cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm',
+            activeCard === 'total' ? 'border-orange-300 ring-2 ring-orange-400' : 'border-zinc-200',
           )}
         >
           <p className="text-2xl font-bold text-zinc-900">{counts.all}</p>
@@ -408,8 +442,8 @@ export default function Maintenance() {
           onClick={() => toggleCard('aguardando-orcamento')}
           aria-pressed={activeCard === 'aguardando-orcamento'}
           className={cn(
-            'cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm w-full',
-            activeCard === 'aguardando-orcamento' ? 'ring-2 ring-orange-400 border-orange-300' : 'border-zinc-200',
+            'w-full cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm',
+            activeCard === 'aguardando-orcamento' ? 'border-orange-300 ring-2 ring-orange-400' : 'border-zinc-200',
           )}
         >
           <p className="text-2xl font-bold text-yellow-600">{counts['Aguardando orçamento']}</p>
@@ -423,8 +457,8 @@ export default function Maintenance() {
           onClick={() => toggleCard('aguardando-aprovacao')}
           aria-pressed={activeCard === 'aguardando-aprovacao'}
           className={cn(
-            'cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm w-full',
-            activeCard === 'aguardando-aprovacao' ? 'ring-2 ring-orange-400 border-orange-300' : 'border-zinc-200',
+            'w-full cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm',
+            activeCard === 'aguardando-aprovacao' ? 'border-orange-300 ring-2 ring-orange-400' : 'border-zinc-200',
           )}
         >
           <p className="text-2xl font-bold text-orange-600">{counts['Aguardando aprovação']}</p>
@@ -438,8 +472,8 @@ export default function Maintenance() {
           onClick={() => toggleCard('em-execucao')}
           aria-pressed={activeCard === 'em-execucao'}
           className={cn(
-            'cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm w-full',
-            activeCard === 'em-execucao' ? 'ring-2 ring-orange-400 border-orange-300' : 'border-zinc-200',
+            'w-full cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm',
+            activeCard === 'em-execucao' ? 'border-orange-300 ring-2 ring-orange-400' : 'border-zinc-200',
           )}
         >
           <p className="text-2xl font-bold text-purple-600">{counts['Serviço em execução']}</p>
@@ -453,8 +487,8 @@ export default function Maintenance() {
           onClick={() => toggleCard('corretiva')}
           aria-pressed={activeCard === 'corretiva'}
           className={cn(
-            'cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm w-full',
-            activeCard === 'corretiva' ? 'ring-2 ring-orange-400 border-orange-300' : 'border-zinc-200',
+            'w-full cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm',
+            activeCard === 'corretiva' ? 'border-orange-300 ring-2 ring-orange-400' : 'border-zinc-200',
           )}
         >
           <p className="text-2xl font-bold text-red-600">{counts.corretiva}</p>
@@ -468,8 +502,8 @@ export default function Maintenance() {
           onClick={() => toggleCard('nao-retirados')}
           aria-pressed={activeCard === 'nao-retirados'}
           className={cn(
-            'cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm w-full',
-            activeCard === 'nao-retirados' ? 'ring-2 ring-orange-400 border-orange-300' : 'border-zinc-200',
+            'w-full cursor-pointer rounded-2xl border bg-white p-4 text-left transition-shadow hover:shadow-sm',
+            activeCard === 'nao-retirados' ? 'border-orange-300 ring-2 ring-orange-400' : 'border-zinc-200',
           )}
         >
           <p className="text-2xl font-bold text-green-600">{vehiclesNotWithdrawn}</p>

@@ -7,6 +7,7 @@ import {
   canApprovePayments,
   canCorrectOdometer,
   canCreateExtraPayments,
+  canExportMaintenanceSpreadsheet,
   canFillCoupling,
   canMarkExtraPaymentsPaid,
   canMarkPaid,
@@ -150,5 +151,26 @@ describe('canFillCoupling', () => {
     expect(canFillCoupling('Driver')).toBe(false);
     expect(canFillCoupling('Workshop')).toBe(false);
     expect(canFillCoupling(undefined)).toBe(false);
+  });
+});
+
+describe('canExportMaintenanceSpreadsheet', () => {
+  it('allows Fleet Assistant and higher ranks', () => {
+    const allowed: Role[] = ['Fleet Assistant', 'Fleet Analyst', 'Operations Manager', 'Coordinator', 'Director', 'Admin Master'];
+    for (const role of allowed) {
+      expect(canExportMaintenanceSpreadsheet(role)).toBe(true);
+    }
+  });
+
+  it('denies Workshop, Yard Auditor, Financeiro, Driver, Coupling Agent', () => {
+    const denied: Role[] = ['Workshop', 'Yard Auditor', 'Financeiro', 'Driver', 'Coupling Agent'];
+    for (const role of denied) {
+      expect(canExportMaintenanceSpreadsheet(role)).toBe(false);
+    }
+  });
+
+  it('returns false for undefined and null', () => {
+    expect(canExportMaintenanceSpreadsheet(undefined)).toBe(false);
+    expect(canExportMaintenanceSpreadsheet(null)).toBe(false);
   });
 });

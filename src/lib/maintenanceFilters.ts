@@ -145,3 +145,9 @@ export function matchesMaintenanceCard(
       return order.status === 'Concluído';
   }
 }
+
+export function daysInWorkshop(entryDate: string): number {
+  const entry = new Date(entryDate);
+  const today = new Date();
+  return Math.floor((today.getTime() - entry.getTime()) / 86400000);
+}
