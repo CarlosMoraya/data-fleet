@@ -14,9 +14,21 @@ vi.mock('../context/AuthContext', () => ({
   useAuth: (): MockAuth => authMock(),
 }));
 
-vi.mock('./BudgetApprovals', () => ({
-  default: () => <div data-testid="budget-approvals">BudgetApprovals</div>,
-}));
+vi.mock('../components/financeiro/BudgetApprovalsTab', async () => {
+  const { useSearchParams } = await import('react-router-dom');
+  return {
+    default: function BudgetApprovalsTabMock() {
+      const [params] = useSearchParams();
+      const segment = params.get('segment');
+      const active = segment === 'history' ? 'history' : 'pending';
+      return (
+        <div data-testid="budget-approvals">
+          <span data-testid={`budget-segment-${active}`} />
+        </div>
+      );
+    },
+  };
+});
 vi.mock('../components/financeiro/PaymentsTab', () => ({
   default: () => <div data-testid="payments-tab">PaymentsTab</div>,
 }));
@@ -153,5 +165,37 @@ describe('Financeiro — shell de quatro abas', () => {
       expect(container.querySelector('[data-testid="budget-approvals"]')).not.toBeNull();
     });
     expect(container.textContent).toContain('Aprovação de Orçamentos');
+  });
+});
+
+describe('Financeiro — segmentos da aba de orçamentos', () => {
+  it('?tab=budget sem segment abre o segmento Pendentes', async () => {
+    setUser('Admin Master');
+    renderFinanceiro(['/financeiro?tab=budget']);
+
+    await waitForAssertion(() => {
+      expect(container.querySelector('[data-testid="budget-segment-pending"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="budget-segment-history"]')).toBeNull();
+    });
+  });
+
+  it('?tab=budget&segment=history abre o segmento Histórico', async () => {
+    setUser('Admin Master');
+    renderFinanceiro(['/financeiro?tab=budget&segment=history']);
+
+    await waitForAssertion(() => {
+      expect(container.querySelector('[data-testid="budget-segment-history"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="budget-segment-pending"]')).toBeNull();
+    });
+  });
+
+  it('?tab=budget&segment=xpto (inválido) cai no primeiro segmento (Pendentes)', async () => {
+    setUser('Admin Master');
+    renderFinanceiro(['/financeiro?tab=budget&segment=xpto']);
+
+    await waitForAssertion(() => {
+      expect(container.querySelector('[data-testid="budget-segment-pending"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="budget-segment-history"]')).toBeNull();
+    });
   });
 });

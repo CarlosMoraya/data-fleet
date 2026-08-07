@@ -17,7 +17,7 @@ import { cn } from '../lib/utils';
 import type { Role } from '../types';
 import type { LucideIcon } from 'lucide-react';
 
-const BudgetApprovals = lazy(() => import('./BudgetApprovals'));
+const BudgetApprovalsTab = lazy(() => import('../components/financeiro/BudgetApprovalsTab'));
 const PaymentsTab = lazy(() => import('../components/financeiro/PaymentsTab'));
 const ApprovalsTab = lazy(() => import('../components/financeiro/ApprovalsTab'));
 const ExtraPaymentsTab = lazy(() => import('../components/financeiro/ExtraPaymentsTab'));
@@ -44,7 +44,7 @@ const TAB_DEFS: TabDef[] = [
     canAccess: canViewBudgetTab,
     render: () => (
       <Suspense fallback={<RouteFallback />}>
-        <BudgetApprovals embedded />
+        <BudgetApprovalsTab />
       </Suspense>
     ),
   },
@@ -127,7 +127,7 @@ export default function Financeiro() {
     setPersistedTab(id);
     const next = new URLSearchParams(searchParams);
     next.set('tab', id);
-    if (id !== 'approvals') {
+    if (id !== 'approvals' && id !== 'budget') {
       next.delete('segment');
     }
     setSearchParams(next);
