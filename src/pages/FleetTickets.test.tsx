@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { listMock, lastKmMock } = vi.hoisted(() => ({ listMock: vi.fn(), lastKmMock: vi.fn() }));
+const { listMock, lastKmMock, slaSettingsMock } = vi.hoisted(() => ({ listMock: vi.fn(), lastKmMock: vi.fn(), slaSettingsMock: vi.fn() }));
 
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1', role: 'Fleet Analyst' }, currentClient: { id: 'client-1' } }),
@@ -13,6 +13,9 @@ vi.mock('../services/fleetTicketService', () => ({
   listFleetTickets: listMock,
   listFleetTicketEvents: vi.fn().mockResolvedValue([]),
   getFleetTicketAttachmentUrls: vi.fn().mockResolvedValue({}),
+}));
+vi.mock('../services/fleetTicketSlaSettingsService', () => ({
+  getFleetTicketSlaSettings: slaSettingsMock,
 }));
 vi.mock('../services/vehicleOdometerService', () => ({
   getVehicleLastKmMap: lastKmMock,
@@ -31,15 +34,19 @@ import FleetTickets from './FleetTickets';
 let container: HTMLDivElement;
 let queryClient: QueryClient;
 
+function hoursAgo(hours: number): string {
+  return new Date(Date.now() - hours * 3_600_000).toISOString();
+}
+
 const rows = [
   {
-    id: 'sos-1', clientId: 'client-1', source: 'sos', openedBy: 'driver-1', openedByRole: 'Driver', openedByNameSnapshot: 'João', driverId: 'driver-1', driverNameSnapshot: 'João', vehicleId: 'vehicle-1', vehicleLicensePlateSnapshot: 'ABC1D23', sosType: 'breakdown', title: 'S.O.S.', description: 'Falha', criticality: 'critical', status: 'open', attachmentPaths: [], createdAt: '2026-07-29T10:00:00Z', updatedAt: '2026-07-29T10:00:00Z', ticketNumber: 'CH-2607-4821', vehicleModelSnapshot: 'Volvo FH',
+    id: 'sos-1', clientId: 'client-1', source: 'sos', openedBy: 'driver-1', openedByRole: 'Driver', openedByNameSnapshot: 'João', driverId: 'driver-1', driverNameSnapshot: 'João', vehicleId: 'vehicle-1', vehicleLicensePlateSnapshot: 'ABC1D23', sosType: 'breakdown', title: 'S.O.S.', description: 'Falha', criticality: 'critical', status: 'open', attachmentPaths: [], createdAt: hoursAgo(30), updatedAt: hoursAgo(30), ticketNumber: 'CH-2607-4821', vehicleModelSnapshot: 'Volvo FH',
   },
   {
-    id: 'report-1', clientId: 'client-1', source: 'report', openedBy: 'auditor-1', openedByRole: 'Yard Auditor', openedByNameSnapshot: 'Maria', vehicleId: 'vehicle-2', vehicleLicensePlateSnapshot: 'XYZ9K88', title: 'Pneu danificado', description: 'Descrição do problema', status: 'open', attachmentPaths: [], createdAt: '2026-07-29T09:00:00Z', updatedAt: '2026-07-29T09:00:00Z', vehicleModelSnapshot: 'Scania R450',
+    id: 'report-1', clientId: 'client-1', source: 'report', openedBy: 'auditor-1', openedByRole: 'Yard Auditor', openedByNameSnapshot: 'Maria', vehicleId: 'vehicle-2', vehicleLicensePlateSnapshot: 'XYZ9K88', title: 'Pneu danificado', description: 'Descrição do problema', status: 'open', attachmentPaths: [], createdAt: hoursAgo(2), updatedAt: hoursAgo(2), vehicleModelSnapshot: 'Scania R450',
   },
   {
-    id: 'closed-1', clientId: 'client-1', source: 'report', openedBy: 'auditor-1', openedByRole: 'Yard Auditor', openedByNameSnapshot: 'Maria', vehicleId: 'vehicle-3', vehicleLicensePlateSnapshot: 'DEF4G56', title: 'Chamado encerrado', description: 'Já resolvido', criticality: 'low', status: 'closed', attachmentPaths: [], createdAt: '2026-07-28T09:00:00Z', updatedAt: '2026-07-28T09:00:00Z',
+    id: 'closed-1', clientId: 'client-1', source: 'report', openedBy: 'auditor-1', openedByRole: 'Yard Auditor', openedByNameSnapshot: 'Maria', vehicleId: 'vehicle-3', vehicleLicensePlateSnapshot: 'DEF4G56', title: 'Chamado encerrado', description: 'Já resolvido', criticality: 'low', status: 'closed', attachmentPaths: [], createdAt: hoursAgo(200), updatedAt: hoursAgo(200),
   },
 ];
 
@@ -50,6 +57,7 @@ beforeEach(() => {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   listMock.mockResolvedValue(rows);
   lastKmMock.mockResolvedValue(new Map());
+  slaSettingsMock.mockResolvedValue({ clientId: 'client-1', openSlaHours: 24, assignedSlaHours: 72 });
 });
 
 afterEach(() => {
@@ -196,6 +204,73 @@ describe('FleetTickets', () => {
     act(() => {
       setSelectValue?.call(statusSelect, 'open');
       statusSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+    expect(container.textContent).toContain('ABC1D23');
+    act(() => root.unmount());
+  });
+
+  it('shows the age counter below the status for an open ticket', async () => {
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    const row = Array.from(container.querySelectorAll('tbody tr')).find((tr) => tr.textContent?.includes('XYZ9K88'))!;
+    expect(row.textContent).toContain('há 2 h');
+    act(() => root.unmount());
+  });
+
+  it('does not show the age counter for a closed ticket', async () => {
+    const root = await renderPage();
+    await waitForText('DEF4G56');
+    const row = Array.from(container.querySelectorAll('tbody tr')).find((tr) => tr.textContent?.includes('DEF4G56'))!;
+    expect(row.textContent).not.toContain('há');
+    act(() => root.unmount());
+  });
+
+  it('reduces displayed rows to only breached tickets when "SLA estourado" is selected', async () => {
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    const slaSelect = container.querySelector('select[aria-label="Filtrar chamados por SLA"]') as HTMLSelectElement;
+    const setSelectValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    act(() => {
+      setSelectValue?.call(slaSelect, 'breached');
+      slaSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+    expect(container.textContent).toContain('ABC1D23');
+    act(() => root.unmount());
+  });
+
+  it('combines "SLA estourado" with the Crítico card', async () => {
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    const criticalCard = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Crítico'))!;
+    act(() => criticalCard.click());
+    await waitForText('ABC1D23');
+    const slaSelect = container.querySelector('select[aria-label="Filtrar chamados por SLA"]') as HTMLSelectElement;
+    const setSelectValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    act(() => {
+      setSelectValue?.call(slaSelect, 'breached');
+      slaSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+    expect(container.textContent).toContain('ABC1D23');
+    act(() => root.unmount());
+  });
+
+  it('combines "SLA estourado" with the Status: Aberto filter', async () => {
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    const statusSelect = container.querySelector('select[aria-label="Filtrar chamados por status"]') as HTMLSelectElement;
+    const setSelectValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    act(() => {
+      setSelectValue?.call(statusSelect, 'open');
+      statusSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await waitForText('ABC1D23');
+    const slaSelect = container.querySelector('select[aria-label="Filtrar chamados por SLA"]') as HTMLSelectElement;
+    act(() => {
+      setSelectValue?.call(slaSelect, 'breached');
+      slaSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
     expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
     expect(container.textContent).toContain('ABC1D23');

@@ -3,11 +3,12 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { authState, listEventsMock, attachmentUrlsMock, lastKmMapMock } = vi.hoisted(() => ({
+const { authState, listEventsMock, attachmentUrlsMock, lastKmMapMock, updateStatusMock } = vi.hoisted(() => ({
   authState: { user: { role: 'Fleet Assistant' as string } },
   listEventsMock: vi.fn(),
   attachmentUrlsMock: vi.fn(),
   lastKmMapMock: vi.fn(),
+  updateStatusMock: vi.fn(),
 }));
 
 vi.mock('../context/AuthContext', () => ({ useAuth: () => authState }));
@@ -16,7 +17,7 @@ vi.mock('../services/fleetTicketService', () => ({
   classifyFleetTicket: vi.fn(),
   getFleetTicketAttachmentUrls: attachmentUrlsMock,
   listFleetTicketEvents: listEventsMock,
-  updateFleetTicketStatus: vi.fn(),
+  updateFleetTicketStatus: updateStatusMock,
 }));
 vi.mock('../services/vehicleOdometerService', () => ({
   getVehicleLastKmMap: lastKmMapMock,
@@ -57,6 +58,7 @@ beforeEach(() => {
   listEventsMock.mockResolvedValue([]);
   attachmentUrlsMock.mockResolvedValue({});
   lastKmMapMock.mockResolvedValue(new Map([['vehicle-1', { value: 91800, isCorrected: false }]]));
+  updateStatusMock.mockResolvedValue(undefined);
   authState.user = { role: 'Fleet Assistant' };
 });
 
@@ -181,6 +183,79 @@ describe('FleetTicketModal', () => {
   it('does not show a resolution notes block when there are none', async () => {
     const root = await renderModal(baseTicket());
     expect(container.textContent).not.toContain('Notas de Resolução');
+    act(() => root.unmount());
+  });
+
+  function setSelectValue(select: HTMLSelectElement, value: string) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    act(() => {
+      setter?.call(select, value);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+
+  function getSaveStatusButton(): HTMLButtonElement {
+    return Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Salvar status') as HTMLButtonElement;
+  }
+
+  it('disables "Salvar status" and shows the message when choosing Resolvido without an assignee', async () => {
+    const root = await renderModal(baseTicket({ status: 'open' }));
+    const select = container.querySelector('#ticket-status') as HTMLSelectElement;
+    setSelectValue(select, 'resolved');
+    expect(getSaveStatusButton().disabled).toBe(true);
+    expect(container.textContent).toContain('Assuma o atendimento antes de alterar o status deste chamado.');
+    act(() => root.unmount());
+  });
+
+  it('disables "Salvar status" and shows the message when choosing Encerrado without an assignee', async () => {
+    const root = await renderModal(baseTicket({ status: 'open' }));
+    const select = container.querySelector('#ticket-status') as HTMLSelectElement;
+    setSelectValue(select, 'closed');
+    expect(getSaveStatusButton().disabled).toBe(true);
+    expect(container.textContent).toContain('Assuma o atendimento antes de alterar o status deste chamado.');
+    act(() => root.unmount());
+  });
+
+  it('disables "Salvar status" and shows the message when choosing Cancelado without an assignee', async () => {
+    const root = await renderModal(baseTicket({ status: 'open' }));
+    const select = container.querySelector('#ticket-status') as HTMLSelectElement;
+    setSelectValue(select, 'cancelled');
+    expect(getSaveStatusButton().disabled).toBe(true);
+    expect(container.textContent).toContain('Assuma o atendimento antes de alterar o status deste chamado.');
+    act(() => root.unmount());
+  });
+
+  it('keeps "Salvar status" enabled for a ticket with an assignee choosing Cancelado', async () => {
+    const root = await renderModal(baseTicket({ status: 'open', assignedTo: 'user-2', assignedToNameSnapshot: 'Carlos' }));
+    const select = container.querySelector('#ticket-status') as HTMLSelectElement;
+    setSelectValue(select, 'cancelled');
+    expect(getSaveStatusButton().disabled).toBe(false);
+    expect(container.textContent).not.toContain('Assuma o atendimento antes de alterar o status deste chamado.');
+    act(() => root.unmount());
+  });
+
+  it('enables "Salvar status" for a ticket with an assignee choosing Resolvido with notes', async () => {
+    const root = await renderModal(baseTicket({ status: 'in_progress', assignedTo: 'user-2', assignedToNameSnapshot: 'Carlos' }));
+    const select = container.querySelector('#ticket-status') as HTMLSelectElement;
+    setSelectValue(select, 'resolved');
+    const textarea = container.querySelector('textarea') as HTMLTextAreaElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    act(() => {
+      setter?.call(textarea, 'Bateria trocada com sucesso.');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(getSaveStatusButton().disabled).toBe(false);
+    expect(container.textContent).not.toContain('Assuma o atendimento antes de alterar o status deste chamado.');
+    act(() => root.unmount());
+  });
+
+  it('does not call updateFleetTicketStatus when trying to conclude without an assignee', async () => {
+    const root = await renderModal(baseTicket({ status: 'open' }));
+    const select = container.querySelector('#ticket-status') as HTMLSelectElement;
+    setSelectValue(select, 'resolved');
+    act(() => { getSaveStatusButton().click(); });
+    await act(async () => { await Promise.resolve(); });
+    expect(updateStatusMock).not.toHaveBeenCalled();
     act(() => root.unmount());
   });
 });

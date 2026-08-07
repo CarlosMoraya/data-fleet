@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   fleetTicketEventFromRow,
   fleetTicketFromRow,
+  fleetTicketSlaSettingsFromRow,
+  fleetTicketSlaSettingsToRow,
   telegramSettingsFromRow,
   telegramSettingsToRow,
   type FleetTicketRow,
@@ -193,5 +195,62 @@ describe('telegram settings mappers', () => {
     }, 'user-1');
 
     expect(row).toMatchObject({ client_id: 'client-1', chat_id: '-100123', updated_by: 'user-1' });
+  });
+});
+
+describe('fleet ticket SLA settings mappers', () => {
+  it('returns factory defaults when no row exists', () => {
+    expect(fleetTicketSlaSettingsFromRow(null, 'c1')).toEqual({
+      clientId: 'c1',
+      openSlaHours: 24,
+      assignedSlaHours: 72,
+    });
+  });
+
+  it('maps a complete row', () => {
+    const settings = fleetTicketSlaSettingsFromRow({
+      client_id: 'c1',
+      open_sla_hours: 12,
+      assigned_sla_hours: 48,
+      updated_by: 'user-1',
+      updated_at: '2026-08-07T10:00:00Z',
+    }, 'ignored-client');
+
+    expect(settings).toEqual({
+      clientId: 'c1',
+      openSlaHours: 12,
+      assignedSlaHours: 48,
+      updatedBy: 'user-1',
+      updatedAt: '2026-08-07T10:00:00Z',
+    });
+  });
+
+  it('maps null updated_by/updated_at to undefined', () => {
+    const settings = fleetTicketSlaSettingsFromRow({
+      client_id: 'c1',
+      open_sla_hours: 24,
+      assigned_sla_hours: 72,
+      updated_by: null,
+      updated_at: null,
+    }, 'c1');
+
+    expect(settings.updatedBy).toBeUndefined();
+    expect(settings.updatedAt).toBeUndefined();
+  });
+
+  it('converts settings to a row without updated_at', () => {
+    const row = fleetTicketSlaSettingsToRow({
+      clientId: 'c1',
+      openSlaHours: 12,
+      assignedSlaHours: 48,
+    }, 'user-1');
+
+    expect(row).toEqual({
+      client_id: 'c1',
+      open_sla_hours: 12,
+      assigned_sla_hours: 48,
+      updated_by: 'user-1',
+    });
+    expect(row).not.toHaveProperty('updated_at');
   });
 });

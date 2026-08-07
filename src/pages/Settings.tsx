@@ -1,10 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, Loader2, Truck, UserCircle, Gauge, CalendarDays } from 'lucide-react';
+import { Bell, Loader2, Truck, UserCircle, Gauge, CalendarDays, Timer } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 
 import ChecklistDayIntervalSettings from '../components/ChecklistDayIntervalSettings';
+import FleetTicketSlaSettingsPanel from '../components/FleetTicketSlaSettingsPanel';
 import TelegramSettingsPanel from '../components/TelegramSettingsPanel';
+import TrailerKmSourceSettings from '../components/TrailerKmSourceSettings';
 import VehicleKmIntervalSettings from '../components/VehicleKmIntervalSettings';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -28,7 +30,7 @@ import { VehicleFieldSettings, DriverFieldSettings } from '../types';
 const ROLES_CAN_MANAGE_FIELDS = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 const ROLES_CAN_ACCESS_SETTINGS = ['Coordinator', 'Manager', 'Director', 'Admin Master'];
 
-type TabType = 'vehicles' | 'drivers' | 'revisoes' | 'checklists' | 'telegram';
+type TabType = 'vehicles' | 'drivers' | 'revisoes' | 'checklists' | 'chamados' | 'telegram';
 type TabDefinition = { id: TabType; name: string; icon: React.ComponentType<{ className?: string }> };
 
 export default function Settings() {
@@ -256,11 +258,13 @@ export default function Settings() {
         { id: 'drivers', name: 'Motoristas', icon: UserCircle },
         { id: 'revisoes', name: 'Revisões', icon: Gauge },
         { id: 'checklists', name: 'Checklists', icon: CalendarDays },
+        { id: 'chamados', name: 'Chamados', icon: Timer },
         { id: 'telegram', name: 'Telegram', icon: Bell },
       ]
     : [
         { id: 'revisoes', name: 'Revisões', icon: Gauge },
         { id: 'checklists', name: 'Checklists', icon: CalendarDays },
+        { id: 'chamados', name: 'Chamados', icon: Timer },
         { id: 'telegram', name: 'Telegram', icon: Bell },
       ];
 
@@ -485,11 +489,18 @@ export default function Settings() {
       )}
 
       {activeTab === 'revisoes' && currentClient?.id && user && (
-        <VehicleKmIntervalSettings clientId={currentClient.id} userId={user.id} />
+        <div className="space-y-6">
+          <VehicleKmIntervalSettings clientId={currentClient.id} userId={user.id} />
+          <TrailerKmSourceSettings clientId={currentClient.id} userId={user.id} />
+        </div>
       )}
 
       {activeTab === 'checklists' && currentClient?.id && user && (
         <ChecklistDayIntervalSettings clientId={currentClient.id} userId={user.id} />
+      )}
+
+      {activeTab === 'chamados' && currentClient?.id && user && (
+        <FleetTicketSlaSettingsPanel clientId={currentClient.id} userId={user.id} />
       )}
 
       {activeTab === 'telegram' && currentClient?.id && user && (

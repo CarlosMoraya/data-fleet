@@ -2,6 +2,41 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-08-07: SLA de Chamados — contador, sinalização visual, filtro e bloqueio de conclusão sem responsável
+
+Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 4, mudança estrutural), nas 8 etapas do plano, com correção pós-implementação antes da promoção a PROD.
+
+**Etapa 1 — Migration, RLS e trava na RPC**: `client_fleet_ticket_sla_settings` (PK `client_id`, `open_sla_hours`/`assigned_sla_hours` com `CHECK BETWEEN 1 AND 8760`, `updated_by`/`updated_at`) em `20260807000000_fleet_ticket_sla.sql`, espelhando o padrão de `client_telegram_settings`. RLS: leitura ampla no tenant (`is_admin_master() OR client_id = get_my_client_id()`), escrita restrita a `Coordinator`/`Manager`/`Director`/Admin Master. RPC `update_fleet_ticket_status` recriada via `CREATE OR REPLACE FUNCTION` adicionando a trava `p_status IN ('resolved','closed') AND assigned_to IS NULL`. Rollback correspondente criado. Nenhuma migration aplicada pelo agente.
+
+**Etapa 2 — Tipos e mappers**: `ClientFleetTicketSlaSettings`/`FleetTicketSlaFilter` em `types/fleetTicket.ts`; `fleetTicketSlaSettingsFromRow`/`fleetTicketSlaSettingsToRow`/`ClientFleetTicketSlaSettingsRow` em `fleetTicketMappers.ts`, com fallback para os padrões de fábrica quando não há linha.
+
+**Etapa 3 — Módulo puro `fleetTicketSla.ts`**: `evaluateFleetTicketSla` (scope determinado pela existência de `assignedTo`, não pelo status — `in_analysis` com responsável usa o SLA de assumido), `filterFleetTicketsBySla`, `isFleetTicketSlaFilter`, `FLEET_TICKET_SLA_DEFAULTS` (24h/72h). Relógio nunca reinicia (`createdAt` é sempre a origem); `now` sempre injetável, sem `Date.now()` implícito. Rótulo: `há N h` até 23h, `há 1 dia`/`há N dias` a partir de 24h; igualdade conta como estourado.
+
+**Etapa 4 — Serviço**: `fleetTicketSlaSettingsService.ts` espelha `telegramSettingsService.ts`; `saveFleetTicketSlaSettings` valida a faixa (inteiro 1–8760) antes de tocar o banco.
+
+**Etapa 5 — Aba "Chamados" em Configurações**: `FleetTicketSlaSettingsPanel.tsx` (React Query + mutation, mesmo desenho visual de `TelegramSettingsPanel.tsx`) inserida entre "Checklists" e "Telegram" em `Settings.tsx`. Nenhuma mudança de permissão — `ROLES_CAN_ACCESS_SETTINGS` já coincidia com a allowlist de escrita da RLS.
+
+**Etapa 6 — Contador e filtro na tela**: `FleetTicketAgeBadge.tsx` (componente puro de apresentação, recebe a avaliação já pronta — não calcula nada, não recebe `ticket`/`settings`). `FleetTickets.tsx` ganhou `slaSettingsQuery`, filtro `<select>` "SLA estourado" (combina com Status, cards de criticidade e busca), e o badge abaixo do selo de status. R10 (fail-safe de carregamento): enquanto `slaSettingsQuery.isLoading`, o filtro não esconde nenhum chamado.
+
+**Etapa 7 — Bloqueio de conclusão no modal**: `requiresAssigneeToSetStatus`/`FLEET_TICKET_STATUSES_REQUIRING_ASSIGNEE` em `fleetTicketRules.ts`; `FleetTicketModal.tsx` desabilita "Salvar status" e mostra aviso âmbar quando aplicável, primeira verificação em `handleStatus` antes de chamar a RPC.
+
+**Correção pós-implementação (mesma sessão, antes da promoção a PROD)**: usuário identificou, testando em DEV, que era possível mudar manualmente o status para "Em andamento" (`in_progress`) pelo `<select>` sem antes clicar em "Assumir atendimento" — e esclareceu que, por questão de auditoria, **nenhuma** mudança de status deveria ser possível sem responsável definido (não só `resolved`/`closed`). Reverteu a decisão original de que `cancelled` seria livre. Correção aplicada em 3 camadas:
+- `FLEET_TICKET_STATUSES_REQUIRING_ASSIGNEE` passou a incluir `in_analysis`, `in_progress`, `resolved`, `closed`, `cancelled` (era só `resolved`/`closed`).
+- `FleetTicketModal.tsx`: mensagem generalizada de "Assuma o atendimento antes de concluir este chamado." para "Assuma o atendimento antes de alterar o status deste chamado." (a trava do botão já era genérica via `requiresAssigneeToSetStatus`).
+- Nova migration `20260807010000_fleet_ticket_status_requires_assignee.sql` (+ rollback) substitui a condição da RPC por `IF v_ticket.assigned_to IS NULL THEN RAISE EXCEPTION` incondicional — necessário porque a primeira migration já havia sido aplicada em DEV quando a correção foi pedida.
+
+**Validação automatizada (após a correção)**: `npx tsc --noEmit` 0 erros; `npm run lint` 0 erros / 208 warnings (baseline 197 + 11 justificados); `npm run test:unit` **1577/1577** (1518 baseline + 59 novos); `npm run test:smoke` **7/7**.
+
+**Validação manual guiada**: roteiro de 16 passos (11 originais da Etapa 1 + 5 da correção) confirmado pelo usuário em DEV; migrations promovidas e revalidadas em PROD (`oajfjdadcicgoxrfrnny`) com autorização expressa.
+
+**Arquivos criados**: `supabase/migrations/20260807000000_fleet_ticket_sla.sql`, `supabase/migrations/rollback/20260807000000_fleet_ticket_sla_rollback.sql`, `supabase/migrations/20260807010000_fleet_ticket_status_requires_assignee.sql`, `supabase/migrations/rollback/20260807010000_fleet_ticket_status_requires_assignee_rollback.sql`, `src/lib/fleetTicketSla.ts`, `src/lib/fleetTicketSla.test.ts`, `src/services/fleetTicketSlaSettingsService.ts`, `src/services/fleetTicketSlaSettingsService.test.ts`, `src/components/FleetTicketSlaSettingsPanel.tsx`, `src/components/FleetTicketSlaSettingsPanel.test.tsx`, `src/components/FleetTicketAgeBadge.tsx`, `src/components/FleetTicketAgeBadge.test.tsx` — 12 arquivos.
+
+**Arquivos modificados**: `src/types/fleetTicket.ts`, `src/lib/fleetTicketMappers.ts`, `src/lib/fleetTicketMappers.test.ts`, `src/lib/fleetTicketRules.ts`, `src/lib/fleetTicketRules.test.ts`, `src/pages/Settings.tsx`, `src/pages/FleetTickets.tsx`, `src/pages/FleetTickets.test.tsx`, `src/components/FleetTicketModal.tsx`, `src/components/FleetTicketModal.test.tsx` — 10 arquivos.
+
+**Decisões**: SLA escolhido pela existência de responsável, não pelo status (`in_analysis` com responsável usa o SLA de assumido); tabela nova em vez de reaproveitar `client_telegram_settings` (RLS daquela é restrita a gestores, SLA precisa ser lido por todos os papéis de `/chamados`); SLA único, não por criticidade; filtro como `<select>` (não card) para combinar naturalmente com os demais; chamados legados concluídos sem responsável (`CH-2608-3252`) não recebem backfill; configurações de SLA fora do `PERSIST_ALLOWLIST`; **qualquer mudança de status exige responsável** (decisão corrigida pós-implementação, ver acima).
+
+**Débitos/observações para sessões futuras**: ordenar a listagem com SLA estourado no topo (hoje só ordena por criticidade/data); notificação Telegram de estouro de SLA (exigiria job agendado, projeto não tem cron); SLA diferenciado por criticidade (simplificação consciente); auditoria completa de alterações de SLA (quem mudou de 24h para 1h, quando).
+
 ## Sessão — 2026-08-07: Exportação XLSX da lista de Manutenção para Fleet Assistant e papéis superiores
 
 Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 2, adição com integração ao sistema existente), nas 6 etapas do plano.

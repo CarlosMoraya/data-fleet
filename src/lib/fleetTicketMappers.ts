@@ -1,6 +1,8 @@
+import { FLEET_TICKET_SLA_DEFAULTS } from './fleetTicketSla';
 import { normalizeTrim } from './inputHelpers';
 
 import type {
+  ClientFleetTicketSlaSettings,
   ClientTelegramSettings,
   FleetTicket,
   FleetTicketEvent,
@@ -173,6 +175,47 @@ export function telegramSettingsToRow(
     notify_sos: settings.notifySos,
     notify_critical: settings.notifyCritical,
     notify_high: settings.notifyHigh,
+    updated_by: userId,
+  };
+}
+
+export interface ClientFleetTicketSlaSettingsRow {
+  client_id: string;
+  open_sla_hours: number;
+  assigned_sla_hours: number;
+  updated_by: string | null;
+  updated_at: string | null;
+}
+
+export function fleetTicketSlaSettingsFromRow(
+  row: ClientFleetTicketSlaSettingsRow | null,
+  clientId: string,
+): ClientFleetTicketSlaSettings {
+  if (!row) {
+    return {
+      clientId,
+      openSlaHours: FLEET_TICKET_SLA_DEFAULTS.openSlaHours,
+      assignedSlaHours: FLEET_TICKET_SLA_DEFAULTS.assignedSlaHours,
+    };
+  }
+
+  return {
+    clientId: row.client_id,
+    openSlaHours: row.open_sla_hours,
+    assignedSlaHours: row.assigned_sla_hours,
+    updatedBy: row.updated_by ?? undefined,
+    updatedAt: row.updated_at ?? undefined,
+  };
+}
+
+export function fleetTicketSlaSettingsToRow(
+  settings: ClientFleetTicketSlaSettings,
+  userId: string,
+): Partial<ClientFleetTicketSlaSettingsRow> {
+  return {
+    client_id: settings.clientId,
+    open_sla_hours: settings.openSlaHours,
+    assigned_sla_hours: settings.assignedSlaHours,
     updated_by: userId,
   };
 }

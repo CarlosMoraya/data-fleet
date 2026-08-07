@@ -21,6 +21,7 @@ import {
   isFleetTicketReadOnly,
   isFleetTicketStatusFilter,
   isUrgentFleetTicket,
+  requiresAssigneeToSetStatus,
   requiresFleetTicketPhoto,
   sortFleetTicketsByUrgency,
 } from './fleetTicketRules';
@@ -313,5 +314,27 @@ describe('isFleetTicketStatusFilter', () => {
     expect(isFleetTicketStatusFilter(undefined)).toBe(false);
     expect(isFleetTicketStatusFilter(0)).toBe(false);
     expect(isFleetTicketStatusFilter({})).toBe(false);
+  });
+});
+
+describe('requiresAssigneeToSetStatus', () => {
+  it('exige responsável para resolved', () => {
+    expect(requiresAssigneeToSetStatus('resolved')).toBe(true);
+  });
+
+  it('exige responsável para closed', () => {
+    expect(requiresAssigneeToSetStatus('closed')).toBe(true);
+  });
+
+  it('exige responsável para cancelled (auditoria: nenhuma mudança de status sem assumir)', () => {
+    expect(requiresAssigneeToSetStatus('cancelled')).toBe(true);
+  });
+
+  it('exige responsável para in_progress', () => {
+    expect(requiresAssigneeToSetStatus('in_progress')).toBe(true);
+  });
+
+  it('exige responsável para in_analysis', () => {
+    expect(requiresAssigneeToSetStatus('in_analysis')).toBe(true);
   });
 });

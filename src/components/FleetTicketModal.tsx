@@ -4,14 +4,6 @@ import React, { useEffect, useState } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import {
-  assignFleetTicketToSelf,
-  classifyFleetTicket,
-  getFleetTicketAttachmentUrls,
-  listFleetTicketEvents,
-  updateFleetTicketStatus,
-} from '../services/fleetTicketService';
-import { getVehicleLastKmMap } from '../services/vehicleOdometerService';
-import {
   FLEET_TICKET_CRITICALITY_DESCRIPTIONS,
   canEditFleetTicketCriticality,
   canHandleFleetTicket,
@@ -21,8 +13,18 @@ import {
   fleetTicketStatusColor,
   fleetTicketStatusLabel,
   isFleetTicketReadOnly,
+  requiresAssigneeToSetStatus,
 } from '../lib/fleetTicketRules';
 import { cn } from '../lib/utils';
+import {
+  assignFleetTicketToSelf,
+  classifyFleetTicket,
+  getFleetTicketAttachmentUrls,
+  listFleetTicketEvents,
+  updateFleetTicketStatus,
+} from '../services/fleetTicketService';
+import { getVehicleLastKmMap } from '../services/vehicleOdometerService';
+
 import LastKmLabel from './LastKmLabel';
 
 import type { FleetTicket, FleetTicketCriticality, FleetTicketEvent, FleetTicketStatus } from '../types/fleetTicket';
@@ -94,6 +96,7 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
   const canEditCriticality = canEditFleetTicketCriticality(user?.role) && ticket.source === 'report' && !isFleetTicketReadOnly(ticket.status);
   const canHandle = canHandleFleetTicket(user?.role) && !isFleetTicketReadOnly(ticket.status);
   const lastKmInfo = lastKmQuery.data?.get(ticket.vehicleId) ?? null;
+  const blockedByMissingAssignee = requiresAssigneeToSetStatus(status) && !ticket.assignedTo;
 
   const runAction = async (action: () => Promise<{ telegramWarning?: string } | void>) => {
     setSaving(true);
@@ -120,6 +123,10 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
   };
 
   const handleStatus = () => {
+    if (blockedByMissingAssignee) {
+      setActionError('Assuma o atendimento antes de alterar o status deste chamado.');
+      return;
+    }
     if (status === 'resolved' && resolutionNotes.trim().length < 5) {
       setActionError('Informe notas de resolução com pelo menos 5 caracteres.');
       return;
@@ -154,26 +161,26 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
           {warning && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{warning}</div>}
 
           <div className="grid gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4 sm:grid-cols-2">
-            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Veículo</p><p className="mt-0.5 text-sm font-semibold text-zinc-900">{ticket.vehicleLicensePlateSnapshot}</p></div>
-            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Status</p><span className={cn('mt-0.5 inline-flex rounded-full px-2 py-0.5 text-xs font-medium', fleetTicketStatusColor(ticket.status))}>{fleetTicketStatusLabel(ticket.status)}</span></div>
-            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Aberto por</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.openedByNameSnapshot}</p></div>
-            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Responsável</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.assignedToNameSnapshot ?? '—'}</p></div>
-            {ticket.driverNameSnapshot && <div><p className="text-xs uppercase tracking-wide text-zinc-400">Motorista</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.driverNameSnapshot}</p></div>}
-            {ticket.source === 'sos' && ticket.sosType && <div><p className="text-xs uppercase tracking-wide text-zinc-400">Tipo de emergência</p><p className="mt-0.5 text-sm text-zinc-800">{fleetTicketSosTypeLabel(ticket.sosType)}</p></div>}
-            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Km informado</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.odometerKm != null ? `${ticket.odometerKm.toLocaleString('pt-BR')} km` : '—'}</p></div>
-            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Último Km oficial</p><LastKmLabel info={lastKmInfo} className="mt-0.5 text-sm text-zinc-800" /></div>
-            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Modelo</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.vehicleModelSnapshot ?? '—'}</p></div>
-            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Proprietário</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.vehicleOwnerSnapshot ?? '—'}</p></div>
-            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Embarcador</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.shipperNameSnapshot ?? '—'}</p></div>
-            <div><p className="text-xs uppercase tracking-wide text-zinc-400">Base</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.operationalUnitNameSnapshot ?? '—'}</p></div>
+            <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Veículo</p><p className="mt-0.5 text-sm font-semibold text-zinc-900">{ticket.vehicleLicensePlateSnapshot}</p></div>
+            <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Status</p><span className={cn('mt-0.5 inline-flex rounded-full px-2 py-0.5 text-xs font-medium', fleetTicketStatusColor(ticket.status))}>{fleetTicketStatusLabel(ticket.status)}</span></div>
+            <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Aberto por</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.openedByNameSnapshot}</p></div>
+            <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Responsável</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.assignedToNameSnapshot ?? '—'}</p></div>
+            {ticket.driverNameSnapshot && <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Motorista</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.driverNameSnapshot}</p></div>}
+            {ticket.source === 'sos' && ticket.sosType && <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Tipo de emergência</p><p className="mt-0.5 text-sm text-zinc-800">{fleetTicketSosTypeLabel(ticket.sosType)}</p></div>}
+            <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Km informado</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.odometerKm != null ? `${ticket.odometerKm.toLocaleString('pt-BR')} km` : '—'}</p></div>
+            <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Último Km oficial</p><LastKmLabel info={lastKmInfo} className="mt-0.5 text-sm text-zinc-800" /></div>
+            <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Modelo</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.vehicleModelSnapshot ?? '—'}</p></div>
+            <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Proprietário</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.vehicleOwnerSnapshot ?? '—'}</p></div>
+            <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Embarcador</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.shipperNameSnapshot ?? '—'}</p></div>
+            <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Base</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.operationalUnitNameSnapshot ?? '—'}</p></div>
           </div>
 
-          {ticket.description && <div><h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Descrição</h3><p className="mt-1 whitespace-pre-wrap text-sm text-zinc-800">{ticket.description}</p></div>}
+          {ticket.description && <div><h3 className="text-xs font-semibold tracking-wider text-zinc-500 uppercase">Descrição</h3><p className="mt-1 text-sm whitespace-pre-wrap text-zinc-800">{ticket.description}</p></div>}
 
           {ticket.resolutionNotes && (
             <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Notas de Resolução</h3>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-emerald-900">{ticket.resolutionNotes}</p>
+              <h3 className="text-xs font-semibold tracking-wider text-emerald-700 uppercase">Notas de Resolução</h3>
+              <p className="mt-1 text-sm whitespace-pre-wrap text-emerald-900">{ticket.resolutionNotes}</p>
               <p className="mt-1.5 text-xs text-emerald-700">{ticket.resolvedByNameSnapshot ?? 'Sistema'} · {formatDate(ticket.resolvedAt)}</p>
             </div>
           )}
@@ -188,7 +195,7 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
 
           {ticket.attachmentPaths.length > 0 && (
             <div>
-              <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500"><Paperclip className="h-4 w-4" /> Anexos</h3>
+              <h3 className="flex items-center gap-2 text-xs font-semibold tracking-wider text-zinc-500 uppercase"><Paperclip className="h-4 w-4" /> Anexos</h3>
               <ul className="mt-2 space-y-2">
                 {ticket.attachmentPaths.map((path) => (
                   <li key={path} className="text-sm">
@@ -225,15 +232,20 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
                   <select id="ticket-status" value={status} onChange={(event) => setStatus(event.target.value as FleetTicketStatus)} disabled={saving} className="flex-1 rounded-xl border border-zinc-300 px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-100 focus:outline-none">
                     {STATUSES.map((item) => <option key={item} value={item}>{fleetTicketStatusLabel(item)}</option>)}
                   </select>
-                  <button type="button" onClick={handleStatus} disabled={saving} className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50">Salvar status</button>
+                  <button type="button" onClick={handleStatus} disabled={saving || blockedByMissingAssignee} className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50">Salvar status</button>
                 </div>
                 {status === 'resolved' && <textarea value={resolutionNotes} onChange={(event) => setResolutionNotes(event.target.value)} placeholder="Notas de resolução (mínimo 5 caracteres)" rows={3} className="mt-2 w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-100 focus:outline-none" />}
+                {blockedByMissingAssignee && (
+                  <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    Assuma o atendimento antes de alterar o status deste chamado.
+                  </p>
+                )}
               </div>
             </div>
           )}
 
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Histórico</h3>
+            <h3 className="text-xs font-semibold tracking-wider text-zinc-500 uppercase">Histórico</h3>
             {eventsQuery.isLoading ? <div className="mt-2 flex items-center gap-2 text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" /> Carregando histórico...</div> : (
               <ol className="mt-2 space-y-2 border-l border-zinc-200 pl-4">
                 {(eventsQuery.data ?? []).map((event) => <li key={event.id} className="text-sm"><p className="font-medium text-zinc-800">{eventLabel(event)}</p><p className="text-xs text-zinc-400">{event.actorNameSnapshot ?? 'Sistema'} · {formatDate(event.createdAt)}</p></li>)}

@@ -153,6 +153,18 @@ export function isFleetTicketReadOnly(status: FleetTicketStatus): boolean {
   return status === 'resolved' || status === 'closed' || status === 'cancelled';
 }
 
+export const FLEET_TICKET_STATUSES_REQUIRING_ASSIGNEE: readonly FleetTicketStatus[] = [
+  'in_analysis',
+  'in_progress',
+  'resolved',
+  'closed',
+  'cancelled',
+];
+
+export function requiresAssigneeToSetStatus(status: FleetTicketStatus): boolean {
+  return FLEET_TICKET_STATUSES_REQUIRING_ASSIGNEE.includes(status);
+}
+
 export function requiresFleetTicketPhoto(
   source: FleetTicketSource,
   criticality?: FleetTicketCriticality,

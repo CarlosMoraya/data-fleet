@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import CreateFleetTicketModal from '../components/CreateFleetTicketModal';
+import FleetTicketAgeBadge from '../components/FleetTicketAgeBadge';
 import FleetTicketCriticalityCards from '../components/FleetTicketCriticalityCards';
 import FleetTicketModal from '../components/FleetTicketModal';
 import LastKmLabel from '../components/LastKmLabel';
@@ -28,11 +29,18 @@ import {
   isFleetTicketStatusFilter,
   sortFleetTicketsByUrgency,
 } from '../lib/fleetTicketRules';
+import {
+  FLEET_TICKET_SLA_DEFAULTS,
+  evaluateFleetTicketSla,
+  filterFleetTicketsBySla,
+  isFleetTicketSlaFilter,
+} from '../lib/fleetTicketSla';
 import { cn } from '../lib/utils';
 import { listFleetTickets } from '../services/fleetTicketService';
+import { getFleetTicketSlaSettings } from '../services/fleetTicketSlaSettingsService';
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 
-import type { FleetTicket, FleetTicketCardFilter, FleetTicketStatusFilter } from '../types/fleetTicket';
+import type { FleetTicket, FleetTicketCardFilter, FleetTicketSlaFilter, FleetTicketStatusFilter } from '../types/fleetTicket';
 
 function isFleetTicketCardFilter(value: unknown): value is FleetTicketCardFilter {
   return value === 'sos' || value === 'unclassified' || value === 'critical' || value === 'high' || value === 'medium' || value === 'low' || value === 'all';
@@ -53,6 +61,7 @@ export default function FleetTickets() {
   const [shipperFilter, setShipperFilter] = usePersistentFilterState('fleet-tickets', 'shipper', '');
   const [unitFilter, setUnitFilter] = usePersistentFilterState('fleet-tickets', 'unit', '');
   const [statusFilter, setStatusFilter] = usePersistentFilterState<FleetTicketStatusFilter>('fleet-tickets', 'status', '', { validator: isFleetTicketStatusFilter });
+  const [slaFilter, setSlaFilter] = usePersistentFilterState<FleetTicketSlaFilter>('fleet-tickets', 'sla', '', { validator: isFleetTicketSlaFilter });
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -70,6 +79,12 @@ export default function FleetTickets() {
     queryFn: () => getVehicleLastKmMap(vehicleIds),
     enabled: vehicleIds.length > 0,
   });
+  const slaSettingsQuery = useQuery({
+    queryKey: ['fleetTicketSlaSettings', currentClient?.id],
+    queryFn: () => getFleetTicketSlaSettings(currentClient!.id),
+    enabled: !!currentClient?.id,
+  });
+  const slaSettings = slaSettingsQuery.data ?? { clientId: currentClient?.id ?? '', ...FLEET_TICKET_SLA_DEFAULTS };
 
   const modelOptions = useMemo(() => buildFleetTicketFilterOptions(tickets, 'vehicleModelSnapshot'), [tickets]);
   const ownerOptions = useMemo(() => buildFleetTicketFilterOptions(tickets, 'vehicleOwnerSnapshot'), [tickets]);
@@ -80,10 +95,11 @@ export default function FleetTickets() {
     const normalizedSearch = search.trim().toLowerCase();
     const byCard = filterFleetTicketsByCard(tickets, activeFilter);
     const byStatus = filterFleetTicketsByStatus(byCard, statusFilter);
+    const bySla = slaSettingsQuery.isLoading ? byStatus : filterFleetTicketsBySla(byStatus, slaFilter, slaSettings);
     const searched = normalizedSearch
-      ? byStatus.filter((ticket) => [ticket.vehicleLicensePlateSnapshot, ticket.title, ticket.description, ticket.openedByNameSnapshot, ticket.driverNameSnapshot, ticket.ticketNumber]
+      ? bySla.filter((ticket) => [ticket.vehicleLicensePlateSnapshot, ticket.title, ticket.description, ticket.openedByNameSnapshot, ticket.driverNameSnapshot, ticket.ticketNumber]
           .some((value) => value?.toLowerCase().includes(normalizedSearch)))
-      : byStatus;
+      : bySla;
     const byVehicleAttributes = filterFleetTicketsByVehicleAttributes(searched, {
       model: modelFilter,
       owner: ownerFilter,
@@ -91,7 +107,7 @@ export default function FleetTickets() {
       unit: unitFilter,
     });
     return sortFleetTicketsByUrgency(byVehicleAttributes);
-  }, [tickets, activeFilter, statusFilter, search, modelFilter, ownerFilter, shipperFilter, unitFilter]);
+  }, [tickets, activeFilter, statusFilter, slaFilter, slaSettings, slaSettingsQuery.isLoading, search, modelFilter, ownerFilter, shipperFilter, unitFilter]);
 
   const selectedTicket = selectedTicketId ? tickets.find((ticket) => ticket.id === selectedTicketId) ?? null : null;
 
@@ -143,6 +159,15 @@ export default function FleetTickets() {
           {FLEET_TICKET_STATUS_FILTER_OPTIONS.map((status) => (
             <option key={status} value={status}>{fleetTicketStatusLabel(status)}</option>
           ))}
+        </select>
+        <select
+          aria-label="Filtrar chamados por SLA"
+          value={slaFilter}
+          onChange={(event) => setSlaFilter(event.target.value as FleetTicketSlaFilter)}
+          className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-100 focus:outline-none"
+        >
+          <option value="">SLA: Todos</option>
+          <option value="breached">SLA estourado</option>
         </select>
         <select value={modelFilter} onChange={(event) => setModelFilter(event.target.value)} className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-100 focus:outline-none">
           <option value="">Modelo: Todos</option>
@@ -198,7 +223,10 @@ export default function FleetTickets() {
                         {vehicleMeta && <div className="text-xs text-zinc-400">{vehicleMeta}</div>}
                       </td>
                       <td className="px-4 py-3"><span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', fleetTicketCriticalityColor(ticket.criticality))}>{fleetTicketCriticalityLabel(ticket.criticality)}</span></td>
-                      <td className="px-4 py-3"><span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', fleetTicketStatusColor(ticket.status))}>{fleetTicketStatusLabel(ticket.status)}</span></td>
+                      <td className="px-4 py-3">
+                        <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', fleetTicketStatusColor(ticket.status))}>{fleetTicketStatusLabel(ticket.status)}</span>
+                        <FleetTicketAgeBadge evaluation={evaluateFleetTicketSla(ticket, slaSettings)} />
+                      </td>
                       <td className="px-4 py-3 text-sm text-zinc-600">
                         <div>{ticket.openedByNameSnapshot}</div>
                         <div className="text-xs text-zinc-400">{formatDate(ticket.createdAt)}</div>

@@ -5,6 +5,7 @@ export type FleetTicketStatus = 'open' | 'in_analysis' | 'in_progress' | 'resolv
 export type FleetTicketLocationStatus = 'captured' | 'denied' | 'unavailable' | 'manual';
 export type FleetTicketCardFilter = 'sos' | 'unclassified' | 'critical' | 'high' | 'medium' | 'low' | 'all';
 export type FleetTicketStatusFilter = '' | FleetTicketStatus;
+export type FleetTicketSlaFilter = '' | 'breached';
 export type FleetTicketEventType =
   | 'created'
   | 'attachments_added'
@@ -75,6 +76,14 @@ export interface ClientTelegramSettings {
   notifySos: boolean;
   notifyCritical: boolean;
   notifyHigh: boolean;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+export interface ClientFleetTicketSlaSettings {
+  clientId: string;
+  openSlaHours: number;
+  assignedSlaHours: number;
   updatedBy?: string;
   updatedAt?: string;
 }
