@@ -23,6 +23,16 @@ export interface ThirdPartyDriver {
   updatedAt?: string;
 }
 
+export type TrailerKmMode = 'hubodometer' | 'coupling_accumulated';
+
+export interface VehicleKmSourceSettings {
+  id: string;
+  clientId: string;
+  trailerKmMode: TrailerKmMode;
+  updatedAt?: string;
+  updatedBy?: string | null;
+}
+
 export interface VehicleCoupling {
   id: string;
   clientId: string;
