@@ -144,6 +144,53 @@ async function waitForAssertion(assertion: () => void) {
   throw lastError;
 }
 
+const ticketOriginRows = [
+  rows[0],
+  {
+    ...rows[1],
+    id: 'plan-3',
+    checklist_id: null,
+    fleet_ticket_id: 'ticket-1',
+    fleet_tickets: { ticket_number: 'CH-2608-0001', title: 'Vazamento de óleo' },
+    vehicles: { license_plate: 'DEF4G56' },
+  },
+];
+
+describe('ActionPlans — origem do plano', () => {
+  it('exibe pílula Checklist e Chamado conforme a origem, e permite buscar pelo número do chamado', async () => {
+    eqMock.mockResolvedValue({ data: ticketOriginRows, error: null });
+
+    const root = createRoot(container);
+    container.__reactRoot = root;
+
+    act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ActionPlans />
+        </QueryClientProvider>,
+      );
+    });
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Checklist');
+      expect(container.textContent).toContain('Chamado');
+      expect(container.textContent).toContain('CH-2608-0001');
+    });
+
+    const searchInput = container.querySelector('input[placeholder*="Buscar"]') as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    act(() => {
+      setter?.call(searchInput, 'CH-2608-0001');
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    await waitForAssertion(() => {
+      expect(container.textContent).not.toContain('Plano A');
+      expect(container.textContent).toContain('Plano B');
+    });
+  });
+});
+
 describe('ActionPlans — Último Km abaixo da placa', () => {
   it('exibe o último Km quando há leitura e o fallback quando não há', async () => {
     const root = createRoot(container);

@@ -1,10 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Loader2, MapPin, Paperclip, UserCheck, X } from 'lucide-react';
+import { AlertTriangle, ClipboardList, ExternalLink, Loader2, MapPin, Paperclip, UserCheck, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
 import { useAuth } from '../context/AuthContext';
+import { actionStatusColor, actionStatusLabel } from '../lib/actionPlanMappers';
+import { fleetTicketActionPlanLabel } from '../lib/fleetTicketActionPlanLink';
 import {
   FLEET_TICKET_CRITICALITY_DESCRIPTIONS,
+  canCreateActionPlanFromFleetTicket,
   canEditFleetTicketCriticality,
   canHandleFleetTicket,
   fleetTicketCriticalityColor,
@@ -24,7 +27,9 @@ import {
   updateFleetTicketStatus,
 } from '../services/fleetTicketService';
 import { getVehicleLastKmMap } from '../services/vehicleOdometerService';
+import { getVehicleOpenTreatment } from '../services/vehicleOpenTreatmentService';
 
+import CreateActionPlanModal from './CreateActionPlanModal';
 import LastKmLabel from './LastKmLabel';
 
 import type { FleetTicket, FleetTicketCriticality, FleetTicketEvent, FleetTicketStatus } from '../types/fleetTicket';
@@ -70,6 +75,7 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
   const [actionError, setActionError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [actionPlanOpen, setActionPlanOpen] = useState(false);
 
   const eventsQuery = useQuery({
     queryKey: ['fleetTicketEvents', ticket.id],
@@ -84,6 +90,10 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
     queryKey: ['vehicleLastKmMap', ticket.vehicleId],
     queryFn: () => getVehicleLastKmMap([ticket.vehicleId]),
   });
+  const openTreatmentQuery = useQuery({
+    queryKey: ['vehicleOpenTreatment', ticket.vehicleId],
+    queryFn: () => getVehicleOpenTreatment(ticket.vehicleId),
+  });
 
   useEffect(() => {
     setCriticality(ticket.criticality ?? '');
@@ -95,8 +105,13 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
 
   const canEditCriticality = canEditFleetTicketCriticality(user?.role) && ticket.source === 'report' && !isFleetTicketReadOnly(ticket.status);
   const canHandle = canHandleFleetTicket(user?.role) && !isFleetTicketReadOnly(ticket.status);
+  const canOpenActionPlan = canCreateActionPlanFromFleetTicket(user?.role, ticket);
   const lastKmInfo = lastKmQuery.data?.get(ticket.vehicleId) ?? null;
   const blockedByMissingAssignee = requiresAssigneeToSetStatus(status) && !ticket.assignedTo;
+  const openTreatment = openTreatmentQuery.data;
+  const hasOpenTreatment = !!openTreatment && (openTreatment.actionPlans.length > 0 || openTreatment.schedules.length > 0);
+  const hasPlan = !!openTreatment?.ticketPlanIds.includes(ticket.id);
+  const planLabel = fleetTicketActionPlanLabel(ticket.status, hasPlan);
 
   const runAction = async (action: () => Promise<{ telegramWarning?: string } | void>) => {
     setSaving(true);
@@ -147,6 +162,7 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
               <h2 className="text-base font-semibold text-zinc-900">{ticket.title}</h2>
               {ticket.source === 'sos' && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">S.O.S.</span>}
               <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', fleetTicketCriticalityColor(ticket.criticality))}>{fleetTicketCriticalityLabel(ticket.criticality)}</span>
+              {planLabel && <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">{planLabel}</span>}
               <span className="text-xs text-zinc-500">{ticket.ticketNumber ? `Chamado ${ticket.ticketNumber}` : '—'}</span>
             </div>
             <p className="mt-1 text-xs text-zinc-500">Criado em {formatDate(ticket.createdAt)}</p>
@@ -174,6 +190,35 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
             <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Embarcador</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.shipperNameSnapshot ?? '—'}</p></div>
             <div><p className="text-xs tracking-wide text-zinc-400 uppercase">Base</p><p className="mt-0.5 text-sm text-zinc-800">{ticket.operationalUnitNameSnapshot ?? '—'}</p></div>
           </div>
+
+          {hasOpenTreatment && openTreatment && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-amber-900">
+                <AlertTriangle className="h-4 w-4" /> Este veículo já está em tratamento
+              </div>
+              {openTreatment.actionPlans.length > 0 && (
+                <ul className="mt-2 space-y-1.5">
+                  {openTreatment.actionPlans.map((plan) => (
+                    <li key={plan.id} className="text-sm text-amber-900">
+                      <span className="font-medium">{plan.name || plan.suggestedAction}</span>{' '}
+                      <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', actionStatusColor(plan.status))}>{actionStatusLabel(plan.status)}</span>
+                      {' '}— {plan.responsibleName ?? 'sem responsável'} · prazo {formatDate(plan.dueDate)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {openTreatment.schedules.length > 0 && (
+                <ul className="mt-2 space-y-1.5">
+                  {openTreatment.schedules.map((schedule) => (
+                    <li key={schedule.id} className="text-sm text-amber-900">
+                      Agendamento em {new Date(schedule.scheduledDate).toLocaleDateString('pt-BR')} — {schedule.workshopName ?? 'oficina não informada'}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-2 text-xs text-amber-700">Aviso informativo — você pode seguir com este chamado normalmente.</p>
+            </div>
+          )}
 
           {ticket.description && <div><h3 className="text-xs font-semibold tracking-wider text-zinc-500 uppercase">Descrição</h3><p className="mt-1 text-sm whitespace-pre-wrap text-zinc-800">{ticket.description}</p></div>}
 
@@ -222,10 +267,18 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
 
           {canHandle && (
             <div className="space-y-3 rounded-xl border border-zinc-200 p-4">
-              <button type="button" onClick={() => { void runAction(() => assignFleetTicketToSelf(ticket.id)); }} disabled={saving || ticket.status === 'resolved' || ticket.status === 'closed' || ticket.status === 'cancelled'} className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-medium text-orange-700 hover:bg-orange-100 disabled:opacity-50">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
-                Assumir atendimento
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => { void runAction(() => assignFleetTicketToSelf(ticket.id)); }} disabled={saving || ticket.status === 'resolved' || ticket.status === 'closed' || ticket.status === 'cancelled'} className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-medium text-orange-700 hover:bg-orange-100 disabled:opacity-50">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
+                  Assumir atendimento
+                </button>
+                {canOpenActionPlan && (
+                  <button type="button" onClick={() => setActionPlanOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100">
+                    <ClipboardList className="h-4 w-4" />
+                    Abrir plano de ação
+                  </button>
+                )}
+              </div>
               <div className="border-t border-zinc-100 pt-3">
                 <label htmlFor="ticket-status" className="mb-2 block text-sm font-medium text-zinc-800">Alterar status</label>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -254,6 +307,19 @@ export default function FleetTicketModal({ ticket, onClose, onSaved }: FleetTick
           </div>
         </div>
       </div>
+
+      {actionPlanOpen && (
+        <CreateActionPlanModal
+          origin={{ kind: 'fleetTicket', ticket }}
+          onClose={() => setActionPlanOpen(false)}
+          onCreated={() => {
+            setActionPlanOpen(false);
+            void queryClient.invalidateQueries({ queryKey: ['actionPlans'] });
+            void queryClient.invalidateQueries({ queryKey: ['vehicleOpenTreatment', ticket.vehicleId] });
+            onSaved();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -24,12 +24,14 @@ import {
   createFleetTicketReport,
   createSosTicket,
   getFleetTicketAttachmentUrls,
+  listFleetTicketIdsWithActionPlan,
   listFleetTickets,
 } from './fleetTicketService';
 
 function queryFor<T>(result: { data: T; error: unknown }) {
   const query: Record<string, unknown> = {};
   query.eq = vi.fn(() => query);
+  query.in = vi.fn(() => query);
   query.order = vi.fn(() => query);
   query.select = vi.fn(() => query);
   query.maybeSingle = vi.fn(() => Promise.resolve(result));
@@ -172,6 +174,27 @@ describe('listFleetTickets', () => {
     expect(result).toHaveLength(1);
     expect(result[0].vehicleLicensePlateSnapshot).toBe('ABC1D23');
     expect(result[0].source).toBe('sos');
+  });
+});
+
+describe('listFleetTicketIdsWithActionPlan', () => {
+  it('resolve Set vazio sem chamar o Supabase quando a lista de ids é vazia', async () => {
+    const result = await listFleetTicketIdsWithActionPlan([]);
+    expect(result).toEqual(new Set());
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it('retorna o Set com os fleet_ticket_id distintos retornados', async () => {
+    fromMock.mockReturnValue({
+      select: vi.fn(() => queryFor({
+        data: [{ fleet_ticket_id: 'ticket-1' }, { fleet_ticket_id: 'ticket-2' }, { fleet_ticket_id: 'ticket-1' }],
+        error: null,
+      })),
+    });
+
+    const result = await listFleetTicketIdsWithActionPlan(['ticket-1', 'ticket-2']);
+
+    expect(result).toEqual(new Set(['ticket-1', 'ticket-2']));
   });
 });
 

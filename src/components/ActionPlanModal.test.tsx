@@ -2,13 +2,14 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { rpcMock, fromMock, selectMock, eqMock, notMock, orderMock } = vi.hoisted(() => ({
+const { rpcMock, fromMock, selectMock, eqMock, notMock, orderMock, signedUrlMock } = vi.hoisted(() => ({
   rpcMock: vi.fn(),
   fromMock: vi.fn(),
   selectMock: vi.fn(),
   eqMock: vi.fn(),
   notMock: vi.fn(),
   orderMock: vi.fn(),
+  signedUrlMock: vi.fn(),
 }));
 
 vi.mock('../lib/supabase', () => ({
@@ -16,6 +17,11 @@ vi.mock('../lib/supabase', () => ({
     rpc: rpcMock,
     from: fromMock,
   },
+}));
+
+vi.mock('../lib/storageHelpers', () => ({
+  uploadActionPlanEvidence: vi.fn(),
+  getFleetTicketAttachmentSignedUrl: signedUrlMock,
 }));
 
 let authRole = 'Coordinator';
@@ -47,6 +53,8 @@ beforeEach(() => {
   eqMock.mockReset();
   notMock.mockReset();
   orderMock.mockReset();
+  signedUrlMock.mockReset();
+  signedUrlMock.mockResolvedValue('https://signed.example.com/foto.jpg');
 
   orderMock.mockResolvedValue({ data: [{ id: 'resp-2', name: 'Ana Coordenadora' }], error: null });
   notMock.mockReturnValue({ order: orderMock });
@@ -85,6 +93,94 @@ function basePlan(overrides: Partial<ActionPlan> = {}): ActionPlan {
     ...overrides,
   } as ActionPlan;
 }
+
+describe('ActionPlanModal — origem do plano', () => {
+  it('exibe o campo Origem com o número do chamado e oculta Template/Item inspecionado para origem chamado', () => {
+    authRole = 'Coordinator';
+    renderWithAct(
+      <ActionPlanModal
+        plan={basePlan({
+          checklistId: undefined,
+          fleetTicketId: 'ticket-1',
+          fleetTicketNumber: 'CH-2608-0001',
+          fleetTicketTitle: 'Vazamento de óleo',
+        })}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+
+    expect(container.textContent).toContain('Origem');
+    expect(container.textContent).toContain('Chamado CH-2608-0001');
+    expect(container.textContent).not.toContain('Template');
+    expect(container.textContent).not.toContain('Item inspecionado');
+  });
+
+  it('resolve o caminho bruto do Storage em URL assinada para foto de plano de origem chamado', async () => {
+    authRole = 'Coordinator';
+    renderWithAct(
+      <ActionPlanModal
+        plan={basePlan({
+          checklistId: undefined,
+          fleetTicketId: 'ticket-1',
+          fleetTicketNumber: 'CH-2608-0001',
+          photoUrl: 'client-1/fleet-tickets/ticket-1/attachment-123.jpg',
+        })}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+
+    expect(container.textContent).toContain('Carregando foto...');
+
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(signedUrlMock).toHaveBeenCalledWith('client-1/fleet-tickets/ticket-1/attachment-123.jpg');
+    const img = container.querySelector('img[alt="foto"]') as HTMLImageElement;
+    expect(img.src).toBe('https://signed.example.com/foto.jpg');
+  });
+
+  it('exibe mensagem de erro quando a URL assinada da foto falha', async () => {
+    authRole = 'Coordinator';
+    signedUrlMock.mockRejectedValue(new Error('falha ao assinar'));
+    renderWithAct(
+      <ActionPlanModal
+        plan={basePlan({
+          checklistId: undefined,
+          fleetTicketId: 'ticket-1',
+          photoUrl: 'client-1/fleet-tickets/ticket-1/attachment-123.jpg',
+        })}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(container.textContent).toContain('Não foi possível carregar a foto.');
+    expect(container.querySelector('img[alt="foto"]')).toBeNull();
+  });
+
+  it('usa plan.photoUrl diretamente (sem gerar URL assinada) para origem checklist', async () => {
+    authRole = 'Coordinator';
+    renderWithAct(
+      <ActionPlanModal
+        plan={basePlan({
+          checklistId: 'checklist-1',
+          photoUrl: 'https://public.example.com/checklist-photo.jpg',
+        })}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+
+    await act(async () => { await Promise.resolve(); });
+
+    expect(signedUrlMock).not.toHaveBeenCalled();
+    const img = container.querySelector('img[alt="foto"]') as HTMLImageElement;
+    expect(img.src).toBe('https://public.example.com/checklist-photo.jpg');
+  });
+});
 
 describe('ActionPlanModal — reatribuição de responsável', () => {
   it('exibe o controle de reatribuição para Coordinator+', () => {

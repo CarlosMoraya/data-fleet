@@ -275,3 +275,28 @@ export function filterFleetTicketsByStatus(
   if (status === '') return tickets;
   return tickets.filter((ticket) => ticket.status === status);
 }
+
+// Allowlist literal, não rank: espelha exatamente a policy "action_plans_insert"
+// (supabase/migrations/fix_action_plans_admin_master_rls.sql), que libera
+// Fleet Analyst, Supervisor, Manager, Coordinator e Director (+ Admin Master
+// via checagem de role separada). Operations Manager NÃO está na policy, apesar
+// de ter rank >= Fleet Analyst em rolePermissions.ts — por isso allowlist literal,
+// não rank: usar rank aqui abriria um botão que o banco recusa.
+const ROLES_ALLOWED_TO_CREATE_ACTION_PLAN_FROM_TICKET: readonly Role[] = [
+  'Fleet Analyst',
+  'Supervisor',
+  'Manager',
+  'Coordinator',
+  'Director',
+];
+
+export function canCreateActionPlanFromFleetTicket(
+  role: Role | null | undefined,
+  ticket: Pick<FleetTicket, 'status' | 'assignedTo'>,
+): boolean {
+  const roleAllowed = role === 'Admin Master' ||
+    ROLES_ALLOWED_TO_CREATE_ACTION_PLAN_FROM_TICKET.includes(role as Role);
+  if (!roleAllowed) return false;
+  if (isFleetTicketReadOnly(ticket.status)) return false;
+  return !!ticket.assignedTo;
+}

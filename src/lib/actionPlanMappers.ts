@@ -7,7 +7,8 @@ import type { ActionPlan, ActionPlanStatus } from '../types';
 export interface ActionPlanRow {
   id: string;
   client_id: string;
-  checklist_id: string;
+  checklist_id: string | null;
+  fleet_ticket_id: string | null;
   checklist_response_id: string | null;
   vehicle_id: string | null;
   reported_by: string | null;
@@ -43,6 +44,7 @@ export interface ActionPlanRow {
   completed_by_profile?: { name: string } | null;
   checklist_responses?: { checklist_items: { title: string } | null } | null;
   checklists?: { checklist_templates: { name: string } | null } | null;
+  fleet_tickets?: { ticket_number: string | null; title: string } | null;
 }
 
 // ─── fromRow converter ────────────────────────────────────────────────────────
@@ -51,7 +53,10 @@ export function actionPlanFromRow(row: ActionPlanRow): ActionPlan {
   return {
     id: row.id,
     clientId: row.client_id,
-    checklistId: row.checklist_id,
+    checklistId: row.checklist_id ?? undefined,
+    fleetTicketId: row.fleet_ticket_id ?? undefined,
+    fleetTicketNumber: row.fleet_tickets?.ticket_number ?? undefined,
+    fleetTicketTitle: row.fleet_tickets?.title ?? undefined,
     checklistResponseId: row.checklist_response_id ?? undefined,
     vehicleId: row.vehicle_id ?? undefined,
     vehicleLicensePlate: row.vehicles?.license_plate ?? undefined,
@@ -91,7 +96,8 @@ export function actionPlanFromRow(row: ActionPlanRow): ActionPlan {
 export function actionPlanToRow(a: Partial<ActionPlan>): Partial<ActionPlanRow> {
   const row: Partial<ActionPlanRow> = {};
   if (a.clientId !== undefined)              row.client_id = a.clientId;
-  if (a.checklistId !== undefined)           row.checklist_id = a.checklistId;
+  if (a.checklistId !== undefined)           row.checklist_id = a.checklistId ?? null;
+  if (a.fleetTicketId !== undefined)         row.fleet_ticket_id = a.fleetTicketId ?? null;
   if (a.checklistResponseId !== undefined)   row.checklist_response_id = a.checklistResponseId ?? null;
   if (a.vehicleId !== undefined)             row.vehicle_id = a.vehicleId ?? null;
   if (a.reportedBy !== undefined)            row.reported_by = a.reportedBy ?? null;

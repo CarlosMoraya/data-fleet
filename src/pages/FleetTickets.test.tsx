@@ -4,7 +4,12 @@ import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { listMock, lastKmMock, slaSettingsMock } = vi.hoisted(() => ({ listMock: vi.fn(), lastKmMock: vi.fn(), slaSettingsMock: vi.fn() }));
+const { listMock, lastKmMock, slaSettingsMock, idsWithActionPlanMock } = vi.hoisted(() => ({
+  listMock: vi.fn(),
+  lastKmMock: vi.fn(),
+  slaSettingsMock: vi.fn(),
+  idsWithActionPlanMock: vi.fn(),
+}));
 
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1', role: 'Fleet Analyst' }, currentClient: { id: 'client-1' } }),
@@ -13,6 +18,7 @@ vi.mock('../services/fleetTicketService', () => ({
   listFleetTickets: listMock,
   listFleetTicketEvents: vi.fn().mockResolvedValue([]),
   getFleetTicketAttachmentUrls: vi.fn().mockResolvedValue({}),
+  listFleetTicketIdsWithActionPlan: idsWithActionPlanMock,
 }));
 vi.mock('../services/fleetTicketSlaSettingsService', () => ({
   getFleetTicketSlaSettings: slaSettingsMock,
@@ -58,6 +64,7 @@ beforeEach(() => {
   listMock.mockResolvedValue(rows);
   lastKmMock.mockResolvedValue(new Map());
   slaSettingsMock.mockResolvedValue({ clientId: 'client-1', openSlaHours: 24, assignedSlaHours: 72 });
+  idsWithActionPlanMock.mockResolvedValue(new Set());
 });
 
 afterEach(() => {
@@ -88,6 +95,22 @@ describe('FleetTickets', () => {
     const root = await renderPage();
     await waitForText('XYZ9K88');
     expect(container.textContent).toContain('ABC1D23');
+    act(() => root.unmount());
+  });
+
+  it('shows "Encerrado com plano de ação" for a closed ticket present in the Set', async () => {
+    idsWithActionPlanMock.mockResolvedValue(new Set(['closed-1']));
+    const root = await renderPage();
+    await waitForText('Encerrado com plano de ação');
+    act(() => root.unmount());
+  });
+
+  it('does not show the pill for a closed ticket outside the Set', async () => {
+    idsWithActionPlanMock.mockResolvedValue(new Set());
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    expect(container.textContent).not.toContain('Encerrado com plano de ação');
+    expect(container.textContent).not.toContain('Com plano de ação');
     act(() => root.unmount());
   });
 

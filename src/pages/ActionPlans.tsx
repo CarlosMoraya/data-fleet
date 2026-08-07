@@ -7,6 +7,7 @@ import LastKmLabel from '../components/LastKmLabel';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { actionPlanFromRow, actionStatusLabel, actionStatusColor, type ActionPlanRow } from '../lib/actionPlanMappers';
+import { actionPlanOriginOf, actionPlanOriginLabel, actionPlanOriginColor } from '../lib/actionPlanOrigin';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
@@ -48,7 +49,8 @@ export default function ActionPlans() {
           claimed_by_profile:profiles!claimed_by(name),
           completed_by_profile:profiles!completed_by(name),
           checklist_responses!checklist_response_id(checklist_items(title)),
-          checklists!checklist_id(checklist_templates(name))
+          checklists!checklist_id(checklist_templates(name)),
+          fleet_tickets!fleet_ticket_id(ticket_number, title)
         `)
         .order('created_at', { ascending: false });
 
@@ -124,7 +126,8 @@ export default function ActionPlans() {
         (p.suggestedAction ?? '').toLowerCase().includes(q) ||
         (p.itemTitle ?? '').toLowerCase().includes(q) ||
         (p.name ?? '').toLowerCase().includes(q) ||
-        (p.responsibleName ?? '').toLowerCase().includes(q)
+        (p.responsibleName ?? '').toLowerCase().includes(q) ||
+        (p.fleetTicketNumber ?? '').toLowerCase().includes(q)
       );
       return matchTab && matchSearch;
     });
@@ -225,7 +228,7 @@ export default function ActionPlans() {
                 <tr className="bg-zinc-50">
                   {[
                     ...(blockWrite ? ['Cliente'] : []),
-                    'Nome / Ação', 'Veículo', 'Status', 'Responsável', 'Prazo', 'Criado em', '',
+                    'Nome / Ação', 'Origem', 'Veículo', 'Status', 'Responsável', 'Prazo', 'Criado em', '',
                   ].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">
                       {h}
@@ -250,6 +253,14 @@ export default function ActionPlans() {
                     <td className="max-w-[220px] px-4 py-3">
                       {p.name && <p className="truncate text-sm font-medium text-zinc-900">{p.name}</p>}
                       <p className="truncate text-xs text-zinc-500">{p.suggestedAction}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', actionPlanOriginColor(actionPlanOriginOf(p)))}>
+                        {actionPlanOriginLabel(actionPlanOriginOf(p))}
+                      </span>
+                      {actionPlanOriginOf(p) === 'fleet_ticket' && p.fleetTicketNumber && (
+                        <div className="mt-0.5 text-xs text-zinc-400">{p.fleetTicketNumber}</div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-zinc-900">
                       {p.vehicleLicensePlate ? (

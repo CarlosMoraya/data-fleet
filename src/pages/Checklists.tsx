@@ -4,24 +4,23 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import ChecklistDetailModal from '../components/ChecklistDetailModal';
-import CreateActionPlanModal from '../components/CreateActionPlanModal';
-import LastKmLabel from '../components/LastKmLabel';
 import ChecklistMapLink from '../components/ChecklistMapLink';
+import CreateActionPlanModal from '../components/CreateActionPlanModal';
+import DriverLoanNotifications from '../components/DriverLoanNotifications';
+import LastKmLabel from '../components/LastKmLabel';
 import SelectClientNotice from '../components/SelectClientNotice';
 import TireInspectionDetailModal from '../components/TireInspectionDetailModal';
 import VehicleLinkDivergenceModal from '../components/VehicleLinkDivergenceModal';
 import VehicleLoanAlert from '../components/VehicleLoanAlert';
-import DriverLoanNotifications from '../components/DriverLoanNotifications';
 import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePersistentTabState, usePersistentFilterState, useSessionUiState } from '../hooks/usePersistentUiState';
-import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
 import { AUDITOR_ONLY_CONTEXTS, requiresHandoverEvidence, filterTemplatesByContext, filterAuditorVehiclesForContext, shouldCreateLoanOnHandover, getAvailableContextsForDriver } from '../lib/checklistContextRules';
+import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
 import { getChecklistStartBlockMessage, getTireInspectionStartBlockMessage } from '../lib/checklistStartGuard';
 import { templateFromRow, type ChecklistTemplateRow } from '../lib/checklistTemplateMappers';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { supabase } from '../lib/supabase';
-import { getActiveVehicleLoan, getActiveLoansForVehicles, getLoanDeliveryChecklistIds } from '../services/vehicleLoanService';
 import { tireInspectionFromRow, type TireInspectionRow } from '../lib/tireInspectionMappers';
 import { safeParseJson } from '../lib/uiStateStorage';
 import { cn } from '../lib/utils';
@@ -38,12 +37,13 @@ import {
   createTireInspection,
   findOpenTireInspection,
 } from '../services/tireInspectionService';
+import { getActiveVehicleLoan, getActiveLoansForVehicles, getLoanDeliveryChecklistIds } from '../services/vehicleLoanService';
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 import { ODOMETER_UPDATE_CONTEXT } from '../types';
 
 import type { Checklist, ChecklistContext, ChecklistTemplate, TireInspection, AxleConfigEntry } from '../types';
-import type { VehicleLoan } from '../types/vehicleLoan';
 import type { VehicleStatus } from '../types/vehicle';
+import type { VehicleLoan } from '../types/vehicleLoan';
 
 const STATUS_LABEL: Record<string, string> = { in_progress: 'Em andamento', completed: 'Concluído' };
 const STATUS_COLOR: Record<string, string> = {
@@ -1368,7 +1368,7 @@ export default function Checklists() {
 
       {createPlanChecklist && (
         <CreateActionPlanModal
-          checklist={createPlanChecklist}
+          origin={{ kind: 'checklist', checklist: createPlanChecklist }}
           onClose={() => setCreatePlanChecklist(null)}
           onCreated={() => { 
             setCreatePlanChecklist(null);

@@ -1,15 +1,15 @@
-import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
-import {
-  getFleetTicketAttachmentSignedUrl,
-  uploadFleetTicketAttachment,
-} from '../lib/storageHelpers';
-import { supabase } from '../lib/supabase';
 import {
   fleetTicketEventFromRow,
   fleetTicketFromRow,
   type FleetTicketEventRow,
   type FleetTicketRow,
 } from '../lib/fleetTicketMappers';
+import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
+import {
+  getFleetTicketAttachmentSignedUrl,
+  uploadFleetTicketAttachment,
+} from '../lib/storageHelpers';
+import { supabase } from '../lib/supabase';
 
 import type {
   CreateFleetTicketReportInput,
@@ -201,6 +201,22 @@ export async function listVehiclesForSos(): Promise<Array<{ id: string; licenseP
       licensePlate: String(row.license_plate ?? row.licensePlate ?? ''),
     }))
     .filter((vehicle) => vehicle.id !== 'undefined' && vehicle.licensePlate.length > 0);
+}
+
+export async function listFleetTicketIdsWithActionPlan(ticketIds: string[]): Promise<Set<string>> {
+  if (ticketIds.length === 0) return new Set();
+
+  const { data, error } = await supabase
+    .from('action_plans')
+    .select('fleet_ticket_id')
+    .in('fleet_ticket_id', ticketIds);
+  if (error) throw error;
+
+  return new Set(
+    (data ?? [])
+      .map((row: { fleet_ticket_id: string | null }) => row.fleet_ticket_id)
+      .filter((id): id is string => !!id),
+  );
 }
 
 export async function listVehiclesForFleetTicketReport(): Promise<Array<{ id: string; licensePlate: string }>> {

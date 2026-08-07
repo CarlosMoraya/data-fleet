@@ -3,12 +3,13 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { authState, listEventsMock, attachmentUrlsMock, lastKmMapMock, updateStatusMock } = vi.hoisted(() => ({
-  authState: { user: { role: 'Fleet Assistant' as string } },
+const { authState, listEventsMock, attachmentUrlsMock, lastKmMapMock, updateStatusMock, openTreatmentMock } = vi.hoisted(() => ({
+  authState: { user: { id: 'user-1', role: 'Fleet Assistant' as string } as { id?: string; role: string }, currentClient: { id: 'client-1' } },
   listEventsMock: vi.fn(),
   attachmentUrlsMock: vi.fn(),
   lastKmMapMock: vi.fn(),
   updateStatusMock: vi.fn(),
+  openTreatmentMock: vi.fn(),
 }));
 
 vi.mock('../context/AuthContext', () => ({ useAuth: () => authState }));
@@ -25,6 +26,9 @@ vi.mock('../services/vehicleOdometerService', () => ({
     info == null
       ? { prefix: 'Último Km:', valueText: null, suffix: null, fullText: 'Último Km: sem leitura' }
       : { prefix: 'Último Km:', valueText: `${info.value.toLocaleString('pt-BR')} km`, suffix: null, fullText: `Último Km: ${info.value.toLocaleString('pt-BR')} km` },
+}));
+vi.mock('../services/vehicleOpenTreatmentService', () => ({
+  getVehicleOpenTreatment: openTreatmentMock,
 }));
 
 import FleetTicketModal from './FleetTicketModal';
@@ -59,6 +63,7 @@ beforeEach(() => {
   attachmentUrlsMock.mockResolvedValue({});
   lastKmMapMock.mockResolvedValue(new Map([['vehicle-1', { value: 91800, isCorrected: false }]]));
   updateStatusMock.mockResolvedValue(undefined);
+  openTreatmentMock.mockResolvedValue({ actionPlans: [], schedules: [], ticketPlanIds: [] });
   authState.user = { role: 'Fleet Assistant' };
 });
 
@@ -258,4 +263,57 @@ describe('FleetTicketModal', () => {
     expect(updateStatusMock).not.toHaveBeenCalled();
     act(() => root.unmount());
   });
+
+  it('shows "Abrir plano de ação" for Fleet Analyst on an in_progress assigned ticket and opens the creation modal', async () => {
+    authState.user = { role: 'Fleet Analyst' };
+    const root = await renderModal(baseTicket({ status: 'in_progress', assignedTo: 'user-2' }));
+    const button = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'Abrir plano de ação');
+    expect(button).toBeTruthy();
+    act(() => { button!.click(); });
+    expect(container.textContent).toContain('Criar Plano de Ação');
+    act(() => root.unmount());
+  });
+
+  it('does not render "Abrir plano de ação" for Fleet Assistant', async () => {
+    authState.user = { role: 'Fleet Assistant' };
+    const root = await renderModal(baseTicket({ status: 'in_progress', assignedTo: 'user-2' }));
+    expect(container.textContent).not.toContain('Abrir plano de ação');
+    act(() => root.unmount());
+  });
+
+  it('does not render "Abrir plano de ação" for a closed ticket', async () => {
+    authState.user = { role: 'Director' };
+    const root = await renderModal(baseTicket({ status: 'closed', assignedTo: 'user-2' }));
+    expect(container.textContent).not.toContain('Abrir plano de ação');
+    act(() => root.unmount());
+  });
+
+  it('shows the open-treatment panel with the plan name when the vehicle has one, without disabling any button', async () => {
+    openTreatmentMock.mockResolvedValue({
+      actionPlans: [{ id: 'plan-1', name: 'Revisão de freios', suggestedAction: 'Trocar pastilhas', status: 'pending', dueDate: '2026-08-10', responsibleName: 'Ana' }],
+      schedules: [],
+      ticketPlanIds: [],
+    });
+    const root = await renderModal(baseTicket({ status: 'open' }));
+    await waitForText(container, 'Este veículo já está em tratamento');
+    expect(container.textContent).toContain('Revisão de freios');
+    const assumeButton = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('Assumir atendimento'));
+    expect(assumeButton?.disabled).toBe(false);
+    act(() => root.unmount());
+  });
+
+  it('does not render the open-treatment panel when there are no plans nor schedules', async () => {
+    openTreatmentMock.mockResolvedValue({ actionPlans: [], schedules: [], ticketPlanIds: [] });
+    const root = await renderModal(baseTicket());
+    expect(container.textContent).not.toContain('Este veículo já está em tratamento');
+    act(() => root.unmount());
+  });
 });
+
+async function waitForText(node: HTMLElement, text: string) {
+  for (let i = 0; i < 20; i += 1) {
+    if (node.textContent?.includes(text)) return;
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)); });
+  }
+  throw new Error(`Texto não encontrado: ${text}`);
+}

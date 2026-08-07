@@ -599,7 +599,7 @@ export function buildOperationalActionQueue(input: {
     { category: 'os_exit_this_week', label: 'Veículos com saída prevista até fim da semana', count: input.osExitThisWeek.length, severity: 'medium', details: input.osExitThisWeek },
     { category: 'os_pending_approval', label: 'OS aguardando aprovação', count: input.osPendingApproval.length, severity: 'medium', details: input.osPendingApproval },
     { category: 'os_pending_budget', label: 'OS aguardando orçamento', count: input.osPendingBudget.length, severity: 'medium', details: input.osPendingBudget },
-    { category: 'action_plans_open', label: 'Planos de ação de checklist abertos', count: input.actionPlansOpen.length, severity: 'medium', details: input.actionPlansOpen },
+    { category: 'action_plans_open', label: 'Planos de ação abertos', count: input.actionPlansOpen.length, severity: 'medium', details: input.actionPlansOpen },
     { category: 'os_due_soon', label: 'OS vencendo nos próximos 7 dias', count: input.osDueSoon.length, severity: 'medium', details: input.osDueSoon },
     { category: 'tracker_missing', label: 'Veículos sem cobertura de rastreador', count: input.vehiclesWithoutTracker.length, severity: 'medium', details: input.vehiclesWithoutTracker },
   ];

@@ -12,6 +12,7 @@ import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { usePersistentFilterState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
+import { fleetTicketActionPlanLabel, hasActionPlan } from '../lib/fleetTicketActionPlanLink';
 import {
   FLEET_TICKET_STATUS_FILTER_OPTIONS,
   buildFleetTicketFilterOptions,
@@ -36,7 +37,7 @@ import {
   isFleetTicketSlaFilter,
 } from '../lib/fleetTicketSla';
 import { cn } from '../lib/utils';
-import { listFleetTickets } from '../services/fleetTicketService';
+import { listFleetTicketIdsWithActionPlan, listFleetTickets } from '../services/fleetTicketService';
 import { getFleetTicketSlaSettings } from '../services/fleetTicketSlaSettingsService';
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 
@@ -74,6 +75,13 @@ export default function FleetTickets() {
   const tickets = ticketsQuery.data ?? [];
   const counts = useMemo(() => getFleetTicketCounts(tickets), [tickets]);
   const vehicleIds = useMemo(() => Array.from(new Set(tickets.map((ticket) => ticket.vehicleId))), [tickets]);
+  const ticketIds = useMemo(() => (ticketsQuery.data ?? []).map((ticket) => ticket.id), [ticketsQuery.data]);
+  const ticketIdsWithActionPlanQuery = useQuery({
+    queryKey: ['fleetTicketIdsWithActionPlan', ticketIds],
+    queryFn: () => listFleetTicketIdsWithActionPlan(ticketIds),
+    enabled: ticketIds.length > 0,
+  });
+  const ticketIdsWithActionPlan = ticketIdsWithActionPlanQuery.data ?? new Set<string>();
   const lastKmQuery = useQuery<Map<string, VehicleLastKmInfo>>({
     queryKey: ['vehicleLastKmMap', 'fleetTickets', vehicleIds],
     queryFn: () => getVehicleLastKmMap(vehicleIds),
@@ -226,6 +234,12 @@ export default function FleetTickets() {
                       <td className="px-4 py-3">
                         <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', fleetTicketStatusColor(ticket.status))}>{fleetTicketStatusLabel(ticket.status)}</span>
                         <FleetTicketAgeBadge evaluation={evaluateFleetTicketSla(ticket, slaSettings)} />
+                        {(() => {
+                          const planLabel = fleetTicketActionPlanLabel(ticket.status, hasActionPlan(ticket.id, ticketIdsWithActionPlan));
+                          return planLabel ? (
+                            <div className="mt-1"><span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">{planLabel}</span></div>
+                          ) : null;
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-sm text-zinc-600">
                         <div>{ticket.openedByNameSnapshot}</div>

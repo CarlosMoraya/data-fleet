@@ -3,7 +3,8 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { actionPlanToRow, actionStatusLabel, actionStatusColor } from '../lib/actionPlanMappers';
-import { uploadActionPlanEvidence } from '../lib/storageHelpers';
+import { actionPlanOriginOf } from '../lib/actionPlanOrigin';
+import { getFleetTicketAttachmentSignedUrl, uploadActionPlanEvidence } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 
@@ -57,8 +58,26 @@ export default function ActionPlanModal({ plan, onClose, onSaved, onReassigned }
   const [responsibleOptions, setResponsibleOptions] = useState<ResponsibleOption[]>([]);
   const [reassigning, setReassigning] = useState(false);
   const [reassignError, setReassignError] = useState('');
+  const [resolvedPhotoUrl, setResolvedPhotoUrl] = useState<string | undefined>(
+    actionPlanOriginOf(plan) === 'fleet_ticket' ? undefined : plan.photoUrl,
+  );
+  const [photoLoadError, setPhotoLoadError] = useState(false);
 
   const canReassignResponsible = isCoordinatorPlus && REASSIGNABLE_STATUSES.includes(plan.status);
+
+  useEffect(() => {
+    setPhotoLoadError(false);
+    if (actionPlanOriginOf(plan) !== 'fleet_ticket' || !plan.photoUrl) {
+      setResolvedPhotoUrl(plan.photoUrl);
+      return;
+    }
+    setResolvedPhotoUrl(undefined);
+    let cancelled = false;
+    void getFleetTicketAttachmentSignedUrl(plan.photoUrl)
+      .then((url) => { if (!cancelled) setResolvedPhotoUrl(url); })
+      .catch(() => { if (!cancelled) setPhotoLoadError(true); });
+    return () => { cancelled = true; };
+  }, [plan]);
 
   useEffect(() => {
     if (!editingResponsible) return;
@@ -203,8 +222,17 @@ export default function ActionPlanModal({ plan, onClose, onSaved, onReassigned }
             )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Veículo" value={plan.vehicleLicensePlate} />
-              <Field label="Template" value={plan.templateName} />
-              <Field label="Item inspecionado" value={plan.itemTitle} />
+              {actionPlanOriginOf(plan) === 'fleet_ticket' ? (
+                <Field
+                  label="Origem"
+                  value={`Chamado ${plan.fleetTicketNumber ?? '—'} — ${plan.fleetTicketTitle ?? ''}`}
+                />
+              ) : (
+                <>
+                  <Field label="Template" value={plan.templateName} />
+                  <Field label="Item inspecionado" value={plan.itemTitle} />
+                </>
+              )}
               <Field label="Reportado por" value={plan.reportedByName} />
               {!editingResponsible && <Field label="Responsável sugerido" value={responsibleName} />}
               <Field label="Data limite" value={plan.dueDate} />
@@ -270,13 +298,19 @@ export default function ActionPlanModal({ plan, onClose, onSaved, onReassigned }
             {plan.photoUrl && (
               <div>
                 <p className="mb-1 text-xs tracking-wide text-zinc-400 uppercase">Foto do problema</p>
-                <div className="flex items-center gap-2">
-                  <img src={plan.photoUrl} alt="foto" className="h-20 w-20 rounded-lg object-cover" />
-                  <a href={plan.photoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-orange-500 hover:underline">
-                    <Camera className="h-3 w-3" />
-                    Ampliar
-                  </a>
-                </div>
+                {resolvedPhotoUrl ? (
+                  <div className="flex items-center gap-2">
+                    <img src={resolvedPhotoUrl} alt="foto" className="h-20 w-20 rounded-lg object-cover" />
+                    <a href={resolvedPhotoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-orange-500 hover:underline">
+                      <Camera className="h-3 w-3" />
+                      Ampliar
+                    </a>
+                  </div>
+                ) : photoLoadError ? (
+                  <p className="text-xs text-red-500 italic">Não foi possível carregar a foto.</p>
+                ) : (
+                  <p className="text-xs text-zinc-400 italic">Carregando foto...</p>
+                )}
               </div>
             )}
           </div>

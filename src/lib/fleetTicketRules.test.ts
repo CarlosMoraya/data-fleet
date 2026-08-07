@@ -4,6 +4,7 @@ import {
   FLEET_TICKET_STATUS_FILTER_OPTIONS,
   buildFleetTicketFilterOptions,
   canClassifyFleetTicket,
+  canCreateActionPlanFromFleetTicket,
   canEditFleetTicketCriticality,
   canHandleFleetTicket,
   canManageTelegramSettings,
@@ -128,6 +129,37 @@ describe('canEditFleetTicketCriticality', () => {
   it('denies missing role', () => {
     expect(canEditFleetTicketCriticality(null)).toBe(false);
     expect(canEditFleetTicketCriticality(undefined)).toBe(false);
+  });
+});
+
+describe('canCreateActionPlanFromFleetTicket', () => {
+  it.each(['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director'] as const)(
+    'permite %s em chamado in_progress assumido',
+    (role) => {
+      expect(canCreateActionPlanFromFleetTicket(role, ticket({ status: 'in_progress', assignedTo: 'user-2' }))).toBe(true);
+    },
+  );
+
+  it.each(['Fleet Assistant', 'Operations Manager', 'Driver'] as const)(
+    'bloqueia %s mesmo com chamado assumido',
+    (role) => {
+      expect(canCreateActionPlanFromFleetTicket(role, ticket({ status: 'in_progress', assignedTo: 'user-2' }))).toBe(false);
+    },
+  );
+
+  it.each(['closed', 'resolved', 'cancelled'] as const)(
+    'bloqueia Director quando status é %s',
+    (status) => {
+      expect(canCreateActionPlanFromFleetTicket('Director', ticket({ status, assignedTo: 'user-2' }))).toBe(false);
+    },
+  );
+
+  it('bloqueia Manager quando chamado ainda não foi assumido', () => {
+    expect(canCreateActionPlanFromFleetTicket('Manager', ticket({ status: 'open', assignedTo: undefined }))).toBe(false);
+  });
+
+  it('permite Admin Master em chamado in_analysis assumido', () => {
+    expect(canCreateActionPlanFromFleetTicket('Admin Master', ticket({ status: 'in_analysis', assignedTo: 'user-2' }))).toBe(true);
   });
 });
 

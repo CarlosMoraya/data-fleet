@@ -108,7 +108,10 @@ export interface ChecklistResponse {
 export interface ActionPlan {
   id: string;
   clientId: string;
-  checklistId: string;
+  checklistId?: string;
+  fleetTicketId?: string;
+  fleetTicketNumber?: string; // from join
+  fleetTicketTitle?: string; // from join
   checklistResponseId?: string;
   vehicleId?: string;
   vehicleLicensePlate?: string; // from join
