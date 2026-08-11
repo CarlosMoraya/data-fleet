@@ -33,6 +33,16 @@ describe('vehicleToRow', () => {
     expect(row.cmt).toBeNull();
     expect(row.eixos).toBe(2);
   });
+
+  it('vehicleToRow grava operation_start_date quando preenchida', () => {
+    const row = vehicleToRow({ operationStartDate: '2026-03-15' }, 'c1');
+    expect(row.operation_start_date).toBe('2026-03-15');
+  });
+
+  it('vehicleToRow converte operationStartDate ausente para null', () => {
+    const row = vehicleToRow({}, 'c1');
+    expect(row.operation_start_date).toBeNull();
+  });
 });
 
 describe('vehicleFromRow', () => {
@@ -60,6 +70,40 @@ describe('vehicleFromRow', () => {
     expect(vehicle.coolingEquipment).toBe(false);
     expect(vehicle.active).toBe(true);
     expect(vehicle.inactivatedAt).toBeNull();
+  });
+
+  it('vehicleFromRow lê operation_start_date preenchida', () => {
+    const row = {
+      id: 'v1',
+      acquisition_date: null,
+      operation_start_date: '2026-03-15',
+    } as unknown as VehicleRow;
+
+    const vehicle = vehicleFromRow(row);
+    expect(vehicle.operationStartDate).toBe('2026-03-15');
+  });
+
+  it('vehicleFromRow converte operation_start_date nula para undefined', () => {
+    const row = {
+      id: 'v1',
+      acquisition_date: null,
+      operation_start_date: null,
+    } as unknown as VehicleRow;
+
+    const vehicle = vehicleFromRow(row);
+    expect(vehicle.operationStartDate).toBeUndefined();
+  });
+
+  it('vehicleFromRow mantém acquisition_date e operation_start_date independentes', () => {
+    const row = {
+      id: 'v1',
+      acquisition_date: '2026-03-10',
+      operation_start_date: '2026-01-05',
+    } as unknown as VehicleRow;
+
+    const vehicle = vehicleFromRow(row);
+    expect(vehicle.acquisitionDate).toBe('2026-03-10');
+    expect(vehicle.operationStartDate).toBe('2026-01-05');
   });
 
   it('handle joins (driverName, shipperName)', () => {

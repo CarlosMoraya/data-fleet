@@ -36,8 +36,8 @@ function baseVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
 }
 
 describe('vehicleExportRows', () => {
-  it('has exactly 17 headers in the exact order', () => {
-    expect(VEHICLE_EXPORT_HEADERS.length).toBe(17);
+  it('has exactly 19 headers in the exact order', () => {
+    expect(VEHICLE_EXPORT_HEADERS.length).toBe(19);
     expect(VEHICLE_EXPORT_HEADERS).toEqual([
       'Placa',
       'Marca',
@@ -48,6 +48,8 @@ describe('vehicleExportRows', () => {
       'Energia',
       'Proprietário',
       'Aquisição',
+      'Data de Aquisição',
+      'Data de Início na Operação',
       'Motorista',
       'Embarcador',
       'Unidade Operacional',
@@ -72,6 +74,8 @@ describe('vehicleExportRows', () => {
       'Combustão',
       'Frota Própria',
       'Próprio',
+      '',
+      '',
       'João da Silva',
       'Embarcador X',
       'Unidade SP',
@@ -86,13 +90,13 @@ describe('vehicleExportRows', () => {
   it('maps unavailable=true to Disponibilidade=Indisponível', () => {
     const row: VehicleExportRow = { ...baseVehicle(), unavailable: true };
     const cells = buildVehicleExportCells(row);
-    expect(cells[16]).toBe('Indisponível');
+    expect(cells[18]).toBe('Indisponível');
   });
 
   it('maps active=false to Status=Inativo', () => {
     const row: VehicleExportRow = { ...baseVehicle({ active: false }), unavailable: false };
     const cells = buildVehicleExportCells(row);
-    expect(cells[15]).toBe('Inativo');
+    expect(cells[17]).toBe('Inativo');
   });
 
   it('renders empty strings for absent optional fields', () => {
@@ -108,15 +112,42 @@ describe('vehicleExportRows', () => {
     };
     const cells = buildVehicleExportCells(row);
     expect(cells[5]).toBe(''); // Categoria
-    expect(cells[9]).toBe(''); // Motorista
-    expect(cells[10]).toBe(''); // Embarcador
-    expect(cells[11]).toBe(''); // Unidade Operacional
-    expect(cells[12]).toBe(''); // Finalidade
+    expect(cells[11]).toBe(''); // Motorista
+    expect(cells[12]).toBe(''); // Embarcador
+    expect(cells[13]).toBe(''); // Unidade Operacional
+    expect(cells[14]).toBe(''); // Finalidade
   });
 
   it('translates acquisition values', () => {
     expect(buildVehicleExportCells({ ...baseVehicle({ acquisition: 'Owned' }), unavailable: false })[8]).toBe('Próprio');
     expect(buildVehicleExportCells({ ...baseVehicle({ acquisition: 'Rented' }), unavailable: false })[8]).toBe('Alugado');
     expect(buildVehicleExportCells({ ...baseVehicle({ acquisition: 'Agregado' }), unavailable: false })[8]).toBe('Agregado');
+  });
+
+  it('formata as datas de aquisição e início na operação', () => {
+    const cells = buildVehicleExportCells({
+      ...baseVehicle({ acquisitionDate: '2026-01-05', operationStartDate: '2026-03-15' }),
+      unavailable: false,
+    });
+
+    expect(cells[9]).toBe('05/01/2026');
+    expect(cells[10]).toBe('15/03/2026');
+  });
+
+  it('retorna strings vazias quando nenhuma das duas datas está preenchida', () => {
+    const cells = buildVehicleExportCells({ ...baseVehicle(), unavailable: false });
+
+    expect(cells[9]).toBe('');
+    expect(cells[10]).toBe('');
+  });
+
+  it('mantém a data de aquisição quando o início na operação está vazio', () => {
+    const cells = buildVehicleExportCells({
+      ...baseVehicle({ acquisitionDate: '2026-01-05' }),
+      unavailable: false,
+    });
+
+    expect(cells[9]).toBe('05/01/2026');
+    expect(cells[10]).toBe('');
   });
 });

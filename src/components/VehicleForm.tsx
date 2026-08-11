@@ -22,6 +22,7 @@ import {
 import { validateFile } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
+import { isOperationStartBeforeAcquisition, OPERATION_START_BEFORE_ACQUISITION_WARNING } from '../lib/vehicleOperationStartDate';
 import { Vehicle, VehicleFieldSettings, AxleConfigEntry } from '../types';
 
 import AxleConfigEditor from './AxleConfigEditor';
@@ -151,6 +152,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
 
   // Helper: retorna true se o campo é obrigatório (default: true quando settings é null)
   const req = (name: string) => fieldSettings ? isFieldRequired(name, fieldSettings) : true;
+  const showOperationStartWarning = isOperationStartBeforeAcquisition(formData.acquisitionDate, formData.operationStartDate);
 
   useEffect(() => {
     if (vehicle) {
@@ -510,6 +512,14 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                 <div>
                   <Label name="acquisitionDate">Data de Aquisição</Label>
                   <input type="date" name="acquisitionDate" required={req('acquisitionDate')} value={formData.acquisitionDate || ''} onChange={handleChange} className={inputClass} />
+                </div>
+                <div>
+                  <Label name="operationStartDate">Data de Início na Operação</Label>
+                  <input type="date" name="operationStartDate" required={req('operationStartDate')} autoComplete="off" value={formData.operationStartDate || ''} onChange={handleChange} className={inputClass} />
+                  <p className="mt-1 text-xs text-zinc-500">Data em que o veículo começou efetivamente a operar na frota.</p>
+                  {showOperationStartWarning && (
+                    <p role="alert" className="mt-1 text-xs text-amber-600">{OPERATION_START_BEFORE_ACQUISITION_WARNING}</p>
+                  )}
                 </div>
                 <div>
                   <Label name="owner">Proprietário</Label>

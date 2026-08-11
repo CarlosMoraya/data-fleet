@@ -55,3 +55,9 @@ export function formatPhone(phone: string | null | undefined): string {
   }
   return phone;
 }
+
+/** Formata data para célula de planilha: vazio em vez do travessão usado na interface. */
+export function formatDateForExport(value: string | null | undefined): string {
+  const formatted = formatDate(value);
+  return formatted === '—' ? '' : formatted;
+}

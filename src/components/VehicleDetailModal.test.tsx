@@ -117,4 +117,18 @@ describe('VehicleDetailModal', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('exibe a data de início na operação formatada', () => {
+    renderModal({ vehicle: { ...vehicle, operationStartDate: '2026-03-15' } });
+
+    const label = [...container.querySelectorAll('p')].find((item) => item.textContent === 'Início na Operação');
+    expect(label?.parentElement?.textContent).toContain('15/03/2026');
+  });
+
+  it('exibe travessão quando a data de início na operação não está preenchida', () => {
+    renderModal();
+
+    const label = [...container.querySelectorAll('p')].find((item) => item.textContent === 'Início na Operação');
+    expect(label?.parentElement?.textContent).toContain('—');
+  });
 });

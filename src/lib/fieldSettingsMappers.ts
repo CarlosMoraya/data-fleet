@@ -14,6 +14,7 @@ export interface VehicleFieldSettingsRow {
   antt_optional: boolean;
   autonomy_optional: boolean;
   acquisition_date_optional: boolean;
+  operation_start_date_optional: boolean;
   tag_optional: boolean;
   category_optional: boolean;
   crlv_upload_optional: boolean;
@@ -53,6 +54,7 @@ export function fieldSettingsFromRow(row: VehicleFieldSettingsRow): VehicleField
     anttOptional: row.antt_optional,
     autonomyOptional: row.autonomy_optional,
     acquisitionDateOptional: row.acquisition_date_optional,
+    operationStartDateOptional: row.operation_start_date_optional ?? true,
     tagOptional: row.tag_optional,
     categoryOptional: row.category_optional,
     crlvUploadOptional: row.crlv_upload_optional,
@@ -95,6 +97,7 @@ export function fieldSettingsToRow(
     antt_optional: settings.anttOptional,
     autonomy_optional: settings.autonomyOptional,
     acquisition_date_optional: settings.acquisitionDateOptional,
+    operation_start_date_optional: settings.operationStartDateOptional,
     tag_optional: settings.tagOptional,
     category_optional: settings.categoryOptional,
     crlv_upload_optional: settings.crlvUploadOptional,
@@ -120,7 +123,7 @@ export function fieldSettingsToRow(
   };
 }
 
-/** Retorna defaults: tudo obrigatório (optional = false) */
+/** Retorna defaults: tudo obrigatório (optional = false), exceto operationStartDate — ver IMPLEMENTATION/MEMORY. */
 export function defaultFieldSettings(clientId: string): VehicleFieldSettings {
   return {
     id: '',
@@ -135,6 +138,7 @@ export function defaultFieldSettings(clientId: string): VehicleFieldSettings {
     anttOptional: false,
     autonomyOptional: false,
     acquisitionDateOptional: false,
+    operationStartDateOptional: true,
     tagOptional: false,
     categoryOptional: false,
     crlvUploadOptional: false,
@@ -172,6 +176,7 @@ const FIELD_TO_SETTING: Record<string, keyof VehicleFieldSettings> = {
   antt: 'anttOptional',
   autonomy: 'autonomyOptional',
   acquisitionDate: 'acquisitionDateOptional',
+  operationStartDate: 'operationStartDateOptional',
   tag: 'tagOptional',
   category: 'categoryOptional',
   crlvUpload: 'crlvUploadOptional',
@@ -217,6 +222,7 @@ export const CONFIGURABLE_FIELDS: { key: keyof VehicleFieldSettings; label: stri
   { key: 'anttOptional', label: 'ANTT', section: 'Propriedade & Rastreamento' },
   { key: 'autonomyOptional', label: 'Autonomia (km)', section: 'Propriedade & Rastreamento' },
   { key: 'acquisitionDateOptional', label: 'Data de Aquisição', section: 'Propriedade & Rastreamento' },
+  { key: 'operationStartDateOptional', label: 'Data de Início na Operação', section: 'Propriedade & Rastreamento' },
   { key: 'tagOptional', label: 'Tag (Sem Parar)', section: 'Propriedade & Rastreamento' },
   { key: 'categoryOptional', label: 'Categoria', section: 'Documentos & Acessórios' },
   // Documentos

@@ -1,5 +1,5 @@
 import { BUDGET_STATUS_FILTER_OPTIONS, daysInWorkshop } from './maintenanceFilters';
-import { formatDate } from './dateUtils';
+import { formatDateForExport } from './dateUtils';
 
 import type { MaintenanceOrder, BudgetStatus } from '../types/maintenance';
 
@@ -17,11 +17,6 @@ const BUDGET_STATUS_EXPORT_LABELS: Record<BudgetStatus, string> = BUDGET_STATUS_
   (acc, o) => ({ ...acc, [o.value]: o.label }),
   {} as Record<BudgetStatus, string>,
 );
-
-function formatExportDate(value: string | null | undefined): string {
-  const formatted = formatDate(value);
-  return formatted === '—' ? '' : formatted;
-}
 
 function formatExportMoney(value: number): string {
   return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -42,9 +37,9 @@ export function buildMaintenanceExportCells(row: MaintenanceExportRow): string[]
     row.shipperName ?? '',
     row.operationalUnitName ?? '',
     row.description ?? '',
-    formatExportDate(row.entryDate),
-    formatExportDate(row.expectedExitDate),
-    formatExportDate(row.actualExitDate),
+    formatDateForExport(row.entryDate),
+    formatDateForExport(row.expectedExitDate),
+    formatDateForExport(row.actualExitDate),
     daysStr,
     row.currentKm != null ? String(row.currentKm) : '',
     BUDGET_STATUS_EXPORT_LABELS[budgetStatus],

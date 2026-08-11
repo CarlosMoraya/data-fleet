@@ -37,6 +37,7 @@ export interface VehicleRow {
   owner: string;
   autonomy: number;
   acquisition_date: string | null;
+  operation_start_date: string | null;
   crlv_upload: string | null;
   crlv_year: string | null;
   crlv_expiration_date: string | null;
@@ -104,6 +105,7 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
     owner: row.owner,
     autonomy: row.autonomy,
     acquisitionDate: row.acquisition_date ?? undefined,
+    operationStartDate: row.operation_start_date ?? undefined,
     crlvUpload: row.crlv_upload ?? undefined,
     crlvYear: row.crlv_year ?? undefined,
     crlvExpirationDate: row.crlv_expiration_date ?? undefined,
@@ -167,6 +169,7 @@ export function vehicleToRow(vehicle: Partial<Vehicle>, clientId: string): Omit<
     owner: capitalizeWords(vehicle.owner),
     autonomy: commaToFloat(vehicle.autonomy),
     acquisition_date: vehicle.acquisitionDate ?? null,
+    operation_start_date: vehicle.operationStartDate ?? null,
     crlv_upload: vehicle.crlvUpload ?? null,
     crlv_year: vehicle.crlvYear ? normalizeTrim(vehicle.crlvYear) : null,
     crlv_expiration_date: vehicle.crlvExpirationDate ?? null,

@@ -37,6 +37,7 @@ export interface Vehicle {
   owner: string;
   autonomy: number;
   acquisitionDate?: string;
+  operationStartDate?: string;
   crlvUpload?: string;
   crlvYear?: string;
   crlvExpirationDate?: string;
@@ -107,6 +108,7 @@ export interface VehicleFieldSettings {
   anttOptional: boolean;
   autonomyOptional: boolean;
   acquisitionDateOptional: boolean;
+  operationStartDateOptional: boolean;
   tagOptional: boolean;
   categoryOptional: boolean;
 

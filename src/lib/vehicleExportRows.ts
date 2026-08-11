@@ -1,3 +1,5 @@
+import { formatDateForExport } from './dateUtils';
+
 import type { Vehicle } from '../types/vehicle';
 
 export type VehicleExportRow = Vehicle & { unavailable: boolean };
@@ -12,6 +14,8 @@ export const VEHICLE_EXPORT_HEADERS: readonly string[] = [
   'Energia',
   'Proprietário',
   'Aquisição',
+  'Data de Aquisição',
+  'Data de Início na Operação',
   'Motorista',
   'Embarcador',
   'Unidade Operacional',
@@ -39,6 +43,8 @@ export function buildVehicleExportCells(row: VehicleExportRow): string[] {
     row.energySource ?? '',
     row.owner ?? '',
     row.acquisition ? (ACQUISITION_LABELS[row.acquisition] ?? '') : '',
+    formatDateForExport(row.acquisitionDate),
+    formatDateForExport(row.operationStartDate),
     row.driverName ?? '',
     row.shipperName ?? '',
     row.operationalUnitName ?? '',

@@ -243,6 +243,7 @@ export default function VehicleDetailModal({ vehicle, onClose, onEdit }: Props) 
               <DetailField label="Rastreador" value={vehicle.tracker} />
               <DetailField label="ANTT" value={vehicle.antt} />
               <DetailField label="Data de Aquisição" value={formatDate(vehicle.acquisitionDate)} />
+              <DetailField label="Início na Operação" value={formatDate(vehicle.operationStartDate)} />
               <DetailField label="PBT (t)" value={vehicle.pbt} />
               <DetailField label="CMT (t)" value={vehicle.cmt} />
               <DetailField label="Eixos" value={vehicle.eixos} />

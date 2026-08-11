@@ -121,7 +121,7 @@ const MODULE_ALLOWLISTS: Record<string, Set<string>> = {
   vehicles: new Set([
     'plate', 'renavam', 'chassi', 'brand', 'model', 'year', 'color',
     'fleetNumber', 'axleConfigId', 'active', 'km', 'notes',
-    'vehicleType', 'fuelType', 'acquisitionDate', 'carrierType',
+    'vehicleType', 'fuelType', 'acquisitionDate', 'operationStartDate', 'carrierType',
   ]),
   drivers: new Set([
     'name', 'phone', 'active', 'licenseCategory', 'licenseNumber',
