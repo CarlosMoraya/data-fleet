@@ -1,6 +1,7 @@
 import { X, ExternalLink, UserCircle, Edit2 } from 'lucide-react';
 import React from 'react';
 
+import { useStorageFileUrl } from '../hooks/useStorageFileUrl';
 import { Driver } from '../types';
 
 interface Props {
@@ -19,22 +20,29 @@ function DetailField({ label, value }: { label: string; value?: string | null })
   );
 }
 
+/**
+ * 'driver-documents' is a private bucket: the stored pointer is resolved into
+ * a short-lived signed URL before the link becomes clickable.
+ */
 function FileField({ label, url }: { label: string; url?: string | null }) {
+  const { url: signedUrl, isLoading, error } = useStorageFileUrl(url, 'driver-documents');
+
   return (
     <div>
       <p className="text-xs text-zinc-400">{label}</p>
-      {url ? (
+      {!url && <span className="text-sm text-zinc-400">Não enviado</span>}
+      {url && isLoading && <span className="text-sm text-zinc-400">Carregando…</span>}
+      {url && signedUrl && (
         <a
-          href={url}
+          href={signedUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-sm text-orange-600 underline underline-offset-2 hover:text-orange-700"
         >
           Visualizar <ExternalLink className="h-3 w-3" />
         </a>
-      ) : (
-        <span className="text-sm text-zinc-400">Não enviado</span>
       )}
+      {url && error && <span className="text-sm text-red-600">Documento indisponível</span>}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ExternalLink, FileText, X } from 'lucide-react';
 import React, { useEffect, useId, useState } from 'react';
 
+import { useStorageFileUrl } from '../../hooks/useStorageFileUrl';
 import { cn } from '../../lib/utils';
 import { getMaintenanceBudgetApprovalDetails } from '../../services/maintenanceService';
 import BudgetItemsTable from '../BudgetItemsTable';
@@ -136,8 +137,15 @@ interface PdfViewProps {
   osNumber: string;
 }
 
+/**
+ * `url` é o ponteiro persistido do orçamento — caminho no bucket privado
+ * 'vehicle-documents' ou URL pública legada. Precisa virar URL assinada antes
+ * de alimentar o `iframe`/`href` do visualizador.
+ */
 function PdfView({ url, error, osNumber }: PdfViewProps): React.ReactElement {
-  if (error) {
+  const { url: signedUrl, isLoading, error: signError } = useStorageFileUrl(url, 'vehicle-documents');
+
+  if (error || (url && signError)) {
     return (
       <div className="flex flex-col items-center gap-2 py-12 text-center text-zinc-400">
         <AlertTriangle className="h-8 w-8 text-red-400" />
@@ -153,10 +161,17 @@ function PdfView({ url, error, osNumber }: PdfViewProps): React.ReactElement {
       </div>
     );
   }
+  if (isLoading || !signedUrl) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-orange-500" />
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-2">
       <a
-        href={url}
+        href={signedUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex items-center gap-1 self-end text-xs font-medium text-orange-600 hover:text-orange-700"
@@ -164,7 +179,7 @@ function PdfView({ url, error, osNumber }: PdfViewProps): React.ReactElement {
         <ExternalLink className="h-3.5 w-3.5" />
         Abrir em nova aba
       </a>
-      <iframe src={url} className="h-[65vh] w-full rounded-lg border border-zinc-200" title={`Orçamento ${osNumber}`} />
+      <iframe src={signedUrl} className="h-[65vh] w-full rounded-lg border border-zinc-200" title={`Orçamento ${osNumber}`} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { X, FileText, ExternalLink, Loader2 , CalendarClock } from 'lucide-react
 import React, { useState, useEffect, useMemo } from 'react';
 
 import { useAuth } from '../context/AuthContext';
+import { useStorageFileUrl } from '../hooks/useStorageFileUrl';
 import { extractCrlvData, ExtractionStatus, ExtractionResult } from '../lib/documentOcr';
 import { isFieldRequired } from '../lib/fieldSettingsMappers';
 import {
@@ -41,6 +42,40 @@ interface AvailableDriver {
   id: string;
   name: string;
   cpf: string;
+}
+
+/**
+ * Preview of an already persisted vehicle document.
+ * The bucket is private, so the stored pointer is resolved into a short-lived
+ * signed URL before it can be opened. Declared at module level so the signed
+ * URL is resolved once per document instead of on every parent render.
+ */
+function FilePreview({ url, selectedFile, label }: { url?: string; selectedFile: File | null; label: string }) {
+  const { url: signedUrl, isLoading, error } = useStorageFileUrl(selectedFile ? null : url, 'vehicle-documents');
+
+  return (
+    <>
+      {url && !selectedFile && (
+        <div className="mt-2 mb-2 flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+          <FileText className="h-4 w-4 flex-shrink-0 text-zinc-400" />
+          <span className="flex-1 truncate">{label}</span>
+          {isLoading && <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />}
+          {signedUrl && (
+            <a href={signedUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700">
+              Visualizar <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+          {error && <span className="text-xs font-medium text-red-600">Indisponível</span>}
+        </div>
+      )}
+      {selectedFile && (
+        <p className="mt-1 text-xs font-medium text-emerald-600">
+          ✓ {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+          {selectedFile.type.startsWith('image/') ? ' — será comprimida antes do upload' : ''}
+        </p>
+      )}
+    </>
+  );
 }
 
 interface AvailableShipper {
@@ -406,26 +441,6 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     <label className="block text-sm font-medium text-zinc-700">
       {children}{req(name) && <span className="ml-0.5 text-red-500">*</span>}
     </label>
-  );
-
-  const FilePreview = ({ url, selectedFile, label }: { url?: string; selectedFile: File | null; label: string }) => (
-    <>
-      {url && !selectedFile && (
-        <div className="mt-2 mb-2 flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-          <FileText className="h-4 w-4 flex-shrink-0 text-zinc-400" />
-          <span className="flex-1 truncate">{label}</span>
-          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700">
-            Visualizar <ExternalLink className="h-3 w-3" />
-          </a>
-        </div>
-      )}
-      {selectedFile && (
-        <p className="mt-1 text-xs font-medium text-emerald-600">
-          ✓ {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-          {selectedFile.type.startsWith('image/') ? ' — será comprimida antes do upload' : ''}
-        </p>
-      )}
-    </>
   );
 
   return (

@@ -71,6 +71,11 @@ function validateEvidence(file: File): void {
   }
 }
 
+/**
+ * Envia o comprovante para o bucket privado 'vehicle-documents' e devolve o
+ * CAMINHO do objeto — é isso que fica persistido em `evidence_url`. URLs
+ * públicas não existem mais neste bucket; a visualização usa URL assinada.
+ */
 async function uploadEvidence(clientId: string, vehicleId: string, eventId: string, file: File): Promise<string> {
   const prepared = file.type.startsWith('image/') ? await prepareImage(file) : file;
   validateEvidence(file); // valida o tipo REAL do arquivo recebido (não só a extensão)
@@ -80,8 +85,7 @@ async function uploadEvidence(clientId: string, vehicleId: string, eventId: stri
     .from(BUCKET)
     .upload(path, prepared, { upsert: true, contentType: prepared.type });
   if (error) throw new Error(`Erro ao enviar comprovante: ${error.message}`);
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return path;
 }
 
 export default function WarrantyImportHistoryModal({ eventId, vehicleId, clientId, label, onClose, onSaved }: Props) {

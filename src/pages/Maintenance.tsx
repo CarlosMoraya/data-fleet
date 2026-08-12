@@ -17,6 +17,7 @@ import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMain
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
 import { canWorkshopFillOrder } from '../lib/maintenanceWorkshop';
 import { isOperationsManager, canExportMaintenanceSpreadsheet } from '../lib/rolePermissions';
+import { openPrivateDocument } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import { cn } from '../lib/utils';
@@ -77,16 +78,17 @@ function budgetStatusBadge(budgetStatus?: BudgetStatus, pdfUrl?: string) {
         {labels[budgetStatus] ?? budgetStatus}
       </span>
       {pdfUrl && (
-        <a
-          href={pdfUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={e => e.stopPropagation()}
+        <button
+          type="button"
+          onClick={e => {
+            e.stopPropagation();
+            void openPrivateDocument(pdfUrl, 'vehicle-documents');
+          }}
           className="rounded p-0.5 text-zinc-400 hover:text-blue-600"
           title="Ver PDF do orçamento"
         >
           <ExternalLink className="h-3 w-3" />
-        </a>
+        </button>
       )}
     </div>
   );

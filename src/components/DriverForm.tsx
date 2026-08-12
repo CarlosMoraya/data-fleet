@@ -2,6 +2,7 @@ import { X, FileText, ExternalLink, Loader2, UserPlus, Eye, EyeOff } from 'lucid
 import React, { useState, useEffect, useMemo } from 'react';
 
 import { useAuth } from '../context/AuthContext';
+import { useStorageFileUrl } from '../hooks/useStorageFileUrl';
 import { extractCnhData, ExtractionStatus, ExtractionResult } from '../lib/documentOcr';
 import { isDriverFieldRequired } from '../lib/driverFieldSettingsMappers';
 import {
@@ -26,6 +27,40 @@ interface DriverFormFiles {
   certificate2: File | null;
   certificate3: File | null;
   serviceContract: File | null;
+}
+
+/**
+ * Preview of an already persisted driver document.
+ * The bucket is private, so the stored pointer is resolved into a short-lived
+ * signed URL before it can be opened. Declared at module level so the signed
+ * URL is resolved once per document instead of on every parent render.
+ */
+function FilePreview({ url, selectedFile, label }: { url?: string; selectedFile: File | null; label: string }) {
+  const { url: signedUrl, isLoading, error } = useStorageFileUrl(selectedFile ? null : url, 'driver-documents');
+
+  return (
+    <>
+      {url && !selectedFile && (
+        <div className="mt-2 mb-2 flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+          <FileText className="h-4 w-4 flex-shrink-0 text-zinc-400" />
+          <span className="flex-1 truncate">{label}</span>
+          {isLoading && <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />}
+          {signedUrl && (
+            <a href={signedUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700">
+              Visualizar <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+          {error && <span className="text-xs font-medium text-red-600">Indisponível</span>}
+        </div>
+      )}
+      {selectedFile && (
+        <p className="mt-1 text-xs font-medium text-emerald-600">
+          ✓ {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+          {selectedFile.type.startsWith('image/') ? ' — será comprimida antes do upload' : ''}
+        </p>
+      )}
+    </>
+  );
 }
 
 interface DriverFormProps {
@@ -263,26 +298,6 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
     </label>
   );
 
-  const FilePreview = ({ url, selectedFile, label }: { url?: string; selectedFile: File | null; label: string }) => (
-    <>
-      {url && !selectedFile && (
-        <div className="mt-2 mb-2 flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-          <FileText className="h-4 w-4 flex-shrink-0 text-zinc-400" />
-          <span className="flex-1 truncate">{label}</span>
-          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700">
-            Visualizar <ExternalLink className="h-3 w-3" />
-          </a>
-        </div>
-      )}
-      {selectedFile && (
-        <p className="mt-1 text-xs font-medium text-emerald-600">
-          ✓ {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-          {selectedFile.type.startsWith('image/') ? ' — será comprimida antes do upload' : ''}
-        </p>
-      )}
-    </>
-  );
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:p-6">
       <div className="my-8 flex max-h-full w-full max-w-3xl flex-col rounded-2xl bg-white shadow-xl">
@@ -319,6 +334,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     <input
                       type="email"
                       required
+                     
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       placeholder="motorista@empresa.com"
@@ -334,6 +350,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                         data-testid="password-input"
                         type={showPassword ? 'text' : 'password'}
                         required
+                       
                         minLength={6}
                         value={password}
                         onChange={e => setPassword(e.target.value)}
@@ -367,6 +384,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="text"
                     name="name"
                     required
+                   
                     value={formData.name || ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -381,6 +399,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="text"
                     name="cpf"
                     required
+                   
                     inputMode="numeric"
                     value={formData.cpf || ''}
                     onChange={handleChange}
@@ -395,6 +414,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                   <input
                     type="tel"
                     name="phone"
+                   
                     inputMode="numeric"
                     value={formData.phone || ''}
                     onChange={handleChange}
@@ -450,6 +470,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="date"
                     name="issueDate"
                     required={req('issueDate')}
+                   
                     value={formData.issueDate || ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -461,6 +482,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="date"
                     name="expirationDate"
                     required={req('expirationDate')}
+                   
                     value={formData.expirationDate || ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -472,6 +494,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="text"
                     name="registrationNumber"
                     required={req('registrationNumber')}
+                   
                     inputMode="numeric"
                     value={formData.registrationNumber || ''}
                     onChange={handleChange}
@@ -484,6 +507,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="text"
                     name="category"
                     required={req('category')}
+                   
                     value={formData.category || ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -496,6 +520,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="text"
                     name="renach"
                     required={req('renach')}
+                   
                     value={formData.renach || ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -574,6 +599,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="date"
                     name="grExpirationDate"
                     required={req('grExpirationDate')}
+                   
                     value={formData.grExpirationDate || ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -595,6 +621,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                       type="text"
                       name="courseName1"
                       required={req('courseName1')}
+                     
                       value={formData.courseName1 || ''}
                       onChange={handleChange}
                       className={inputClass}
@@ -622,6 +649,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                       type="text"
                       name="courseName2"
                       required={req('courseName2')}
+                     
                       value={formData.courseName2 || ''}
                       onChange={handleChange}
                       className={inputClass}
@@ -649,6 +677,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                       type="text"
                       name="courseName3"
                       required={req('courseName3')}
+                     
                       value={formData.courseName3 || ''}
                       onChange={handleChange}
                       className={inputClass}

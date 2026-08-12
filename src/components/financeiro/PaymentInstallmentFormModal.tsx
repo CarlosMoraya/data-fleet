@@ -16,7 +16,7 @@ import {
   clearSharedBoletoFromDrafts,
   countDraftsWithDistinctBoleto,
 } from '../../lib/sharedBoleto';
-import { uploadFinancialDocument } from '../../lib/storageHelpers';
+import { openPrivateDocument, uploadFinancialDocument } from '../../lib/storageHelpers';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import {
@@ -362,14 +362,13 @@ export default function PaymentInstallmentFormModal({
                   </p>
                 </div>
                 {selectedOrder.budgetPdfUrl && (
-                  <a
-                    href={selectedOrder.budgetPdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => { void openPrivateDocument(selectedOrder.budgetPdfUrl, 'vehicle-documents'); }}
                     className="text-xs font-medium text-orange-600 hover:text-orange-700"
                   >
                     📄 Ver orçamento
-                  </a>
+                  </button>
                 )}
               </div>
             </div>

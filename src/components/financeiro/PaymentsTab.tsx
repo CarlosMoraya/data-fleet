@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { resolveExportSelection } from '../../lib/paymentExportSelection';
 import { buildPaymentPendingQueue } from '../../lib/paymentPendingDocs';
 import { canCreatePayments, canMarkPaid } from '../../lib/rolePermissions';
-import { getFinancialDocumentSignedUrl } from '../../lib/storageHelpers';
+import { getFinancialDocumentSignedUrl, openPrivateDocument } from '../../lib/storageHelpers';
 import { cn } from '../../lib/utils';
 import { SpreadsheetPaymentProvider } from '../../services/financialExport/spreadsheetPaymentProvider';
 import { XlsxPaymentProvider } from '../../services/financialExport/xlsxPaymentProvider';
@@ -426,16 +426,15 @@ export default function PaymentsTab(): React.ReactElement {
                         <div className="flex items-center gap-1.5 text-xs">
                           {/* Orçamento (budget PDF) — somente origem manutenção */}
                           {getBudgetPdfUrl(i) && (
-                            <a
-                              href={getBudgetPdfUrl(i)}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => { void openPrivateDocument(getBudgetPdfUrl(i), 'vehicle-documents'); }}
                               title="Orçamento"
                               aria-label="Orçamento"
                               className="text-zinc-500 hover:text-orange-600"
                             >
                               <FileText className="h-3.5 w-3.5" />
-                            </a>
+                            </button>
                           )}
                           {/* Boleto via signed URL */}
                           {i.paymentMethod === 'boleto' && i.boletoUrl && (
