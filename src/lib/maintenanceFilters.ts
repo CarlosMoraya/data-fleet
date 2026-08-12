@@ -146,8 +146,8 @@ export function matchesMaintenanceCard(
   }
 }
 
-export function daysInWorkshop(entryDate: string): number {
+export function daysInWorkshop(entryDate: string, actualExitDate?: string): number {
   const entry = new Date(entryDate);
-  const today = new Date();
-  return Math.floor((today.getTime() - entry.getTime()) / 86400000);
+  const end = actualExitDate ? new Date(actualExitDate) : new Date();
+  return Math.floor((end.getTime() - entry.getTime()) / 86400000);
 }

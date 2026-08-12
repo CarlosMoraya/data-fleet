@@ -374,6 +374,10 @@ describe('matchesMaintenanceCard', () => {
 });
 
 describe('daysInWorkshop', () => {
+  it('uses actual exit date as the end of a closed workshop stay', () => {
+    expect(daysInWorkshop('2026-08-05', '2026-08-06T08:27:00-03:00')).toBe(1);
+  });
+
   it('returns the correct number of days for a past date', () => {
     const fiveDaysAgo = new Date(Date.now() - 5 * 86400000);
     const dateStr = fiveDaysAgo.toISOString().slice(0, 10);

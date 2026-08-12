@@ -75,6 +75,7 @@ describe('maintenanceExportRows', () => {
     expect(cells[10]).toBe('02/08/2026');
     expect(cells[11]).toBe('10/08/2026');
     expect(cells[12]).toBe('09/08/2026');
+    expect(cells[13]).toBe('7');
     expect(cells[14]).toBe('128000');
     expect(cells[15]).toBe('Aprovado');
     expect(cells[16]).toBe('1.234,50');

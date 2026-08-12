@@ -605,7 +605,7 @@ export default function Maintenance() {
               </thead>
               <tbody className="divide-y divide-zinc-50">
                 {filtered.map(o => {
-                  const days = daysInWorkshop(o.entryDate);
+                  const days = daysInWorkshop(o.entryDate, o.actualExitDate);
                   return (
                     <tr key={o.id} className="transition-colors hover:bg-zinc-50">
                       {blockWrite && (

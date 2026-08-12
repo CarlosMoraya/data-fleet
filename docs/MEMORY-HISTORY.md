@@ -2,6 +2,30 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-08-12: Correção de Dias em Oficina após a saída real
+
+Implementado o escopo fechado de `IMPLEMENTATION_FIXBUG.md` para o bug em que uma OS retirada continuava acumulando dias desde a entrada até o momento atual. Nenhuma dependência foi instalada, nenhum arquivo fora da allowlist foi alterado e a alteração local preexistente de `BudgetPdfLink`/`useStorageFileUrl` em `MaintenanceDetailModal.tsx` foi preservada.
+
+### Causa e correção
+
+`daysInWorkshop` usava sempre `new Date()` como término. O helper passou a aceitar `actualExitDate?: string` e usa `new Date(actualExitDate)` quando preenchido, preservando o parse da entrada, a divisão por `86400000` e `Math.floor`; sem saída real, continua usando o momento atual. O modal deixou de manter a cópia local e, junto com a listagem e o XLSX, passou a fornecer `actualExitDate` ao helper.
+
+Arquivos modificados: `src/lib/maintenanceFilters.ts`, `src/lib/maintenanceFilters.test.ts`, `src/components/MaintenanceDetailModal.tsx`, `src/pages/Maintenance.tsx`, `src/lib/maintenanceExportRows.ts` e `src/lib/maintenanceExportRows.test.ts`.
+
+### Regressões e validações
+
+Foi adicionado o caso unitário `05/08/2026 → 06/08/2026 08:27 = 1`; a fixture completa do export passou a verificar `cells[13] === '7'` para `02/08/2026 → 09/08/2026`. Os resultados reais foram:
+
+- testes direcionados: **54/54**;
+- `npx tsc --noEmit`: **0 erros**;
+- `npm run lint`: **0 erros / 220 warnings**, sem warning novo causado pela correção;
+- `npm run test:unit`: **195 arquivos, 1722/1722 testes**;
+- `npm run test:smoke`: **7/7**.
+
+### Limitação da validação manual
+
+O roteiro manual da UI não pôde ser executado neste ambiente porque o Chromium falhou antes de abrir a página com `content/browser/sandbox_host_linux.cc:41 — Operation not permitted`. Assim, não foi declarada validação manual do modal, da coluna da listagem ou do XLSX; é necessário executar o roteiro em um ambiente com navegador Chromium funcional e acesso autenticado aos dados da OS `OS-2608-4487` (ou equivalente), confirmando também uma OS aberta.
+
 ## Sessão — 2026-08-07: Histórico de orçamentos aprovados e reprovados em segmento próprio da aba de Orçamentos, com filtros e exportação XLSX
 
 Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 2 — adição com integração ao sistema existente), Etapas 1 a 6. Nenhuma decisão de arquitetura foi tomada além do documento; nenhum arquivo fora da lista fechada foi criado ou alterado; nenhuma migration, coluna, trigger, RPC, policy ou dependência foi criada/aplicada; `src/pages/BudgetApprovals.tsx`, `package.json`/`package-lock.json` e `supabase/migrations/` permanecem inalterados por esta sessão.

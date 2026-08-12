@@ -24,7 +24,7 @@ function formatExportMoney(value: number): string {
 
 export function buildMaintenanceExportCells(row: MaintenanceExportRow): string[] {
   const budgetStatus: BudgetStatus = row.budgetStatus ?? 'sem_orcamento';
-  const daysStr = row.entryDate ? String(daysInWorkshop(row.entryDate)) : '';
+  const daysStr = row.entryDate ? String(daysInWorkshop(row.entryDate, row.actualExitDate)) : '';
 
   return [
     row.os ?? '',
