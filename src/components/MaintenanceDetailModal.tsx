@@ -4,6 +4,7 @@ import React from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { formatDate } from '../lib/dateUtils';
+import { daysInWorkshop } from '../lib/maintenanceFilters';
 import { budgetItemFromRow, type MaintenanceBudgetItemRow } from '../lib/maintenanceMappers';
 import { canManagePartPhotos, canViewPartPhotos } from '../lib/rolePermissions';
 import { supabase } from '../lib/supabase';
@@ -50,12 +51,6 @@ function typeColor(type: MaintenanceOrder['type']) {
   }
 }
 
-function daysInWorkshop(entryDate: string) {
-  const entry = new Date(entryDate);
-  const today = new Date();
-  return Math.floor((today.getTime() - entry.getTime()) / 86400000);
-}
-
 function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -72,7 +67,7 @@ function Field({ label, value, className }: { label: string; value: React.ReactN
 export default function MaintenanceDetailModal({ order, onClose }: Props) {
   const { user } = useAuth();
   const isWorkshopUser = user?.role === 'Workshop';
-  const days = daysInWorkshop(order.entryDate);
+  const days = daysInWorkshop(order.entryDate, order.actualExitDate);
 
   const hasBudget = order.budgetStatus && order.budgetStatus !== 'sem_orcamento';
 
