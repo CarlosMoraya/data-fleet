@@ -94,13 +94,15 @@ export async function saveMaintenanceOrder(
     orderId = (inserted as { id: string }).id;
   }
 
-  // Upload do PDF de orçamento
+  // Upload do PDF de orçamento.
+  // 'vehicle-documents' é privado: persistimos o CAMINHO do objeto, nunca a URL
+  // assinada (que é temporária e não pode ser gravada no banco).
   if (budgetFile) {
-    const pdfUrl = await uploadMaintenanceBudget(effectiveClientId, orderId, budgetFile);
+    const pdfPath = await uploadMaintenanceBudget(effectiveClientId, orderId, budgetFile);
     const { error } = await supabase
       .from('maintenance_orders')
       .update({
-        budget_pdf_url: pdfUrl,
+        budget_pdf_url: pdfPath,
         budget_status: 'pendente',
         status: 'Aguardando aprovação',
         budget_rejection_reason: null,

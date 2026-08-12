@@ -21,6 +21,7 @@ import {
   type BudgetItem,
   type MaintenanceBudgetItemRow,
 } from '../lib/maintenanceMappers';
+import { openPrivateDocument } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
@@ -151,16 +152,17 @@ function OrderRow({ order, user, onApprove, onReject, approving, lastKmInfo }: O
         </td>
         <td className="px-4 py-3">
           {order.budgetPdfUrl && (
-            <a
-              href={order.budgetPdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={e => e.stopPropagation()}
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation();
+                void openPrivateDocument(order.budgetPdfUrl, 'vehicle-documents');
+              }}
               className="flex items-center gap-1 text-xs font-medium text-orange-600 hover:text-orange-700"
             >
               <ExternalLink className="h-3.5 w-3.5" />
               PDF
-            </a>
+            </button>
           )}
         </td>
         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>

@@ -1,5 +1,5 @@
 import { partPhotoFromRow } from '../lib/maintenanceMappers';
-import { uploadMaintenancePartPhoto } from '../lib/storageHelpers';
+import { extractStoragePath, uploadMaintenancePartPhoto } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 
 import type { MaintenancePartPhoto, MaintenancePartPhotoRow, PartPhotoType } from '../types/maintenance';
@@ -49,11 +49,10 @@ export async function addPartPhoto(params: {
 }
 
 export async function deletePartPhoto(photo: { id: string; url: string }): Promise<void> {
-  const marker = '/vehicle-documents/';
-  const idx = photo.url.indexOf(marker);
+  // Aceita tanto registros antigos (URL pública) quanto novos (caminho do objeto).
+  const path = extractStoragePath(photo.url, 'vehicle-documents');
 
-  if (idx !== -1) {
-    const path = photo.url.slice(idx + marker.length);
+  if (path) {
     const { error: storageError } = await supabase.storage.from('vehicle-documents').remove([path]);
     if (storageError) {
       console.warn('Aviso: não foi possível deletar a foto da peça do Storage.', storageError.message);

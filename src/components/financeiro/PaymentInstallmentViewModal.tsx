@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import React from 'react';
 
-import { getFinancialDocumentSignedUrl } from '../../lib/storageHelpers';
+import { getFinancialDocumentSignedUrl, openPrivateDocument } from '../../lib/storageHelpers';
 import { cn } from '../../lib/utils';
 import { getPaymentInstallmentAuditors } from '../../services/paymentInstallmentService';
 
@@ -130,14 +130,13 @@ export default function PaymentInstallmentViewModal({
             <h3 className="mb-3 text-xs font-semibold tracking-wider text-zinc-500 uppercase">Documentos</h3>
             <div className="flex flex-wrap gap-2">
               {installment.budgetPdfUrl && (
-                <a
-                  href={installment.budgetPdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => { void openPrivateDocument(installment.budgetPdfUrl, 'vehicle-documents'); }}
                   className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
                 >
                   Orçamento
-                </a>
+                </button>
               )}
               {installment.boletoUrl && (
                 <DocumentButton label="Boleto" path={installment.boletoUrl} />

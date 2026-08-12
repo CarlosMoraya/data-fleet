@@ -16,6 +16,7 @@ import {
   type BudgetItem,
   type MaintenanceBudgetItemRow,
 } from '../../lib/maintenanceMappers';
+import { openPrivateDocument } from '../../lib/storageHelpers';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { XlsxBudgetHistoryProvider } from '../../services/budgetHistoryExport/xlsxBudgetHistoryProvider';
@@ -99,15 +100,14 @@ function HistoryRow({ order }: HistoryRowProps) {
         <td className="px-4 py-3 text-sm text-zinc-500">{formatDate(order.budgetReviewedAt)}</td>
         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
           {order.budgetPdfUrl && (
-            <a
-              href={order.budgetPdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => { void openPrivateDocument(order.budgetPdfUrl, 'vehicle-documents'); }}
               className="flex items-center gap-1 text-xs font-medium text-orange-600 hover:text-orange-700"
             >
               <ExternalLink className="h-3.5 w-3.5" />
               PDF
-            </a>
+            </button>
           )}
         </td>
       </tr>

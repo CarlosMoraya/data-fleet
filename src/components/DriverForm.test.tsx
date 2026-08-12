@@ -9,6 +9,13 @@ vi.mock('../context/AuthContext', () => ({
   }),
 }));
 
+// 'driver-documents' é privado: o valor persistido é um caminho e o link só
+// existe depois que a URL assinada é resolvida.
+vi.mock('../lib/storageHelpers', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/storageHelpers')>()),
+  getPrivateDocumentSignedUrl: vi.fn(() => Promise.resolve('https://signed.example/contrato.pdf?token=abc')),
+}));
+
 import DriverForm from './DriverForm';
 
 import type { Driver } from '../types/driver';
@@ -83,7 +90,7 @@ describe('DriverForm', () => {
     expect(container.querySelectorAll('input[type="file"]')).toHaveLength(5);
   });
 
-  it('exibe o link do contrato existente para PJ', () => {
+  it('exibe o link do contrato existente para PJ usando URL assinada', async () => {
     renderWithAct(<DriverForm {...baseProps({
       id: 'driver-1',
       clientId: 'client-1',
@@ -91,10 +98,15 @@ describe('DriverForm', () => {
       name: 'Maria Silva',
       cpf: '12345678901',
       employmentRegime: 'PJ',
-      serviceContractUpload: 'https://x/contrato.pdf',
+      serviceContractUpload: 'client-1/driver-1/service-contract.pdf',
     })} />);
 
-    expect(container.querySelector('a[href="https://x/contrato.pdf"]')).not.toBeNull();
+    // O caminho bruto nunca vira href.
+    expect(container.querySelector('a[href="client-1/driver-1/service-contract.pdf"]')).toBeNull();
+
+    await act(async () => { await Promise.resolve(); });
+
+    expect(container.querySelector('a[href="https://signed.example/contrato.pdf?token=abc"]')).not.toBeNull();
     expect(container.textContent).toContain('Visualizar');
   });
 

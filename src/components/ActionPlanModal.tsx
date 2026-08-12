@@ -2,6 +2,7 @@ import { X, Camera, Loader2, CheckCircle, UserCheck, XCircle, Paperclip, FileTex
 import React, { useEffect, useRef, useState } from 'react';
 
 import { useAuth } from '../context/AuthContext';
+import { useStorageFileUrl } from '../hooks/useStorageFileUrl';
 import { actionPlanToRow, actionStatusLabel, actionStatusColor } from '../lib/actionPlanMappers';
 import { actionPlanOriginOf } from '../lib/actionPlanOrigin';
 import { getFleetTicketAttachmentSignedUrl, uploadActionPlanEvidence } from '../lib/storageHelpers';
@@ -62,6 +63,14 @@ export default function ActionPlanModal({ plan, onClose, onSaved, onReassigned }
     actionPlanOriginOf(plan) === 'fleet_ticket' ? undefined : plan.photoUrl,
   );
   const [photoLoadError, setPhotoLoadError] = useState(false);
+
+  // A evidência de conclusão vive no bucket privado 'vehicle-documents': o valor
+  // persistido é um caminho (ou URL pública legada) e vira URL assinada aqui.
+  // A foto de origem `checklist` continua vindo do bucket público checklist-photos.
+  const { url: resolvedEvidenceUrl, error: evidenceLoadError } = useStorageFileUrl(
+    plan.conclusionEvidenceUrl,
+    'vehicle-documents',
+  );
 
   const canReassignResponsible = isCoordinatorPlus && REASSIGNABLE_STATUSES.includes(plan.status);
 
@@ -148,15 +157,16 @@ export default function ActionPlanModal({ plan, onClose, onSaved, onReassigned }
     setSaving(true);
     setError('');
     try {
-      let uploadedUrl: string | undefined = plan.conclusionEvidenceUrl;
+      // Persistimos o CAMINHO no bucket privado, nunca uma URL assinada.
+      let evidencePointer: string | undefined = plan.conclusionEvidenceUrl;
       if (evidenceFile) {
         setUploading(true);
-        uploadedUrl = await uploadActionPlanEvidence(currentClient.id, plan.id, evidenceFile);
+        evidencePointer = await uploadActionPlanEvidence(currentClient.id, plan.id, evidenceFile);
         setUploading(false);
       }
       await update({
         status: 'awaiting_conclusion',
-        conclusionEvidenceUrl: uploadedUrl || undefined,
+        conclusionEvidenceUrl: evidencePointer || undefined,
         completionNotes: notes.trim() || undefined,
       });
     } catch (err: unknown) {
@@ -331,10 +341,13 @@ export default function ActionPlanModal({ plan, onClose, onSaved, onReassigned }
             <div className="space-y-2 rounded-xl border border-orange-100 bg-orange-50 p-4">
               <p className="text-xs font-semibold tracking-wider text-orange-600 uppercase">Conclusão enviada — aguardando aprovação</p>
               {plan.completionNotes && <p className="text-sm text-zinc-700">{plan.completionNotes}</p>}
-              {plan.conclusionEvidenceUrl && (
+              {plan.conclusionEvidenceUrl && evidenceLoadError && (
+                <p className="text-xs text-zinc-500">Evidência indisponível no momento.</p>
+              )}
+              {plan.conclusionEvidenceUrl && resolvedEvidenceUrl && (
                 plan.conclusionEvidenceUrl.toLowerCase().includes('.pdf') ? (
                   <a
-                    href={plan.conclusionEvidenceUrl}
+                    href={resolvedEvidenceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm text-orange-600 hover:bg-orange-50"
@@ -344,8 +357,8 @@ export default function ActionPlanModal({ plan, onClose, onSaved, onReassigned }
                   </a>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <img src={plan.conclusionEvidenceUrl} alt="evidência" className="h-20 w-20 rounded-lg object-cover" />
-                    <a href={plan.conclusionEvidenceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-orange-500 hover:underline">
+                    <img src={resolvedEvidenceUrl} alt="evidência" className="h-20 w-20 rounded-lg object-cover" />
+                    <a href={resolvedEvidenceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-orange-500 hover:underline">
                       <Camera className="h-3 w-3" />
                       Ampliar
                     </a>

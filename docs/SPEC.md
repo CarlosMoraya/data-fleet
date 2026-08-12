@@ -176,6 +176,24 @@ As três tabelas usam `CHECK` em vez de enums PostgreSQL. A constraint de forma 
 
 O bucket `fleet-ticket-attachments` é privado. Os paths seguem `<client_id>/fleet-tickets/<ticket_id>/...`, uploads usam `validateFile()` e a UI limita a três arquivos por criação. A leitura é feita por signed URL com validade de uma hora.
 
+## Storage de documentos (V-01)
+
+Os buckets `vehicle-documents` e `driver-documents` são **privados**. A leitura anônima foi fechada pela migration `20260811010000_make_document_buckets_private.sql`; as policies de `SELECT` exigem usuário autenticado e mantêm o isolamento por tenant, com as exceções já vigentes de `Admin Master` e, em `vehicle-documents`, de oficina com parceria ativa.
+
+O banco persiste o **caminho** do objeto (`<client_id>/...`), nunca uma URL. A visualização gera uma **URL assinada com validade de 3600 segundos** no momento da leitura, por `getPrivateDocumentSignedUrl()` em `src/lib/storageHelpers.ts` ou pelo hook `src/hooks/useStorageFileUrl.ts`. A URL assinada é um bearer link temporário e não é persistida em banco, `localStorage` nem logs; ao reabrir a tela, outra é gerada.
+
+Registros antigos que ainda guardam a URL pública continuam abrindo: `extractStoragePath()` converte URL pública ou assinada legada para caminho na leitura, sem backfill destrutivo, e rejeita valores que não pertençam ao bucket esperado.
+
+`checklist-photos` permanece **público**, por ser o bucket de fotos operacionais usado pelo fluxo offline de checklists e inspeção de pneus. `financial-documents` e `fleet-ticket-attachments` já eram privados e não foram alterados.
+
+## OCR de documentos (V-06)
+
+O processamento de documentos pelo **Gemini (`gemini-2.5-flash`)** é autorizado. A Edge Function `gemini-ocr` aplica validação server-side antes de qualquer chamada externa — MIME permitido (PDF, JPG, PNG, WEBP), assinatura real do arquivo, Base64 válido, máximo de 10 MB por arquivo e teto técnico do prompt —, respondendo `400`, `413`, `415`, `429`, `502` ou `500` conforme o caso, sem expor stack trace, chave ou conteúdo do documento.
+
+A cota por usuário é reservada atomicamente **antes** da chamada ao Gemini, pela RPC `public.consume_gemini_ocr_quota(p_file_bytes bigint)` (`SECURITY DEFINER`, `auth.uid()`, bloqueio de linha). Em uma janela fixa de uma hora em UTC são permitidas no máximo **20 chamadas** e **104857600 bytes (100 MB)** por usuário; ao estourar, a função devolve `429` com o motivo e os segundos para nova tentativa. A tabela `public.gemini_ocr_usage_windows` tem RLS habilitado sem policies: só a RPC acessa seus dados.
+
+O limite é por usuário e não substitui o monitoramento de custo da conta Google nem uma proteção global contra muitos usuários simultâneos — limitação conhecida e aceita.
+
 ### Frontend
 
 - `/sos`: formulário mobile-first para Driver, com GPS, localização manual quando necessário, descrição mínima de 5 caracteres e anexos opcionais.

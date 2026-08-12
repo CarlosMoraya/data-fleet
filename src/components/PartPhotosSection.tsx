@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Camera, Loader2, Trash2, Upload } from 'lucide-react';
 import React from 'react';
 
+import { useStorageFileUrls } from '../hooks/useStorageFileUrl';
 import { canAddMorePartPhotos, PART_PHOTO_LIMIT, remainingPartPhotoSlots } from '../lib/maintenanceWorkshop';
 import { stampTimestampOnImage } from '../lib/stampTimestampOnImage';
 import {
@@ -156,6 +157,15 @@ export default function PartPhotosSection({
     queryFn: () => listPartPhotos(orderId),
   });
 
+  // Fotos persistidas vivem no bucket privado 'vehicle-documents': o ponteiro
+  // salvo (caminho novo ou URL pública legada) vira URL assinada sob demanda.
+  // Os previews locais continuam usando blob: e não passam por aqui.
+  const persistedPointers = React.useMemo(
+    () => persistedPhotos.map((photo) => photo.url),
+    [persistedPhotos],
+  );
+  const { urls: persistedPhotoUrls } = useStorageFileUrls(persistedPointers, 'vehicle-documents');
+
   React.useEffect(() => {
     if (mode !== 'staged') return;
 
@@ -307,7 +317,7 @@ export default function PartPhotosSection({
       ...persisted.map((photo) => (
         <React.Fragment key={photo.id}>
           <PhotoThumb
-            src={photo.url}
+            src={persistedPhotoUrls[photo.url] ?? ''}
             caption={photo.caption}
             removable={mode === 'immediate' && canManage}
             onRemove={mode === 'immediate' && canManage ? () => void removePersisted(photo) : undefined}
@@ -346,7 +356,7 @@ export default function PartPhotosSection({
         isUploading={uploadingType === type}
       />
     );
-  }, [canManage, captionInputs, draftPreviewUrls, drafts, mode, openFilePicker, persistedPhotos, removeDraft, removePersisted, setCaptionInput, updateDraftCaption, uploadingType]);
+  }, [canManage, captionInputs, draftPreviewUrls, drafts, mode, openFilePicker, persistedPhotos, persistedPhotoUrls, removeDraft, removePersisted, setCaptionInput, updateDraftCaption, uploadingType]);
 
   if (cameraType) {
     return <CameraCapture onCapture={(f) => { void handleCapture(f); }} onClose={() => setCameraType(null)} />;

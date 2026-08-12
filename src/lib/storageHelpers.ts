@@ -4,6 +4,132 @@ const BUCKET = 'vehicle-documents';
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 const ACCEPTED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
+// ─────────────────────────────────────────────────────────────
+// Private document buckets (V-01)
+// 'vehicle-documents' and 'driver-documents' are PRIVATE buckets:
+// the database stores the object PATH and the app resolves a
+// short-lived signed URL on demand. Never use getPublicUrl here.
+// ─────────────────────────────────────────────────────────────
+
+export const PRIVATE_DOCUMENT_BUCKETS = ['vehicle-documents', 'driver-documents'] as const;
+
+export type PrivateDocumentBucket = (typeof PRIVATE_DOCUMENT_BUCKETS)[number];
+
+/** TTL, in seconds, of every signed URL generated for a private document. */
+export const SIGNED_URL_TTL_SECONDS = 3600;
+
+const STORAGE_OBJECT_PREFIXES = ['public', 'sign', 'authenticated'];
+
+function isPrivateDocumentBucket(value: string): value is PrivateDocumentBucket {
+  return (PRIVATE_DOCUMENT_BUCKETS as readonly string[]).includes(value);
+}
+
+function extractPathFromStorageUrl(value: string, bucket: PrivateDocumentBucket): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return null;
+  }
+
+  // Expected shape: /storage/v1/object/{public|sign|authenticated}/{bucket}/{path}
+  const segments = parsed.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+  const objectIdx = segments.findIndex(
+    (segment, idx) =>
+      segment === 'object' && segments[idx - 1] === 'v1' && segments[idx - 2] === 'storage',
+  );
+  if (objectIdx === -1) return null;
+
+  const prefix = segments[objectIdx + 1];
+  if (!prefix || !STORAGE_OBJECT_PREFIXES.includes(prefix)) return null;
+
+  if (segments[objectIdx + 2] !== bucket) return null;
+
+  const path = segments.slice(objectIdx + 3).join('/');
+  return path || null;
+}
+
+/**
+ * Resolves a persisted document pointer into a canonical Storage path.
+ *
+ * Accepts three historical formats:
+ *  - a canonical path already stored as such (`{clientId}/{vehicleId}/crlv.pdf`);
+ *  - a legacy Supabase public URL;
+ *  - a legacy Supabase signed URL.
+ *
+ * Returns `null` when the value does not belong to the expected bucket, so an
+ * arbitrary external URL is never promoted into a trusted document link.
+ */
+export function extractStoragePath(
+  value: string | null | undefined,
+  bucket: PrivateDocumentBucket,
+): string | null {
+  if (!value) return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.includes('://')) {
+    return extractPathFromStorageUrl(trimmed, bucket);
+  }
+
+  // Bare path: reject absolute paths and traversal attempts.
+  if (trimmed.startsWith('/') || trimmed.split('/').includes('..')) return null;
+
+  return trimmed;
+}
+
+/**
+ * Generates a short-lived signed URL for a private document pointer.
+ * The pointer may be a canonical path or a legacy public/signed URL.
+ * Never persist the returned URL — it is a temporary bearer link.
+ */
+export async function getPrivateDocumentSignedUrl(
+  value: string | null | undefined,
+  bucket: PrivateDocumentBucket,
+): Promise<string> {
+  const path = extractStoragePath(value, bucket);
+  if (!path) throw new Error('Documento inválido ou fora do armazenamento esperado.');
+
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+
+  if (error || !data) {
+    throw new Error(`Erro ao gerar URL do documento: ${error?.message ?? 'desconhecido'}`);
+  }
+
+  return data.signedUrl;
+}
+
+/**
+ * Resolves a private document pointer and opens it in a new tab.
+ *
+ * Used by links that used to point straight at a public URL: the signed URL is
+ * generated on click, so listing screens never mint URLs for rows nobody opens.
+ * Mirrors the existing `openSignedUrl` pattern of the Financeiro components.
+ */
+export async function openPrivateDocument(
+  value: string | null | undefined,
+  bucket: PrivateDocumentBucket,
+): Promise<void> {
+  try {
+    const url = await getPrivateDocumentSignedUrl(value, bucket);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Falha ao abrir documento.';
+    window.alert(msg);
+  }
+}
+
+/** Narrowing helper for callers that receive the bucket name as a plain string. */
+export function assertPrivateDocumentBucket(bucket: string): PrivateDocumentBucket {
+  if (!isPrivateDocumentBucket(bucket)) {
+    throw new Error(`Bucket não suportado para documentos privados: ${bucket}`);
+  }
+  return bucket;
+}
+
 /**
  * Compresses an image file using canvas API.
  * PDFs are returned as-is.
@@ -85,7 +211,7 @@ export function validateFile(file: File): void {
 /**
  * Uploads a vehicle document to Supabase Storage.
  * Images are compressed before upload. PDFs are sent as-is.
- * Returns the public URL of the uploaded file.
+ * Returns the storage PATH (bucket is private — resolve a signed URL to view).
  */
 export async function uploadVehicleDocument(
   clientId: string,
@@ -105,24 +231,25 @@ export async function uploadVehicleDocument(
 
   if (error) throw new Error(`Erro ao enviar documento: ${error.message}`);
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return path;
 }
 
 /**
- * Deletes a vehicle document from Supabase Storage using its public URL.
- * Silently ignores if the URL is empty or invalid.
+ * Resolves a vehicle document pointer (path or legacy public URL) into a signed URL.
+ */
+export async function getVehicleDocumentSignedUrl(value: string): Promise<string> {
+  return getPrivateDocumentSignedUrl(value, BUCKET);
+}
+
+/**
+ * Deletes a vehicle document from Supabase Storage.
+ * Accepts either the canonical path or a legacy public URL.
+ * Silently ignores if the pointer is empty or does not belong to the bucket.
  */
 export async function deleteVehicleDocument(crlvUrl: string): Promise<void> {
-  if (!crlvUrl) return;
+  const path = extractStoragePath(crlvUrl, BUCKET);
+  if (!path) return;
 
-  // Extract the path after the bucket name from the full URL
-  // e.g. https://.../storage/v1/object/public/vehicle-documents/clientId/vehicleId/crlv.pdf
-  const marker = `/vehicle-documents/`;
-  const idx = crlvUrl.indexOf(marker);
-  if (idx === -1) return;
-
-  const path = crlvUrl.slice(idx + marker.length);
   const { error } = await supabase.storage.from(BUCKET).remove([path]);
   if (error) console.warn('Aviso: não foi possível deletar o documento do Storage.', error.message);
 }
@@ -136,7 +263,7 @@ export async function deleteVehicleDocument(crlvUrl: string): Promise<void> {
 /**
  * Uploads a maintenance budget PDF or image to Supabase Storage.
  * Images are compressed before upload. PDFs are sent as-is.
- * Returns the public URL of the uploaded file.
+ * Returns the storage PATH (bucket is private — resolve a signed URL to view).
  */
 export async function uploadMaintenanceBudget(
   clientId: string,
@@ -155,8 +282,7 @@ export async function uploadMaintenanceBudget(
 
   if (error) throw new Error(`Erro ao enviar orçamento: ${error.message}`);
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return path;
 }
 
 export function buildMaintenancePartPhotoPath(clientId: string, orderId: string, fileName: string): string {
@@ -183,8 +309,7 @@ export async function uploadMaintenancePartPhoto(
 
   if (error) throw new Error(`Erro ao enviar foto da peça: ${error.message}`);
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return path;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -300,7 +425,7 @@ const DRIVER_BUCKET = 'driver-documents';
  * Uploads a driver document to Supabase Storage.
  * Images are compressed before upload (max 1920px, 82% JPEG). PDFs are sent as-is.
  * Accepted formats: PDF, JPG, PNG, WEBP. Max size: 10MB.
- * Returns the public URL of the uploaded file.
+ * Returns the storage PATH (bucket is private — resolve a signed URL to view).
  */
 export async function uploadDriverDocument(
   clientId: string,
@@ -320,22 +445,25 @@ export async function uploadDriverDocument(
 
   if (error) throw new Error(`Erro ao enviar documento: ${error.message}`);
 
-  const { data } = supabase.storage.from(DRIVER_BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return path;
 }
 
 /**
- * Deletes a driver document from Supabase Storage using its public URL.
- * Silently ignores if the URL is empty or invalid.
+ * Resolves a driver document pointer (path or legacy public URL) into a signed URL.
+ */
+export async function getDriverDocumentSignedUrl(value: string): Promise<string> {
+  return getPrivateDocumentSignedUrl(value, DRIVER_BUCKET);
+}
+
+/**
+ * Deletes a driver document from Supabase Storage.
+ * Accepts either the canonical path or a legacy public URL.
+ * Silently ignores if the pointer is empty or does not belong to the bucket.
  */
 export async function deleteDriverDocument(url: string): Promise<void> {
-  if (!url) return;
+  const path = extractStoragePath(url, DRIVER_BUCKET);
+  if (!path) return;
 
-  const marker = `/driver-documents/`;
-  const idx = url.indexOf(marker);
-  if (idx === -1) return;
-
-  const path = url.slice(idx + marker.length);
   const { error } = await supabase.storage.from(DRIVER_BUCKET).remove([path]);
   if (error) console.warn('Aviso: não foi possível deletar o documento do Storage.', error.message);
 }
@@ -349,7 +477,7 @@ export async function deleteDriverDocument(url: string): Promise<void> {
 /**
  * Uploads an action plan evidence file (image or PDF) to Supabase Storage.
  * Images are compressed before upload. PDFs are sent as-is.
- * Returns the public URL of the uploaded file.
+ * Returns the storage PATH (bucket is private — resolve a signed URL to view).
  */
 export async function uploadActionPlanEvidence(
   clientId: string,
@@ -368,6 +496,5 @@ export async function uploadActionPlanEvidence(
 
   if (error) throw new Error(`Erro ao enviar evidência: ${error.message}`);
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return path;
 }

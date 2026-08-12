@@ -3,6 +3,7 @@ import { X, Wrench, Building2, Calendar, User, FileText, DollarSign, Clock, Exte
 import React from 'react';
 
 import { useAuth } from '../context/AuthContext';
+import { useStorageFileUrl } from '../hooks/useStorageFileUrl';
 import { formatDate } from '../lib/dateUtils';
 import { daysInWorkshop } from '../lib/maintenanceFilters';
 import { budgetItemFromRow, type MaintenanceBudgetItemRow } from '../lib/maintenanceMappers';
@@ -20,6 +21,34 @@ import type { MaintenanceOrder } from '../types/maintenance';
 interface Props {
   order: MaintenanceOrder;
   onClose: () => void;
+}
+
+/**
+ * Link para o PDF do orçamento. O ponteiro persistido em `budget_pdf_url` é um
+ * caminho no bucket privado 'vehicle-documents' (ou uma URL pública legada) e
+ * precisa ser resolvido em URL assinada antes de virar `href`.
+ */
+function BudgetPdfLink({ pointer }: { pointer: string }) {
+  const { url, isLoading, error } = useStorageFileUrl(pointer, 'vehicle-documents');
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs font-medium tracking-wide text-zinc-400 uppercase">PDF do Orçamento</span>
+      {isLoading && <span className="text-sm text-zinc-400">Carregando…</span>}
+      {url && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-sm font-medium text-orange-600 hover:text-orange-700"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Ver PDF
+        </a>
+      )}
+      {error && <span className="text-sm text-red-600">Documento indisponível</span>}
+    </div>
+  );
 }
 
 function statusColor(status: MaintenanceOrder['status']) {
@@ -220,20 +249,7 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
                       </span>
                     </div>
                   )}
-                  {order.budgetPdfUrl && (
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-xs font-medium tracking-wide text-zinc-400 uppercase">PDF do Orçamento</span>
-                      <a
-                        href={order.budgetPdfUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-sm font-medium text-orange-600 hover:text-orange-700"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        Ver PDF
-                      </a>
-                    </div>
-                  )}
+                  {order.budgetPdfUrl && <BudgetPdfLink pointer={order.budgetPdfUrl} />}
                   {order.budgetReviewedBy && (
                     <Field label="Revisado por" value={order.budgetReviewedBy} />
                   )}

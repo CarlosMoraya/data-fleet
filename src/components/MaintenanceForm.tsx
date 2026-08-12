@@ -6,7 +6,7 @@ import { extractBudgetData } from '../lib/budgetOcr';
 import { isKnownBudgetSystem } from '../lib/budgetSystems';
 import { validateMaintenanceCurrentKm } from '../lib/maintenanceKmValidation';
 import { budgetItemFromRow, calcBudgetSubtotal, type MaintenanceBudgetItemRow, BudgetItem } from '../lib/maintenanceMappers';
-import { validateFile } from '../lib/storageHelpers';
+import { openPrivateDocument, validateFile } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
 import { listPendingEventsForVehicle } from '../services/warrantyRevisionService';
@@ -428,16 +428,15 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
                         className="mt-1 block w-full cursor-pointer text-sm text-zinc-500 transition-colors file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100"
                       />
                       {existingBudgetPdfUrl && !budgetFile && (
-                        <a
-                          href={existingBudgetPdfUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => { void openPrivateDocument(existingBudgetPdfUrl, 'vehicle-documents'); }}
                           className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
                         >
                           <FileText className="h-3 w-3" />
                           Ver PDF atual
                           <ExternalLink className="h-3 w-3" />
-                        </a>
+                        </button>
                       )}
                       {budgetFile && (
                         <p className="mt-1 text-xs text-zinc-500">
@@ -657,16 +656,15 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
                         className="mt-1 block w-full cursor-pointer text-sm text-zinc-500 transition-colors file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100"
                       />
                       {existingBudgetPdfUrl && !budgetFile && (
-                        <a
-                          href={existingBudgetPdfUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => { void openPrivateDocument(existingBudgetPdfUrl, 'vehicle-documents'); }}
                           className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
                         >
                           <FileText className="h-3 w-3" />
                           Ver PDF atual
                           <ExternalLink className="h-3 w-3" />
-                        </a>
+                        </button>
                       )}
                       {budgetFile && (
                         <p className="mt-1 text-xs text-zinc-500">
