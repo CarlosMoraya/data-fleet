@@ -133,7 +133,7 @@ export default function OperationalUnitForm({ unit, availableShippers, onClose, 
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          <form id="operational-unit-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-8 p-6">
+          <form id="operational-unit-form" onSubmit={(e) => { void handleSubmit(e); }} autoComplete="off" className="space-y-8 p-6">
 
             {/* Seção 1: Dados da Unidade */}
             <div>
@@ -159,6 +159,7 @@ export default function OperationalUnitForm({ unit, availableShippers, onClose, 
                   <Label htmlFor="name" required>Nome da Unidade</Label>
                   <input
                     id="name" name="name" type="text" required
+                    autoComplete="off"
                     value={formData.name ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -169,6 +170,7 @@ export default function OperationalUnitForm({ unit, availableShippers, onClose, 
                   <Label htmlFor="code">Código</Label>
                   <input
                     id="code" name="code" type="text"
+                    autoComplete="off"
                     value={formData.code ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -177,9 +179,10 @@ export default function OperationalUnitForm({ unit, availableShippers, onClose, 
                   />
                 </div>
                 <div>
-                  <Label htmlFor="city">Cidade</Label>
+                    <Label htmlFor="city">Cidade</Label>
                   <input
                     id="city" name="city" type="text"
+                    autoComplete="off"
                     value={formData.city ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -187,9 +190,10 @@ export default function OperationalUnitForm({ unit, availableShippers, onClose, 
                   />
                 </div>
                 <div className="sm:col-span-1">
-                  <Label htmlFor="state">UF</Label>
+                    <Label htmlFor="state">UF</Label>
                   <input
                     id="state" name="state" type="text"
+                    autoComplete="off"
                     value={formData.state ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -210,6 +214,7 @@ export default function OperationalUnitForm({ unit, availableShippers, onClose, 
                   <Label htmlFor="notes">Observações</Label>
                   <textarea
                     id="notes" name="notes"
+                    autoComplete="off"
                     value={formData.notes ?? ''}
                     onChange={handleChange}
                     rows={3}

@@ -372,6 +372,7 @@ export default function TireBatchForm({
                   onChange={e => updateTemplate('specification', e.target.value)}
                   placeholder="ex: 295/80R22.5"
                   required
+                  autoComplete="off"
                   className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                 />
               </div>
@@ -382,6 +383,7 @@ export default function TireBatchForm({
                   <input
                     value={template.dot}
                     onChange={e => updateTemplate('dot', e.target.value)}
+                    autoComplete="off"
                     placeholder="ex: 2524"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
@@ -391,6 +393,7 @@ export default function TireBatchForm({
                   <input
                     value={template.fireMarking}
                     onChange={e => updateTemplate('fireMarking', e.target.value)}
+                    autoComplete="off"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
@@ -399,6 +402,7 @@ export default function TireBatchForm({
                   <input
                     value={template.manufacturer}
                     onChange={e => updateTemplate('manufacturer', e.target.value)}
+                    autoComplete="off"
                     placeholder="ex: Bridgestone"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
@@ -408,6 +412,7 @@ export default function TireBatchForm({
                   <input
                     value={template.brand}
                     onChange={e => updateTemplate('brand', e.target.value)}
+                    autoComplete="off"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
@@ -419,6 +424,7 @@ export default function TireBatchForm({
                   <input
                     type="number"
                     min="0"
+                    autoComplete="off"
                     value={template.rotationIntervalKm}
                     onChange={e => updateTemplate('rotationIntervalKm', e.target.value)}
                     placeholder="20000"
@@ -430,6 +436,7 @@ export default function TireBatchForm({
                   <input
                     type="number"
                     min="0"
+                    autoComplete="off"
                     value={template.usefulLifeKm}
                     onChange={e => updateTemplate('usefulLifeKm', e.target.value)}
                     placeholder="120000"
@@ -441,6 +448,7 @@ export default function TireBatchForm({
                   <input
                     type="number"
                     min="0"
+                    autoComplete="off"
                     value={template.retreadIntervalKm}
                     onChange={e => updateTemplate('retreadIntervalKm', e.target.value)}
                     placeholder="60000"
