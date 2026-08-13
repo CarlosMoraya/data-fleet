@@ -317,7 +317,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
             </div>
           )}
 
-          <form id="driver-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-8">
+          <form id="driver-form" onSubmit={(e) => { void handleSubmit(e); }} autoComplete="off" className="space-y-8">
             {/* Acesso ao Sistema — apenas na criação */}
             {isCreating && (
               <div>
@@ -334,7 +334,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     <input
                       type="email"
                       required
-                     
+                      autoComplete="off"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       placeholder="motorista@empresa.com"
@@ -350,7 +350,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                         data-testid="password-input"
                         type={showPassword ? 'text' : 'password'}
                         required
-                       
+                        autoComplete="new-password"
                         minLength={6}
                         value={password}
                         onChange={e => setPassword(e.target.value)}
@@ -384,7 +384,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="text"
                     name="name"
                     required
-                   
+                    autoComplete="off"
                     value={formData.name || ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -399,7 +399,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="text"
                     name="cpf"
                     required
-                   
+                    autoComplete="off"
                     inputMode="numeric"
                     value={formData.cpf || ''}
                     onChange={handleChange}
@@ -414,7 +414,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                   <input
                     type="tel"
                     name="phone"
-                   
+                    autoComplete="off"
                     inputMode="numeric"
                     value={formData.phone || ''}
                     onChange={handleChange}
@@ -470,7 +470,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="date"
                     name="issueDate"
                     required={req('issueDate')}
-                   
+                    autoComplete="off"
                     value={formData.issueDate || ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -482,7 +482,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="date"
                     name="expirationDate"
                     required={req('expirationDate')}
-                   
+                    autoComplete="off"
                     value={formData.expirationDate || ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -494,7 +494,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="text"
                     name="registrationNumber"
                     required={req('registrationNumber')}
-                   
+                    autoComplete="off"
                     inputMode="numeric"
                     value={formData.registrationNumber || ''}
                     onChange={handleChange}
@@ -507,7 +507,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="text"
                     name="category"
                     required={req('category')}
-                   
+                    autoComplete="off"
                     value={formData.category || ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -520,7 +520,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="text"
                     name="renach"
                     required={req('renach')}
-                   
+                    autoComplete="off"
                     value={formData.renach || ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -599,7 +599,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                     type="date"
                     name="grExpirationDate"
                     required={req('grExpirationDate')}
-                   
+                    autoComplete="off"
                     value={formData.grExpirationDate || ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -621,7 +621,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                       type="text"
                       name="courseName1"
                       required={req('courseName1')}
-                     
+                      autoComplete="off"
                       value={formData.courseName1 || ''}
                       onChange={handleChange}
                       className={inputClass}
@@ -649,7 +649,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                       type="text"
                       name="courseName2"
                       required={req('courseName2')}
-                     
+                      autoComplete="off"
                       value={formData.courseName2 || ''}
                       onChange={handleChange}
                       className={inputClass}
@@ -677,7 +677,7 @@ export default function DriverForm({ driver, fieldSettings, clientId, onClose, o
                       type="text"
                       name="courseName3"
                       required={req('courseName3')}
-                     
+                      autoComplete="off"
                       value={formData.courseName3 || ''}
                       onChange={handleChange}
                       className={inputClass}

@@ -386,12 +386,13 @@ export function CreateUserModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 p-6">
+        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4 p-6">
           <div>
             <label className="block text-sm font-medium text-zinc-700">Nome *</label>
             <input
               type="text"
               required
+              autoComplete="off"
               value={form.name}
               onChange={set('name')}
               placeholder="Ex: João Silva"
@@ -404,6 +405,7 @@ export function CreateUserModal({
             <input
               type="email"
               required
+              autoComplete="off"
               value={form.email}
               onChange={set('email')}
               placeholder="joao@empresa.com"
@@ -416,6 +418,7 @@ export function CreateUserModal({
             <input
               type="password"
               required
+              autoComplete="new-password"
               minLength={6}
               value={form.password}
               onChange={set('password')}
@@ -477,6 +480,7 @@ export function CreateUserModal({
                 type="number"
                 min="0"
                 step="0.01"
+                autoComplete="off"
                 value={form.budgetLimit}
                 onChange={(e) => setForm((previous) => ({ ...previous, budgetLimit: e.target.value }))}
                 placeholder="R$ 0,00"
@@ -654,12 +658,13 @@ function EditUserModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 p-6">
+        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4 p-6">
           <div>
             <label className="block text-sm font-medium text-zinc-700">Nome *</label>
             <input
               type="text"
               required
+              autoComplete="off"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="mt-1 block w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
@@ -712,6 +717,7 @@ function EditUserModal({
                 type="number"
                 min="0"
                 step="0.01"
+                autoComplete="off"
                 value={budgetLimit}
                 onChange={(e) => setBudgetLimit(e.target.value)}
                 placeholder="R$ 0,00"

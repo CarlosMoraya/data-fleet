@@ -188,7 +188,7 @@ export default function TireForm({
         </div>
 
         {/* Conteúdo */}
-        <form onSubmit={(e) => { void handleSubmit(e); }} className="flex min-h-0 flex-1 flex-col">
+        <form onSubmit={(e) => { void handleSubmit(e); }} autoComplete="off" className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 space-y-5 overflow-y-auto px-6 py-4">
 
             {/* Fallback: todas as posições ocupadas */}
@@ -260,6 +260,7 @@ export default function TireForm({
                     value={specification}
                     onChange={e => setSpecification(e.target.value)}
                     required
+                    autoComplete="off"
                     placeholder="ex: 295/80R22.5"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
@@ -269,6 +270,7 @@ export default function TireForm({
                   <input
                     value={dot}
                     onChange={e => setDot(e.target.value)}
+                    autoComplete="off"
                     placeholder="ex: 2524"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
@@ -278,6 +280,7 @@ export default function TireForm({
                   <input
                     value={fireMarking}
                     onChange={e => setFireMarking(e.target.value)}
+                    autoComplete="off"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
@@ -293,6 +296,7 @@ export default function TireForm({
                   <input
                     value={manufacturer}
                     onChange={e => setManufacturer(e.target.value)}
+                    autoComplete="off"
                     placeholder="ex: Bridgestone"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
@@ -302,6 +306,7 @@ export default function TireForm({
                   <input
                     value={brand}
                     onChange={e => setBrand(e.target.value)}
+                    autoComplete="off"
                     placeholder="ex: R295"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                   />
@@ -318,6 +323,7 @@ export default function TireForm({
                   <input
                     type="number"
                     min="0"
+                    autoComplete="off"
                     value={rotationIntervalKm}
                     onChange={e => setRotationIntervalKm(e.target.value)}
                     placeholder="ex: 20000"
@@ -329,6 +335,7 @@ export default function TireForm({
                   <input
                     type="number"
                     min="0"
+                    autoComplete="off"
                     value={usefulLifeKm}
                     onChange={e => setUsefulLifeKm(e.target.value)}
                     placeholder="ex: 120000"
@@ -340,6 +347,7 @@ export default function TireForm({
                   <input
                     type="number"
                     min="0"
+                    autoComplete="off"
                     value={retreadIntervalKm}
                     onChange={e => setRetreadIntervalKm(e.target.value)}
                     placeholder="ex: 60000"
@@ -360,6 +368,7 @@ export default function TireForm({
                   type="number"
                   min="0"
                   step="1"
+                  autoComplete="off"
                   value={odometerKm}
                   onChange={e => setOdometerKm(e.target.value)}
                   placeholder="ex: 125000"

@@ -168,7 +168,7 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          <form id="workshop-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-8 p-6">
+          <form id="workshop-form" onSubmit={(e) => { void handleSubmit(e); }} autoComplete="off" className="space-y-8 p-6">
 
             {/* Seção 1: Dados da Oficina */}
             <div>
@@ -180,6 +180,7 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
                   <Label htmlFor="name" required>Nome da Oficina</Label>
                   <input
                     id="name" name="name" type="text" required
+                    autoComplete="off"
                     value={formData.name ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -190,6 +191,7 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
                   <Label htmlFor="cnpj" required>CNPJ</Label>
                   <input
                     id="cnpj" name="cnpj" type="text" required
+                    autoComplete="off"
                     value={isSelfMode ? formatCNPJ(formData.cnpj ?? '') : formData.cnpj ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -216,6 +218,7 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
                   <Label htmlFor="phone" required={isSelfMode}>Telefone</Label>
                   <input
                     id="phone" name="phone" type="text"
+                    autoComplete="off"
                     required={isSelfMode}
                     value={formData.phone ?? ''}
                     onChange={handleChange}
@@ -228,6 +231,7 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
                   <Label htmlFor="email" required={isSelfMode}>E-mail</Label>
                   <input
                     id="email" name="email" type="email"
+                    autoComplete="off"
                     required={isSelfMode}
                     value={formData.email ?? ''}
                     onChange={handleChange}
@@ -239,6 +243,7 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
                   <Label htmlFor="contactPerson" required={isSelfMode}>Pessoa de Contato</Label>
                   <input
                     id="contactPerson" name="contactPerson" type="text"
+                    autoComplete="off"
                     required={isSelfMode}
                     value={formData.contactPerson ?? ''}
                     onChange={handleChange}
@@ -259,6 +264,7 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
                   <Label htmlFor="addressStreet" required={isSelfMode}>Logradouro</Label>
                   <input
                     id="addressStreet" name="addressStreet" type="text"
+                    autoComplete="off"
                     required={isSelfMode}
                     value={formData.addressStreet ?? ''}
                     onChange={handleChange}
@@ -270,6 +276,7 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
                   <Label htmlFor="addressNumber" required={isSelfMode}>Número</Label>
                   <input
                     id="addressNumber" name="addressNumber" type="text"
+                    autoComplete="off"
                     required={isSelfMode}
                     value={formData.addressNumber ?? ''}
                     onChange={handleChange}
@@ -281,6 +288,7 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
                   <Label htmlFor="addressComplement">Complemento</Label>
                   <input
                     id="addressComplement" name="addressComplement" type="text"
+                    autoComplete="off"
                     value={formData.addressComplement ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -291,6 +299,7 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
                   <Label htmlFor="addressNeighborhood" required={isSelfMode}>Bairro</Label>
                   <input
                     id="addressNeighborhood" name="addressNeighborhood" type="text"
+                    autoComplete="off"
                     required={isSelfMode}
                     value={formData.addressNeighborhood ?? ''}
                     onChange={handleChange}
@@ -298,9 +307,10 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
                   />
                 </div>
                 <div className="sm:col-span-3">
-                  <Label htmlFor="addressCity" required={isSelfMode}>Cidade</Label>
+                    <Label htmlFor="addressCity" required={isSelfMode}>Cidade</Label>
                   <input
                     id="addressCity" name="addressCity" type="text"
+                    autoComplete="off"
                     required={isSelfMode}
                     value={formData.addressCity ?? ''}
                     onChange={handleChange}
@@ -311,6 +321,7 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
                   <Label htmlFor="addressState" required={isSelfMode}>UF</Label>
                   <input
                     id="addressState" name="addressState" type="text"
+                    autoComplete="off"
                     required={isSelfMode}
                     value={formData.addressState ?? ''}
                     onChange={handleChange}
@@ -323,6 +334,7 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
                   <Label htmlFor="addressZip" required={isSelfMode}>CEP</Label>
                   <input
                     id="addressZip" name="addressZip" type="text"
+                    autoComplete="off"
                     required={isSelfMode}
                     value={formData.addressZip ?? ''}
                     onChange={handleChange}
@@ -364,6 +376,7 @@ export default function WorkshopForm({ workshop, onClose, onSave, mode = 'client
                   <Label htmlFor="notes">Observações</Label>
                   <textarea
                     id="notes" name="notes"
+                    autoComplete="off"
                     value={formData.notes ?? ''}
                     onChange={handleChange}
                     rows={3}

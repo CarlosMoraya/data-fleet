@@ -462,42 +462,42 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
             </div>
           )}
 
-          <form id="vehicle-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-8">
+          <form id="vehicle-form" onSubmit={(e) => { void handleSubmit(e); }} autoComplete="off" className="space-y-8">
             {/* Basic Info */}
             <div>
               <h3 className="mb-4 border-b border-zinc-200 pb-2 text-lg leading-6 font-medium text-zinc-900">Informações Básicas</h3>
               <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Placa<span className="ml-0.5 text-red-500">*</span></label>
-                  <input type="text" name="licensePlate" required inputMode="text" value={formData.licensePlate || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="licensePlate" required autoComplete="off" inputMode="text" value={formData.licensePlate || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Marca<span className="ml-0.5 text-red-500">*</span></label>
-                  <input type="text" name="brand" required value={formData.brand || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="brand" required autoComplete="off" value={formData.brand || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Modelo<span className="ml-0.5 text-red-500">*</span></label>
-                  <input type="text" name="model" required value={formData.model || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="model" required autoComplete="off" value={formData.model || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700">Ano<span className="ml-0.5 text-red-500">*</span></label>
-                  <input type="text" name="year" required inputMode="numeric" maxLength={4} value={formData.year || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="year" required autoComplete="off" inputMode="numeric" maxLength={4} value={formData.year || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <Label name="color">Cor</Label>
-                  <input type="text" name="color" required={req('color')} value={formData.color || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="color" required={req('color')} autoComplete="off" value={formData.color || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <Label name="renavam">Renavam</Label>
-                  <input type="text" name="renavam" required={req('renavam')} inputMode="numeric" value={formData.renavam || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="renavam" required={req('renavam')} autoComplete="off" inputMode="numeric" value={formData.renavam || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <Label name="chassi">Chassi</Label>
-                  <input type="text" name="chassi" required={req('chassi')} value={formData.chassi || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="chassi" required={req('chassi')} autoComplete="off" value={formData.chassi || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <Label name="detranUF">Detran (UF)</Label>
-                  <input type="text" name="detranUF" required={req('detranUF')} maxLength={2} value={formData.detranUF || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="detranUF" required={req('detranUF')} autoComplete="off" maxLength={2} value={formData.detranUF || ''} onChange={handleChange} className={inputClass} />
                 </div>
               </div>
             </div>
@@ -526,7 +526,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                 </div>
                 <div>
                   <Label name="acquisitionDate">Data de Aquisição</Label>
-                  <input type="date" name="acquisitionDate" required={req('acquisitionDate')} value={formData.acquisitionDate || ''} onChange={handleChange} className={inputClass} />
+                  <input type="date" name="acquisitionDate" required={req('acquisitionDate')} autoComplete="off" value={formData.acquisitionDate || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <Label name="operationStartDate">Data de Início na Operação</Label>
@@ -538,41 +538,41 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                 </div>
                 <div>
                   <Label name="owner">Proprietário</Label>
-                  <input type="text" name="owner" required={req('owner')} value={formData.owner || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="owner" required={req('owner')} autoComplete="off" value={formData.owner || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <Label name="fipePrice">Preço FIPE (R$)</Label>
-                  <input type="text" name="fipePrice" required={req('fipePrice')} inputMode="decimal" value={formData.fipePrice || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="fipePrice" required={req('fipePrice')} autoComplete="off" inputMode="decimal" value={formData.fipePrice || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <Label name="tracker">Rastreador</Label>
-                  <input type="text" name="tracker" required={req('tracker')} value={formData.tracker || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="tracker" required={req('tracker')} autoComplete="off" value={formData.tracker || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <Label name="antt">ANTT</Label>
-                  <input type="text" name="antt" required={req('antt')} inputMode="numeric" value={formData.antt || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="antt" required={req('antt')} autoComplete="off" inputMode="numeric" value={formData.antt || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <Label name="autonomy">Autonomia (km)</Label>
-                  <input type="text" name="autonomy" required={req('autonomy')} inputMode="decimal" value={formData.autonomy || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="autonomy" required={req('autonomy')} autoComplete="off" inputMode="decimal" value={formData.autonomy || ''} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <Label name="tag">Tag (Sem Parar)</Label>
-                  <input type="text" name="tag" required={req('tag')} value={formData.tag || ''} onChange={handleChange} className={inputClass} placeholder="Código do dispositivo" />
+                  <input type="text" name="tag" required={req('tag')} autoComplete="off" value={formData.tag || ''} onChange={handleChange} className={inputClass} placeholder="Código do dispositivo" />
                 </div>
                 <div>
                   <Label name="initialKm">Km Inicial</Label>
-                  <input type="text" name="initialKm" required={req('initialKm')} inputMode="numeric" value={formData.initialKm ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 15000" />
+                  <input type="text" name="initialKm" required={req('initialKm')} autoComplete="off" inputMode="numeric" value={formData.initialKm ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 15000" />
                 </div>
 
                 <div>
                   <Label name="crlvYear">Exercício CRLV</Label>
-                  <input type="text" name="crlvYear" required={req('crlvYear')} inputMode="numeric" maxLength={4} placeholder="Ex: 2025" value={formData.crlvYear || ''} onChange={handleChange} className={inputClass} />
+                  <input type="text" name="crlvYear" required={req('crlvYear')} autoComplete="off" inputMode="numeric" maxLength={4} placeholder="Ex: 2025" value={formData.crlvYear || ''} onChange={handleChange} className={inputClass} />
                 </div>
 
                 <div>
                   <Label name="crlvExpirationDate">Vencimento do CRLV</Label>
-                  <input type="date" name="crlvExpirationDate" value={formData.crlvExpirationDate || ''} onChange={handleChange} className={inputClass} />
+                  <input type="date" name="crlvExpirationDate" autoComplete="off" value={formData.crlvExpirationDate || ''} onChange={handleChange} className={inputClass} />
                 </div>
 
                 {/* CRLV Upload */}
@@ -681,7 +681,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                 </div>
                 <div>
                   <Label name="grExpirationDate">Vencimento do GR</Label>
-                  <input type="date" name="grExpirationDate" required={req('grExpirationDate')} value={formData.grExpirationDate || ''} onChange={handleChange} className={inputClass} />
+                  <input type="date" name="grExpirationDate" required={req('grExpirationDate')} autoComplete="off" value={formData.grExpirationDate || ''} onChange={handleChange} className={inputClass} />
                 </div>
               </div>
             </div>
@@ -728,17 +728,17 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                 {/* PBT / CMT / Eixos */}
                 <div>
                   <Label name="pbt">PBT — Peso Bruto Total (t)</Label>
-                  <input type="text" name="pbt" required={req('pbt')} inputMode="decimal" value={formData.pbt ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 3,5" />
+                  <input type="text" name="pbt" required={req('pbt')} autoComplete="off" inputMode="decimal" value={formData.pbt ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 3,5" />
                 </div>
                 {!isImplement && (
                   <div>
                     <Label name="cmt">CMT — Cap. Máxima de Tração (t)</Label>
-                    <input type="text" name="cmt" required={req('cmt')} inputMode="decimal" value={formData.cmt ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 45,0" />
+                    <input type="text" name="cmt" required={req('cmt')} autoComplete="off" inputMode="decimal" value={formData.cmt ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 45,0" />
                   </div>
                 )}
                 <div>
                   <Label name="eixos">Eixos</Label>
-                  <input type="text" name="eixos" required={req('eixos')} inputMode="numeric" maxLength={2} value={formData.eixos ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 2" />
+                  <input type="text" name="eixos" required={req('eixos')} autoComplete="off" inputMode="numeric" maxLength={2} value={formData.eixos ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 2" />
                   {formData.type === 'Cavalo' && (
                     <p className="mt-1 text-xs text-zinc-400">
                       Informe apenas os eixos do cavalo mecânico; os do semi-reboque são cadastrados no próprio semi-reboque.
@@ -781,7 +781,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                     {formData.semiReboque && (
                       <div>
                         <Label name="placaSemiReboque">Placa Semi-Reboque</Label>
-                        <input type="text" name="placaSemiReboque" required={req('placaSemiReboque')} value={formData.placaSemiReboque || ''} onChange={handleChange} className={inputClass} />
+                        <input type="text" name="placaSemiReboque" required={req('placaSemiReboque')} autoComplete="off" value={formData.placaSemiReboque || ''} onChange={handleChange} className={inputClass} />
                       </div>
                     )}
                   </>
@@ -792,15 +792,15 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                   <>
                     <div>
                       <Label name="fuelType">Tipo de Combustível</Label>
-                      <input type="text" name="fuelType" required={req('fuelType')} value={formData.fuelType || ''} onChange={handleChange} className={inputClass} />
+                      <input type="text" name="fuelType" required={req('fuelType')} autoComplete="off" value={formData.fuelType || ''} onChange={handleChange} className={inputClass} />
                     </div>
                     <div>
                       <Label name="tankCapacity">Capacidade do Tanque (L)</Label>
-                      <input type="text" name="tankCapacity" required={req('tankCapacity')} inputMode="decimal" value={formData.tankCapacity || ''} onChange={handleChange} className={inputClass} />
+                      <input type="text" name="tankCapacity" required={req('tankCapacity')} autoComplete="off" inputMode="decimal" value={formData.tankCapacity || ''} onChange={handleChange} className={inputClass} />
                     </div>
                     <div>
                       <Label name="avgConsumption">Consumo Médio (Km/L)</Label>
-                      <input type="text" name="avgConsumption" required={req('avgConsumption')} inputMode="decimal" value={formData.avgConsumption || ''} onChange={handleChange} className={inputClass} />
+                      <input type="text" name="avgConsumption" required={req('avgConsumption')} autoComplete="off" inputMode="decimal" value={formData.avgConsumption || ''} onChange={handleChange} className={inputClass} />
                     </div>
                   </>
                 )}
@@ -813,11 +813,11 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                   <>
                     <div>
                       <Label name="coolingBrand">Marca/Modelo do Refrigerador</Label>
-                      <input type="text" name="coolingBrand" placeholder="Ex: Termoking, Thermo Star" required={req('coolingBrand')} value={formData.coolingBrand || ''} onChange={handleChange} className={inputClass} />
+                      <input type="text" name="coolingBrand" placeholder="Ex: Termoking, Thermo Star" required={req('coolingBrand')} autoComplete="off" value={formData.coolingBrand || ''} onChange={handleChange} className={inputClass} />
                     </div>
                     <div>
                       <Label name="coolingFirstRevisionDeadline">Data Limite da 1ª Revisão do Refrigerador</Label>
-                      <input type="date" name="coolingFirstRevisionDeadline" required={req('coolingFirstRevisionDeadline')} value={formData.coolingFirstRevisionDeadline || ''} onChange={handleChange} className={inputClass} />
+                      <input type="date" name="coolingFirstRevisionDeadline" required={req('coolingFirstRevisionDeadline')} autoComplete="off" value={formData.coolingFirstRevisionDeadline || ''} onChange={handleChange} className={inputClass} />
                     </div>
                   </>
                 )}
@@ -835,12 +835,12 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                 {formData.warranty && (
                   <div>
                     <Label name="warrantyEndDate">Data Final da Garantia</Label>
-                    <input type="date" name="warrantyEndDate" required={req('warrantyEndDate')} value={formData.warrantyEndDate || ''} onChange={handleChange} className={inputClass} />
+                    <input type="date" name="warrantyEndDate" required={req('warrantyEndDate')} autoComplete="off" value={formData.warrantyEndDate || ''} onChange={handleChange} className={inputClass} />
                   </div>
                 )}
                 <div>
                   <Label name="firstRevisionMaxKm">Km Máximo da 1ª Revisão</Label>
-                  <input type="text" name="firstRevisionMaxKm" required={req('firstRevisionMaxKm')} inputMode="numeric" value={formData.firstRevisionMaxKm ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 10000" />
+                  <input type="text" name="firstRevisionMaxKm" required={req('firstRevisionMaxKm')} autoComplete="off" inputMode="numeric" value={formData.firstRevisionMaxKm ?? ''} onChange={handleChange} className={inputClass} placeholder="Ex: 10000" />
                   {vehicle?.id && formData.firstRevisionMaxKm && !hasActiveWarrantyPlan && (
                     <button
                       type="button"
@@ -854,7 +854,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                 </div>
                 <div>
                   <Label name="firstRevisionDeadline">Data Limite da 1ª Revisão</Label>
-                  <input type="date" name="firstRevisionDeadline" required={req('firstRevisionDeadline')} value={formData.firstRevisionDeadline || ''} onChange={handleChange} className={inputClass} />
+                  <input type="date" name="firstRevisionDeadline" required={req('firstRevisionDeadline')} autoComplete="off" value={formData.firstRevisionDeadline || ''} onChange={handleChange} className={inputClass} />
                 </div>
               </div>
             </div>

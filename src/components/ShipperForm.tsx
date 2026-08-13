@@ -123,7 +123,7 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          <form id="shipper-form" onSubmit={(e) => { void handleSubmit(e); }} className="space-y-8 p-6">
+          <form id="shipper-form" onSubmit={(e) => { void handleSubmit(e); }} autoComplete="off" className="space-y-8 p-6">
 
             {/* Seção 1: Dados do Embarcador */}
             <div>
@@ -135,6 +135,7 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
                   <Label htmlFor="name" required>Nome do Embarcador</Label>
                   <input
                     id="name" name="name" type="text" required
+                    autoComplete="off"
                     value={formData.name ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -145,6 +146,7 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
                   <Label htmlFor="cnpj">CNPJ</Label>
                   <input
                     id="cnpj" name="cnpj" type="text"
+                    autoComplete="off"
                     value={formData.cnpj ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -156,6 +158,7 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
                   <Label htmlFor="phone">Telefone</Label>
                   <input
                     id="phone" name="phone" type="text"
+                    autoComplete="off"
                     value={formData.phone ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -167,6 +170,7 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
                   <Label htmlFor="email">E-mail</Label>
                   <input
                     id="email" name="email" type="email"
+                    autoComplete="off"
                     value={formData.email ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -177,6 +181,7 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
                   <Label htmlFor="contactPerson">Pessoa de Contato</Label>
                   <input
                     id="contactPerson" name="contactPerson" type="text"
+                    autoComplete="off"
                     value={formData.contactPerson ?? ''}
                     onChange={handleChange}
                     className={inputClass}
@@ -196,6 +201,7 @@ export default function ShipperForm({ shipper, onClose, onSave }: ShipperFormPro
                   <Label htmlFor="notes">Observações</Label>
                   <textarea
                     id="notes" name="notes"
+                    autoComplete="off"
                     value={formData.notes ?? ''}
                     onChange={handleChange}
                     rows={3}
