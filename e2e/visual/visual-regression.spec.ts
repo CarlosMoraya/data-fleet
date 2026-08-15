@@ -161,17 +161,31 @@ test.describe('Regressão visual — telas críticas', () => {
       await page.waitForLoadState('networkidle');
       await expect(page.locator('main').getByRole('heading', { name: /checklists/i })).toBeVisible({ timeout: 15000 });
 
-      // Abrir um checklist concluído (botão com ícone Eye) para visualizar o detalhe
-      const viewButton = page.locator('main').locator('button:has(svg.lucide-eye)').first();
-      if (!(await viewButton.isVisible({ timeout: 5000 }).catch(() => false))) {
+      // Abrir um checklist concluído (botão com ícone Eye) para visualizar o detalhe.
+      // A lista vem ordenada por `started_at` decrescente, então o PRIMEIRO botão
+      // é o checklist mais recente — âncora instável: qualquer checklist novo
+      // preenchido no ambiente trocava o registro fotografado. Usamos o ÚLTIMO
+      // botão (o checklist mais antigo), que não muda conforme a massa cresce.
+      const viewButtons = page.locator('main').locator('button:has(svg.lucide-eye)');
+      if ((await viewButtons.count()) === 0) {
         test.skip(true, 'sem checklist disponível para validar tela de preenchimento');
         return;
       }
+      const viewButton = viewButtons.last();
       await viewButton.click();
-      const modal = page.locator('.fixed.inset-0');
-      await expect(modal).toBeVisible({ timeout: 10000 });
+      const overlay = page.locator('.fixed.inset-0');
+      await expect(overlay).toBeVisible({ timeout: 10000 });
 
-      await expect(page).toHaveScreenshot('checklist-fill.png', {
+      // As respostas são carregadas depois que o modal abre; sem esperar, o
+      // golden master fotografava "Carregando..." de forma intermitente.
+      await expect(overlay.getByText('Carregando...')).toHaveCount(0, { timeout: 15000 });
+
+      // Fotografa o painel do modal, não a página nem o overlay de tela cheia:
+      // o fundo é a tabela de histórico, que cresce a cada checklist preenchido
+      // e tornava o golden master instável por deriva de massa, sem nenhuma
+      // regressão visual real.
+      const modalPanel = overlay.locator('> div').first();
+      await expect(modalPanel).toHaveScreenshot('checklist-fill.png', {
         maxDiffPixelRatio: 0.01,
         animations: 'disabled',
       });

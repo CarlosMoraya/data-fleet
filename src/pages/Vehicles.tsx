@@ -3,6 +3,7 @@ import { Download, Plus, Search, Edit2, Trash2, Truck, User, Eye, ToggleLeft, To
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 
+import LinkedRecordLink from '../components/common/LinkedRecordLink';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import LastKmLabel from '../components/LastKmLabel';
 import SelectClientNotice from '../components/SelectClientNotice';
@@ -10,21 +11,20 @@ import VehicleActiveFilterBanner from '../components/VehicleActiveFilterBanner';
 import VehicleDetailModal from '../components/VehicleDetailModal';
 import VehicleForm from '../components/VehicleForm';
 import VehicleLoanChangeTitularModal from '../components/VehicleLoanChangeTitularModal';
-import LinkedRecordLink from '../components/common/LinkedRecordLink';
 import { useAuth } from '../context/AuthContext';
 import { usePersistentUiState, useSessionUiState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection } from '../lib/clientScope';
 import { computeOverdueChecklistVehicleIds } from '../lib/dashboardKpi';
 import { resolveExportSelection } from '../lib/exportSelection';
 import { fieldSettingsFromRow, defaultFieldSettings, VehicleFieldSettingsRow } from '../lib/fieldSettingsMappers';
-import { clearVehicleDraftFiles } from '../lib/offline/vehicleDraftFiles';
-import { computeUnavailableVehicleIds } from '../lib/overviewFleetFilters';
-import { filterByActive } from '../lib/registryActiveFilter';
 import {
   buildDriverRecordLink,
   parseOpenRecordId,
   withoutOpenRecordParam,
 } from '../lib/linkedRecordNavigation';
+import { clearVehicleDraftFiles } from '../lib/offline/vehicleDraftFiles';
+import { computeUnavailableVehicleIds } from '../lib/overviewFleetFilters';
+import { filterByActive } from '../lib/registryActiveFilter';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import {
@@ -41,9 +41,9 @@ import {
 } from '../lib/vehicleFilters';
 import { vehicleFromRow, VehicleRow } from '../lib/vehicleMappers';
 import { XlsxVehicleProvider } from '../services/vehicleExport/xlsxVehicleProvider';
+import { completeVehicleLoan, getActiveVehicleLoan, getActiveLoansForVehicles } from '../services/vehicleLoanService';
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 import { saveVehicle, deleteVehicle, toggleVehicleActive } from '../services/vehicleService';
-import { completeVehicleLoan, getActiveVehicleLoan, getActiveLoansForVehicles } from '../services/vehicleLoanService';
 import { Vehicle } from '../types';
 
 import type { VehicleExportRow } from '../lib/vehicleExportRows';
@@ -573,12 +573,12 @@ export default function Vehicles() {
   };
 
   return (
-    <div className="flex h-full flex-col gap-6">
+    <div className="flex h-full flex-col gap-3 tall:gap-6">
       {blockWrite && <SelectClientNotice />}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Veículos</h1>
-          <p className="mt-1 text-sm text-zinc-500">Gerencie a frota de veículos do cliente.</p>
+          <h1 className="text-lg font-semibold tracking-tight text-zinc-900 tall:text-2xl">Veículos</h1>
+          <p className="mt-1 hidden text-sm text-zinc-500 tall:block">Gerencie a frota de veículos do cliente.</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -696,7 +696,7 @@ export default function Vehicles() {
             <table className="min-w-full divide-y divide-zinc-200">
               <thead className="sticky top-0 z-10 bg-zinc-50">
                 <tr>
-                  <th className="w-10 px-3 py-3.5">
+                  <th className="w-10 px-3 py-2 tall:py-3.5">
                     <input
                       type="checkbox"
                       checked={filteredVehicles.length > 0 && filteredVehicles.every((v) => selected.has(v.id))}
@@ -705,16 +705,16 @@ export default function Vehicles() {
                     />
                   </th>
                   {blockWrite && (
-                    <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Cliente</th>
+                    <th scope="col" className="px-3 py-2 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase tall:py-3.5">Cliente</th>
                   )}
-                  <th scope="col" className="py-3.5 pr-3 pl-4 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase sm:pl-6">Veículo</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Tipo / Energia</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Proprietário</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Motorista</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Embarcador / Unid. Op.</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Finalidade</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">Status</th>
-                  <th scope="col" className="relative py-3.5 pr-4 pl-3 sm:pr-6">
+                  <th scope="col" className="py-2 pr-3 pl-4 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase sm:pl-6 tall:py-3.5">Veículo</th>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase tall:py-3.5">Tipo / Energia</th>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase tall:py-3.5">Proprietário</th>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase tall:py-3.5">Motorista</th>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase tall:py-3.5">Embarcador / Unid. Op.</th>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase tall:py-3.5">Finalidade</th>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase tall:py-3.5">Status</th>
+                  <th scope="col" className="relative py-2 pr-4 pl-3 sm:pr-6 tall:py-3.5">
                     <span className="sr-only">Ações</span>
                   </th>
                 </tr>
@@ -725,7 +725,7 @@ export default function Vehicles() {
                     key={vehicle.id}
                     className={`transition-colors hover:bg-zinc-50 ${vehicle.active === false ? 'opacity-50' : ''}`}
                   >
-                    <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-3 py-2 tall:py-4" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selected.has(vehicle.id)}
@@ -734,13 +734,13 @@ export default function Vehicles() {
                       />
                     </td>
                     {blockWrite && (
-                      <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-600">
+                      <td className="px-3 py-2 text-sm whitespace-nowrap text-zinc-600 tall:py-4">
                         <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
                           {vehicle.clientId ? (clientNameMap.get(vehicle.clientId) ?? '—') : '—'}
                         </span>
                       </td>
                     )}
-                    <td className="py-4 pr-3 pl-4 whitespace-nowrap sm:pl-6">
+                    <td className="py-2 pr-3 pl-4 whitespace-nowrap sm:pl-6 tall:py-4">
                       <div className="flex items-center">
                         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100">
                           <Truck className="h-5 w-5 text-zinc-500" />
@@ -752,15 +752,15 @@ export default function Vehicles() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
+                    <td className="px-3 py-2 text-sm whitespace-nowrap text-zinc-500 tall:py-4">
                       <div className="text-zinc-900">{vehicle.type}</div>
                       <div>{vehicle.energySource}</div>
                     </td>
-                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
+                    <td className="px-3 py-2 text-sm whitespace-nowrap text-zinc-500 tall:py-4">
                       <div className="text-zinc-900">{vehicle.owner}</div>
                       <div>{vehicle.acquisition}</div>
                     </td>
-                    <td className="max-w-[140px] px-3 py-4 text-sm text-zinc-500">
+                    <td className="max-w-[140px] px-3 py-2 text-sm text-zinc-500 tall:py-4">
                       {vehicle.driverId && vehicle.driverName ? (() => {
                         const parts = vehicle.driverName.split(' ');
                         const firstLine = parts.slice(0, 2).join(' ');
@@ -786,7 +786,7 @@ export default function Vehicles() {
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
+                    <td className="px-3 py-2 text-sm whitespace-nowrap text-zinc-500 tall:py-4">
                       {vehicle.shipperName ? (
                         <div className="text-zinc-900">{vehicle.shipperName}</div>
                       ) : (
@@ -796,14 +796,14 @@ export default function Vehicles() {
                         <div className="text-zinc-500">{vehicle.operationalUnitName}</div>
                       )}
                     </td>
-                    <td className="px-3 py-4 text-sm whitespace-nowrap text-zinc-500">
+                    <td className="px-3 py-2 text-sm whitespace-nowrap text-zinc-500 tall:py-4">
                       {vehicle.vehicleUsage ? (
                         <span className="text-zinc-900">{vehicle.vehicleUsage}</span>
                       ) : (
                         <span className="text-zinc-400 italic">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-4 text-sm whitespace-nowrap">
+                    <td className="px-3 py-2 text-sm whitespace-nowrap tall:py-4">
                       <div className="flex flex-col items-start gap-1">
                         {vehicle.active === false ? (
                           <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
@@ -825,7 +825,7 @@ export default function Vehicles() {
                         )}
                       </div>
                     </td>
-                    <td className="relative py-4 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-6">
+                    <td className="relative py-2 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-6 tall:py-4">
                       <div className="flex items-center justify-end gap-3">
                         <button
                           onClick={() => setViewingVehicle(vehicle)}

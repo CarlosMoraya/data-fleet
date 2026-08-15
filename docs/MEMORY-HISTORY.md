@@ -2,6 +2,79 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-08-15: Densidade adaptativa por altura de tela
+
+Sessão exclusivamente de CSS/classes de apresentação (Tipo 3). Nenhuma query, mapper, serviço, migration, RLS, permissão, rota ou regra de negócio alterada; nenhuma dependência instalada; nenhuma função TypeScript criada ou modificada.
+
+### O problema
+
+Em notebooks de 1366×768 — e em 1920×1080 com zoom de navegador acima de 110% — o chrome vertical (Topbar de 64px, `p-8` do `<main>`, `h1` de 24px, subtítulos, abas com `py-3`) consumia tanto espaço que `/cadastros/veiculos` exibia praticamente **uma linha** de tabela por vez.
+
+### A decisão central — variante `tall`, não variante "compacta"
+
+Registrada em `src/index.css`:
+
+```css
+@custom-variant tall (@media (min-height: 901px));
+```
+
+O sentido é invertido de propósito: o valor **compacto** é a classe base e `tall:` **restaura** o valor de hoje (`gap-3 tall:gap-6`, `h-12 tall:h-16`, `py-2 tall:py-4`). Consequências:
+
+1. Qualquer classe que não receba um par `tall:` continua produzindo exatamente o resultado atual em qualquer tela — é isso que garante que telas grandes não foram afetadas.
+2. Nenhuma regra depende da ordem em que o Tailwind emite variantes. A alternativa ("compacto sobrepõe `md:`") dependeria de ordem de emissão — ambiguidade inaceitável.
+
+O CSS emitido usa a sintaxe de intervalo moderna: `@media (height>=901px)`.
+
+### Ponto de corte em 901px
+
+Cobre 1366×768 e 1920×1080 com zoom acima de 110% sem atingir monitores de 1920×1200 e superiores. Consequência assumida: os E2E, que rodam em 1280×720, passam a validar o **modo compacto** — considerado desejável.
+
+### Assimetria consciente de rolagem
+
+Checklists e Agendamentos trocam o scrollport interno pelo scrollport da página em janela baixa; Veículos e Plano de Ação **mantêm** rolagem interna. Motivo: as tabelas de Veículos e Plano de Ação são mais largas que 1280px e precisam de `overflow-x: auto`; um elemento com `overflow-x: auto` também é scrollport **vertical**, então migrá-las para rolagem de página custaria o cabeçalho de colunas fixo. **Não uniformizar as quatro telas** sem resolver antes a priorização de colunas.
+
+Para as duas telas migradas, a cadeia **inteira** de contêineres entre o `<thead>` e o `<main>` precisou liberar o overflow (`overflow-visible tall:overflow-hidden` / `tall:overflow-auto`): `position: sticky` só funciona dentro do scrollport mais próximo.
+
+### Outras decisões
+
+- **Fonte de dados não encolhe** — reduzir tipografia agravaria as violações de `color-contrast` já mapeadas. A densidade vem só de espaçamento e de esconder chrome redundante.
+- **Sem preferência manual de densidade** — adaptação automática por CSS puro; nada de `matchMedia`, hook, contexto ou `bf:v1:ui`.
+- **Cartões de contagem de Plano de Ação ocultos, não removidos** — a duplicação com as pílulas de filtro é real, mas removê-la é decisão de produto de outra sessão.
+- **`e2e/completed/table-scroll-shell.spec.ts` mudou de contrato de propósito**: agora roda em duas alturas explícitas (1280×1000 e 1280×720) e o helper de localização do scrollport passou a usar **estilo computado** em vez do token de classe `overflow-auto` — necessário porque a classe agora é `tall:overflow-auto`, cujo efeito depende da altura da janela.
+
+### Resultado da validação
+
+`npx tsc --noEmit` 0 erros; `npx eslint src/` 0 erros / 255 warnings (baseline real medido nesta data: 258 — a memória registrava 220, número corrigido); `npm run test:unit` 1722/1722; `npm run test:smoke` 7/7 antes e depois; `table-scroll-shell` 9 passando / 2 skip; `compact-density` 3/3; `test:e2e:visual` 3/3.
+
+### Alvo de linhas visíveis revisado de 5 para 4
+
+O critério original do plano — "pelo menos 5 linhas visíveis em 1280×720 em `/cadastros/veiculos`" — entregou **4** (contra 1 antes da sessão). A causa não é padding: a célula "Veículo" tem ícone `h-10` mais três linhas de texto (placa / Último Km / marca-modelo-ano), então a linha mede **77px** em modo compacto; o plano estimara ~41px. A altura é dominada pelo conteúdo, e reduzir a fonte dos dados está vetado por acessibilidade.
+
+O cenário 1 de `compact-density.spec.ts` foi primeiro mantido exigindo 5 (fiel à especificação) e reportado vermelho; **o usuário decidiu em 2026-08-15 ajustar o alvo para 4**, e o teste foi alterado com a justificativa registrada em comentário no próprio arquivo. Compactar a célula "Veículo" segue como o único caminho restante para as 5 linhas sem tocar em tipografia.
+
+### `checklist-fill` do golden master — corrigido na mesma sessão
+
+`checklist-fill-visual-linux.png` já falhava **antes** desta branch (confirmado isolando as mudanças com `git stash`): deriva de massa de dados, não regressão visual. A pedido do usuário, foi corrigido em vez de apenas regravado — regravar consertaria hoje e quebraria no próximo checklist preenchido.
+
+Duas causas, ambas de instabilidade do **teste**, não do produto:
+
+1. **Fotografava a página inteira.** O fundo é a tabela de histórico de checklists, que cresce a cada preenchimento. Agora fotografa o **painel do modal** — `.fixed.inset-0 > div`, não o `.fixed.inset-0`, que é o overlay de tela cheia e trazia o fundo junto.
+2. **Clicava no primeiro botão de olho.** A lista é `order('started_at', { ascending: false })`, então o primeiro é o checklist **mais recente** — âncora que muda sozinha. Agora usa `.last()`, o mais antigo, que não se move conforme a massa cresce.
+
+Havia ainda uma corrida: as respostas são carregadas depois que o modal abre, e o `Carregando...` entrava na foto de forma intermitente. O teste passou a esperar `Carregando...` sumir antes do clique do obturador.
+
+Baseline regravado; três execuções seguidas verdes. Arquivo tocado: `e2e/visual/visual-regression.spec.ts`. Nenhuma alteração em `src/components/ChecklistDetailModal.tsx` — a correção é inteiramente do lado do teste.
+
+### Observação registrada, não corrigida
+
+- O baseline do Dashboard, desatualizado desde 2026-06-30, ao ser regravado absorveu também deriva pré-existente do menu lateral (ganhou "Controle de carretas" e "Chamados", perdeu "Aprovação de Orçamentos").
+
+### Sugestões para sessões futuras
+
+- **Prioridade de colunas em tabelas largas** — a raiz do problema em Veículos e Plano de Ação é ter mais colunas do que cabe em 1280px. Resolveria os dois casos e permitiria unificar a rolagem de página. Exige sessão própria: mexe em quais informações ficam disponíveis a cada papel.
+- **Compactar a célula "Veículo"** de `/cadastros/veiculos` (ícone menor ou menos linhas de texto) é o único caminho restante para as 5 linhas sem tocar em tipografia.
+- **Estender a Etapa 5 às demais telas com tabela** (Manutenção, Chamados, Pneus, Financeiro, Controle de Carretas, Usuários, Oficinas, Embarcadores, Unidades Operacionais, Revisões de Garantia) — trabalho mecânico e de baixo risco.
+
 ## Sessão — 2026-08-11: Segurança V-05 (risco aceito), V-01 (buckets de documentos privados) e V-06 (limites do OCR Gemini)
 
 Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 4 — mudança estrutural de segurança, Storage e integração externa). Nenhuma decisão de arquitetura além do documento; nenhuma dependência instalada; **nenhuma migration aplicada em DEV ou PROD** e **nenhuma Edge Function publicada**; `public/downloads` e `dist/downloads` intocados; `checklist-photos`, `client-logos`, `financial-documents` e `fleet-ticket-attachments` inalterados; nenhuma operação destrutiva na árvore de trabalho (as alterações pré-existentes de outras sessões foram preservadas).

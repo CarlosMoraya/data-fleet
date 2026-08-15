@@ -4,3 +4,8 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
+
+/* Densidade adaptativa por altura de janela (2026-08-15).
+   O valor compacto e' a base; `tall:` restaura o espacamento confortavel
+   em janelas com mais de 900px de altura. Ver agent/AGENT-DESIGN.md. */
+@custom-variant tall (@media (min-height: 901px));

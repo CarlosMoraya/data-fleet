@@ -77,6 +77,62 @@ O dashboard utiliza o princípio de "Progressive Disclosure", mostrando KPIs ger
 - **Raiz da Página**: `h-full flex flex-col gap-6`.
 - **Tabela Wrapper**: `overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm flex-1 min-h-0 flex flex-col`.
 
+> Este é o comportamento de **janela alta**. Em janelas de 900px de altura ou
+> menos, ver "Densidade adaptativa por altura" logo abaixo — Checklists e
+> Agendamentos passam a rolar pela página.
+
+#### Densidade adaptativa por altura
+
+A variante `tall` está registrada em `src/index.css`:
+
+```css
+@custom-variant tall (@media (min-height: 901px));
+```
+
+**Convenção obrigatória: `<valor-compacto> tall:<valor-confortável>`.** O valor
+compacto é a classe base; a variante `tall` restaura o espaçamento de sempre.
+A inversão é deliberada: escrever "compacto sobrepõe" faria o resultado depender
+da ordem em que o Tailwind emite as variantes (`md:` vs. `tall:`), o que é uma
+fonte real de comportamento imprevisível. Com a inversão, qualquer classe que
+não receba um par `tall:` continua produzindo exatamente o resultado atual em
+qualquer tela.
+
+Regras:
+
+- **Fonte de dados não encolhe.** Células, cabeçalhos de coluna e textos de dado
+  mantêm o tamanho tipográfico em qualquer altura de janela — reduzir agravaria
+  as violações de contraste já mapeadas. A densidade vem **exclusivamente** de
+  espaçamento (`py-*`, `gap-*`, `h-*`) e de ocultar chrome redundante.
+- **Sem detecção em JavaScript.** Nada de `matchMedia`, hook, contexto ou
+  preferência persistida: é CSS puro, sem re-render.
+- Chrome global (`Layout.tsx`, `Topbar.tsx`) recupera ~190px verticais: barra
+  superior `h-12 tall:h-16` e área de conteúdo `p-4 tall:md:p-8`.
+
+**Política de rolagem por tela em janela baixa:**
+
+| Tela | Janela alta (>900px) | Janela baixa (≤900px) |
+| :--- | :--- | :--- |
+| Checklists | rolagem interna do card | **rolagem da página** (`<main>`), `thead` fixo no topo |
+| Agendamentos | rolagem interna do card | **rolagem da página** (`<main>`), `thead` fixo no topo |
+| Veículos | rolagem interna | rolagem interna |
+| Plano de Ação | rolagem interna | rolagem interna |
+| Demais telas com tabela | rolagem interna | rolagem interna |
+
+A assimetria é consciente: Veículos e Plano de Ação têm tabelas mais largas que
+1280px e, portanto, precisam de `overflow-x: auto` no contêiner. Um elemento com
+`overflow-x: auto` também é scrollport **vertical**, então trocá-las para rolagem
+de página custaria o cabeçalho de colunas fixo. **Não uniformizar as quatro
+telas** sem resolver antes a priorização de colunas.
+
+Ao migrar uma tela para rolagem de página, a cadeia **inteira** de contêineres
+entre o `<thead>` e o `<main>` precisa liberar o overflow em janela baixa
+(`overflow-visible tall:overflow-hidden` / `tall:overflow-auto`). `position: sticky`
+só funciona dentro do scrollport mais próximo: qualquer ancestral com overflow
+intermediário mata o cabeçalho fixo.
+
+Contrato executável: `e2e/completed/table-scroll-shell.spec.ts` (valida as duas
+alturas) e `e2e/completed/compact-density.spec.ts` (valida o ponto de corte).
+
 ---
 
 ## ✨ Estética Premium - Regras Mandatárias

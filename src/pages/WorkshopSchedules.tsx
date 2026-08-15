@@ -179,8 +179,8 @@ function DriverView() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Agendamentos</h1>
-          <p className="mt-1 text-sm text-zinc-500">Seus próximos agendamentos de oficina.</p>
+          <h1 className="text-lg font-semibold tracking-tight text-zinc-900 tall:text-2xl">Agendamentos</h1>
+          <p className="mt-1 hidden text-sm text-zinc-500 tall:block">Seus próximos agendamentos de oficina.</p>
         </div>
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 py-16 text-center">
           <CalendarClock className="mb-3 h-10 w-10 text-zinc-300" />
@@ -272,8 +272,8 @@ function DriverView() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Agendamentos</h1>
-          <p className="mt-1 text-sm text-zinc-500">Seus próximos agendamentos de oficina.</p>
+          <h1 className="text-lg font-semibold tracking-tight text-zinc-900 tall:text-2xl">Agendamentos</h1>
+          <p className="mt-1 hidden text-sm text-zinc-500 tall:block">Seus próximos agendamentos de oficina.</p>
         </div>
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-amber-300 bg-amber-50 py-16 text-center">
           <CalendarClock className="mb-3 h-10 w-10 text-amber-300" />
@@ -290,8 +290,8 @@ function DriverView() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Agendamentos</h1>
-        <p className="mt-1 text-sm text-zinc-500">Seus próximos agendamentos de oficina.</p>
+        <h1 className="text-lg font-semibold tracking-tight text-zinc-900 tall:text-2xl">Agendamentos</h1>
+        <p className="mt-1 hidden text-sm text-zinc-500 tall:block">Seus próximos agendamentos de oficina.</p>
       </div>
 
       {/* Agendamentos pendentes */}
@@ -528,11 +528,11 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
   const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
 
   return (
-    <div className="flex h-full flex-col gap-6">
+    <div className="flex h-full flex-col gap-3 tall:gap-6">
       {blockWrite && <SelectClientNotice />}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Agendamentos</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="text-lg font-semibold tracking-tight text-zinc-900 tall:text-2xl">Agendamentos</h1>
+        <p className="mt-1 hidden text-sm text-zinc-500 tall:block">
           {operationsManager ? 'Visualize os agendamentos dentro do seu escopo.' : 'Gerencie os agendamentos de visita às oficinas.'}
         </p>
       </div>
@@ -576,7 +576,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
               <button
                 key={tab.key}
                 onClick={() => setStatusFilter(tab.key)}
-                className={`flex items-center gap-1.5 border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm whitespace-nowrap transition-colors tall:py-3 ${
                   isActive
                     ? 'border-orange-500 font-medium text-orange-600'
                     : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
@@ -610,20 +610,20 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
           )}
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-          <div className="flex-1 overflow-auto">
+        <div className="flex flex-col overflow-visible rounded-2xl border border-zinc-200 bg-white shadow-sm tall:min-h-0 tall:flex-1 tall:overflow-hidden">
+          <div className="overflow-visible tall:flex-1 tall:overflow-auto">
             <table className="min-w-full text-sm">
               <thead className="sticky top-0 z-10 bg-zinc-50">
                 <tr className="border-b border-zinc-200">
                   {blockWrite && (
-                    <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Cliente</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase tall:py-3">Cliente</th>
                   )}
-                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Veículo</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Oficina</th>
-                  <th className="hidden px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase sm:table-cell">Data</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase">Status</th>
-                  <th className="hidden px-4 py-3 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase md:table-cell">Criado por</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium tracking-wider text-zinc-500 uppercase">Ações</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase tall:py-3">Veículo</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase tall:py-3">Oficina</th>
+                  <th className="hidden px-4 py-2 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase sm:table-cell tall:py-3">Data</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase tall:py-3">Status</th>
+                  <th className="hidden px-4 py-2 text-left text-xs font-medium tracking-wider text-zinc-500 uppercase md:table-cell tall:py-3">Criado por</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium tracking-wider text-zinc-500 uppercase tall:py-3">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
@@ -696,19 +696,19 @@ const ScheduleRow: React.FC<{
   return (
     <tr className="transition-colors hover:bg-zinc-50">
       {blockWrite && (
-        <td className="px-4 py-3 text-sm text-zinc-600">
+        <td className="px-4 py-2 text-sm text-zinc-600 tall:py-3">
           <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
             {clientName ?? '—'}
           </span>
         </td>
       )}
-      <td className="px-4 py-3 font-mono text-xs font-medium text-zinc-700">
+      <td className="px-4 py-2 font-mono text-xs font-medium text-zinc-700 tall:py-3">
         <div>{schedule.vehicleLicensePlate ?? '-'}</div>
         {schedule.vehicleLicensePlate && (
           <LastKmLabel info={lastKmInfo} className="font-sans text-xs font-normal text-zinc-400" />
         )}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-2 tall:py-3">
         <div className="text-sm text-zinc-800">{schedule.workshopName ?? '-'}</div>
         {hasAddress && (
           <a
@@ -723,8 +723,8 @@ const ScheduleRow: React.FC<{
           </a>
         )}
       </td>
-      <td className="hidden px-4 py-3 text-zinc-600 sm:table-cell">{formatDate(schedule.scheduledDate)}</td>
-      <td className="px-4 py-3">
+      <td className="hidden px-4 py-2 text-zinc-600 sm:table-cell tall:py-3">{formatDate(schedule.scheduledDate)}</td>
+      <td className="px-4 py-2 tall:py-3">
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[schedule.status]}`}>
           {STATUS_LABELS[schedule.status]}
         </span>
@@ -732,8 +732,8 @@ const ScheduleRow: React.FC<{
           <div className="mt-0.5 text-xs text-zinc-400">{formatDate(schedule.completedAt.split('T')[0])}</div>
         )}
       </td>
-      <td className="hidden px-4 py-3 text-xs text-zinc-500 md:table-cell">{schedule.createdByName ?? '-'}</td>
-      <td className="px-4 py-3">
+      <td className="hidden px-4 py-2 text-xs text-zinc-500 md:table-cell tall:py-3">{schedule.createdByName ?? '-'}</td>
+      <td className="px-4 py-2 tall:py-3">
         <div className="flex items-center justify-end gap-1">
           {canWriteSchedules && isScheduled && onEdit && onComplete && onCancel && (
             <>

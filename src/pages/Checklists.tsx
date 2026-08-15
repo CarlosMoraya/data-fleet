@@ -771,14 +771,14 @@ export default function Checklists() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-6">
+    <div className="flex h-full flex-col gap-3 tall:gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-zinc-900">
+          <h1 className="flex items-center gap-2 text-lg font-bold text-zinc-900 tall:text-2xl">
             <ClipboardCheck className="h-6 w-6 text-orange-500" />
             Checklists
           </h1>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 hidden text-sm text-zinc-500 tall:block">
             {isDriverOrAuditor ? 'Inicie ou continue um checklist' : 'Histórico de inspeções do tenant'}
           </p>
         </div>
@@ -1086,9 +1086,9 @@ export default function Checklists() {
 
       {/* ── Fleet Assistant+ view ─────────────────────────────── */}
       {isAssistantPlus && (
-        <div className="flex min-h-0 flex-1 flex-col gap-4">
+        <div className="flex flex-col gap-3 tall:min-h-0 tall:flex-1 tall:gap-4">
           {blockWrite && <SelectClientNotice />}
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+          <div className="flex flex-col overflow-visible rounded-2xl border border-zinc-200 bg-white tall:min-h-0 tall:flex-1 tall:overflow-hidden">
             <div className="border-b border-zinc-200 px-4">
               <nav role="tablist" className="-mb-px flex gap-1">
                 <button
@@ -1100,7 +1100,7 @@ export default function Checklists() {
                     activeTab === 'checklists'
                       ? 'border-orange-500 font-medium text-orange-700'
                       : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700',
-                    'flex items-center border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors',
+                    'flex items-center border-b-2 px-4 py-2 text-sm whitespace-nowrap transition-colors tall:py-3',
                   )}
                 >
                   Checklists
@@ -1114,7 +1114,7 @@ export default function Checklists() {
                     activeTab === 'tireInspections'
                       ? 'border-orange-500 font-medium text-orange-700'
                       : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700',
-                    'flex items-center border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors',
+                    'flex items-center border-b-2 px-4 py-2 text-sm whitespace-nowrap transition-colors tall:py-3',
                   )}
                 >
                   Inspeções de Pneus
@@ -1165,12 +1165,12 @@ export default function Checklists() {
                     <p className="text-sm">{blockWrite ? 'Nenhum checklist realizado em nenhum cliente.' : 'Nenhum checklist realizado neste tenant.'}</p>
                   </div>
                 ) : (
-                  <div className="flex-1 overflow-auto">
+                  <div className="overflow-visible tall:flex-1 tall:overflow-auto">
                     <table className="min-w-full divide-y divide-zinc-100">
                       <thead className="sticky top-0 z-10 bg-zinc-50">
                         <tr>
                           {[...(blockWrite ? ['Cliente'] : []), 'Template', 'Contexto', 'Veículo', 'Preenchido por', 'Data', 'Status', 'Ações'].map(h => (
-                            <th key={h} className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">
+                            <th key={h} className="px-4 py-2 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase tall:py-3">
                               {h}
                             </th>
                           ))}
@@ -1183,13 +1183,13 @@ export default function Checklists() {
                           .map(c => (
                             <tr key={c.id} className="hover:bg-zinc-50">
                               {blockWrite && (
-                                <td className="px-4 py-3 text-sm text-zinc-600">
+                                <td className="px-4 py-2 text-sm text-zinc-600 tall:py-3">
                                   <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
                                     {c.clientId ? (clientNameMap.get(c.clientId) ?? '—') : '—'}
                                   </span>
                                 </td>
                               )}
-                              <td className="px-4 py-3 text-sm text-zinc-900">
+                              <td className="px-4 py-2 text-sm text-zinc-900 tall:py-3">
                                 <div className="flex items-center gap-1.5">
                                   {issueChecklistIds.has(c.id) && (
                                     <span title="Contém inconformidades">
@@ -1199,7 +1199,7 @@ export default function Checklists() {
                                   {c.templateName ?? '—'}
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-xs text-zinc-500">
+                              <td className="px-4 py-2 text-xs text-zinc-500 tall:py-3">
                                 {c.templateContext ?? '—'}
                                 {loanDeliveryChecklistIds.has(c.id) && c.templateContext === 'Entrega' && (
                                   <span className="mt-1 block w-fit rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
@@ -1207,7 +1207,7 @@ export default function Checklists() {
                                   </span>
                                 )}
                               </td>
-                              <td className="px-4 py-3 text-sm text-zinc-600">
+                              <td className="px-4 py-2 text-sm text-zinc-600 tall:py-3">
                                 {c.vehicleLicensePlate ? (
                                   <>
                                     <div>{c.vehicleLicensePlate}</div>
@@ -1237,14 +1237,14 @@ export default function Checklists() {
                                   </>
                                 ) : '—'}
                               </td>
-                              <td className="px-4 py-3 text-sm text-zinc-600">{c.filledByName ?? '—'}</td>
-                              <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(c.startedAt)}</td>
-                              <td className="px-4 py-3">
+                              <td className="px-4 py-2 text-sm text-zinc-600 tall:py-3">{c.filledByName ?? '—'}</td>
+                              <td className="px-4 py-2 text-xs text-zinc-500 tall:py-3">{formatDate(c.startedAt)}</td>
+                              <td className="px-4 py-2 tall:py-3">
                                 <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[c.status])}>
                                   {STATUS_LABEL[c.status]}
                                 </span>
                               </td>
-                              <td className="px-4 py-3">
+                              <td className="px-4 py-2 tall:py-3">
                                 <div className="flex items-center gap-1">
                                   <button onClick={() => setViewChecklist(c)} className="rounded p-1.5 hover:bg-zinc-100" title="Visualizar">
                                     <Eye className="h-4 w-4 text-zinc-400" />
@@ -1285,12 +1285,12 @@ export default function Checklists() {
                   <p className="text-sm">{blockWrite ? 'Nenhuma inspeção de pneus registrada em nenhum cliente.' : 'Nenhuma inspeção de pneus registrada neste tenant.'}</p>
                 </div>
               ) : (
-                <div className="flex-1 overflow-auto">
+                <div className="overflow-visible tall:flex-1 tall:overflow-auto">
                   <table className="min-w-full divide-y divide-zinc-100">
                     <thead className="sticky top-0 z-10 bg-zinc-50">
                       <tr>
                         {[...(blockWrite ? ['Cliente'] : []), 'Veículo', 'Inspetor', 'Início', 'Conclusão', 'Status', 'Ações'].map(h => (
-                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">
+                          <th key={h} className="px-4 py-2 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase tall:py-3">
                             {h}
                           </th>
                         ))}
@@ -1300,13 +1300,13 @@ export default function Checklists() {
                       {tireInspections.map(ti => (
                         <tr key={ti.id} className="hover:bg-zinc-50">
                           {blockWrite && (
-                            <td className="px-4 py-3 text-sm text-zinc-600">
+                            <td className="px-4 py-2 text-sm text-zinc-600 tall:py-3">
                               <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
                                 {ti.clientId ? (clientNameMap.get(ti.clientId) ?? '—') : '—'}
                               </span>
                             </td>
                           )}
-                          <td className="px-4 py-3 text-sm text-zinc-900">
+                          <td className="px-4 py-2 text-sm text-zinc-900 tall:py-3">
                             <div className="flex items-center gap-1.5">
                               <Disc className="h-3.5 w-3.5 flex-shrink-0 text-blue-400" />
                               {ti.vehicleLicensePlate ?? '—'}
@@ -1321,15 +1321,15 @@ export default function Checklists() {
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-sm text-zinc-600">{ti.filledByName ?? '—'}</td>
-                          <td className="px-4 py-3 text-xs text-zinc-500">{formatDate(ti.startedAt)}</td>
-                          <td className="px-4 py-3 text-xs text-zinc-500">{ti.completedAt ? formatDate(ti.completedAt) : '—'}</td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-2 text-sm text-zinc-600 tall:py-3">{ti.filledByName ?? '—'}</td>
+                          <td className="px-4 py-2 text-xs text-zinc-500 tall:py-3">{formatDate(ti.startedAt)}</td>
+                          <td className="px-4 py-2 text-xs text-zinc-500 tall:py-3">{ti.completedAt ? formatDate(ti.completedAt) : '—'}</td>
+                          <td className="px-4 py-2 tall:py-3">
                             <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[ti.status])}>
                               {STATUS_LABEL[ti.status]}
                             </span>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-2 tall:py-3">
                             <button onClick={() => setViewTireInspection(ti)} className="rounded p-1.5 hover:bg-zinc-100" title="Visualizar">
                               <Eye className="h-4 w-4 text-zinc-400" />
                             </button>
