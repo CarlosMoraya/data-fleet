@@ -44,7 +44,7 @@ Para as duas telas migradas, a cadeia **inteira** de contêineres entre o `<thea
 
 ### Resultado da validação
 
-`npx tsc --noEmit` 0 erros; `npx eslint src/` 0 erros / 255 warnings (baseline real medido nesta data: 258 — a memória registrava 220, número corrigido); `npm run test:unit` 1722/1722; `npm run test:smoke` 7/7 antes e depois; `table-scroll-shell` 9 passando / 2 skip; `compact-density` 3/3.
+`npx tsc --noEmit` 0 erros; `npx eslint src/` 0 erros / 255 warnings (baseline real medido nesta data: 258 — a memória registrava 220, número corrigido); `npm run test:unit` 1722/1722; `npm run test:smoke` 7/7 antes e depois; `table-scroll-shell` 9 passando / 2 skip; `compact-density` 3/3; `test:e2e:visual` 3/3.
 
 ### Alvo de linhas visíveis revisado de 5 para 4
 
@@ -52,9 +52,21 @@ O critério original do plano — "pelo menos 5 linhas visíveis em 1280×720 em
 
 O cenário 1 de `compact-density.spec.ts` foi primeiro mantido exigindo 5 (fiel à especificação) e reportado vermelho; **o usuário decidiu em 2026-08-15 ajustar o alvo para 4**, e o teste foi alterado com a justificativa registrada em comentário no próprio arquivo. Compactar a célula "Veículo" segue como o único caminho restante para as 5 linhas sem tocar em tipografia.
 
-### Observações registradas, não corrigidas
+### `checklist-fill` do golden master — corrigido na mesma sessão
 
-- `e2e/visual` — `checklist-fill-visual-linux.png` já falhava **antes** desta sessão (deriva de massa de dados; confirmado isolando as mudanças com `git stash`). Não foi regravado.
+`checklist-fill-visual-linux.png` já falhava **antes** desta branch (confirmado isolando as mudanças com `git stash`): deriva de massa de dados, não regressão visual. A pedido do usuário, foi corrigido em vez de apenas regravado — regravar consertaria hoje e quebraria no próximo checklist preenchido.
+
+Duas causas, ambas de instabilidade do **teste**, não do produto:
+
+1. **Fotografava a página inteira.** O fundo é a tabela de histórico de checklists, que cresce a cada preenchimento. Agora fotografa o **painel do modal** — `.fixed.inset-0 > div`, não o `.fixed.inset-0`, que é o overlay de tela cheia e trazia o fundo junto.
+2. **Clicava no primeiro botão de olho.** A lista é `order('started_at', { ascending: false })`, então o primeiro é o checklist **mais recente** — âncora que muda sozinha. Agora usa `.last()`, o mais antigo, que não se move conforme a massa cresce.
+
+Havia ainda uma corrida: as respostas são carregadas depois que o modal abre, e o `Carregando...` entrava na foto de forma intermitente. O teste passou a esperar `Carregando...` sumir antes do clique do obturador.
+
+Baseline regravado; três execuções seguidas verdes. Arquivo tocado: `e2e/visual/visual-regression.spec.ts`. Nenhuma alteração em `src/components/ChecklistDetailModal.tsx` — a correção é inteiramente do lado do teste.
+
+### Observação registrada, não corrigida
+
 - O baseline do Dashboard, desatualizado desde 2026-06-30, ao ser regravado absorveu também deriva pré-existente do menu lateral (ganhou "Controle de carretas" e "Chamados", perdeu "Aprovação de Orçamentos").
 
 ### Sugestões para sessões futuras
