@@ -146,20 +146,20 @@ export default function ActionPlans() {
   }, [clients]);
 
   return (
-    <div className="flex h-full flex-col gap-6">
+    <div className="flex h-full flex-col gap-3 tall:gap-6">
       {blockWrite && <SelectClientNotice />}
 
       {/* Header */}
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-zinc-900">
+        <h1 className="flex items-center gap-2 text-lg font-bold text-zinc-900 tall:text-2xl">
           <ClipboardList className="h-6 w-6 text-orange-500" />
           Plano de Ação
         </h1>
-        <p className="mt-1 text-sm text-zinc-500">Gerencie as ações geradas por não conformidades nos checklists</p>
+        <p className="mt-1 hidden text-sm text-zinc-500 tall:block">Gerencie as ações geradas por não conformidades nos checklists</p>
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="hidden gap-3 tall:grid tall:grid-cols-2 tall:sm:grid-cols-5">
         {(['pending', 'in_progress', 'awaiting_conclusion', 'completed', 'cancelled'] as ActionPlanStatus[]).map(s => (
           <button
             key={s}
@@ -230,7 +230,7 @@ export default function ActionPlans() {
                     ...(blockWrite ? ['Cliente'] : []),
                     'Nome / Ação', 'Origem', 'Veículo', 'Status', 'Responsável', 'Prazo', 'Criado em', '',
                   ].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase">
+                    <th key={h} className="px-4 py-2 text-left text-xs font-semibold tracking-wider text-zinc-500 uppercase tall:py-3">
                       {h}
                     </th>
                   ))}
@@ -244,17 +244,17 @@ export default function ActionPlans() {
                     className={cn('transition-colors hover:bg-zinc-50', !blockWrite && 'cursor-pointer')}
                   >
                     {blockWrite && (
-                      <td className="px-4 py-3 text-sm text-zinc-600">
+                      <td className="px-4 py-2 text-sm text-zinc-600 tall:py-3">
                         <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
                           {p.clientId ? (clientNameMap.get(p.clientId) ?? '—') : '—'}
                         </span>
                       </td>
                     )}
-                    <td className="max-w-[220px] px-4 py-3">
+                    <td className="max-w-[220px] px-4 py-2 tall:py-3">
                       {p.name && <p className="truncate text-sm font-medium text-zinc-900">{p.name}</p>}
                       <p className="truncate text-xs text-zinc-500">{p.suggestedAction}</p>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2 tall:py-3">
                       <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', actionPlanOriginColor(actionPlanOriginOf(p)))}>
                         {actionPlanOriginLabel(actionPlanOriginOf(p))}
                       </span>
@@ -262,7 +262,7 @@ export default function ActionPlans() {
                         <div className="mt-0.5 text-xs text-zinc-400">{p.fleetTicketNumber}</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm font-medium text-zinc-900">
+                    <td className="px-4 py-2 text-sm font-medium text-zinc-900 tall:py-3">
                       {p.vehicleLicensePlate ? (
                         <>
                           <div>{p.vehicleLicensePlate}</div>
@@ -275,22 +275,22 @@ export default function ActionPlans() {
                         <span className="text-zinc-400 italic">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2 tall:py-3">
                       <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', actionStatusColor(p.status))}>
                         {actionStatusLabel(p.status)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-zinc-600">
+                    <td className="px-4 py-2 text-sm text-zinc-600 tall:py-3">
                       <div>{p.responsibleName ?? <span className="text-zinc-400 italic">—</span>}</div>
                       {p.claimedByName && (
                         <div className="text-xs text-zinc-400">Assumido: {p.claimedByName}</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-zinc-600">
+                    <td className="px-4 py-2 text-sm text-zinc-600 tall:py-3">
                       {formatDueDate(p.dueDate)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-zinc-400">{formatDate(p.createdAt)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2 text-xs text-zinc-400 tall:py-3">{formatDate(p.createdAt)}</td>
+                    <td className="px-4 py-2 tall:py-3">
                       <span className={cn('text-xs text-orange-500 hover:underline', blockWrite && 'pointer-events-none opacity-40')}>
                         Gerenciar
                       </span>

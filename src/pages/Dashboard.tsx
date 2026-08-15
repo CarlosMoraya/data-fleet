@@ -889,9 +889,9 @@ export default function Dashboard() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full flex-col gap-6">
+    <div className="flex h-full flex-col gap-3 tall:gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+        <h1 className="text-lg font-semibold tracking-tight text-zinc-900 tall:text-2xl">
           Dashboard
         </h1>
       </div>
@@ -907,7 +907,7 @@ export default function Dashboard() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex items-center gap-2 border-b-2 px-4 py-3 text-sm transition-colors',
+                  'flex items-center gap-2 border-b-2 px-4 py-2 text-sm transition-colors tall:py-3',
                   isActive
                     ? 'border-orange-500 font-medium text-orange-700'
                     : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'

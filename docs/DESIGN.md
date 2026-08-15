@@ -62,3 +62,11 @@ O dashboard utiliza o princípio de "Progressive Disclosure", mostrando KPIs ger
 - **Modal de confirmação de lote** (`FinancialApprovalConfirmModal`): título, entidade, quantidade de parcelas e total em BRL; botão de confirmação verde sem exigir texto digitado; desabilita todos os controles e mostra spinner durante o envio; erro aparece dentro do modal, nunca via `window.alert`.
 - **Modal Itens/PDF** (`BudgetDocumentPreviewModal`): duas visões internas (`Itens`/`PDF`) com tablist própria; estados de carregamento/erro/vazio independentes por visão — PDF ausente não bloqueia Itens e vice-versa; em mobile ocupa a largura disponível com scroll interno (`max-h-[calc(100vh-2rem)]`).
 - Todos os modais financeiros usam `role="dialog"`, `aria-modal="true"` e título associado via `aria-labelledby`; fecham por botão e por Escape (Escape é ignorado enquanto uma submissão está em andamento).
+
+### Responsividade — densidade adaptativa por altura de tela
+
+- **O problema**: em notebooks de 1366×768 (ou 1920×1080 com zoom acima de 110%), a barra superior, os títulos de página e os respiros consumiam tanto espaço vertical que a lista de veículos exibia praticamente uma linha por vez. O usuário rolava a tabela inteira sem nunca ver um conjunto de registros.
+- **O que o produto faz**: quando a janela tem **900px de altura ou menos**, a interface entra automaticamente em densidade compacta — barra superior mais baixa, títulos menores, subtítulos de apoio recolhidos, abas e linhas de tabela com menos respiro. Não há botão nem preferência a configurar: o sistema decide pelo espaço disponível, como fazem os *density modes* de Material Design, IBM Carbon e Ant Design.
+- **Em telas altas nada muda.** Acima de 900px de altura o produto é idêntico ao que sempre foi — mesmo respiro, mesma altura de linha, mesmos subtítulos.
+- **O texto dos dados nunca encolhe.** A densidade vem só de espaçamento e de esconder chrome redundante (subtítulos, cartões de contagem duplicados em Plano de Ação). Reduzir a fonte dos dados prejudicaria a legibilidade e a acessibilidade em campo.
+- **Checklists e Agendamentos** passam a rolar pela página inteira em tela baixa, com o cabeçalho de colunas fixo no topo: uma única barra de rolagem em vez de duas. Veículos e Plano de Ação mantêm rolagem interna porque suas tabelas também rolam na horizontal.

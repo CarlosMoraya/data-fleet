@@ -32,7 +32,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
   const { user, currentClient, clients, switchClient, canSwitchClient, workshopPartnerships } = useAuth();
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4 md:px-6">
+    <header className="flex h-12 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4 md:px-6 tall:h-16">
       <div className="flex flex-1 items-center gap-3 md:gap-4">
         <button
           onClick={onMenuClick}

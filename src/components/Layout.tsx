@@ -38,7 +38,7 @@ export default function Layout() {
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar onMenuClick={() => setIsSidebarOpen(true)} />
-        <main className="flex flex-1 flex-col overflow-hidden p-4 md:p-8">
+        <main className="flex flex-1 flex-col overflow-y-auto p-4 tall:overflow-hidden tall:md:p-8">
           <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col">
             <Suspense fallback={<RouteFallback />}>
               <Outlet />

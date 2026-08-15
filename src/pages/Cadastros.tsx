@@ -55,10 +55,10 @@ export default function Cadastros() {
   const visibleTabs = TABS.filter((tab) => tab.roles.includes(user?.role || ''));
 
   return (
-    <div className="flex h-full flex-col gap-6">
+    <div className="flex h-full flex-col gap-3 tall:gap-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Cadastros</h1>
-        <p className="mt-1 text-sm text-zinc-500">Gerencie os cadastros da sua frota.</p>
+        <h1 className="text-lg font-semibold tracking-tight text-zinc-900 tall:text-2xl">Cadastros</h1>
+        <p className="mt-1 hidden text-sm text-zinc-500 tall:block">Gerencie os cadastros da sua frota.</p>
       </div>
 
       {/* Tab bar */}
@@ -73,7 +73,7 @@ export default function Cadastros() {
                   isActive
                     ? 'border-orange-500 font-medium text-orange-700'
                     : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700',
-                  'flex items-center border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors'
+                  'flex items-center border-b-2 px-4 py-2 text-sm whitespace-nowrap transition-colors tall:py-3'
                 )
               }
             >
