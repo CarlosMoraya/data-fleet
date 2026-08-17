@@ -6,6 +6,7 @@ import { Navigate, useSearchParams } from 'react-router-dom';
 import LinkedRecordLink from '../components/common/LinkedRecordLink';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import LastKmLabel from '../components/LastKmLabel';
+import LastRouteLabel from '../components/LastRouteLabel';
 import SelectClientNotice from '../components/SelectClientNotice';
 import VehicleActiveFilterBanner from '../components/VehicleActiveFilterBanner';
 import VehicleDetailModal from '../components/VehicleDetailModal';
@@ -31,6 +32,7 @@ import {
   PENDENCY_LABELS,
   PENDENCY_VALUES,
   applyVehicleFilters,
+  buildLastRouteFilterOptions,
   hasActiveStructuredFilters,
   hasLegacyVehicleParams,
   parseSearchFromParams,
@@ -41,6 +43,11 @@ import {
 } from '../lib/vehicleFilters';
 import { vehicleFromRow, VehicleRow } from '../lib/vehicleMappers';
 import { XlsxVehicleProvider } from '../services/vehicleExport/xlsxVehicleProvider';
+import {
+  getVehicleLastRouteMap,
+  normalizeFleetPlate,
+  type VehicleLastRouteInfo,
+} from '../services/vehicleLastRouteService';
 import { completeVehicleLoan, getActiveVehicleLoan, getActiveLoansForVehicles } from '../services/vehicleLoanService';
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 import { saveVehicle, deleteVehicle, toggleVehicleActive } from '../services/vehicleService';
@@ -60,6 +67,8 @@ export default function Vehicles() {
   const { currentClient, user, clients } = useAuth();
   const queryClient = useQueryClient();
   const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
+  const lastRouteClientId = import.meta.env.VITE_LAST_ROUTE_CLIENT_ID as string | undefined;
+  const showLastRoute = !!lastRouteClientId && currentClient?.id === lastRouteClientId;
   const [searchParams, setSearchParams] = useSearchParams();
   const search = parseSearchFromParams(searchParams);
   const filters = useMemo(() => parseVehicleFiltersFromParams(searchParams), [searchParams]);
@@ -480,10 +489,32 @@ export default function Vehicles() {
     [activeMaintenanceOrders, vehicles],
   );
 
+  const { data: lastRouteMap = new Map<string, VehicleLastRouteInfo>() } = useQuery({
+    queryKey: ['vehicleLastRoutes', currentClient?.id],
+    queryFn: getVehicleLastRouteMap,
+    enabled: showLastRoute,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
   const filteredVehicles = useMemo(() => {
-    const list = applyVehicleFilters(vehicles, search, filters, pendencyCtx);
+    const list = applyVehicleFilters(
+      vehicles,
+      search,
+      filters,
+      pendencyCtx,
+      showLastRoute ? lastRouteMap : undefined,
+      normalizeFleetPlate,
+    );
     return filterByActive(list, showInactive);
-  }, [vehicles, search, filters, pendencyCtx, showInactive]);
+  }, [vehicles, search, filters, pendencyCtx, showInactive, showLastRoute, lastRouteMap]);
+
+  const lastRouteOptions = useMemo(
+    () => showLastRoute
+      ? buildLastRouteFilterOptions(filterByActive(vehicles, showInactive), lastRouteMap, normalizeFleetPlate)
+      : [],
+    [showLastRoute, vehicles, showInactive, lastRouteMap],
+  );
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -654,6 +685,19 @@ export default function Vehicles() {
             <option key={pendency} value={pendency}>{PENDENCY_LABELS[pendency]}</option>
           ))}
         </select>
+        {showLastRoute && lastRouteOptions.length > 0 && (
+          <select
+            aria-label="Última rota"
+            value={filters.lastRoute ?? ''}
+            onChange={(e) => updateFilter({ lastRoute: e.target.value || null })}
+            className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+          >
+            <option value="">Todas as rotas</option>
+            {lastRouteOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label} ({option.count})</option>
+            ))}
+          </select>
+        )}
         {(hasActiveStructuredFilters(filters) || !!search) && (
           <button
             type="button"
@@ -748,6 +792,12 @@ export default function Vehicles() {
                         <div className="ml-4">
                           <div className="font-medium text-zinc-900">{vehicle.licensePlate}</div>
                           <LastKmLabel info={lastKmMap.get(vehicle.id)} className="text-xs text-zinc-400" />
+                          {showLastRoute && (
+                            <LastRouteLabel
+                              info={lastRouteMap.get(normalizeFleetPlate(vehicle.licensePlate))}
+                              className="text-xs text-zinc-400"
+                            />
+                          )}
                           <div className="text-sm text-zinc-500">{vehicle.brand} {vehicle.model} ({vehicle.year})</div>
                         </div>
                       </div>
@@ -883,6 +933,9 @@ export default function Vehicles() {
       {viewingVehicle && (
         <VehicleDetailModal
           vehicle={viewingVehicle}
+          lastRoute={showLastRoute
+            ? lastRouteMap.get(normalizeFleetPlate(viewingVehicle.licensePlate))
+            : undefined}
           onClose={() => setViewingVehicle(null)}
           onEdit={canEdit ? () => {
             const vehicle = viewingVehicle;

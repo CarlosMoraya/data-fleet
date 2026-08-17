@@ -1,4 +1,5 @@
 import { isBlank, isCrlvExpired, isWithinExpiryWindow, lacksTrackerCoverage } from './dashboardKpi';
+import { formatDate } from './dateUtils';
 
 import type { Vehicle } from '../types';
 
@@ -30,18 +31,35 @@ export const LEGACY_VEHICLE_ISSUE_VALUES: Record<string, VehiclePendency> = {
 
 export const SEARCH_PARAM = 'q';
 
+export const LAST_ROUTE_PARAM = 'lastRoute';
+export const LAST_ROUTE_NONE = 'none';
+export const LAST_ROUTE_OLDER_7D = 'older_7d';
+export const LAST_ROUTE_OLDER_30D = 'older_30d';
+export const LAST_ROUTE_RECENT_WINDOW_DAYS = 7;
+export const LAST_ROUTE_OLDER_WINDOW_DAYS = 30;
+
+export type LastRouteFilterValue = string;
+
+export interface LastRouteFilterOption {
+  value: LastRouteFilterValue;
+  label: string;
+  count: number;
+}
+
 export const PENDENCY_EXPIRY_WINDOW_DAYS = 30;
 
 export interface VehicleStructuredFilters {
   shipperId: string | null;
   operationalUnitId: string | null;
   pendency: VehiclePendency | null;
+  lastRoute: LastRouteFilterValue | null;
 }
 
 export const EMPTY_STRUCTURED_FILTERS: VehicleStructuredFilters = {
   shipperId: null,
   operationalUnitId: null,
   pendency: null,
+  lastRoute: null,
 };
 
 export interface PendencyContext {
@@ -54,13 +72,59 @@ export function isVehiclePendency(value: string | null): value is VehiclePendenc
   return PENDENCY_VALUES.includes(value as VehiclePendency);
 }
 
+function dateOnlyToUtc(value: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const [, year, month, day] = match.map(Number);
+  const timestamp = Date.UTC(year, month - 1, day);
+  const date = new Date(timestamp);
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) return null;
+  return timestamp;
+}
+
+function isLastRouteFilterValue(value: string | null): value is LastRouteFilterValue {
+  return value === LAST_ROUTE_NONE ||
+    value === LAST_ROUTE_OLDER_7D ||
+    value === LAST_ROUTE_OLDER_30D ||
+    (value != null && dateOnlyToUtc(value) != null);
+}
+
+function lastRouteReferenceDate(
+  vehicles: Vehicle[],
+  lastRouteByPlate: Map<string, { lastRouteDate: string }>,
+  normalizePlate: (plate: string) => string,
+): string | null {
+  let referenceDate: string | null = null;
+  for (const vehicle of vehicles) {
+    const date = lastRouteByPlate.get(normalizePlate(vehicle.licensePlate))?.lastRouteDate;
+    if (date && dateOnlyToUtc(date) != null && (referenceDate == null || date > referenceDate)) {
+      referenceDate = date;
+    }
+  }
+  return referenceDate;
+}
+
+function routeAgeInDays(referenceDate: string, routeDate: string): number | null {
+  const referenceTime = dateOnlyToUtc(referenceDate);
+  const routeTime = dateOnlyToUtc(routeDate);
+  if (referenceTime == null || routeTime == null) return null;
+  return (referenceTime - routeTime) / 86_400_000;
+}
+
 export function parseVehicleFiltersFromParams(params: URLSearchParams): VehicleStructuredFilters {
   const rawIssue = params.get('issue') ?? params.get('pendencia');
   const issue = rawIssue ? (LEGACY_VEHICLE_ISSUE_VALUES[rawIssue] ?? rawIssue) : null;
+  const lastRoute = params.get(LAST_ROUTE_PARAM);
   return {
     shipperId: params.get('shipper') || params.get('embarcador') || null,
     operationalUnitId: params.get('unit') || params.get('unidade') || null,
     pendency: isVehiclePendency(issue) ? issue : null,
+    lastRoute: isLastRouteFilterValue(lastRoute) ? lastRoute : null,
   };
 }
 
@@ -69,6 +133,7 @@ export function serializeVehicleFiltersToParams(filters: VehicleStructuredFilter
   if (filters.shipperId) params.set('shipper', filters.shipperId);
   if (filters.operationalUnitId) params.set('unit', filters.operationalUnitId);
   if (filters.pendency) params.set('issue', filters.pendency);
+  if (filters.lastRoute) params.set(LAST_ROUTE_PARAM, filters.lastRoute);
   if (search) params.set(SEARCH_PARAM, search);
   return params;
 }
@@ -82,7 +147,78 @@ export function hasLegacyVehicleParams(params: URLSearchParams): boolean {
 }
 
 export function hasActiveStructuredFilters(filters: VehicleStructuredFilters): boolean {
-  return filters.shipperId != null || filters.operationalUnitId != null || filters.pendency != null;
+  return filters.shipperId != null ||
+    filters.operationalUnitId != null ||
+    filters.pendency != null ||
+    filters.lastRoute != null;
+}
+
+export function buildLastRouteFilterOptions(
+  vehicles: Vehicle[],
+  lastRouteByPlate: Map<string, { lastRouteDate: string }>,
+  normalizePlate: (plate: string) => string,
+): LastRouteFilterOption[] {
+  const referenceDate = lastRouteReferenceDate(vehicles, lastRouteByPlate, normalizePlate);
+  const exactDateCounts = new Map<string, number>();
+  let older7DaysCount = 0;
+  let older30DaysCount = 0;
+  let withoutRouteCount = 0;
+
+  for (const vehicle of vehicles) {
+    const route = lastRouteByPlate.get(normalizePlate(vehicle.licensePlate));
+    if (!route || !referenceDate) {
+      withoutRouteCount += 1;
+      continue;
+    }
+
+    const age = routeAgeInDays(referenceDate, route.lastRouteDate);
+    if (age == null) {
+      withoutRouteCount += 1;
+    } else if (age >= 0 && age < LAST_ROUTE_RECENT_WINDOW_DAYS) {
+      exactDateCounts.set(route.lastRouteDate, (exactDateCounts.get(route.lastRouteDate) ?? 0) + 1);
+    } else if (age >= LAST_ROUTE_RECENT_WINDOW_DAYS && age <= LAST_ROUTE_OLDER_WINDOW_DAYS) {
+      older7DaysCount += 1;
+    } else if (age > LAST_ROUTE_OLDER_WINDOW_DAYS) {
+      older30DaysCount += 1;
+    }
+  }
+
+  const options = [...exactDateCounts.entries()]
+    .sort(([left], [right]) => right.localeCompare(left))
+    .map(([value, count]) => ({ value, label: formatDate(value), count }));
+
+  if (older7DaysCount > 0) {
+    options.push({ value: LAST_ROUTE_OLDER_7D, label: 'Há mais de 7 dias', count: older7DaysCount });
+  }
+  if (older30DaysCount > 0) {
+    options.push({ value: LAST_ROUTE_OLDER_30D, label: 'Há mais de 30 dias', count: older30DaysCount });
+  }
+  if (withoutRouteCount > 0) {
+    options.push({ value: LAST_ROUTE_NONE, label: 'Sem rota registrada', count: withoutRouteCount });
+  }
+  return options;
+}
+
+export function vehicleMatchesLastRoute(
+  vehicle: Vehicle,
+  value: LastRouteFilterValue,
+  lastRouteByPlate: Map<string, { lastRouteDate: string }>,
+  normalizePlate: (plate: string) => string,
+  referenceDate: string | null,
+): boolean {
+  const route = lastRouteByPlate.get(normalizePlate(vehicle.licensePlate));
+  if (value === LAST_ROUTE_NONE) return route == null;
+  if (!route) return false;
+  if (dateOnlyToUtc(value) != null) return route.lastRouteDate === value;
+  if (!referenceDate) return false;
+
+  const age = routeAgeInDays(referenceDate, route.lastRouteDate);
+  if (age == null) return false;
+  if (value === LAST_ROUTE_OLDER_7D) {
+    return age >= LAST_ROUTE_RECENT_WINDOW_DAYS && age <= LAST_ROUTE_OLDER_WINDOW_DAYS;
+  }
+  if (value === LAST_ROUTE_OLDER_30D) return age > LAST_ROUTE_OLDER_WINDOW_DAYS;
+  return false;
 }
 
 export function vehicleMatchesSearch(vehicle: Vehicle, search: string): boolean {
@@ -129,13 +265,25 @@ export function applyVehicleFilters(
   vehicles: Vehicle[],
   search: string,
   filters: VehicleStructuredFilters,
-  ctx: PendencyContext
+  ctx: PendencyContext,
+  lastRouteByPlate?: Map<string, { lastRouteDate: string }>,
+  normalizePlate?: (plate: string) => string,
 ): Vehicle[] {
+  const referenceDate = filters.lastRoute && lastRouteByPlate && normalizePlate
+    ? lastRouteReferenceDate(vehicles, lastRouteByPlate, normalizePlate)
+    : null;
+
   return vehicles.filter((vehicle) => {
     if (!vehicleMatchesSearch(vehicle, search)) return false;
     if (filters.shipperId && vehicle.shipperId !== filters.shipperId) return false;
     if (filters.operationalUnitId && vehicle.operationalUnitId !== filters.operationalUnitId) return false;
     if (filters.pendency && !vehicleMatchesPendency(vehicle, filters.pendency, ctx)) return false;
+    if (
+      filters.lastRoute &&
+      lastRouteByPlate &&
+      normalizePlate &&
+      !vehicleMatchesLastRoute(vehicle, filters.lastRoute, lastRouteByPlate, normalizePlate, referenceDate)
+    ) return false;
     return true;
   });
 }

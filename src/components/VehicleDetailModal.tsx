@@ -12,10 +12,12 @@ import VehicleKmHistoryTab from './VehicleKmHistoryTab';
 import VehicleLoanDetail from './VehicleLoanDetail';
 import VehicleLoanHistory from './VehicleLoanHistory';
 
+import type { VehicleLastRouteInfo } from '../services/vehicleLastRouteService';
 import type { VehicleLoan } from '../types/vehicleLoan';
 
 interface Props {
   vehicle: Vehicle;
+  lastRoute?: VehicleLastRouteInfo | null;
   onClose: () => void;
   onEdit?: () => void;
 }
@@ -78,7 +80,7 @@ function formatDate(dateStr?: string | null): string | undefined {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR');
 }
 
-export default function VehicleDetailModal({ vehicle, onClose, onEdit }: Props) {
+export default function VehicleDetailModal({ vehicle, lastRoute, onClose, onEdit }: Props) {
   const [activeTab, setActiveTab] = useState<'general' | 'kmHistory' | 'couplingHistory' | 'loans'>('general');
   const [selectedLoan, setSelectedLoan] = useState<VehicleLoan | null>(null);
   const isImplement = vehicle.category === 'Semi-reboque/Implemento';
@@ -223,6 +225,12 @@ export default function VehicleDetailModal({ vehicle, onClose, onEdit }: Props) 
                 <SectionTitle title="Identificação" />
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
                   <DetailField label="Placa" value={vehicle.licensePlate} />
+                  {lastRoute && (
+                    <DetailField
+                      label="Última rota"
+                      value={`${formatDate(lastRoute.lastRouteDate)} · Rota #${lastRoute.routeId}`}
+                    />
+                  )}
                   <DetailField label="Marca" value={vehicle.brand} />
                   <DetailField label="Modelo" value={vehicle.model} />
                   <DetailField label="Ano" value={vehicle.year} />
