@@ -7,6 +7,7 @@ import LinkedRecordLink from '../components/common/LinkedRecordLink';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import LastKmLabel from '../components/LastKmLabel';
 import LastRouteLabel from '../components/LastRouteLabel';
+import MultiSelectDropdown from '../components/MultiSelectDropdown';
 import SelectClientNotice from '../components/SelectClientNotice';
 import VehicleActiveFilterBanner from '../components/VehicleActiveFilterBanner';
 import VehicleDetailModal from '../components/VehicleDetailModal';
@@ -24,11 +25,14 @@ import {
   withoutOpenRecordParam,
 } from '../lib/linkedRecordNavigation';
 import { clearVehicleDraftFiles } from '../lib/offline/vehicleDraftFiles';
+import { filterOperationalUnitsByShippers } from '../lib/operationsManagerScope';
 import { computeUnavailableVehicleIds } from '../lib/overviewFleetFilters';
 import { filterByActive } from '../lib/registryActiveFilter';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import {
+  AVAILABILITY_LABELS,
+  AVAILABILITY_VALUES,
   PENDENCY_LABELS,
   PENDENCY_VALUES,
   applyVehicleFilters,
@@ -38,6 +42,7 @@ import {
   parseSearchFromParams,
   parseVehicleFiltersFromParams,
   serializeVehicleFiltersToParams,
+  type VehicleAvailability,
   type VehiclePendency,
   type VehicleStructuredFilters,
 } from '../lib/vehicleFilters';
@@ -125,7 +130,7 @@ export default function Vehicles() {
     enabled: !!user,
   });
 
-  const { data: activeMaintenanceOrders = [] } = useQuery<
+  const { data: activeMaintenanceOrders = [], isLoading: loadingMaintenanceOrders, isError: maintenanceOrdersError } = useQuery<
     { vehicle_id: string; status: string }[]
   >({
     queryKey: ['vehicles-active-maintenance', currentClient?.id],
@@ -245,9 +250,16 @@ export default function Vehicles() {
   }, [vehicles]);
 
   const unitOptions = useMemo(() => {
-    if (!filters.shipperId) return allUnitOptions;
-    return allUnitOptions.filter((unit) => unit.shipperId === filters.shipperId);
-  }, [allUnitOptions, filters.shipperId]);
+    if (filters.shipperIds.length === 0) return allUnitOptions;
+    const units = allUnitOptions.map((unit) => ({ id: unit.id, shipperId: unit.shipperId }));
+    const visibleIds = filterOperationalUnitsByShippers(
+      units.map((unit) => unit.id),
+      filters.shipperIds,
+      units,
+    );
+    const visible = new Set(visibleIds);
+    return allUnitOptions.filter((unit) => visible.has(unit.id));
+  }, [allUnitOptions, filters.shipperIds]);
 
   const { data: checklistRows = [] } = useQuery<
     { vehicle_id: string; context: string; completed_at: string }[]
@@ -265,7 +277,7 @@ export default function Vehicles() {
         completed_at: row.completed_at as string,
       }));
     },
-    enabled: !!user && filters.pendency === 'checklist_overdue',
+    enabled: !!user && filters.pendencies.includes('checklist_overdue'),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
@@ -285,13 +297,13 @@ export default function Vehicles() {
       if (error) throw error;
       return (data ?? []);
     },
-    enabled: !!user && filters.pendency === 'checklist_overdue',
+    enabled: !!user && filters.pendencies.includes('checklist_overdue'),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
 
   const overdueChecklistVehicleIds = useMemo(() => {
-    if (filters.pendency !== 'checklist_overdue') return new Set<string>();
+    if (!filters.pendencies.includes('checklist_overdue')) return new Set<string>();
     const intervalsByClient = new Map<string, { rotina_day_interval: number | null; seguranca_day_interval: number | null }>();
     for (const row of intervalRows) {
       intervalsByClient.set(row.client_id, {
@@ -305,7 +317,7 @@ export default function Vehicles() {
       intervalsByClient,
       today: new Date(),
     });
-  }, [checklistRows, filters.pendency, intervalRows, vehicles]);
+  }, [checklistRows, filters.pendencies, intervalRows, vehicles]);
 
   const pendencyCtx = useMemo(() => ({
     todayIso: new Date().toISOString().slice(0, 10),
@@ -319,13 +331,13 @@ export default function Vehicles() {
 
   const updateFilter = (patch: Partial<VehicleStructuredFilters>) => {
     const next = { ...filters, ...patch };
-    if ('shipperId' in patch) {
-      const selectedUnit = next.operationalUnitId
-        ? allUnitOptions.find((unit) => unit.id === next.operationalUnitId)
-        : undefined;
-      if (selectedUnit && selectedUnit.shipperId !== next.shipperId) {
-        next.operationalUnitId = null;
-      }
+    if ('shipperIds' in patch) {
+      const units = allUnitOptions.map((unit) => ({ id: unit.id, shipperId: unit.shipperId }));
+      next.operationalUnitIds = filterOperationalUnitsByShippers(
+        next.operationalUnitIds,
+        next.shipperIds,
+        units,
+      );
     }
     setSearchParams(serializeVehicleFiltersToParams(next, search), { replace: false });
   };
@@ -489,6 +501,8 @@ export default function Vehicles() {
     [activeMaintenanceOrders, vehicles],
   );
 
+  const maintenanceOrdersReady = !loadingMaintenanceOrders && !maintenanceOrdersError;
+
   const { data: lastRouteMap = new Map<string, VehicleLastRouteInfo>() } = useQuery({
     queryKey: ['vehicleLastRoutes', currentClient?.id],
     queryFn: getVehicleLastRouteMap,
@@ -503,11 +517,12 @@ export default function Vehicles() {
       search,
       filters,
       pendencyCtx,
+      maintenanceOrdersReady ? unavailableVehicleIds : undefined,
       showLastRoute ? lastRouteMap : undefined,
       normalizeFleetPlate,
     );
     return filterByActive(list, showInactive);
-  }, [vehicles, search, filters, pendencyCtx, showInactive, showLastRoute, lastRouteMap]);
+  }, [vehicles, search, filters, pendencyCtx, showInactive, showLastRoute, lastRouteMap, maintenanceOrdersReady, unavailableVehicleIds]);
 
   const lastRouteOptions = useMemo(
     () => showLastRoute
@@ -639,7 +654,7 @@ export default function Vehicles() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <Search className="h-5 w-5 text-zinc-400" aria-hidden="true" />
@@ -652,51 +667,41 @@ export default function Vehicles() {
             placeholder="Buscar por placa, modelo ou chassi..."
           />
         </div>
-        <select
-          aria-label="Embarcador"
-          value={filters.shipperId ?? ''}
-          onChange={(e) => updateFilter({ shipperId: e.target.value || null })}
-          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-        >
-          <option value="">Todos os embarcadores</option>
-          {shipperOptions.map((shipper) => (
-            <option key={shipper.id} value={shipper.id}>{shipper.name}</option>
-          ))}
-        </select>
-        <select
-          aria-label="Unidade Operacional"
-          value={filters.operationalUnitId ?? ''}
-          onChange={(e) => updateFilter({ operationalUnitId: e.target.value || null })}
-          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-        >
-          <option value="">Todas as unidades</option>
-          {unitOptions.map((unit) => (
-            <option key={unit.id} value={unit.id}>{unit.name}</option>
-          ))}
-        </select>
-        <select
-          aria-label="Pendência"
-          value={filters.pendency ?? ''}
-          onChange={(e) => updateFilter({ pendency: (e.target.value || null) as VehiclePendency | null })}
-          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-        >
-          <option value="">Todas as pendências</option>
-          {PENDENCY_VALUES.map((pendency) => (
-            <option key={pendency} value={pendency}>{PENDENCY_LABELS[pendency]}</option>
-          ))}
-        </select>
+        <MultiSelectDropdown
+          label="Embarcador"
+          options={shipperOptions.map((shipper) => ({ value: shipper.id, label: shipper.name }))}
+          selected={filters.shipperIds}
+          onChange={(next) => updateFilter({ shipperIds: next })}
+        />
+        <MultiSelectDropdown
+          label="Unidade Operacional"
+          options={unitOptions.map((unit) => ({ value: unit.id, label: unit.name }))}
+          selected={filters.operationalUnitIds}
+          onChange={(next) => updateFilter({ operationalUnitIds: next })}
+        />
+        <MultiSelectDropdown
+          label="Pendência"
+          options={PENDENCY_VALUES.map((pendency) => ({ value: pendency, label: PENDENCY_LABELS[pendency] }))}
+          selected={filters.pendencies}
+          onChange={(next) => updateFilter({ pendencies: next as VehiclePendency[] })}
+        />
+        <MultiSelectDropdown
+          label="Disponibilidade"
+          options={AVAILABILITY_VALUES.map((availability) => ({
+            value: availability,
+            label: AVAILABILITY_LABELS[availability],
+          }))}
+          selected={filters.availability}
+          onChange={(next) => updateFilter({ availability: next as VehicleAvailability[] })}
+          disabled={!maintenanceOrdersReady}
+        />
         {showLastRoute && lastRouteOptions.length > 0 && (
-          <select
-            aria-label="Última rota"
-            value={filters.lastRoute ?? ''}
-            onChange={(e) => updateFilter({ lastRoute: e.target.value || null })}
-            className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-          >
-            <option value="">Todas as rotas</option>
-            {lastRouteOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label} ({option.count})</option>
-            ))}
-          </select>
+          <MultiSelectDropdown
+            label="Última rota"
+            options={lastRouteOptions.map((option) => ({ value: option.value, label: `${option.label} (${option.count})` }))}
+            selected={filters.lastRoutes}
+            onChange={(next) => updateFilter({ lastRoutes: next })}
+          />
         )}
         {(hasActiveStructuredFilters(filters) || !!search) && (
           <button
@@ -720,9 +725,17 @@ export default function Vehicles() {
       </div>
 
       <VehicleActiveFilterBanner
-        issueLabel={filters.pendency ? PENDENCY_LABELS[filters.pendency] : null}
-        onClearIssue={() => updateFilter({ pendency: null })}
+        issueLabel={filters.pendencies.length > 0
+          ? filters.pendencies.map((pendency) => PENDENCY_LABELS[pendency]).join(', ')
+          : null}
+        onClearIssue={() => updateFilter({ pendencies: [] })}
       />
+
+      {maintenanceOrdersError && filters.availability.length > 0 && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Não foi possível calcular a disponibilidade. Tente novamente.
+        </div>
+      )}
 
       {vehiclesError && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

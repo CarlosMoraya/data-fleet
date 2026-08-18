@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -63,6 +63,13 @@ const DELUNA_CLIENT_ID = 'client-deluna';
 
 let container: Container;
 let queryClient: QueryClient;
+let latestSearch: string;
+
+function LocationProbe() {
+  const location = useLocation();
+  latestSearch = location.search;
+  return null;
+}
 
 function vehicleRow(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
   return {
@@ -119,6 +126,11 @@ function chain(response: { data?: unknown; error?: unknown }) {
   return self;
 }
 
+const vehicles = [
+  vehicleRow(),
+  vehicleRow({ id: 'v-no-route', license_plate: 'ABC1D23', chassi: 'CHASSI456' }),
+];
+
 beforeEach(() => {
   vi.stubEnv('VITE_LAST_ROUTE_CLIENT_ID', DELUNA_CLIENT_ID);
   window.localStorage.clear();
@@ -127,6 +139,7 @@ beforeEach(() => {
   container = document.createElement('div') as Container;
   document.body.appendChild(container);
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  latestSearch = '';
 
   fromMock.mockReset();
   rpcMock.mockReset();
@@ -135,10 +148,6 @@ beforeEach(() => {
   getVehicleLastRouteMapMock.mockReset();
   useAuthMock.mockReset();
 
-  const vehicles = [
-    vehicleRow(),
-    vehicleRow({ id: 'v-no-route', license_plate: 'ABC1D23', chassi: 'CHASSI456' }),
-  ];
   fromMock.mockImplementation((table: string) => (
     table === 'vehicles' ? chain({ data: vehicles }) : chain({ data: [] })
   ));
@@ -163,14 +172,15 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function renderPage() {
+function renderPage(initialEntry = '/') {
   const root = createRoot(container);
   container.__reactRoot = root;
   act(() => {
     root.render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[initialEntry]}>
           <Vehicles />
+          <LocationProbe />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -190,14 +200,18 @@ function rowForPlate(plate: string): HTMLTableRowElement | undefined {
     .find((row) => row.textContent?.includes(plate));
 }
 
-describe('Vehicles — última rota', () => {
+function filterTrigger(label: string): HTMLButtonElement | null {
+  return container.querySelector(`button[aria-haspopup="listbox"][aria-label="${label}"]`);
+}
+
+describe('Vehicles — última rota e disponibilidade', () => {
   it('exibe a última rota e o filtro para o cliente configurado', async () => {
     renderPage();
     await settleQueries();
 
     expect(rowForPlate('TEV8C85')?.textContent)
       .toContain('Últ. rota 15/08/2026 · #425129405');
-    expect(container.querySelector('select[aria-label="Última rota"]')).not.toBeNull();
+    expect(filterTrigger('Última rota')).not.toBeNull();
   });
 
   it('não exibe informação de rota nem placeholder para veículo não localizado', async () => {
@@ -219,6 +233,90 @@ describe('Vehicles — última rota', () => {
 
     expect(getVehicleLastRouteMapMock).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain('Últ. rota');
-    expect(container.querySelector('select[aria-label="Última rota"]')).toBeNull();
+    expect(filterTrigger('Última rota')).toBeNull();
+  });
+
+  it('permite selecionar duas opções de rota, incluindo data e sem rota', async () => {
+    renderPage();
+    await settleQueries();
+
+    const trigger = filterTrigger('Última rota');
+    expect(trigger).not.toBeNull();
+
+    act(() => {
+      trigger?.click();
+    });
+
+    const options = Array.from(container.querySelectorAll('[role="listbox"][aria-label="Última rota"] [role="option"]'));
+    expect(options.length).toBe(2);
+
+    act(() => {
+      (options[0] as HTMLElement).click();
+    });
+    act(() => {
+      (options[1] as HTMLElement).click();
+    });
+
+    expect(trigger?.textContent).toContain('(2)');
+  });
+
+  it('exibe o filtro de disponibilidade para tenant comum', async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'u2', role: 'Fleet Assistant', clientId: 'client-other' },
+      currentClient: { id: 'client-other', name: 'Outro cliente' },
+      clients: [{ id: 'client-other', name: 'Outro cliente' }],
+    });
+
+    renderPage();
+    await settleQueries();
+
+    const availability = filterTrigger('Disponibilidade');
+    expect(availability).not.toBeNull();
+    expect((availability as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('seleção de disponibilidade grava values canônicos na URL', async () => {
+    renderPage();
+    await settleQueries();
+
+    const trigger = filterTrigger('Disponibilidade');
+    expect(trigger).not.toBeNull();
+
+    act(() => {
+      trigger?.click();
+    });
+
+    const options = Array.from(container.querySelectorAll('[role="listbox"][aria-label="Disponibilidade"] [role="option"]'));
+    const availableOption = options.find((option) => option.textContent?.includes('Disponíveis'));
+    expect(availableOption).not.toBeNull();
+
+    act(() => {
+      (availableOption as HTMLElement).click();
+    });
+
+    expect(latestSearch).toContain('availability=available');
+  });
+
+  it('mantém disponibilidade desabilitada enquanto as ordens carregam', () => {
+    renderPage();
+
+    const availability = filterTrigger('Disponibilidade');
+    expect(availability).not.toBeNull();
+    expect((availability as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('mantém disponibilidade desabilitada em erro e não fabrica resultado falso', async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'vehicles') return chain({ data: vehicles });
+      if (table === 'maintenance_orders') return chain({ data: [], error: new Error('boom') });
+      return chain({ data: [] });
+    });
+
+    renderPage();
+    await settleQueries();
+
+    const availability = filterTrigger('Disponibilidade');
+    expect(availability).not.toBeNull();
+    expect((availability as HTMLButtonElement).disabled).toBe(true);
   });
 });

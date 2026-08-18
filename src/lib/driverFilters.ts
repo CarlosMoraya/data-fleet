@@ -1,5 +1,10 @@
 import { isBlank, isWithinExpiryWindow } from './dashboardKpi';
-import { SEARCH_PARAM, parseSearchFromParams as _parseSearchFromParams } from './vehicleFilters';
+import {
+  SEARCH_PARAM,
+  appendMultiValueParam,
+  parseSearchFromParams as _parseSearchFromParams,
+  readMultiValueParam,
+} from './vehicleFilters';
 
 import type { Driver } from '../types';
 
@@ -32,15 +37,15 @@ export const LEGACY_DRIVER_ISSUE_VALUES: Record<string, DriverPendency> = {
 export const DRIVER_PENDENCY_EXPIRY_WINDOW_DAYS = 30;
 
 export interface DriverStructuredFilters {
-  shipperId: string | null;
-  operationalUnitId: string | null;
-  pendency: DriverPendency | null;
+  shipperIds: string[];
+  operationalUnitIds: string[];
+  pendencies: DriverPendency[];
 }
 
 export const EMPTY_DRIVER_FILTERS: DriverStructuredFilters = {
-  shipperId: null,
-  operationalUnitId: null,
-  pendency: null,
+  shipperIds: [],
+  operationalUnitIds: [],
+  pendencies: [],
 };
 
 export interface DriverVehicleLink {
@@ -58,20 +63,24 @@ export function isDriverPendency(value: string | null): value is DriverPendency 
 }
 
 export function parseDriverFiltersFromParams(params: URLSearchParams): DriverStructuredFilters {
-  const rawIssue = params.get('issue') ?? params.get('situacao');
-  const issue = rawIssue ? (LEGACY_DRIVER_ISSUE_VALUES[rawIssue] ?? rawIssue) : null;
+  const shipperIds = readMultiValueParam(params, 'shipper', 'embarcador');
+  const operationalUnitIds = readMultiValueParam(params, 'unit', 'unidade');
+  const rawIssues = readMultiValueParam(params, 'issue', 'situacao');
+  const pendencies = rawIssues
+    .map((raw) => LEGACY_DRIVER_ISSUE_VALUES[raw] ?? raw)
+    .filter(isDriverPendency);
   return {
-    shipperId: params.get('shipper') || params.get('embarcador') || null,
-    operationalUnitId: params.get('unit') || params.get('unidade') || null,
-    pendency: isDriverPendency(issue) ? issue : null,
+    shipperIds,
+    operationalUnitIds,
+    pendencies,
   };
 }
 
 export function serializeDriverFiltersToParams(filters: DriverStructuredFilters, search?: string): URLSearchParams {
   const params = new URLSearchParams();
-  if (filters.shipperId) params.set('shipper', filters.shipperId);
-  if (filters.operationalUnitId) params.set('unit', filters.operationalUnitId);
-  if (filters.pendency) params.set('issue', filters.pendency);
+  appendMultiValueParam(params, 'shipper', filters.shipperIds);
+  appendMultiValueParam(params, 'unit', filters.operationalUnitIds);
+  appendMultiValueParam(params, 'issue', filters.pendencies);
   if (search) params.set(SEARCH_PARAM, search);
   return params;
 }
@@ -81,7 +90,9 @@ export function hasLegacyDriverParams(params: URLSearchParams): boolean {
 }
 
 export function hasActiveDriverFilters(filters: DriverStructuredFilters): boolean {
-  return filters.shipperId != null || filters.operationalUnitId != null || filters.pendency != null;
+  return filters.shipperIds.length > 0 ||
+    filters.operationalUnitIds.length > 0 ||
+    filters.pendencies.length > 0;
 }
 
 export function driverMatchesSearch(driver: Driver, search: string): boolean {
@@ -125,9 +136,12 @@ export function applyDriverFilters(
   return drivers.filter((driver) => {
     if (!driverMatchesSearch(driver, search)) return false;
     const link = ctx.vehicleByDriverId[driver.id];
-    if (filters.shipperId && link?.shipperId !== filters.shipperId) return false;
-    if (filters.operationalUnitId && link?.operationalUnitId !== filters.operationalUnitId) return false;
-    if (filters.pendency && !driverMatchesPendency(driver, filters.pendency, ctx)) return false;
+    if (filters.shipperIds.length > 0 && (!link?.shipperId || !filters.shipperIds.includes(link.shipperId))) return false;
+    if (filters.operationalUnitIds.length > 0 && (!link?.operationalUnitId || !filters.operationalUnitIds.includes(link.operationalUnitId))) return false;
+    if (
+      filters.pendencies.length > 0 &&
+      !filters.pendencies.some((pendency) => driverMatchesPendency(driver, pendency, ctx))
+    ) return false;
     return true;
   });
 }

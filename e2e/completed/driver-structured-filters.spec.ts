@@ -1,4 +1,21 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+async function openFilter(page: Page, label: string) {
+  await page.getByRole('button', { name: label }).click();
+}
+
+async function closeFilter(page: Page) {
+  await page.keyboard.press('Escape');
+}
+
+function filterOptions(page: Page) {
+  return page.getByRole('listbox').getByRole('option');
+}
+
+function option(page: Page, name: string) {
+  return page.getByRole('listbox').getByRole('option', { name, exact: true });
+}
 
 test.describe.serial('Motoristas: filtros estruturados', () => {
   test.use({ storageState: 'e2e/.auth/admin.json' });
@@ -9,20 +26,34 @@ test.describe.serial('Motoristas: filtros estruturados', () => {
   });
 
   test('filtros estruturados estão visíveis', async ({ page }) => {
-    await expect(page.getByLabel('Embarcador')).toBeVisible();
-    await expect(page.getByLabel('Base / Unidade Operacional')).toBeVisible();
-    await expect(page.getByLabel('Situação')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Embarcador' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Base / Unidade Operacional' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Situação' })).toBeVisible();
   });
 
   test('aplicar situação atualiza URL e mostra banner', async ({ page }) => {
-    await page.getByLabel('Situação').selectOption('without_vehicle');
+    await openFilter(page, 'Situação');
+    await option(page, 'Sem veículo').click();
+    await closeFilter(page);
 
     await expect(page).toHaveURL(/issue=without_vehicle/);
     await expect(page.getByTestId('active-filter-banner')).toBeVisible();
   });
 
+  test('permite combinar duas situações e repete o parâmetro na URL', async ({ page }) => {
+    await openFilter(page, 'Situação');
+    await option(page, 'Sem veículo').click();
+    await option(page, 'CNH vencida').click();
+    await closeFilter(page);
+
+    await expect(page).toHaveURL(/issue=without_vehicle/);
+    await expect(page).toHaveURL(/issue=cnh_expired/);
+  });
+
   test('limpar filtros remove parâmetros e banner', async ({ page }) => {
-    await page.getByLabel('Situação').selectOption('without_vehicle');
+    await openFilter(page, 'Situação');
+    await option(page, 'Sem veículo').click();
+    await closeFilter(page);
     await expect(page.getByTestId('active-filter-banner')).toBeVisible();
 
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
@@ -32,24 +63,26 @@ test.describe.serial('Motoristas: filtros estruturados', () => {
   });
 
   test('filtros estruturados não persistem PII em storage', async ({ page }) => {
-    const shipperSelect = page.getByLabel('Embarcador');
-    const firstShipper = await shipperSelect.evaluate((select) => {
-      const options = Array.from((select as HTMLSelectElement).options);
-      return options.find((option) => option.value !== '')?.value ?? null;
-    });
+    await openFilter(page, 'Embarcador');
+    const options = filterOptions(page);
+    const count = await options.count();
 
-    if (!firstShipper) {
+    if (count === 0) {
       test.info().annotations.push({
         type: 'not-covered',
         description: 'Seed sem embarcador derivado de veículos vinculados a motoristas; validação ficou limitada a URL e ausência de chaves persistidas.',
       });
     } else {
-      await shipperSelect.selectOption(firstShipper);
+      await options.first().click();
     }
+    await closeFilter(page);
 
-    await page.getByLabel('Situação').selectOption('with_vehicle');
+    await openFilter(page, 'Situação');
+    await option(page, 'Com veículo').click();
+    await closeFilter(page);
+
     await expect(page).toHaveURL(/issue=with_vehicle/);
-    if (firstShipper) {
+    if (count > 0) {
       await expect(page).toHaveURL(/shipper=/);
     }
 
@@ -71,7 +104,7 @@ test.describe.serial('Motoristas: filtros estruturados', () => {
     expect(persistedStructuredFilters.local).toEqual([]);
     expect(persistedStructuredFilters.session).toEqual([]);
     expect(persistedStructuredFilters.search).toContain('issue=with_vehicle');
-    if (firstShipper) {
+    if (count > 0) {
       expect(persistedStructuredFilters.search).toContain('shipper=');
     }
   });

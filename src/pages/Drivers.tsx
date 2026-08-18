@@ -8,6 +8,7 @@ import DriverActiveFilterBanner from '../components/DriverActiveFilterBanner';
 import DriverDetailModal from '../components/DriverDetailModal';
 import DriverForm from '../components/DriverForm';
 import LinkedRecordLink from '../components/common/LinkedRecordLink';
+import MultiSelectDropdown from '../components/MultiSelectDropdown';
 import ResetDriverPasswordModal from '../components/ResetDriverPasswordModal';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
@@ -33,6 +34,7 @@ import {
   parseOpenRecordId,
   withoutOpenRecordParam,
 } from '../lib/linkedRecordNavigation';
+import { filterOperationalUnitsByShippers } from '../lib/operationsManagerScope';
 import { filterByActive } from '../lib/registryActiveFilter';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
@@ -204,19 +206,26 @@ export default function Drivers() {
   }, [driverVehicleInfo]);
 
   const unitOptions = useMemo(() => {
-    if (!filters.shipperId) return allUnitOptions;
-    return allUnitOptions.filter((unit) => unit.shipperId === filters.shipperId);
-  }, [allUnitOptions, filters.shipperId]);
+    if (filters.shipperIds.length === 0) return allUnitOptions;
+    const units = allUnitOptions.map((unit) => ({ id: unit.id, shipperId: unit.shipperId }));
+    const visibleIds = filterOperationalUnitsByShippers(
+      units.map((unit) => unit.id),
+      filters.shipperIds,
+      units,
+    );
+    const visible = new Set(visibleIds);
+    return allUnitOptions.filter((unit) => visible.has(unit.id));
+  }, [allUnitOptions, filters.shipperIds]);
 
   const updateFilter = (patch: Partial<DriverStructuredFilters>) => {
     const next = { ...filters, ...patch };
-    if ('shipperId' in patch) {
-      const selectedUnit = next.operationalUnitId
-        ? allUnitOptions.find((unit) => unit.id === next.operationalUnitId)
-        : undefined;
-      if (selectedUnit && selectedUnit.shipperId !== next.shipperId) {
-        next.operationalUnitId = null;
-      }
+    if ('shipperIds' in patch) {
+      const units = allUnitOptions.map((unit) => ({ id: unit.id, shipperId: unit.shipperId }));
+      next.operationalUnitIds = filterOperationalUnitsByShippers(
+        next.operationalUnitIds,
+        next.shipperIds,
+        units,
+      );
     }
     setSearchParams(serializeDriverFiltersToParams(next, search), { replace: false });
   };
@@ -383,7 +392,7 @@ export default function Drivers() {
         )}
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <Search className="h-5 w-5 text-zinc-400" aria-hidden="true" />
@@ -396,39 +405,24 @@ export default function Drivers() {
             placeholder="Buscar por nome ou CPF..."
           />
         </div>
-        <select
-          aria-label="Embarcador"
-          value={filters.shipperId ?? ''}
-          onChange={(e) => updateFilter({ shipperId: e.target.value || null })}
-          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-        >
-          <option value="">Todos os embarcadores</option>
-          {shipperOptions.map((shipper) => (
-            <option key={shipper.id} value={shipper.id}>{shipper.name}</option>
-          ))}
-        </select>
-        <select
-          aria-label="Base / Unidade Operacional"
-          value={filters.operationalUnitId ?? ''}
-          onChange={(e) => updateFilter({ operationalUnitId: e.target.value || null })}
-          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-        >
-          <option value="">Todas as unidades</option>
-          {unitOptions.map((unit) => (
-            <option key={unit.id} value={unit.id}>{unit.name}</option>
-          ))}
-        </select>
-        <select
-          aria-label="Situação"
-          value={filters.pendency ?? ''}
-          onChange={(e) => updateFilter({ pendency: (e.target.value || null) as DriverPendency | null })}
-          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-        >
-          <option value="">Todas as situações</option>
-          {DRIVER_PENDENCY_VALUES.map((pendency) => (
-            <option key={pendency} value={pendency}>{DRIVER_PENDENCY_LABELS[pendency]}</option>
-          ))}
-        </select>
+        <MultiSelectDropdown
+          label="Embarcador"
+          options={shipperOptions.map((shipper) => ({ value: shipper.id, label: shipper.name }))}
+          selected={filters.shipperIds}
+          onChange={(next) => updateFilter({ shipperIds: next })}
+        />
+        <MultiSelectDropdown
+          label="Base / Unidade Operacional"
+          options={unitOptions.map((unit) => ({ value: unit.id, label: unit.name }))}
+          selected={filters.operationalUnitIds}
+          onChange={(next) => updateFilter({ operationalUnitIds: next })}
+        />
+        <MultiSelectDropdown
+          label="Situação"
+          options={DRIVER_PENDENCY_VALUES.map((pendency) => ({ value: pendency, label: DRIVER_PENDENCY_LABELS[pendency] }))}
+          selected={filters.pendencies}
+          onChange={(next) => updateFilter({ pendencies: next as DriverPendency[] })}
+        />
         {(hasActiveDriverFilters(filters) || !!search) && (
           <button
             type="button"
@@ -451,8 +445,10 @@ export default function Drivers() {
       </div>
 
       <DriverActiveFilterBanner
-        issueLabel={filters.pendency ? DRIVER_PENDENCY_LABELS[filters.pendency] : null}
-        onClearIssue={() => updateFilter({ pendency: null })}
+        issueLabel={filters.pendencies.length > 0
+          ? filters.pendencies.map((pendency) => DRIVER_PENDENCY_LABELS[pendency]).join(', ')
+          : null}
+        onClearIssue={() => updateFilter({ pendencies: [] })}
       />
 
       {driversError && (

@@ -65,10 +65,32 @@ Filtros de navegação acionável vivem em query params da URL. São filtros de 
 
 | Param | Uso |
 |---|---|
-| `issue` | Pendência/situação do registro |
-| `shipper` | Embarcador |
-| `unit` | Unidade operacional |
-| `q` | Busca textual livre |
+| `q` | Busca textual livre (valor singular) |
+| `shipper` | ID de embarcador (repetível) |
+| `unit` | ID de unidade operacional (repetível) |
+| `issue` | Pendência (Veículos) ou Situação (Motoristas) (repetível) |
+| `lastRoute` | Categoria ou data de Última rota (repetível, somente tenant Deluna) |
+| `availability` | `available` ou `unavailable` (repetível, somente Veículos) |
+
+### Semântica de multisseleção
+
+- Filtros de listagem em Cadastros (Veículos e Motoristas) são multisseleções visuais em checkbox.
+- **OR dentro da dimensão**: duas opções selecionadas da mesma dimensão são combinadas com OR.
+- **AND entre dimensões**: dimensões distintas (embarcador, unidade, pendência, disponibilidade, última rota, busca `q`) são combinadas com AND.
+- A URL guarda arrays por parâmetros canônicos repetidos (`URLSearchParams.append` na escrita e `getAll` na leitura).
+- Links antigos com valor singular continuam funcionando (lidos por `getAll`).
+- Aliases legados (`embarcador`, `unidade`, `pendencia`, `situacao`) continuam válidos quando o canônico da dimensão não existe.
+
+### Disponibilidade (Veículos)
+
+- `availability=available` aceita veículos que não estejam no conjunto de indisponíveis; `availability=unavailable` aceita os indisponíveis; ambos aceitam qualquer veículo.
+- A regra oficial é `computeUnavailableVehicleIds` (`src/lib/overviewFleetFilters.ts`): indisponível = ordem de manutenção fora de estado final.
+- Durante o carregamento das ordens o controle fica desabilitado; em erro, o filtro de disponibilidade não é aplicado.
+
+### Última rota (gate Deluna)
+
+- `lastRoute` só é aplicável quando `VITE_LAST_ROUTE_CLIENT_ID` existe e `currentClient.id` é igual a ele.
+- Outros tenants não consultam, renderizam nem aplicam `lastRoute`; o parâmetro canônico é ignorado e removido da URL.
 
 **Valores de `issue` — VEÍCULOS:**
 
@@ -91,7 +113,7 @@ Filtros de navegação acionável vivem em query params da URL. São filtros de 
 | `without_vehicle` | Sem veículo |
 
 ### Comportamento de `setSearchParams`
-- **Filtros estruturados** (`issue`, `shipper`, `unit`): `replace: false` — cada mudança entra no histórico do navegador, permitindo que o botão voltar desfaça o filtro.
+- **Filtros estruturados** (`issue`, `shipper`, `unit`, `lastRoute`, `availability`): `replace: false` — cada mudança entra no histórico do navegador, permitindo que o botão voltar desfaça o filtro.
 - **Digitação de busca** (`q`): `replace: true` — não polui o histórico a cada tecla digitada.
 
 ### Retrocompatibilidade

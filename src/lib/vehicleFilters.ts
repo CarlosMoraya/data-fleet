@@ -48,19 +48,67 @@ export interface LastRouteFilterOption {
 
 export const PENDENCY_EXPIRY_WINDOW_DAYS = 30;
 
+export const AVAILABILITY_VALUES = ['available', 'unavailable'] as const;
+
+export type VehicleAvailability = typeof AVAILABILITY_VALUES[number];
+
+export const AVAILABILITY_LABELS: Record<VehicleAvailability, string> = {
+  available: 'Disponíveis',
+  unavailable: 'Indisponíveis',
+};
+
+export function isVehicleAvailability(value: string): value is VehicleAvailability {
+  return (AVAILABILITY_VALUES as readonly string[]).includes(value);
+}
+
 export interface VehicleStructuredFilters {
-  shipperId: string | null;
-  operationalUnitId: string | null;
-  pendency: VehiclePendency | null;
-  lastRoute: LastRouteFilterValue | null;
+  shipperIds: string[];
+  operationalUnitIds: string[];
+  pendencies: VehiclePendency[];
+  lastRoutes: LastRouteFilterValue[];
+  availability: VehicleAvailability[];
 }
 
 export const EMPTY_STRUCTURED_FILTERS: VehicleStructuredFilters = {
-  shipperId: null,
-  operationalUnitId: null,
-  pendency: null,
-  lastRoute: null,
+  shipperIds: [],
+  operationalUnitIds: [],
+  pendencies: [],
+  lastRoutes: [],
+  availability: [],
 };
+
+function dedupe(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    if (seen.has(value)) continue;
+    seen.add(value);
+    result.push(value);
+  }
+  return result;
+}
+
+export function readMultiValueParam(
+  params: URLSearchParams,
+  canonicalKey: string,
+  legacyKey?: string,
+): string[] {
+  const canonical = params.getAll(canonicalKey).filter(Boolean);
+  const rawValues = canonical.length > 0
+    ? canonical
+    : legacyKey ? params.getAll(legacyKey).filter(Boolean) : [];
+  return dedupe(rawValues);
+}
+
+export function appendMultiValueParam(
+  params: URLSearchParams,
+  key: string,
+  values: readonly string[],
+): void {
+  for (const value of values) {
+    if (value) params.append(key, value);
+  }
+}
 
 export interface PendencyContext {
   todayIso: string;
@@ -117,23 +165,30 @@ function routeAgeInDays(referenceDate: string, routeDate: string): number | null
 }
 
 export function parseVehicleFiltersFromParams(params: URLSearchParams): VehicleStructuredFilters {
-  const rawIssue = params.get('issue') ?? params.get('pendencia');
-  const issue = rawIssue ? (LEGACY_VEHICLE_ISSUE_VALUES[rawIssue] ?? rawIssue) : null;
-  const lastRoute = params.get(LAST_ROUTE_PARAM);
+  const shipperIds = readMultiValueParam(params, 'shipper', 'embarcador');
+  const operationalUnitIds = readMultiValueParam(params, 'unit', 'unidade');
+  const rawIssues = readMultiValueParam(params, 'issue', 'pendencia');
+  const pendencies = rawIssues
+    .map((raw) => LEGACY_VEHICLE_ISSUE_VALUES[raw] ?? raw)
+    .filter(isVehiclePendency);
+  const lastRoutes = readMultiValueParam(params, LAST_ROUTE_PARAM).filter(isLastRouteFilterValue);
+  const availability = readMultiValueParam(params, 'availability').filter(isVehicleAvailability);
   return {
-    shipperId: params.get('shipper') || params.get('embarcador') || null,
-    operationalUnitId: params.get('unit') || params.get('unidade') || null,
-    pendency: isVehiclePendency(issue) ? issue : null,
-    lastRoute: isLastRouteFilterValue(lastRoute) ? lastRoute : null,
+    shipperIds,
+    operationalUnitIds,
+    pendencies,
+    lastRoutes,
+    availability,
   };
 }
 
 export function serializeVehicleFiltersToParams(filters: VehicleStructuredFilters, search?: string): URLSearchParams {
   const params = new URLSearchParams();
-  if (filters.shipperId) params.set('shipper', filters.shipperId);
-  if (filters.operationalUnitId) params.set('unit', filters.operationalUnitId);
-  if (filters.pendency) params.set('issue', filters.pendency);
-  if (filters.lastRoute) params.set(LAST_ROUTE_PARAM, filters.lastRoute);
+  appendMultiValueParam(params, 'shipper', filters.shipperIds);
+  appendMultiValueParam(params, 'unit', filters.operationalUnitIds);
+  appendMultiValueParam(params, 'issue', filters.pendencies);
+  appendMultiValueParam(params, LAST_ROUTE_PARAM, filters.lastRoutes);
+  appendMultiValueParam(params, 'availability', filters.availability);
   if (search) params.set(SEARCH_PARAM, search);
   return params;
 }
@@ -147,10 +202,11 @@ export function hasLegacyVehicleParams(params: URLSearchParams): boolean {
 }
 
 export function hasActiveStructuredFilters(filters: VehicleStructuredFilters): boolean {
-  return filters.shipperId != null ||
-    filters.operationalUnitId != null ||
-    filters.pendency != null ||
-    filters.lastRoute != null;
+  return filters.shipperIds.length > 0 ||
+    filters.operationalUnitIds.length > 0 ||
+    filters.pendencies.length > 0 ||
+    filters.lastRoutes.length > 0 ||
+    filters.availability.length > 0;
 }
 
 export function buildLastRouteFilterOptions(
@@ -265,24 +321,37 @@ export function applyVehicleFilters(
   vehicles: Vehicle[],
   search: string,
   filters: VehicleStructuredFilters,
-  ctx: PendencyContext,
+  pendencyContext: PendencyContext,
+  unavailableVehicleIds?: Set<string>,
   lastRouteByPlate?: Map<string, { lastRouteDate: string }>,
   normalizePlate?: (plate: string) => string,
 ): Vehicle[] {
-  const referenceDate = filters.lastRoute && lastRouteByPlate && normalizePlate
+  const referenceDate = filters.lastRoutes.length > 0 && lastRouteByPlate && normalizePlate
     ? lastRouteReferenceDate(vehicles, lastRouteByPlate, normalizePlate)
     : null;
 
   return vehicles.filter((vehicle) => {
     if (!vehicleMatchesSearch(vehicle, search)) return false;
-    if (filters.shipperId && vehicle.shipperId !== filters.shipperId) return false;
-    if (filters.operationalUnitId && vehicle.operationalUnitId !== filters.operationalUnitId) return false;
-    if (filters.pendency && !vehicleMatchesPendency(vehicle, filters.pendency, ctx)) return false;
+    if (filters.shipperIds.length > 0 && (!vehicle.shipperId || !filters.shipperIds.includes(vehicle.shipperId))) return false;
+    if (filters.operationalUnitIds.length > 0 && (!vehicle.operationalUnitId || !filters.operationalUnitIds.includes(vehicle.operationalUnitId))) return false;
     if (
-      filters.lastRoute &&
+      filters.pendencies.length > 0 &&
+      !filters.pendencies.some((pendency) => vehicleMatchesPendency(vehicle, pendency, pendencyContext))
+    ) return false;
+    if (filters.availability.length > 0 && unavailableVehicleIds) {
+      const isUnavailable = unavailableVehicleIds.has(vehicle.id);
+      const matchesAvailability = filters.availability.some((availability) =>
+        availability === 'available' ? !isUnavailable : isUnavailable
+      );
+      if (!matchesAvailability) return false;
+    }
+    if (
+      filters.lastRoutes.length > 0 &&
       lastRouteByPlate &&
       normalizePlate &&
-      !vehicleMatchesLastRoute(vehicle, filters.lastRoute, lastRouteByPlate, normalizePlate, referenceDate)
+      !filters.lastRoutes.some((lastRoute) =>
+        vehicleMatchesLastRoute(vehicle, lastRoute, lastRouteByPlate, normalizePlate, referenceDate)
+      )
     ) return false;
     return true;
   });

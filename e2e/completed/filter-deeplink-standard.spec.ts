@@ -1,4 +1,17 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+async function openFilter(page: Page, label: string) {
+  await page.getByRole('button', { name: label }).click();
+}
+
+async function closeFilter(page: Page) {
+  await page.keyboard.press('Escape');
+}
+
+function option(page: Page, name: string) {
+  return page.getByRole('listbox').getByRole('option', { name, exact: true });
+}
 
 test.describe.serial('Padrão de deep link de filtros', () => {
   test.beforeEach(async ({ page }) => {
@@ -9,7 +22,10 @@ test.describe.serial('Padrão de deep link de filtros', () => {
   test('link compartilhável: ir direto para veículos com issue já filtra a tabela', async ({ page }) => {
     await page.goto('/cadastros/veiculos?issue=crlv_expired');
     await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 10000 });
-    await expect(page.getByLabel('Pendência')).toHaveValue('crlv_expired');
+
+    await openFilter(page, 'Pendência');
+    await expect(option(page, 'CRLV vencido')).toHaveAttribute('aria-checked', 'true');
+    await closeFilter(page);
     await expect(page.getByTestId('active-filter-banner')).toBeVisible();
   });
 
@@ -17,15 +33,19 @@ test.describe.serial('Padrão de deep link de filtros', () => {
     await page.goto('/cadastros/veiculos');
     await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 10000 });
 
-    const pendencySelect = page.getByLabel('Pendência');
-    await pendencySelect.selectOption('crlv_expired');
+    await openFilter(page, 'Pendência');
+    await option(page, 'CRLV vencido').click();
+    await closeFilter(page);
     await expect(page).toHaveURL(/issue=crlv_expired/);
-    await pendencySelect.selectOption('gr_expiring');
+
+    await openFilter(page, 'Pendência');
+    await option(page, 'GR a vencer (30 dias)').click();
+    await closeFilter(page);
     await expect(page).toHaveURL(/issue=gr_expiring/);
 
     await page.goBack();
     await expect(page).toHaveURL(/issue=crlv_expired/);
-    await expect(pendencySelect).toHaveValue('crlv_expired');
+    await expect(page).not.toHaveURL(/issue=gr_expiring/);
   });
 
   test('limpar filtro: com filtro ativo, clicar Limpar filtros remove query params', async ({ page }) => {

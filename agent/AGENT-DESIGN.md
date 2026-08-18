@@ -66,6 +66,17 @@ O dashboard utiliza o princípio de "Progressive Disclosure", mostrando KPIs ger
 
 ## 🏗️ Padrões de Componentes
 
+### Multisseleção de filtros (checkbox visual)
+
+Filtros de listagem em Cadastros usam `MultiSelectDropdown` (`src/components/MultiSelectDropdown.tsx`), uma multisseleção visual em checkbox:
+
+- Gatilho com `aria-label` igual ao rótulo, `aria-haspopup="listbox"`, `aria-expanded` e `aria-controls`; texto `Rótulo` sem seleção e `Rótulo (N)` com seleção.
+- Menu com `role="listbox"` e `aria-multiselectable="true"`; cada opção com `role="option"` e um único estado exposto por `aria-checked` (não usar `aria-selected` junto).
+- O quadrado de checkbox é **apenas visual** (`aria-hidden="true"`); não inserir `input` interativo dentro de `role="option"`.
+- Os botões "Selecionar todos" e "Limpar seleção" ficam fora do elemento `role="listbox"`.
+- Teclado: `Enter`/`Espaço` alternam, `ArrowDown`/`ArrowUp` movem com ciclo, `Home`/`End` focam a primeira/última, `Escape` fecha e devolve o foco ao gatilho; ao abrir, foca a primeira opção selecionada (ou a primeira disponível).
+- Opções aceitam `string[]` (retrocompatível com Manutenção) ou `{ value, label }[]`.
+
 ### Formulários Modais
 - **Estrutura**: `fixed inset-0` com `backdrop-blur`.
 - **Transições**: Devem ser suaves (micro-animações).

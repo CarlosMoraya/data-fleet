@@ -14,6 +14,7 @@ import {
   parseSearchFromParams,
   serializeDriverFiltersToParams,
   type DriverFilterContext,
+  type DriverStructuredFilters,
 } from './driverFilters';
 
 import type { Driver } from '../types';
@@ -37,12 +38,16 @@ function driver(overrides: Partial<Driver>): Driver {
   };
 }
 
+function filters(overrides: Partial<DriverStructuredFilters>): DriverStructuredFilters {
+  return { ...EMPTY_DRIVER_FILTERS, ...overrides };
+}
+
 describe('driverFilters', () => {
   it('faz round-trip parse/serialize com nomes novos', () => {
     const params = new URLSearchParams('issue=gr_expiring&shipper=s1&unit=u1');
     const parsed = parseDriverFiltersFromParams(params);
 
-    expect(parsed).toEqual({ shipperId: 's1', operationalUnitId: 'u1', pendency: 'gr_expiring' });
+    expect(parsed).toEqual({ shipperIds: ['s1'], operationalUnitIds: ['u1'], pendencies: ['gr_expiring'] });
     expect(serializeDriverFiltersToParams(parsed).toString()).toBe('shipper=s1&unit=u1&issue=gr_expiring');
   });
 
@@ -50,16 +55,58 @@ describe('driverFilters', () => {
     const params = new URLSearchParams('embarcador=s1&unidade=u1&situacao=cnh_vencida');
     const parsed = parseDriverFiltersFromParams(params);
 
-    expect(parsed).toEqual({ shipperId: 's1', operationalUnitId: 'u1', pendency: 'cnh_expired' });
+    expect(parsed).toEqual({ shipperIds: ['s1'], operationalUnitIds: ['u1'], pendencies: ['cnh_expired'] });
+  });
+
+  it('parseia dois shipper, unit e situação em arrays', () => {
+    const params = new URLSearchParams('shipper=s1&shipper=s2&unit=u1&unit=u2&issue=cnh_expired&issue=with_vehicle');
+    const parsed = parseDriverFiltersFromParams(params);
+
+    expect(parsed.shipperIds).toEqual(['s1', 's2']);
+    expect(parsed.operationalUnitIds).toEqual(['u1', 'u2']);
+    expect(parsed.pendencies).toEqual(['cnh_expired', 'with_vehicle']);
+  });
+
+  it('serializa por parâmetros repetidos', () => {
+    const params = serializeDriverFiltersToParams(filters({
+      shipperIds: ['s1', 's2'],
+      pendencies: ['cnh_expired', 'with_vehicle'],
+    }));
+
+    expect(params.getAll('shipper')).toEqual(['s1', 's2']);
+    expect(params.getAll('issue')).toEqual(['cnh_expired', 'with_vehicle']);
+  });
+
+  it('deduplica valores e descarta códigos inválidos', () => {
+    const params = new URLSearchParams('shipper=s1&shipper=s1&issue=cnh_expired&issue=xpto&issue=cnh_expired');
+    const parsed = parseDriverFiltersFromParams(params);
+
+    expect(parsed.shipperIds).toEqual(['s1']);
+    expect(parsed.pendencies).toEqual(['cnh_expired']);
+  });
+
+  it('canônico prevalece sobre legado por dimensão', () => {
+    const params = new URLSearchParams('shipper=s1&embarcador=legado&unit=u1&unidade=legada');
+    const parsed = parseDriverFiltersFromParams(params);
+
+    expect(parsed.shipperIds).toEqual(['s1']);
+    expect(parsed.operationalUnitIds).toEqual(['u1']);
+  });
+
+  it('links legados singulares continuam válidos', () => {
+    const parsed = parseDriverFiltersFromParams(new URLSearchParams('embarcador=s1&situacao=cnh_vencida'));
+
+    expect(parsed.shipperIds).toEqual(['s1']);
+    expect(parsed.pendencies).toEqual(['cnh_expired']);
   });
 
   it('serialize inclui busca textual como q', () => {
     const params = serializeDriverFiltersToParams(
-      { shipperId: 's1', operationalUnitId: null, pendency: 'cnh_expired' },
-      'maria'
+      filters({ shipperIds: ['s1'], pendencies: ['cnh_expired'] }),
+      'maria',
     );
-    expect(params.get('issue')).toBe('cnh_expired');
-    expect(params.get('shipper')).toBe('s1');
+    expect(params.getAll('issue')).toEqual(['cnh_expired']);
+    expect(params.getAll('shipper')).toEqual(['s1']);
     expect(params.get('q')).toBe('maria');
   });
 
@@ -75,8 +122,8 @@ describe('driverFilters', () => {
     expect(hasLegacyDriverParams(new URLSearchParams('issue=cnh_expired&shipper=s1&unit=u1'))).toBe(false);
   });
 
-  it('normaliza situação inválida para null', () => {
-    expect(parseDriverFiltersFromParams(new URLSearchParams('situacao=xpto')).pendency).toBeNull();
+  it('normaliza situação inválida para array vazio', () => {
+    expect(parseDriverFiltersFromParams(new URLSearchParams('situacao=xpto')).pendencies).toEqual([]);
   });
 
   it('retorna filtros vazios para query vazia', () => {
@@ -101,9 +148,9 @@ describe('driverFilters', () => {
 
   it('indica presença de filtros estruturados ativos', () => {
     expect(hasActiveDriverFilters(EMPTY_DRIVER_FILTERS)).toBe(false);
-    expect(hasActiveDriverFilters({ ...EMPTY_DRIVER_FILTERS, shipperId: 's1' })).toBe(true);
-    expect(hasActiveDriverFilters({ ...EMPTY_DRIVER_FILTERS, operationalUnitId: 'u1' })).toBe(true);
-    expect(hasActiveDriverFilters({ ...EMPTY_DRIVER_FILTERS, pendency: 'without_vehicle' })).toBe(true);
+    expect(hasActiveDriverFilters(filters({ shipperIds: ['s1'] }))).toBe(true);
+    expect(hasActiveDriverFilters(filters({ operationalUnitIds: ['u1'] }))).toBe(true);
+    expect(hasActiveDriverFilters(filters({ pendencies: ['without_vehicle'] }))).toBe(true);
   });
 
   it('aplica situação cnh_expired', () => {
@@ -172,8 +219,19 @@ describe('driverFilters', () => {
       driver({ id: 'd3', name: 'Maria Costa', cpf: '55566677788', expirationDate: '2026-12-01' }),
     ];
 
-    expect(applyDriverFilters(drivers, 'maria', { shipperId: 's1', operationalUnitId: null, pendency: 'cnh_expired' }, ctx))
+    expect(applyDriverFilters(drivers, 'maria', filters({ shipperIds: ['s1'], pendencies: ['cnh_expired'] }), ctx))
       .toEqual([drivers[0]]);
+  });
+
+  it('combina duas situações com OR dentro da dimensão', () => {
+    const drivers = [
+      driver({ id: 'd1', name: 'Maria Silva' }),
+      driver({ id: 'd2', name: 'Joao Santos' }),
+      driver({ id: 'd3', name: 'Ana Costa', expirationDate: '2026-06-01' }),
+    ];
+
+    expect(applyDriverFilters(drivers, '', filters({ pendencies: ['with_vehicle', 'cnh_expired'] }), ctx))
+      .toEqual([drivers[0], drivers[2]]);
   });
 
   it('filtra a lista por PJ sem contrato anexado', () => {
@@ -186,7 +244,7 @@ describe('driverFilters', () => {
     expect(applyDriverFilters(
       drivers,
       '',
-      { shipperId: null, operationalUnitId: null, pendency: 'pj_contract_missing' },
+      filters({ pendencies: ['pj_contract_missing'] }),
       ctx,
     )).toEqual([drivers[0]]);
   });
@@ -198,15 +256,32 @@ describe('driverFilters', () => {
       driver({ id: 'd3', name: 'Ana Costa' }),
     ];
 
-    expect(applyDriverFilters(drivers, '', { ...EMPTY_DRIVER_FILTERS, operationalUnitId: 'u2' }, ctx)).toEqual([drivers[2]]);
+    expect(applyDriverFilters(drivers, '', filters({ operationalUnitIds: ['u2'] }), ctx)).toEqual([drivers[2]]);
+  });
+
+  it('aceita dois embarcadores na mesma dimensão com OR', () => {
+    const drivers = [
+      driver({ id: 'd1', name: 'Maria Silva' }),
+      driver({ id: 'd2', name: 'Joao Santos' }),
+      driver({ id: 'd3', name: 'Ana Costa' }),
+    ];
+
+    expect(applyDriverFilters(drivers, '', filters({ shipperIds: ['s1', 's2'] }), ctx))
+      .toEqual([drivers[0], drivers[2]]);
+  });
+
+  it('arrays vazios não restringem a listagem', () => {
+    const drivers = [driver({ id: 'd1' }), driver({ id: 'd2' })];
+
+    expect(applyDriverFilters(drivers, '', EMPTY_DRIVER_FILTERS, ctx)).toEqual(drivers);
   });
 
   it('serializa apenas chaves estruturadas e nunca inclui PII', () => {
-    const params = serializeDriverFiltersToParams({
-      shipperId: 's1',
-      operationalUnitId: 'u1',
-      pendency: 'gr_expiring',
-    });
+    const params = serializeDriverFiltersToParams(filters({
+      shipperIds: ['s1'],
+      operationalUnitIds: ['u1'],
+      pendencies: ['gr_expiring'],
+    }));
     const serialized = params.toString();
     const sampleDriver = driver({ name: 'Maria da Silva', cpf: '12345678901' });
 

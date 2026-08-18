@@ -63,6 +63,13 @@ O dashboard utiliza o princípio de "Progressive Disclosure", mostrando KPIs ger
 - **Modal Itens/PDF** (`BudgetDocumentPreviewModal`): duas visões internas (`Itens`/`PDF`) com tablist própria; estados de carregamento/erro/vazio independentes por visão — PDF ausente não bloqueia Itens e vice-versa; em mobile ocupa a largura disponível com scroll interno (`max-h-[calc(100vh-2rem)]`).
 - Todos os modais financeiros usam `role="dialog"`, `aria-modal="true"` e título associado via `aria-labelledby`; fecham por botão e por Escape (Escape é ignorado enquanto uma submissão está em andamento).
 
+### Cadastros — filtros de listagem em multisseleção
+
+- Os filtros de lista de Veículos e Motoristas (Embarcador, Unidade Operacional, Pendência/Situação, Disponibilidade e Última rota) usam um dropdown de multisseleção em checkbox visual.
+- Cada dimensão permite marcar várias opções; dentro da dimensão as opções combinam com OR e entre dimensões com AND.
+- O contêiner dos filtros usa `flex-wrap` para quebrar linha sem overflow na largura suportada.
+- Disponibilidade reflete a regra de indisponibilidade por ordem de manutenção; Última rota permanece exclusiva do tenant Deluna Transportes.
+
 ### Responsividade — densidade adaptativa por altura de tela
 
 - **O problema**: em notebooks de 1366×768 (ou 1920×1080 com zoom acima de 110%), a barra superior, os títulos de página e os respiros consumiam tanto espaço vertical que a lista de veículos exibia praticamente uma linha por vez. O usuário rolava a tabela inteira sem nunca ver um conjunto de registros.

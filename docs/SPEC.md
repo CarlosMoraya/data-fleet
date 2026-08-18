@@ -64,6 +64,38 @@ USING (
 
 ---
 
+## 🔎 Filtros de listagem em Cadastros
+
+As listagens de Veículos e Motoristas usam filtros multisseleção em checkbox visual. Não há mudança de banco, RLS, autenticação, API ou formulários de cadastro.
+
+### Contrato de URL
+
+Parâmetros canônicos:
+
+- `q` — busca textual, valor singular.
+- `shipper` — IDs de embarcadores, repetível.
+- `unit` — IDs de unidades operacionais, repetível.
+- `issue` — Pendências de Veículos ou Situações de Motoristas, repetível.
+- `lastRoute` — categorias (`none`, `older_7d`, `older_30d`) ou datas de Última rota, repetível e somente aplicável ao tenant Deluna.
+- `availability` — `available` ou `unavailable`, repetível e somente em Veículos.
+
+Semântica: **OR dentro da dimensão** (opções da mesma dimensão) e **AND entre dimensões** (incluindo a busca `q`). A URL guarda arrays por parâmetros repetidos (`append` na escrita, `getAll` na leitura) e aceita links antigos com valor singular. Aliases legados (`embarcador`, `unidade`, `pendencia`, `situacao`) valem quando o canônico da dimensão não existe.
+
+### Tipos de filtro
+
+`VehicleStructuredFilters`: `shipperIds[]`, `operationalUnitIds[]`, `pendencies[]`, `lastRoutes[]`, `availability[]`.
+`DriverStructuredFilters`: `shipperIds[]`, `operationalUnitIds[]`, `pendencies[]`.
+
+### Regra oficial de disponibilidade
+
+Reutiliza `computeUnavailableVehicleIds` (`src/lib/overviewFleetFilters.ts`): um veículo é indisponível se tiver ordem de manutenção fora de estado final (`Concluído`, `Cancelado`, `Veículo retirado`). Durante o carregamento das ordens o controle fica desabilitado; em erro, o filtro de disponibilidade não é aplicado e a seleção/URL são preservadas para nova tentativa.
+
+### Exceção Deluna Transportes
+
+`lastRoute` é exclusivo do tenant configurado: exige `VITE_LAST_ROUTE_CLIENT_ID` presente e `currentClient.id` igual ao valor. Outros tenants não consultam, renderizam nem aplicam o filtro, e o parâmetro canônico é ignorado e removido da URL.
+
+---
+
 ## 🚀 Plano de Fases (Roadmap Técnico)
 
 1.  **Fase 1 (Concluída)**: Bootstrap, Auth e Cadastros Básicos.

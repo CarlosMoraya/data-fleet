@@ -10,6 +10,7 @@ import {
   buildLastRouteFilterOptions,
   hasActiveStructuredFilters,
   hasLegacyVehicleParams,
+  isVehicleAvailability,
   isVehiclePendency,
   parseSearchFromParams,
   parseVehicleFiltersFromParams,
@@ -18,6 +19,7 @@ import {
   vehicleMatchesPendency,
   vehicleMatchesSearch,
   type PendencyContext,
+  type VehicleStructuredFilters,
 } from './vehicleFilters';
 
 import type { Vehicle } from '../types';
@@ -59,16 +61,21 @@ const normalizePlate = (plate: string) => plate
   .toUpperCase()
   .slice(-7);
 
+function filters(overrides: Partial<VehicleStructuredFilters>): VehicleStructuredFilters {
+  return { ...EMPTY_STRUCTURED_FILTERS, ...overrides };
+}
+
 describe('vehicleFilters', () => {
   it('faz round-trip parse/serialize com nomes novos', () => {
     const params = new URLSearchParams('issue=gr_expiring&shipper=s1&unit=u1');
     const parsed = parseVehicleFiltersFromParams(params);
 
     expect(parsed).toEqual({
-      shipperId: 's1',
-      operationalUnitId: 'u1',
-      pendency: 'gr_expiring',
-      lastRoute: null,
+      shipperIds: ['s1'],
+      operationalUnitIds: ['u1'],
+      pendencies: ['gr_expiring'],
+      lastRoutes: [],
+      availability: [],
     });
     expect(serializeVehicleFiltersToParams(parsed).toString()).toBe('shipper=s1&unit=u1&issue=gr_expiring');
   });
@@ -78,20 +85,66 @@ describe('vehicleFilters', () => {
     const parsed = parseVehicleFiltersFromParams(params);
 
     expect(parsed).toEqual({
-      shipperId: 's1',
-      operationalUnitId: 'u1',
-      pendency: 'crlv_expired',
-      lastRoute: null,
+      shipperIds: ['s1'],
+      operationalUnitIds: ['u1'],
+      pendencies: ['crlv_expired'],
+      lastRoutes: [],
+      availability: [],
     });
   });
 
-  it('serialize inclui busca textual como q', () => {
+  it('parseia dois shipper, unit e issue em arrays', () => {
+    const params = new URLSearchParams('shipper=s1&shipper=s2&unit=u1&unit=u2&issue=crlv_expired&issue=no_driver');
+    const parsed = parseVehicleFiltersFromParams(params);
+
+    expect(parsed.shipperIds).toEqual(['s1', 's2']);
+    expect(parsed.operationalUnitIds).toEqual(['u1', 'u2']);
+    expect(parsed.pendencies).toEqual(['crlv_expired', 'no_driver']);
+  });
+
+  it('serializa por parâmetros repetidos', () => {
+    const params = serializeVehicleFiltersToParams(filters({
+      shipperIds: ['s1', 's2'],
+      operationalUnitIds: ['u1'],
+      pendencies: ['crlv_expired', 'no_driver'],
+    }));
+
+    expect(params.getAll('shipper')).toEqual(['s1', 's2']);
+    expect(params.getAll('issue')).toEqual(['crlv_expired', 'no_driver']);
+    expect(params.toString()).toBe('shipper=s1&shipper=s2&unit=u1&issue=crlv_expired&issue=no_driver');
+  });
+
+  it('deduplica valores e descarta códigos inválidos', () => {
+    const params = new URLSearchParams('shipper=s1&shipper=s1&issue=crlv_expired&issue=valor_invalido&issue=crlv_expired');
+    const parsed = parseVehicleFiltersFromParams(params);
+
+    expect(parsed.shipperIds).toEqual(['s1']);
+    expect(parsed.pendencies).toEqual(['crlv_expired']);
+  });
+
+  it('canônico prevalece sobre legado por dimensão', () => {
+    const params = new URLSearchParams('shipper=s1&embarcador=legado&unit=u1&unidade=legada');
+    const parsed = parseVehicleFiltersFromParams(params);
+
+    expect(parsed.shipperIds).toEqual(['s1']);
+    expect(parsed.operationalUnitIds).toEqual(['u1']);
+  });
+
+  it('links legados singulares continuam válidos', () => {
+    const parsed = parseVehicleFiltersFromParams(new URLSearchParams('embarcador=s1&unidade=u1&pendencia=crlv_vencido'));
+
+    expect(parsed.shipperIds).toEqual(['s1']);
+    expect(parsed.operationalUnitIds).toEqual(['u1']);
+    expect(parsed.pendencies).toEqual(['crlv_expired']);
+  });
+
+  it('serialize inclui busca textual como q e preserva q', () => {
     const params = serializeVehicleFiltersToParams(
-      { shipperId: 's1', operationalUnitId: null, pendency: 'crlv_expired', lastRoute: null },
-      'ABC'
+      filters({ shipperIds: ['s1'], pendencies: ['crlv_expired'] }),
+      'ABC',
     );
-    expect(params.get('issue')).toBe('crlv_expired');
-    expect(params.get('shipper')).toBe('s1');
+    expect(params.getAll('issue')).toEqual(['crlv_expired']);
+    expect(params.getAll('shipper')).toEqual(['s1']);
     expect(params.get('q')).toBe('ABC');
   });
 
@@ -107,8 +160,8 @@ describe('vehicleFilters', () => {
     expect(hasLegacyVehicleParams(new URLSearchParams('issue=crlv_expired&shipper=s1&unit=u1'))).toBe(false);
   });
 
-  it('normaliza pendência inválida para null', () => {
-    expect(parseVehicleFiltersFromParams(new URLSearchParams('pendencia=valor_invalido')).pendency).toBeNull();
+  it('normaliza pendência inválida para array vazio', () => {
+    expect(parseVehicleFiltersFromParams(new URLSearchParams('pendencia=valor_invalido')).pendencies).toEqual([]);
   });
 
   it('retorna filtros vazios para query vazia', () => {
@@ -131,6 +184,12 @@ describe('vehicleFilters', () => {
     expect(isVehiclePendency('desconhecida')).toBe(false);
   });
 
+  it('valida os valores de disponibilidade', () => {
+    expect(isVehicleAvailability('available')).toBe(true);
+    expect(isVehicleAvailability('unavailable')).toBe(true);
+    expect(isVehicleAvailability('qualquer')).toBe(false);
+  });
+
   it('migra valores legados corretamente', () => {
     expect(LEGACY_VEHICLE_ISSUE_VALUES['crlv_vencido']).toBe('crlv_expired');
     expect(LEGACY_VEHICLE_ISSUE_VALUES['crlv_a_vencer']).toBe('crlv_expiring');
@@ -141,10 +200,11 @@ describe('vehicleFilters', () => {
 
   it('indica presença de filtros estruturados ativos', () => {
     expect(hasActiveStructuredFilters(EMPTY_STRUCTURED_FILTERS)).toBe(false);
-    expect(hasActiveStructuredFilters({ ...EMPTY_STRUCTURED_FILTERS, shipperId: 's1' })).toBe(true);
-    expect(hasActiveStructuredFilters({ ...EMPTY_STRUCTURED_FILTERS, operationalUnitId: 'u1' })).toBe(true);
-    expect(hasActiveStructuredFilters({ ...EMPTY_STRUCTURED_FILTERS, pendency: 'no_driver' })).toBe(true);
-    expect(hasActiveStructuredFilters({ ...EMPTY_STRUCTURED_FILTERS, lastRoute: '2026-08-15' })).toBe(true);
+    expect(hasActiveStructuredFilters(filters({ shipperIds: ['s1'] }))).toBe(true);
+    expect(hasActiveStructuredFilters(filters({ operationalUnitIds: ['u1'] }))).toBe(true);
+    expect(hasActiveStructuredFilters(filters({ pendencies: ['no_driver'] }))).toBe(true);
+    expect(hasActiveStructuredFilters(filters({ lastRoutes: ['2026-08-15'] }))).toBe(true);
+    expect(hasActiveStructuredFilters(filters({ availability: ['available'] }))).toBe(true);
   });
 
   it('aplica pendência crlv_expired', () => {
@@ -213,7 +273,7 @@ describe('vehicleFilters', () => {
   });
 
   it('aceita issue=tracker_missing vindo da URL', () => {
-    expect(parseVehicleFiltersFromParams(new URLSearchParams('issue=tracker_missing')).pendency).toBe('tracker_missing');
+    expect(parseVehicleFiltersFromParams(new URLSearchParams('issue=tracker_missing')).pendencies).toEqual(['tracker_missing']);
   });
 
   it('serializa tracker_missing de volta para a URL', () => {
@@ -238,13 +298,73 @@ describe('vehicleFilters', () => {
       vehicle({ id: 'v3', licensePlate: 'DEF1D23', shipperId: 's1', crlvExpirationDate: '2026-12-31' }),
     ];
 
-    expect(applyVehicleFilters(vehicles, 'abc', {
-      shipperId: 's1',
-      operationalUnitId: null,
-      pendency: 'crlv_expired',
-      lastRoute: null,
-    }, ctx))
+    expect(applyVehicleFilters(vehicles, 'abc', filters({
+      shipperIds: ['s1'],
+      pendencies: ['crlv_expired'],
+    }), ctx))
       .toEqual([vehicles[0]]);
+  });
+
+  it('combina duas pendências com lógica OR dentro da dimensão', () => {
+    const vehicles = [
+      vehicle({ id: 'v1', crlvExpirationDate: '2026-01-01' }),
+      vehicle({ id: 'v2', driverId: undefined }),
+      vehicle({ id: 'v3', crlvExpirationDate: '2026-12-31', driverId: 'd1' }),
+    ];
+
+    expect(applyVehicleFilters(vehicles, '', filters({
+      pendencies: ['crlv_expired', 'no_driver'],
+    }), ctx))
+      .toEqual([vehicles[0], vehicles[1]]);
+  });
+
+  it('combina embarcador, unidade, pendência e busca com AND entre dimensões', () => {
+    const vehicles = [
+      vehicle({ id: 'v1', shipperId: 's1', operationalUnitId: 'u1', crlvExpirationDate: '2026-01-01', licensePlate: 'ABC1D23' }),
+      vehicle({ id: 'v2', shipperId: 's1', operationalUnitId: 'u2', crlvExpirationDate: '2026-01-01', licensePlate: 'ABC9Z99' }),
+      vehicle({ id: 'v3', shipperId: 's2', operationalUnitId: 'u1', crlvExpirationDate: '2026-01-01', licensePlate: 'DEF1D23' }),
+    ];
+
+    expect(applyVehicleFilters(vehicles, 'abc', filters({
+      shipperIds: ['s1'],
+      operationalUnitIds: ['u1'],
+      pendencies: ['crlv_expired'],
+    }), ctx))
+      .toEqual([vehicles[0]]);
+  });
+
+  it('aceita dois embarcadores na mesma dimensão com OR', () => {
+    const vehicles = [
+      vehicle({ id: 'v1', shipperId: 's1' }),
+      vehicle({ id: 'v2', shipperId: 's2' }),
+      vehicle({ id: 'v3', shipperId: 's3' }),
+    ];
+
+    expect(applyVehicleFilters(vehicles, '', filters({ shipperIds: ['s1', 's3'] }), ctx))
+      .toEqual([vehicles[0], vehicles[2]]);
+  });
+
+  it('aplica disponíveis, indisponíveis e ambos', () => {
+    const vehicles = [
+      vehicle({ id: 'v1' }),
+      vehicle({ id: 'v2' }),
+      vehicle({ id: 'v3' }),
+    ];
+    const unavailable = new Set(['v2']);
+
+    expect(applyVehicleFilters(vehicles, '', filters({ availability: ['available'] }), ctx, unavailable))
+      .toEqual([vehicles[0], vehicles[2]]);
+    expect(applyVehicleFilters(vehicles, '', filters({ availability: ['unavailable'] }), ctx, unavailable))
+      .toEqual([vehicles[1]]);
+    expect(applyVehicleFilters(vehicles, '', filters({ availability: ['available', 'unavailable'] }), ctx, unavailable))
+      .toEqual(vehicles);
+  });
+
+  it('não aplica disponibilidade quando o conjunto de indisponíveis é desconhecido', () => {
+    const vehicles = [vehicle({ id: 'v1' }), vehicle({ id: 'v2' })];
+
+    expect(applyVehicleFilters(vehicles, '', filters({ availability: ['unavailable'] }), ctx))
+      .toEqual(vehicles);
   });
 
   it('retorna todos quando não há busca nem filtros', () => {
@@ -256,7 +376,13 @@ describe('vehicleFilters', () => {
   it('retorna vazio quando embarcador não casa com nenhum veículo', () => {
     const vehicles = [vehicle({ id: 'v1', shipperId: 's1' })];
 
-    expect(applyVehicleFilters(vehicles, '', { ...EMPTY_STRUCTURED_FILTERS, shipperId: 's2' }, ctx)).toEqual([]);
+    expect(applyVehicleFilters(vehicles, '', filters({ shipperIds: ['s2'] }), ctx)).toEqual([]);
+  });
+
+  it('arrays vazios não restringem a listagem', () => {
+    const vehicles = [vehicle({ id: 'v1', shipperId: 's1' }), vehicle({ id: 'v2', shipperId: 's2' })];
+
+    expect(applyVehicleFilters(vehicles, '', EMPTY_STRUCTURED_FILTERS, ctx)).toEqual(vehicles);
   });
 
   it('preserva os valores legados de issue', () => {
@@ -268,24 +394,21 @@ describe('vehicleFilters', () => {
   });
 
   it('lê valores válidos de lastRoute e rejeita valores inválidos', () => {
-    expect(parseVehicleFiltersFromParams(new URLSearchParams('lastRoute=2026-08-15')).lastRoute)
-      .toBe('2026-08-15');
-    expect(parseVehicleFiltersFromParams(new URLSearchParams('lastRoute=none')).lastRoute)
-      .toBe(LAST_ROUTE_NONE);
-    expect(parseVehicleFiltersFromParams(new URLSearchParams('lastRoute=older_7d')).lastRoute)
-      .toBe(LAST_ROUTE_OLDER_7D);
-    expect(parseVehicleFiltersFromParams(new URLSearchParams('lastRoute=older_30d')).lastRoute)
-      .toBe(LAST_ROUTE_OLDER_30D);
-    expect(parseVehicleFiltersFromParams(new URLSearchParams('lastRoute=ontem')).lastRoute).toBeNull();
-    expect(parseVehicleFiltersFromParams(new URLSearchParams('lastRoute=2026-13-99')).lastRoute).toBeNull();
+    expect(parseVehicleFiltersFromParams(new URLSearchParams('lastRoute=2026-08-15')).lastRoutes)
+      .toEqual(['2026-08-15']);
+    expect(parseVehicleFiltersFromParams(new URLSearchParams('lastRoute=none')).lastRoutes)
+      .toEqual([LAST_ROUTE_NONE]);
+    expect(parseVehicleFiltersFromParams(new URLSearchParams('lastRoute=older_7d')).lastRoutes)
+      .toEqual([LAST_ROUTE_OLDER_7D]);
+    expect(parseVehicleFiltersFromParams(new URLSearchParams('lastRoute=older_30d')).lastRoutes)
+      .toEqual([LAST_ROUTE_OLDER_30D]);
+    expect(parseVehicleFiltersFromParams(new URLSearchParams('lastRoute=ontem')).lastRoutes).toEqual([]);
+    expect(parseVehicleFiltersFromParams(new URLSearchParams('lastRoute=2026-13-99')).lastRoutes).toEqual([]);
   });
 
   it('serializa e omite lastRoute corretamente', () => {
-    const withLastRoute = serializeVehicleFiltersToParams({
-      ...EMPTY_STRUCTURED_FILTERS,
-      lastRoute: '2026-08-15',
-    });
-    expect(withLastRoute.get('lastRoute')).toBe('2026-08-15');
+    const withLastRoute = serializeVehicleFiltersToParams(filters({ lastRoutes: ['2026-08-15'] }));
+    expect(withLastRoute.getAll('lastRoute')).toEqual(['2026-08-15']);
     expect(serializeVehicleFiltersToParams(EMPTY_STRUCTURED_FILTERS).has('lastRoute')).toBe(false);
   });
 
@@ -357,6 +480,28 @@ describe('vehicleFilters', () => {
     )).toBe(true);
   });
 
+  it('combina duas opções de última rota com OR', () => {
+    const vehicles = [
+      vehicle({ id: 'v1', licensePlate: 'ABC1D23' }),
+      vehicle({ id: 'v2', licensePlate: 'DEF4G56' }),
+      vehicle({ id: 'v3', licensePlate: 'GHI7J89' }),
+    ];
+    const routes = new Map([
+      ['ABC1D23', { lastRouteDate: '2026-08-15' }],
+      ['GHI7J89', { lastRouteDate: '2026-06-10' }],
+    ]);
+
+    expect(applyVehicleFilters(
+      vehicles,
+      '',
+      filters({ lastRoutes: ['2026-08-15', LAST_ROUTE_NONE] }),
+      ctx,
+      undefined,
+      routes,
+      normalizePlate,
+    )).toEqual([vehicles[0], vehicles[1]]);
+  });
+
   it('respeita as bordas de 7, 8, 30 e 31 dias', () => {
     const dates = [
       ['AGE0007', '2026-08-08'],
@@ -410,9 +555,9 @@ describe('vehicleFilters', () => {
       vehicle({ id: 'v1', shipperId: 's1' }),
       vehicle({ id: 'v2', shipperId: 's2' }),
     ];
-    const filters = { ...EMPTY_STRUCTURED_FILTERS, shipperId: 's1', lastRoute: '2026-08-15' };
+    const activeFilters = filters({ shipperIds: ['s1'], lastRoutes: ['2026-08-15'] });
 
-    expect(applyVehicleFilters(vehicles, '', filters, ctx)).toEqual([vehicles[0]]);
+    expect(applyVehicleFilters(vehicles, '', activeFilters, ctx)).toEqual([vehicles[0]]);
   });
 
   it('combina última rota com embarcador e busca textual', () => {
@@ -429,8 +574,9 @@ describe('vehicleFilters', () => {
     expect(applyVehicleFilters(
       vehicles,
       'abc',
-      { ...EMPTY_STRUCTURED_FILTERS, shipperId: 's1', lastRoute: '2026-08-15' },
+      filters({ shipperIds: ['s1'], lastRoutes: ['2026-08-15'] }),
       ctx,
+      undefined,
       routes,
       normalizePlate,
     )).toEqual([vehicles[0]]);
