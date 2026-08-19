@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit2, Trash2, UserCircle, Truck, Eye, ToggleLeft, ToggleRight, KeyRound } from 'lucide-react';
+import { Download, Plus, Search, Edit2, Trash2, UserCircle, Truck, Eye, ToggleLeft, ToggleRight, KeyRound } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 
@@ -14,6 +14,7 @@ import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { usePersistentUiState, useSessionUiState } from '../hooks/usePersistentUiState';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
+import { downloadBlobFile } from '../lib/downloadBlobFile';
 import { driverFieldSettingsFromRow, defaultDriverFieldSettings, DriverFieldSettingsRow } from '../lib/driverFieldSettingsMappers';
 import {
   DRIVER_PENDENCY_LABELS,
@@ -38,9 +39,11 @@ import { filterOperationalUnitsByShippers } from '../lib/operationsManagerScope'
 import { filterByActive } from '../lib/registryActiveFilter';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
+import { XlsxDriverProvider } from '../services/driverExport/xlsxDriverProvider';
 import { saveDriver, deleteDriver, toggleDriverActive } from '../services/driverService';
 import { Driver } from '../types';
 
+import type { DriverExportRow } from '../lib/driverExportRows';
 import type { DriverFiles } from '../services/driverService';
 
 const ROLES_WITH_ACCESS = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'];
@@ -347,6 +350,30 @@ export default function Drivers() {
     return filterByActive(list, showInactive);
   }, [drivers, search, filters, filterCtx, showInactive]);
 
+  const handleExportXlsx = async () => {
+    try {
+      const exportRows: DriverExportRow[] = filteredDrivers.map((driver) => ({
+        ...driver,
+        vehiclePlate: driverVehicleInfo[driver.id]?.plate ?? '',
+        shipperName: driverVehicleInfo[driver.id]?.shipperName ?? '',
+        operationalUnitName: driverVehicleInfo[driver.id]?.unitName ?? '',
+      }));
+      if (exportRows.length === 0) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      const provider = new XlsxDriverProvider();
+      const result = await provider.exportData(currentClient?.id ?? '', exportRows);
+      if (!result.success || !result.blob) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      downloadBlobFile(result.blob, `motoristas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Falha ao gerar XLSX.');
+    }
+  };
+
   const driverDeleteBlockedReason = useMemo(() => {
     if (!driverToDelete) return null;
     const total = driverDeleteLinks ?? 0;
@@ -377,19 +404,29 @@ export default function Drivers() {
           <p className="mt-1 text-sm text-zinc-500">Gerencie os motoristas da sua frota.</p>
         </div>
 
-        {canCreate && (
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => {
-              clearDriverDraft();
-              setEditingDriver(null);
-              setIsFormOpen(true);
-            }}
-            className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none"
+            type="button"
+            onClick={() => { void handleExportXlsx(); }}
+            className="flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
           >
-            <Plus className="mr-2 -ml-1 h-5 w-5" aria-hidden="true" />
-            Adicionar Motorista
+            <Download className="h-4 w-4" />
+            Baixar XLSX
           </button>
-        )}
+          {canCreate && (
+            <button
+              onClick={() => {
+                clearDriverDraft();
+                setEditingDriver(null);
+                setIsFormOpen(true);
+              }}
+              className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:outline-none"
+            >
+              <Plus className="mr-2 -ml-1 h-5 w-5" aria-hidden="true" />
+              Adicionar Motorista
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
