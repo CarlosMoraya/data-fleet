@@ -1,6 +1,9 @@
 -- Recria dashboard_last_checklist_per_vehicle (removida em 20260619000003).
 -- O frontend (Dashboard e Veículos) depende desta RPC para o filtro/KPI de checklist vencido.
 -- SECURITY INVOKER -> herda RLS de checklists. p_client_id NULL = Admin Master (RLS governa).
+-- 2026-08-19: a função passou a devolver também o contexto 'Auditoria', consumido pela sub-aba
+-- Aderência da página Checklists. O agregado do Dashboard e o filtro de Veículos NÃO consomem
+-- esse contexto: eles continuam usando exclusivamente a união Rotina U Segurança.
 CREATE OR REPLACE FUNCTION public.dashboard_last_checklist_per_vehicle(
   p_client_id UUID
 )
@@ -19,7 +22,7 @@ AS $$
   WHERE c.status = 'completed'
     AND c.vehicle_id IS NOT NULL
     AND c.completed_at IS NOT NULL
-    AND ct.context IN ('Rotina', 'Segurança')
+    AND ct.context IN ('Rotina', 'Segurança', 'Auditoria')
     AND (p_client_id IS NULL OR c.client_id = p_client_id)
   ORDER BY c.vehicle_id, ct.context, c.completed_at DESC;
 $$;

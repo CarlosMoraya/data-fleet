@@ -20,7 +20,8 @@ function reduceToLastChecklistRows(rows: ChecklistHistoryRow[]) {
 
   for (const row of rows) {
     if (!row.vehicle_id || !row.completed_at) continue;
-    if (row.context !== 'Rotina' && row.context !== 'Segurança') continue;
+    // Espelha o `IN` da RPC `dashboard_last_checklist_per_vehicle` (2026-08-19: Auditoria incluída).
+    if (row.context !== 'Rotina' && row.context !== 'Segurança' && row.context !== 'Auditoria') continue;
 
     const key = `${row.vehicle_id}:${row.context}`;
     const current = lastByKey.get(key);
@@ -138,6 +139,48 @@ describe('dashboard RPC parity', () => {
 
     expect(rpcResult).toEqual(oldResult);
     expect(rpcResult.has('v3')).toBe(true);
+  });
+
+  it('linha de Auditoria trafega pela simulacao sem alterar o resultado agregado', () => {
+    const vehicles = [
+      { id: 'v1', client_id: 'client-a' },
+      { id: 'v2', client_id: 'client-a' },
+    ];
+    const intervalsByClient = new Map([
+      ['client-a', { rotina_day_interval: 20, seguranca_day_interval: 30 }],
+    ]);
+    const today = new Date('2026-06-17T12:00:00Z');
+    const historyWithoutAudit: ChecklistHistoryRow[] = [
+      { vehicle_id: 'v1', context: 'Rotina', completed_at: '2026-06-10T10:00:00Z' },
+      { vehicle_id: 'v1', context: 'Segurança', completed_at: '2026-06-02T10:00:00Z' },
+      { vehicle_id: 'v2', context: 'Rotina', completed_at: '2026-05-10T10:00:00Z' },
+      { vehicle_id: 'v2', context: 'Segurança', completed_at: '2026-05-01T10:00:00Z' },
+    ];
+    const historyWithAudit: ChecklistHistoryRow[] = [
+      ...historyWithoutAudit,
+      { vehicle_id: 'v1', context: 'Auditoria', completed_at: '2026-01-05T10:00:00Z' },
+    ];
+
+    const rpcRowsWithoutAudit = reduceToLastChecklistRows(historyWithoutAudit);
+    const rpcRowsWithAudit = reduceToLastChecklistRows(historyWithAudit);
+
+    expect(rpcRowsWithAudit).toHaveLength(rpcRowsWithoutAudit.length + 1);
+    expect(rpcRowsWithAudit.some((row) => row.context === 'Auditoria')).toBe(true);
+
+    const withoutAudit = computeOverdueChecklistVehicleIds({
+      vehicles,
+      checklistRows: rpcRowsWithoutAudit,
+      intervalsByClient,
+      today,
+    });
+    const withAudit = computeOverdueChecklistVehicleIds({
+      vehicles,
+      checklistRows: rpcRowsWithAudit,
+      intervalsByClient,
+      today,
+    });
+
+    expect(withAudit).toEqual(withoutAudit);
   });
 
   it('custo por KM e identico entre linhas brutas e km agregado por veiculo', () => {

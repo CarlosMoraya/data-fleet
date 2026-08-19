@@ -66,6 +66,39 @@ USING (
 
 ---
 
+## ✅ Conformidade de checklist — regra oficial
+
+### Fonte única
+
+A data do último checklist concluído por veículo e por contexto vem exclusivamente da RPC `public.dashboard_last_checklist_per_vehicle(p_client_id UUID)`. Ela é `SECURITY INVOKER`, portanto herda o RLS de `checklists`, e devolve `RETURNS TABLE (vehicle_id UUID, context TEXT, completed_at TIMESTAMPTZ)`. Desde 2026-08-19 a cláusula `IN` da consulta cobre os contextos `Rotina`, `Segurança` e `Auditoria` (antes só os dois primeiros). `p_client_id NULL` é o caso Admin Master: não filtra por tenant e o RLS governa.
+
+### Regra por contexto
+
+Um veículo está **vencido em um contexto** quando as duas condições valem:
+
+1. o intervalo daquele contexto está parametrizado em `checklist_day_intervals` (`rotina_day_interval`, `seguranca_day_interval`, `auditoria_day_interval`); e
+2. não existe checklist concluído daquele contexto para o veículo **ou** o número de dias entre o último checklist e hoje é **maior** que o intervalo.
+
+Contexto com intervalo `NULL` é ignorado: o veículo não entra no conjunto daquele contexto. Veículo cujo cliente não possui linha em `checklist_day_intervals` não entra em nenhum conjunto.
+
+### Distinção crítica entre agregado e contextos individuais
+
+- O card "Conformidade de Checklist" e o contador "Checklists Vencidos" do Dashboard, e o filtro de pendência `checklist_overdue` da listagem de Veículos, usam **exclusivamente** a união **Rotina ∪ Segurança**.
+- **`Auditoria` nunca entra no agregado**, mesmo quando o intervalo está parametrizado. Isso é requisito de produto, não inconsistência a ser corrigida.
+- A sub-aba "Aderência" da página Checklists (visão Fleet Assistant+) usa os três contextos **individualmente**, um card por contexto.
+
+### Onde a regra vive
+
+`src/lib/dashboardKpi.ts`:
+
+- `computeOverdueChecklistVehicleIdsByContext(...)` → `OverdueChecklistSets` com os conjuntos `rotina`, `seguranca`, `auditoria` e `aggregated` (este último apenas Rotina ∪ Segurança).
+- `computeOverdueChecklistVehicleIds(...)` é um wrapper fino que devolve `aggregated`, preservando o contrato consumido por Dashboard e Veículos.
+- `buildLastChecklistByVehicleAndContext(...)` e `isContextOverdue(...)` são as auxiliares puras da regra.
+
+A agregação por embarcador/unidade e as linhas da tabela da sub-aba ficam em `src/lib/checklistAdherence.ts`, sem duplicar a regra de vencimento.
+
+---
+
 ## 🔎 Filtros de listagem em Cadastros
 
 As listagens de Veículos e Motoristas usam filtros multisseleção em checkbox visual. Não há mudança de banco, RLS, autenticação, API ou formulários de cadastro.

@@ -49,6 +49,7 @@ import {
   sumApprovedCostByMonthKeys,
   calculateMovingAverageProjection,
   computeOverdueChecklistVehicleIds,
+  computeOverdueChecklistVehicleIdsByContext,
   resolveHorizonRange,
   buildMonthlyOrderCounts,
   buildMonthlyAverageCompletionDays,
@@ -1476,6 +1477,122 @@ describe('computeOverdueChecklistVehicleIds', () => {
     const today = new Date('2026-06-14T12:00:00Z');
     const result = computeOverdueChecklistVehicleIds({ vehicles, checklistRows, intervalsByClient, today });
     expect(result.has('v1')).toBe(false);
+  });
+});
+
+describe('computeOverdueChecklistVehicleIdsByContext', () => {
+  const clientId = 'client-a';
+  const today = new Date('2026-06-14T12:00:00Z');
+
+  it('conjuntos por contexto são independentes entre si', () => {
+    const vehicles = [{ id: 'v1', client_id: clientId }];
+    const checklistRows = [
+      { vehicle_id: 'v1', context: 'Rotina', completed_at: '2026-06-01T10:00:00Z' },
+      { vehicle_id: 'v1', context: 'Segurança', completed_at: '2026-04-01T10:00:00Z' },
+    ];
+    const intervalsByClient = new Map([
+      [clientId, { rotina_day_interval: 30, seguranca_day_interval: 30, auditoria_day_interval: 30 }],
+    ]);
+    const result = computeOverdueChecklistVehicleIdsByContext({ vehicles, checklistRows, intervalsByClient, today });
+    expect(result.rotina.has('v1')).toBe(false);
+    expect(result.seguranca.has('v1')).toBe(true);
+  });
+
+  it('aggregated é a união de rotina e seguranca', () => {
+    const vehicles = [
+      { id: 'v1', client_id: clientId },
+      { id: 'v2', client_id: clientId },
+    ];
+    const checklistRows = [
+      { vehicle_id: 'v1', context: 'Rotina', completed_at: '2026-04-01T10:00:00Z' },
+      { vehicle_id: 'v1', context: 'Segurança', completed_at: '2026-06-01T10:00:00Z' },
+      { vehicle_id: 'v2', context: 'Rotina', completed_at: '2026-06-01T10:00:00Z' },
+      { vehicle_id: 'v2', context: 'Segurança', completed_at: '2026-04-01T10:00:00Z' },
+    ];
+    const intervalsByClient = new Map([
+      [clientId, { rotina_day_interval: 30, seguranca_day_interval: 30, auditoria_day_interval: null }],
+    ]);
+    const result = computeOverdueChecklistVehicleIdsByContext({ vehicles, checklistRows, intervalsByClient, today });
+    expect(result.rotina.has('v1')).toBe(true);
+    expect(result.seguranca.has('v2')).toBe(true);
+    expect(result.aggregated.has('v1')).toBe(true);
+    expect(result.aggregated.has('v2')).toBe(true);
+  });
+
+  it('aggregated NÃO inclui veículo vencido apenas em auditoria', () => {
+    const vehicles = [{ id: 'v3', client_id: clientId }];
+    const checklistRows = [
+      { vehicle_id: 'v3', context: 'Rotina', completed_at: '2026-06-01T10:00:00Z' },
+      { vehicle_id: 'v3', context: 'Segurança', completed_at: '2026-06-01T10:00:00Z' },
+      { vehicle_id: 'v3', context: 'Auditoria', completed_at: '2026-04-01T10:00:00Z' },
+    ];
+    const intervalsByClient = new Map([
+      [clientId, { rotina_day_interval: 30, seguranca_day_interval: 30, auditoria_day_interval: 30 }],
+    ]);
+    const result = computeOverdueChecklistVehicleIdsByContext({ vehicles, checklistRows, intervalsByClient, today });
+    expect(result.auditoria.has('v3')).toBe(true);
+    expect(result.aggregated.has('v3')).toBe(false);
+  });
+
+  it('contexto sem intervalo parametrizado não gera vencidos', () => {
+    const vehicles = [{ id: 'v1', client_id: clientId }];
+    const checklistRows: { vehicle_id: string; context: string; completed_at: string }[] = [];
+    const intervalsByClient = new Map([
+      [clientId, { rotina_day_interval: 30, seguranca_day_interval: 30, auditoria_day_interval: null }],
+    ]);
+    const result = computeOverdueChecklistVehicleIdsByContext({ vehicles, checklistRows, intervalsByClient, today });
+    expect(result.auditoria.size).toBe(0);
+  });
+
+  it('veículo sem auditoria registrada conta como vencido quando o intervalo está definido', () => {
+    const vehicles = [{ id: 'v1', client_id: clientId }];
+    const checklistRows: { vehicle_id: string; context: string; completed_at: string }[] = [];
+    const intervalsByClient = new Map([
+      [clientId, { rotina_day_interval: null, seguranca_day_interval: null, auditoria_day_interval: 30 }],
+    ]);
+    const result = computeOverdueChecklistVehicleIdsByContext({ vehicles, checklistRows, intervalsByClient, today });
+    expect(result.auditoria.has('v1')).toBe(true);
+  });
+
+  it('auditoria_day_interval ausente no objeto de intervalos equivale a não parametrizado', () => {
+    const vehicles = [
+      { id: 'v1', client_id: clientId },
+      { id: 'v2', client_id: clientId },
+    ];
+    const checklistRows = [
+      { vehicle_id: 'v1', context: 'Rotina', completed_at: '2026-06-01T10:00:00Z' },
+      { vehicle_id: 'v2', context: 'Rotina', completed_at: '2026-04-01T10:00:00Z' },
+    ];
+    const intervalsByClient = new Map([
+      [clientId, { rotina_day_interval: 30, seguranca_day_interval: 30 }],
+    ]);
+    const result = computeOverdueChecklistVehicleIdsByContext({ vehicles, checklistRows, intervalsByClient, today });
+    const legacy = computeOverdueChecklistVehicleIds({ vehicles, checklistRows, intervalsByClient, today });
+    expect(result.auditoria.size).toBe(0);
+    expect([...result.aggregated].sort()).toEqual([...legacy].sort());
+  });
+
+  it('contextos fora dos três conhecidos são ignorados', () => {
+    const vehicles = [{ id: 'v1', client_id: clientId }];
+    const checklistRows = [
+      { vehicle_id: 'v1', context: 'Entrega', completed_at: '2026-06-13T10:00:00Z' },
+    ];
+    const intervalsByClient = new Map([
+      [clientId, { rotina_day_interval: 30, seguranca_day_interval: null, auditoria_day_interval: null }],
+    ]);
+    const result = computeOverdueChecklistVehicleIdsByContext({ vehicles, checklistRows, intervalsByClient, today });
+    expect(result.rotina.has('v1')).toBe(true);
+  });
+
+  it('veículo cujo cliente não tem intervalos não entra em nenhum conjunto', () => {
+    const vehicles = [{ id: 'v1', client_id: clientId }];
+    const checklistRows: { vehicle_id: string; context: string; completed_at: string }[] = [];
+    const intervalsByClient = new Map<string, { rotina_day_interval: number | null; seguranca_day_interval: number | null; auditoria_day_interval: number | null }>();
+    const result = computeOverdueChecklistVehicleIdsByContext({ vehicles, checklistRows, intervalsByClient, today });
+    expect(result.rotina.size).toBe(0);
+    expect(result.seguranca.size).toBe(0);
+    expect(result.auditoria.size).toBe(0);
+    expect(result.aggregated.size).toBe(0);
   });
 });
 

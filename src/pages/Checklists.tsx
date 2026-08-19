@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 import ChecklistDetailModal from '../components/ChecklistDetailModal';
 import ChecklistMapLink from '../components/ChecklistMapLink';
+import ChecklistAdherencePanel from '../components/checklists/ChecklistAdherencePanel';
 import CreateActionPlanModal from '../components/CreateActionPlanModal';
 import DriverLoanNotifications from '../components/DriverLoanNotifications';
 import LastKmLabel from '../components/LastKmLabel';
@@ -15,11 +16,27 @@ import VehicleLoanAlert from '../components/VehicleLoanAlert';
 import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePersistentTabState, usePersistentFilterState, useSessionUiState } from '../hooks/usePersistentUiState';
+import {
+  ADHERENCE_CONTEXT_LABELS,
+  buildAdherenceCards,
+  buildAdherenceTableRows,
+  filterAdherenceRowsByGroup,
+  groupOverdueVehiclesByDimension,
+  type AdherenceTableRow,
+  type AdherenceVehicle,
+} from '../lib/checklistAdherence';
 import { requiresHandoverEvidence, filterTemplatesByContext, filterAuditorVehiclesForContext, shouldCreateLoanOnHandover, getAvailableContextsForDriver, getFreeVehicleChoiceContexts } from '../lib/checklistContextRules';
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
 import { getChecklistStartBlockMessage, getTireInspectionStartBlockMessage } from '../lib/checklistStartGuard';
 import { templateFromRow, type ChecklistTemplateRow } from '../lib/checklistTemplateMappers';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
+import {
+  buildLastChecklistByVehicleAndContext,
+  computeOverdueChecklistVehicleIdsByContext,
+  type ChecklistAdherenceContext,
+  type ChecklistDayIntervalsByContext,
+} from '../lib/dashboardKpi';
+import { buildVehicleRecordLink } from '../lib/linkedRecordNavigation';
 import { supabase } from '../lib/supabase';
 import { tireInspectionFromRow, type TireInspectionRow } from '../lib/tireInspectionMappers';
 import { safeParseJson } from '../lib/uiStateStorage';
@@ -51,18 +68,24 @@ const STATUS_COLOR: Record<string, string> = {
   completed: 'bg-green-100 text-green-800',
 };
 
-export function isValidChecklistTab(value: unknown): value is 'checklists' | 'tireInspections' {
-  return value === 'checklists' || value === 'tireInspections';
+export function isValidChecklistTab(value: unknown): value is 'checklists' | 'tireInspections' | 'adherence' {
+  return value === 'checklists' || value === 'tireInspections' || value === 'adherence';
 }
 
 function isValidHistoryStatusFilter(value: unknown): value is 'all' | 'in_progress' | 'completed' {
   return value === 'all' || value === 'in_progress' || value === 'completed';
 }
 
-export function getStoredChecklistTab(raw: string | null): 'checklists' | 'tireInspections' {
+export function getStoredChecklistTab(raw: string | null): 'checklists' | 'tireInspections' | 'adherence' {
   if (raw === null) return 'checklists';
   const parsed = safeParseJson<string>(raw, raw);
   return isValidChecklistTab(parsed) ? parsed : 'checklists';
+}
+
+const ADHERENCE_CONTEXTS: ChecklistAdherenceContext[] = ['rotina', 'seguranca', 'auditoria'];
+
+function isValidAdherenceContext(value: unknown): value is ChecklistAdherenceContext {
+  return value === 'rotina' || value === 'seguranca' || value === 'auditoria';
 }
 
 export function isOdometerUpdateChecklist(checklist: Pick<Checklist, 'templateContext'>): boolean {
@@ -102,6 +125,16 @@ export default function Checklists() {
   );
   const [selectedVehicleId, setSelectedVehicleId] = useSessionUiState<string>(
     'checklists', 'selection', 'auditor-vehicle', '',
+  );
+  const [adherenceContext, setAdherenceContext] = useSessionUiState<ChecklistAdherenceContext>(
+    'checklists', 'filter', 'adherence-context', 'rotina',
+    { validator: isValidAdherenceContext },
+  );
+  const [adherenceShipper, setAdherenceShipper] = useSessionUiState<string | null>(
+    'checklists', 'selection', 'adherence-shipper', null,
+  );
+  const [adherenceUnit, setAdherenceUnit] = useSessionUiState<string | null>(
+    'checklists', 'selection', 'adherence-unit', null,
   );
 
   // Local UI state
@@ -520,6 +553,246 @@ export default function Checklists() {
     queryFn: () => getLoanDeliveryChecklistIds(checklists.map((c) => c.id)),
     enabled: checklists.length > 0,
   });
+
+  // ── Adherence sub-tab (Assistant+) ────────────────────────────────────────
+  type AdherenceVehicleRecord = AdherenceVehicle & { active: boolean; client_id: string | null };
+  type AdherenceIntervalRow = {
+    client_id: string;
+    rotina_day_interval: number | null;
+    seguranca_day_interval: number | null;
+    auditoria_day_interval: number | null;
+  };
+  type AdherenceRpcRow = { vehicle_id: string; context: string | null; completed_at: string };
+
+  const adherenceEnabled = activeTab === 'adherence' && showsAggregatedData(user?.role, currentClient?.id);
+
+  const {
+    data: adherenceVehicles = [],
+    isLoading: loadingAdherenceVehicles,
+    error: adherenceVehiclesError,
+    refetch: refetchAdherenceVehicles,
+  } = useQuery<AdherenceVehicleRecord[]>({
+    queryKey: ['adherenceVehicles', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from('vehicles')
+        .select('id, active, client_id, license_plate, brand, model, shippers(name), operational_units(name), drivers!driver_id(name)');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []).map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        active: row.active != null ? Boolean(row.active) : true,
+        client_id: row.client_id != null ? (row.client_id as string) : null,
+        license_plate: row.license_plate != null ? (row.license_plate as string) : null,
+        brand: row.brand != null ? (row.brand as string) : null,
+        model: row.model != null ? (row.model as string) : null,
+        driver_name:
+          row.drivers && typeof row.drivers === 'object' && !Array.isArray(row.drivers)
+            ? (row.drivers as Record<string, unknown>).name as string | null
+            : null,
+        shipper_name:
+          row.shippers && typeof row.shippers === 'object' && !Array.isArray(row.shippers)
+            ? (row.shippers as Record<string, unknown>).name as string | null
+            : null,
+        operational_unit_name:
+          row.operational_units && typeof row.operational_units === 'object' && !Array.isArray(row.operational_units)
+            ? (row.operational_units as Record<string, unknown>).name as string | null
+            : null,
+      }));
+    },
+    enabled: adherenceEnabled,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  const {
+    data: adherenceChecklistRows = [],
+    isLoading: loadingAdherenceChecklistRows,
+    error: adherenceChecklistRowsError,
+    refetch: refetchAdherenceChecklistRows,
+  } = useQuery<{ vehicle_id: string; context: string; completed_at: string }[]>({
+    queryKey: ['adherenceLastChecklists', currentClient?.id],
+    queryFn: async () => {
+      const response = await supabase.rpc('dashboard_last_checklist_per_vehicle', {
+        p_client_id: currentClient?.id ?? null,
+      });
+      const data = response.data as AdherenceRpcRow[] | null;
+      const error = response.error;
+      if (error) throw error;
+      const rows = (data ?? []) as AdherenceRpcRow[];
+      return rows.map((row) => ({
+        vehicle_id: row.vehicle_id,
+        context: row.context ?? '',
+        completed_at: row.completed_at,
+      }));
+    },
+    enabled: adherenceEnabled,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  const {
+    data: adherenceIntervalRows = [],
+    isLoading: loadingAdherenceIntervals,
+    error: adherenceIntervalsError,
+    refetch: refetchAdherenceIntervals,
+  } = useQuery<AdherenceIntervalRow[]>({
+    queryKey: ['adherenceIntervals', currentClient?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from('checklist_day_intervals')
+        .select('client_id, rotina_day_interval, seguranca_day_interval, auditoria_day_interval');
+      if (currentClient?.id) {
+        query = query.eq('client_id', currentClient.id);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as AdherenceIntervalRow[];
+    },
+    enabled: adherenceEnabled,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  const adherenceError = adherenceVehiclesError ?? adherenceChecklistRowsError ?? adherenceIntervalsError;
+
+  useEffect(() => {
+    if (adherenceError) console.error(adherenceError);
+  }, [adherenceError]);
+
+  const retryAdherence = () => {
+    void refetchAdherenceVehicles();
+    void refetchAdherenceChecklistRows();
+    void refetchAdherenceIntervals();
+  };
+
+  const activeAdherenceVehicles = useMemo(
+    () => adherenceVehicles.filter((vehicle) => vehicle.active !== false),
+    [adherenceVehicles],
+  );
+
+  const adherenceIntervalsByClient = useMemo(() => {
+    const map = new Map<string, ChecklistDayIntervalsByContext>();
+    for (const row of adherenceIntervalRows) {
+      map.set(row.client_id, {
+        rotina_day_interval: row.rotina_day_interval,
+        seguranca_day_interval: row.seguranca_day_interval,
+        auditoria_day_interval: row.auditoria_day_interval,
+      });
+    }
+    return map;
+  }, [adherenceIntervalRows]);
+
+  const adherenceIntervals = useMemo(
+    () => (currentClient?.id ? adherenceIntervalsByClient.get(currentClient.id) : undefined),
+    [adherenceIntervalsByClient, currentClient?.id],
+  );
+
+  const adherenceOverdueSets = useMemo(
+    () =>
+      computeOverdueChecklistVehicleIdsByContext({
+        vehicles: activeAdherenceVehicles,
+        checklistRows: adherenceChecklistRows,
+        intervalsByClient: adherenceIntervalsByClient,
+        today: new Date(),
+      }),
+    [activeAdherenceVehicles, adherenceChecklistRows, adherenceIntervalsByClient],
+  );
+
+  const adherenceCards = useMemo(
+    () =>
+      buildAdherenceCards({
+        contexts: ADHERENCE_CONTEXTS,
+        overdueSets: adherenceOverdueSets,
+        intervals: adherenceIntervals,
+        totalActiveVehicles: activeAdherenceVehicles.length,
+      }),
+    [adherenceOverdueSets, adherenceIntervals, activeAdherenceVehicles.length],
+  );
+
+  const adherenceOverdueIds = adherenceOverdueSets[adherenceContext];
+
+  const adherenceLastByVehicle = useMemo(
+    () => buildLastChecklistByVehicleAndContext(adherenceChecklistRows),
+    [adherenceChecklistRows],
+  );
+
+  // O `RETURNS TABLE` da RPC não devolve o id do checklist: ele é resolvido a partir do
+  // array `checklists` já carregado por esta página (ver IMPLEMENTATION.md, decisão 5).
+  const lastChecklistIdByKey = useMemo(() => {
+    const contextByLabel = new Map<string, ChecklistAdherenceContext>(
+      (Object.entries(ADHERENCE_CONTEXT_LABELS) as [ChecklistAdherenceContext, string][])
+        .map(([context, label]) => [label, context]),
+    );
+    const bestByKey = new Map<string, { id: string; completedAt: string }>();
+    for (const checklist of checklists) {
+      if (checklist.status !== 'completed' || !checklist.vehicleId || !checklist.completedAt) continue;
+      const context = checklist.templateContext ? contextByLabel.get(checklist.templateContext) : undefined;
+      if (!context) continue;
+      const key = `${checklist.vehicleId}:${context}`;
+      const current = bestByKey.get(key);
+      if (!current || checklist.completedAt > current.completedAt) {
+        bestByKey.set(key, { id: checklist.id, completedAt: checklist.completedAt });
+      }
+    }
+    return new Map([...bestByKey.entries()].map(([key, value]) => [key, value.id]));
+  }, [checklists]);
+
+  const adherenceAllRows = useMemo(
+    () =>
+      buildAdherenceTableRows({
+        vehicles: activeAdherenceVehicles,
+        overdueIds: adherenceOverdueIds,
+        context: adherenceContext,
+        dayInterval: adherenceCards.find((card) => card.context === adherenceContext)?.dayInterval ?? 0,
+        lastByVehicle: adherenceLastByVehicle,
+        lastChecklistIdByKey,
+        today: new Date(),
+      }),
+    [activeAdherenceVehicles, adherenceOverdueIds, adherenceContext, adherenceCards, adherenceLastByVehicle, lastChecklistIdByKey],
+  );
+
+  const adherenceShipperSlices = useMemo(
+    () => groupOverdueVehiclesByDimension(activeAdherenceVehicles, adherenceOverdueIds, 'shipper'),
+    [activeAdherenceVehicles, adherenceOverdueIds],
+  );
+
+  const adherenceUnitSlices = useMemo(() => {
+    if (adherenceShipper === null) return [];
+    const idsInShipper = new Set(
+      filterAdherenceRowsByGroup(adherenceAllRows, adherenceShipper, null).map((row) => row.vehicleId),
+    );
+    return groupOverdueVehiclesByDimension(
+      activeAdherenceVehicles.filter((vehicle) => idsInShipper.has(vehicle.id)),
+      adherenceOverdueIds,
+      'operationalUnit',
+    );
+  }, [adherenceShipper, adherenceAllRows, activeAdherenceVehicles, adherenceOverdueIds]);
+
+  const adherenceRows = useMemo(
+    () => filterAdherenceRowsByGroup(adherenceAllRows, adherenceShipper, adherenceUnit),
+    [adherenceAllRows, adherenceShipper, adherenceUnit],
+  );
+
+  const handleAdherenceSelectContext = (context: ChecklistAdherenceContext) => {
+    setAdherenceContext(context);
+    setAdherenceShipper(null);
+    setAdherenceUnit(null);
+  };
+
+  const handleAdherenceSelectShipper = (shipper: string | null) => {
+    setAdherenceShipper(shipper);
+    setAdherenceUnit(null);
+  };
+
+  const handleAdherenceRowClick = (row: AdherenceTableRow) => {
+    const checklist = row.checklistId ? checklists.find((c) => c.id === row.checklistId) : undefined;
+    if (checklist) { setViewChecklist(checklist); return; }
+    void navigate(buildVehicleRecordLink(row.vehicleId));
+  };
 
   // ── Tire inspection queries ───────────────────────────────────────────────
   const { data: tireInspections = [] } = useQuery({
@@ -1123,6 +1396,20 @@ export default function Checklists() {
                 >
                   Inspeções de Pneus
                 </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'adherence'}
+                  onClick={() => setActiveTab('adherence')}
+                  className={cn(
+                    activeTab === 'adherence'
+                      ? 'border-orange-500 font-medium text-orange-700'
+                      : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700',
+                    'flex items-center border-b-2 px-4 py-2 text-sm whitespace-nowrap transition-colors tall:py-3',
+                  )}
+                >
+                  Aderência
+                </button>
               </nav>
             </div>
 
@@ -1342,6 +1629,40 @@ export default function Checklists() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )
+            )}
+
+            {activeTab === 'adherence' && (
+              adherenceError ? (
+                <div className="p-4">
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-700">
+                    <p>Não foi possível carregar os dados de aderência. Tente novamente.</p>
+                    <button
+                      type="button"
+                      onClick={retryAdherence}
+                      className="mt-3 inline-flex cursor-pointer items-center rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
+                    >
+                      Tentar novamente
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-visible tall:flex-1 tall:overflow-auto">
+                  <ChecklistAdherencePanel
+                    cards={adherenceCards}
+                    selectedContext={adherenceContext}
+                    onSelectContext={handleAdherenceSelectContext}
+                    shipperSlices={adherenceShipperSlices}
+                    unitSlices={adherenceUnitSlices}
+                    selectedShipper={adherenceShipper}
+                    onSelectShipper={handleAdherenceSelectShipper}
+                    selectedUnit={adherenceUnit}
+                    onSelectUnit={setAdherenceUnit}
+                    rows={adherenceRows}
+                    onRowClick={handleAdherenceRowClick}
+                    isLoading={loadingAdherenceVehicles || loadingAdherenceChecklistRows || loadingAdherenceIntervals}
+                  />
                 </div>
               )
             )}

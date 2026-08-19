@@ -78,7 +78,7 @@ AS $$
   WHERE c.status = 'completed'
     AND c.vehicle_id IS NOT NULL
     AND c.completed_at IS NOT NULL
-    AND ct.context IN ('Rotina', 'Segurança')
+    AND ct.context IN ('Rotina', 'Segurança', 'Auditoria')
     AND (p_client_id IS NULL OR c.client_id = p_client_id)
   ORDER BY c.vehicle_id, ct.context, c.completed_at DESC;
 $$;

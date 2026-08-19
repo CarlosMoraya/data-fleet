@@ -46,17 +46,18 @@ OR (role = 'Admin Master')
 Existem tabelas dedicadas para permitir que cada cliente (`client_id`) configure a obrigatoriedade de campos:
 - **`vehicle_field_settings`**: Controla campos como Renavam, Chassi, etc.
 - **`driver_field_settings`**: Controla campos de documentos do motorista.
-- **`checklist_day_intervals`**: Define o intervalo (em dias) entre checklists de rotina e segurança.
+- **`checklist_day_intervals`**: Define o intervalo (em dias) entre checklists consecutivos de Rotina, Segurança e Auditoria (`rotina_day_interval`, `seguranca_day_interval`, `auditoria_day_interval`), além de pneus, hodômetro e do vínculo motorista-veículo. Coluna `NULL` = contexto não parametrizado, que não gera vencidos.
 
 ---
 
 ## 📜 Histórico Recente de Migrações (Destaques)
 
-1.  **`20260818000000_allow_operations_manager_audit_checklist.sql`**: Libera execução e consulta de checklists de Auditoria para o Operations Manager, restritas aos veículos do escopo atribuído ao perfil.
-2.  **`20260405000000_fix_workshop_partnership_rls.sql`**: Correção de recursão infinita (42P17) entre policies de oficinas.
-3.  **`20260326000000_fix_supervisor_coordinator_rls.sql`**: Atualização da hierarquia de roles e permissões de visibilidade.
-4.  **`20260324000000_create_tire_management.sql`**: Implementação completa do módulo de pneus.
-5.  **`20260319000000_add_budget_to_maintenance.sql`**: Campos de orçamento e auditoria em ordens de serviço.
+1.  **`20260819000000_add_auditoria_day_interval.sql`**: Adiciona `auditoria_day_interval` a `checklist_day_intervals` (aditiva, `NULL` por padrão). Alimenta a sub-aba "Aderência" da página Checklists.
+2.  **`20260818000000_allow_operations_manager_audit_checklist.sql`**: Libera execução e consulta de checklists de Auditoria para o Operations Manager, restritas aos veículos do escopo atribuído ao perfil.
+3.  **`20260405000000_fix_workshop_partnership_rls.sql`**: Correção de recursão infinita (42P17) entre policies de oficinas.
+4.  **`20260326000000_fix_supervisor_coordinator_rls.sql`**: Atualização da hierarquia de roles e permissões de visibilidade.
+5.  **`20260324000000_create_tire_management.sql`**: Implementação completa do módulo de pneus.
+6.  **`20260319000000_add_budget_to_maintenance.sql`**: Campos de orçamento e auditoria em ordens de serviço.
 
 > [!IMPORTANT]
 > Migrações são executadas manualmente no SQL Editor do Supabase. O projeto não utiliza sistema de migração por linha de comando no momento.

@@ -2,6 +2,33 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Arquivamento — 2026-08-19
+
+Bloco movido de `docs/MEMORY.md` nesta data, sem perda de informação.
+
+### Filtros multisseleção em Cadastros (2026-08-17)
+
+Todos os filtros suspensos de listagem de Veículos e Motoristas viraram multisseleção em checkbox (`MultiSelectDropdown`, compatível com o consumo `string[]` de Manutenção). Semântica: **OR dentro da dimensão e AND entre dimensões** (incluindo busca `q`). Persistência por parâmetros canônicos repetidos na URL (`shipper`, `unit`, `issue`, `lastRoute`, `availability`), com retrocompat para links singulares e aliases legados. Veículos: Embarcador, Unidade Operacional, Pendência, Disponibilidade e Última rota (só Deluna). Motoristas: Embarcador, Base/Unidade Operacional e Situação. Disponibilidade reutiliza `computeUnavailableVehicleIds` (indisponível = ordem de manutenção fora de estado final; em erro o filtro não é aplicado). Contratos em `docs/SPEC.md` e `agent/AGENT-FRONTEND.md`. Resultado: 1.776 testes unitários, smoke 7/7, E2E dirigidos 20/20, E2E de navegação cruzada 8/8.
+
+### Sessão — 2026-08-19: Sub-aba "Aderência" na página Checklists
+
+Sub-aba nova (Tipo 4) na visão Fleet Assistant+ de `src/pages/Checklists.tsx`, apresentando a conformidade de checklist **por contexto individual** — Rotina, Segurança e Auditoria — em três cards, um gráfico de barras com drill-down de embarcador para unidade operacional e uma tabela dos veículos vencidos que funciona como fila de ação.
+
+**Padrões aplicados:**
+- *Facade*: `computeOverdueChecklistVehicleIds` virou wrapper fino de `computeOverdueChecklistVehicleIdsByContext`, devolvendo só o conjunto `aggregated`. Assinatura e comportamento preservados — Dashboard e Veículos ficaram **fora do diff**. Os 5 testes originais da função não foram tocados e seguem como trava de não-regressão.
+- *Expand and Contract*: coluna `auditoria_day_interval` (aditiva, `NULL`) e ampliação do `IN` da RPC `dashboard_last_checklist_per_vehicle` para incluir `'Auditoria'`. `RETURNS TABLE` intacto — nenhum `DROP FUNCTION`.
+- *Pure functions*: agregação por embarcador/unidade, montagem de cards e linhas em `src/lib/checklistAdherence.ts`, fora do componente React.
+- *Presentational/Container*: `ChecklistAdherencePanel` recebe tudo por props; as três queries vivem em `Checklists.tsx`.
+
+**Decisões que não devem ser "corrigidas" por sessões futuras:**
+1. `Auditoria` **nunca** entra no conjunto agregado do Dashboard nem no filtro `checklist_overdue` de Veículos. É requisito de produto.
+2. A RPC devolve Auditoria mesmo sem consumidor agregado; linhas desse contexto são ignoradas por construção no wrapper. Não adicionar filtro client-side "defensivo" no Dashboard.
+3. `auditoria_day_interval` é **opcional** no tipo `ChecklistDayIntervalsByContext` — é isso que permite Dashboard e Veículos continuarem selecionando só duas colunas.
+4. `checklistId` da linha da tabela é resolvido a partir do array `checklists` já carregado pela página, não pela RPC. Alterar o `RETURNS TABLE` exigiria `DROP FUNCTION` numa função de produção consumida por duas telas.
+5. Métrica do gráfico é contagem absoluta de veículos vencidos, não percentual. Sem série histórica/tendência por data.
+
+**Resultado:** `tsc --noEmit` 0 erros; `npm run lint` exit 0 (257 warnings pré-existentes, nenhum novo); `npm run test:unit` 1.816 testes em 199 arquivos (26 novos); `npm run test:smoke` 7/7.
+
 ## Sessão — 2026-08-15: Densidade adaptativa por altura de tela
 
 Sessão exclusivamente de CSS/classes de apresentação (Tipo 3). Nenhuma query, mapper, serviço, migration, RLS, permissão, rota ou regra de negócio alterada; nenhuma dependência instalada; nenhuma função TypeScript criada ou modificada.

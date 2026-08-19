@@ -364,55 +364,105 @@ export function calculateChecklistComplianceRate(totalVehicles: number, overdueV
   return Math.max(0, Math.min(100, result));
 }
 
-function daysBetween(a: Date, b: Date) {
+export function daysBetween(a: Date, b: Date) {
   return Math.floor((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export function computeOverdueChecklistVehicleIds(params: {
+export type ChecklistAdherenceContext = 'rotina' | 'seguranca' | 'auditoria';
+
+export interface ChecklistDayIntervalsByContext {
+  rotina_day_interval: number | null;
+  seguranca_day_interval: number | null;
+  auditoria_day_interval?: number | null;
+}
+
+export interface OverdueChecklistSets {
+  rotina: Set<string>;
+  seguranca: Set<string>;
+  auditoria: Set<string>;
+  aggregated: Set<string>;
+}
+
+const CHECKLIST_CONTEXT_BY_LABEL: Record<string, ChecklistAdherenceContext> = {
+  Rotina: 'rotina',
+  'Segurança': 'seguranca',
+  Auditoria: 'auditoria',
+};
+
+export function buildLastChecklistByVehicleAndContext(
+  checklistRows: { vehicle_id: string; context: string; completed_at: string }[],
+): Map<string, Partial<Record<ChecklistAdherenceContext, string>>> {
+  const lastByVehicle = new Map<string, Partial<Record<ChecklistAdherenceContext, string>>>();
+  for (const row of checklistRows) {
+    if (!row.vehicle_id || !row.completed_at) continue;
+    const context = CHECKLIST_CONTEXT_BY_LABEL[row.context];
+    if (!context) continue;
+    const entry = lastByVehicle.get(row.vehicle_id) ?? {};
+    const current = entry[context];
+    if (!current || row.completed_at > current) {
+      entry[context] = row.completed_at;
+    }
+    lastByVehicle.set(row.vehicle_id, entry);
+  }
+  return lastByVehicle;
+}
+
+export function isContextOverdue(
+  lastCompletedAt: string | undefined,
+  dayInterval: number | null | undefined,
+  today: Date,
+): boolean {
+  if (dayInterval == null) return false;
+  if (lastCompletedAt === undefined) return true;
+  return daysBetween(new Date(lastCompletedAt), today) > dayInterval;
+}
+
+export function computeOverdueChecklistVehicleIdsByContext(params: {
   vehicles: { id: string; client_id?: string | null }[];
   checklistRows: { vehicle_id: string; context: string; completed_at: string }[];
-  intervalsByClient: Map<string, { rotina_day_interval: number | null; seguranca_day_interval: number | null }>;
+  intervalsByClient: Map<string, ChecklistDayIntervalsByContext>;
   today: Date;
-}): Set<string> {
+}): OverdueChecklistSets {
   const { vehicles, checklistRows, intervalsByClient, today } = params;
-  const overdue = new Set<string>();
-
-  const lastByVehicle = new Map<string, { rotina?: string; seguranca?: string }>();
-  for (const c of checklistRows) {
-    if (!c.vehicle_id || !c.completed_at) continue;
-    const entry = lastByVehicle.get(c.vehicle_id) ?? {};
-    if (c.context === 'Rotina' && (!entry.rotina || c.completed_at > entry.rotina)) {
-      entry.rotina = c.completed_at;
-    }
-    if (c.context === 'Segurança' && (!entry.seguranca || c.completed_at > entry.seguranca)) {
-      entry.seguranca = c.completed_at;
-    }
-    lastByVehicle.set(c.vehicle_id, entry);
-  }
+  const lastByVehicle = buildLastChecklistByVehicleAndContext(checklistRows);
+  const sets: OverdueChecklistSets = {
+    rotina: new Set<string>(),
+    seguranca: new Set<string>(),
+    auditoria: new Set<string>(),
+    aggregated: new Set<string>(),
+  };
 
   for (const v of vehicles) {
     const clientId = v.client_id ?? null;
     const intervals = clientId != null ? intervalsByClient.get(clientId) : undefined;
     if (!intervals) continue;
-    if (intervals.rotina_day_interval == null && intervals.seguranca_day_interval == null) continue;
 
     const last = lastByVehicle.get(v.id);
-    if (intervals.rotina_day_interval != null) {
-      const lastDate = last?.rotina ? new Date(last.rotina) : null;
-      if (!lastDate || daysBetween(lastDate, today) > intervals.rotina_day_interval) {
-        overdue.add(v.id);
-        continue;
-      }
+    if (isContextOverdue(last?.rotina, intervals.rotina_day_interval, today)) {
+      sets.rotina.add(v.id);
+      sets.aggregated.add(v.id);
     }
-    if (intervals.seguranca_day_interval != null) {
-      const lastDate = last?.seguranca ? new Date(last.seguranca) : null;
-      if (!lastDate || daysBetween(lastDate, today) > intervals.seguranca_day_interval) {
-        overdue.add(v.id);
-      }
+    if (isContextOverdue(last?.seguranca, intervals.seguranca_day_interval, today)) {
+      sets.seguranca.add(v.id);
+      sets.aggregated.add(v.id);
+    }
+    if (isContextOverdue(last?.auditoria, intervals.auditoria_day_interval, today)) {
+      sets.auditoria.add(v.id);
     }
   }
 
-  return overdue;
+  return sets;
+}
+
+// Facade: preserva o contrato público consumido por Dashboard e Veículos.
+// Devolve exclusivamente a união Rotina U Segurança; Auditoria nunca entra no agregado.
+export function computeOverdueChecklistVehicleIds(params: {
+  vehicles: { id: string; client_id?: string | null }[];
+  checklistRows: { vehicle_id: string; context: string; completed_at: string }[];
+  intervalsByClient: Map<string, ChecklistDayIntervalsByContext>;
+  today: Date;
+}): Set<string> {
+  return computeOverdueChecklistVehicleIdsByContext(params).aggregated;
 }
 
 export function countOverdueMaintenanceOrders(

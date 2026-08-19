@@ -15,6 +15,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
 
   const [rotinaDays, setRotinaDays] = useState<string>('');
   const [segurancaDays, setSegurancaDays] = useState<string>('');
+  const [auditoriaDays, setAuditoriaDays] = useState<string>('');
   const [pneusDays, setPneusDays] = useState<string>('7');
   const [odometerDays, setOdometerDays] = useState<string>('');
   const [odometerTolerance, setOdometerTolerance] = useState<string>('');
@@ -27,6 +28,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
   useEffect(() => {
     setRotinaDays('');
     setSegurancaDays('');
+    setAuditoriaDays('');
     setPneusDays('7');
     setOdometerDays('');
     setOdometerTolerance('');
@@ -41,7 +43,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
     queryFn: async () => {
       const { data, error } = await supabase
         .from('checklist_day_intervals')
-        .select('id, client_id, rotina_day_interval, seguranca_day_interval, pneus_day_interval, odometer_update_day_interval, odometer_km_tolerance_per_day, enforce_driver_vehicle_link')
+        .select('id, client_id, rotina_day_interval, seguranca_day_interval, auditoria_day_interval, pneus_day_interval, odometer_update_day_interval, odometer_km_tolerance_per_day, enforce_driver_vehicle_link')
         .eq('client_id', clientId)
         .maybeSingle();
       if (error) throw error;
@@ -55,6 +57,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
     if (query.isSuccess) {
       setRotinaDays(query.data?.rotina_day_interval != null ? String(query.data.rotina_day_interval) : '');
       setSegurancaDays(query.data?.seguranca_day_interval != null ? String(query.data.seguranca_day_interval) : '');
+      setAuditoriaDays(query.data?.auditoria_day_interval != null ? String(query.data.auditoria_day_interval) : '');
       setPneusDays(query.data?.pneus_day_interval != null ? String(query.data.pneus_day_interval) : '7');
       setOdometerDays(query.data?.odometer_update_day_interval != null ? String(query.data.odometer_update_day_interval) : '');
       setOdometerTolerance(query.data?.odometer_km_tolerance_per_day != null ? String(query.data.odometer_km_tolerance_per_day) : '');
@@ -80,6 +83,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
         client_id: clientId,
         rotina_day_interval: rotinaDays === '' ? null : parseInt(rotinaDays, 10),
         seguranca_day_interval: segurancaDays === '' ? null : parseInt(segurancaDays, 10),
+        auditoria_day_interval: auditoriaDays === '' ? null : parseInt(auditoriaDays, 10),
         pneus_day_interval: pneusVal,
         odometer_update_day_interval: odometerDays === '' ? null : parseInt(odometerDays, 10),
         odometer_km_tolerance_per_day: odometerTolerance === '' ? null : parseInt(odometerTolerance, 10),
@@ -119,7 +123,7 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
         <div>
           <h2 className="text-lg font-medium text-zinc-900">Intervalo entre Checklists</h2>
           <p className="text-sm text-zinc-500">
-            Configure o número de dias entre checklists consecutivos de Rotina e Segurança.
+            Configure o número de dias entre checklists consecutivos de Rotina, Segurança e Auditoria.
             Estes valores serão usados para gerar alertas de checklists em atraso.
           </p>
         </div>
@@ -174,6 +178,27 @@ export default function ChecklistDayIntervalSettings({ clientId, userId }: Props
               min="1"
               value={segurancaDays}
               onChange={handleChange(setSegurancaDays)}
+              placeholder="—"
+              className="h-9 w-24 rounded-lg border border-zinc-200 px-3 text-right text-sm text-zinc-800 transition-colors placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500 focus:outline-none"
+            />
+            <span className="w-8 text-xs text-zinc-400">dias</span>
+          </div>
+        </div>
+
+        {/* Auditoria */}
+        <div className="flex items-center justify-between py-5">
+          <div>
+            <span className="text-sm font-medium text-zinc-800">Auditoria</span>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              Intervalo máximo em dias entre checklists de Auditoria consecutivos.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <input
+              type="number"
+              min="1"
+              value={auditoriaDays}
+              onChange={handleChange(setAuditoriaDays)}
               placeholder="—"
               className="h-9 w-24 rounded-lg border border-zinc-200 px-3 text-right text-sm text-zinc-800 transition-colors placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500 focus:outline-none"
             />
