@@ -13,9 +13,9 @@ import * as path from 'path';
 
 const ALL_TESTS: { id: string; name: string }[] = [
   { id: '01', name: 'login redireciona para /agendamentos' },
-  { id: '02', name: 'sidebar só com Agendamentos e Manutenção' },
+  { id: '02', name: 'sidebar com Agendamentos, Manutenção, Chamados e Checklists' },
   { id: '03', name: 'rota proibida /cadastros/usuarios redireciona para /agendamentos' },
-  { id: '04', name: 'rota proibida /checklists redireciona para /agendamentos' },
+  { id: '04', name: '/checklists acessível com escolha livre de veículo' },
   { id: '05', name: 'rota proibida /settings redireciona para /agendamentos' },
   { id: '06', name: 'Agendamentos é somente leitura' },
   { id: '07', name: 'Manutenção é somente leitura' },
@@ -94,7 +94,7 @@ test.describe('Operations Manager — escopo somente leitura', () => {
     }
   });
 
-  test('02 — sidebar só com Agendamentos e Manutenção', async ({ page }) => {
+  test('02 — sidebar com Agendamentos, Manutenção, Chamados e Checklists', async ({ page }) => {
     const r = rec('02');
     try {
       await page.goto('/agendamentos');
@@ -105,7 +105,7 @@ test.describe('Operations Manager — escopo somente leitura', () => {
       await expect(nav.getByRole('link', { name: /manutenção/i })).toBeVisible();
       // Ausentes
       await expect(nav.getByRole('link', { name: /cadastros/i })).toHaveCount(0);
-      await expect(nav.getByRole('link', { name: /checklists/i })).toHaveCount(0);
+      await expect(nav.getByRole('link', { name: /checklists/i })).toBeVisible();
       await expect(nav.getByRole('link', { name: /configurações/i })).toHaveCount(0);
       // Link de Usuários (admin) ausente
       await expect(page.locator('a[href="/cadastros/usuarios"]')).toHaveCount(0);
@@ -127,12 +127,13 @@ test.describe('Operations Manager — escopo somente leitura', () => {
     }
   });
 
-  test('04 — rota proibida /checklists redireciona para /agendamentos', async ({ page }) => {
+  test('04 — /checklists acessível com escolha livre de veículo', async ({ page }) => {
     const r = rec('04');
     try {
       await page.goto('/checklists');
       await page.waitForLoadState('networkidle');
-      await expect(page).toHaveURL(/\/agendamentos$/, { timeout: 15000 });
+      await expect(page).toHaveURL(/\/checklists$/);
+      await expect(page.getByRole('heading', { name: 'Checklists' })).toBeVisible();
       r.pass();
     } catch (e) {
       r.fail(e);

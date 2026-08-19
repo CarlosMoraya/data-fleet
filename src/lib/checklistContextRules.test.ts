@@ -6,6 +6,7 @@ import {
   isHandoverGateBlocked,
   isAuditorOnlyContext,
   getAvailableContextsForDriver,
+  getFreeVehicleChoiceContexts,
   shouldCreateLoanOnHandover,
   filterAuditorVehiclesForContext,
 } from './checklistContextRules';
@@ -240,6 +241,35 @@ describe('checklistContextRules', () => {
         activeLoanVehicleIds: new Set(['v1']),
       });
       expect(result).toEqual(vehicles);
+    });
+  });
+
+  describe('getFreeVehicleChoiceContexts', () => {
+    it('retorna os três contextos de escolha livre para Yard Auditor', () => {
+      expect(getFreeVehicleChoiceContexts('Yard Auditor')).toEqual(['Auditoria', 'Entrega', 'Devolução']);
+    });
+
+    it('retorna apenas Auditoria para Operations Manager', () => {
+      const result = getFreeVehicleChoiceContexts('Operations Manager');
+      expect(result).toEqual(['Auditoria']);
+      expect(result).not.toContain('Entrega');
+      expect(result).not.toContain('Devolução');
+    });
+
+    it('retorna vazio para Driver', () => {
+      expect(getFreeVehicleChoiceContexts('Driver')).toEqual([]);
+    });
+
+    it('retorna vazio para Fleet Assistant', () => {
+      expect(getFreeVehicleChoiceContexts('Fleet Assistant')).toEqual([]);
+    });
+
+    it('retorna vazio para undefined', () => {
+      expect(getFreeVehicleChoiceContexts(undefined)).toEqual([]);
+    });
+
+    it('retorna vazio para null', () => {
+      expect(getFreeVehicleChoiceContexts(null)).toEqual([]);
     });
   });
 });

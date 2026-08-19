@@ -52,6 +52,8 @@ O **βetaFleet** segue uma arquitetura de Single Page Application (SPA) com Back
 
 As políticas de RLS são aplicadas no nível da linha, garantindo que usuários de um tenant não acessem dados de outro.
 
+O `Operations Manager` executa e consulta checklists de contexto `Auditoria` somente nos veículos pertencentes aos escopos de embarcador e unidade operacional atribuídos ao perfil. Esse contrato é aplicado pelas 9 policies `*_operations_manager` da migration `20260818000000_allow_operations_manager_audit_checklist.sql`; os contextos `Entrega` e `Devolução` e a Inspeção de Pneus permanecem exclusivos do `Yard Auditor`.
+
 **Exemplo de Política (Checklists):**
 ```sql
 CREATE POLICY "Assistant see tenant checklists" 

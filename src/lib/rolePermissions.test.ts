@@ -29,6 +29,22 @@ describe('canAccessRoute', () => {
     expect(canAccessRoute('Operations Manager', '/cadastros')).toBe(false);
   });
 
+  it('allows Operations Manager to access checklists', () => {
+    expect(canAccessRoute('Operations Manager', '/checklists')).toBe(true);
+  });
+
+  it('allows Operations Manager to access a checklist fill deep link', () => {
+    expect(canAccessRoute('Operations Manager', '/checklists/preencher/abc-123')).toBe(true);
+  });
+
+  it('keeps Operations Manager blocked from checklist templates', () => {
+    expect(canAccessRoute('Operations Manager', '/checklist-templates')).toBe(false);
+  });
+
+  it('keeps the Operations Manager default route at schedules', () => {
+    expect(getDefaultRouteForRole('Operations Manager')).toBe('/agendamentos');
+  });
+
   it('allows Driver to access the password page', () => {
     expect(canAccessRoute('Driver', '/conta/senha')).toBe(true);
   });

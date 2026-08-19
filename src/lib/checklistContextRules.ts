@@ -1,8 +1,10 @@
+import type { Role } from '../types';
 import type { ChecklistContext } from '../types/checklist';
 import type { VehicleStatus } from '../types/vehicle';
 
 export const AUDITOR_ONLY_CONTEXTS: ChecklistContext[] = ['Auditoria', 'Entrega', 'Devolução'];
 export const HANDOVER_CONTEXTS: ChecklistContext[] = ['Entrega', 'Devolução'];
+export const OPERATIONS_MANAGER_CONTEXTS: ChecklistContext[] = ['Auditoria'];
 
 export function isAuditorOnlyContext(context: ChecklistContext): boolean {
   return AUDITOR_ONLY_CONTEXTS.includes(context);
@@ -100,4 +102,10 @@ export function shouldCreateLoanOnHandover(
   if (!requiresHandoverEvidence(context)) return false;
   if (!selectedDriverId) return false;
   return selectedDriverId !== (titularDriverId ?? null);
+}
+
+export function getFreeVehicleChoiceContexts(role: Role | null | undefined): ChecklistContext[] {
+  if (role === 'Yard Auditor') return AUDITOR_ONLY_CONTEXTS;
+  if (role === 'Operations Manager') return OPERATIONS_MANAGER_CONTEXTS;
+  return [];
 }

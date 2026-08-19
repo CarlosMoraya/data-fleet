@@ -5,6 +5,7 @@ Histórico detalhado de sessões anteriores: `docs/MEMORY-HISTORY.md`.
 
 ## Estado Atual
 
+- **Checklists de Auditoria para Gestor de Operações — validado em DEV e PROD (2026-08-18)**: o papel escolhe livremente qualquer veículo dos escopos atribuídos, inicia apenas contexto `Auditoria` e consulta auditorias de terceiros nesses veículos. A migration `20260818000000_allow_operations_manager_audit_checklist.sql` foi aplicada em DEV e PROD pelo usuário; o diagnóstico em DEV confirmou 9 policies, 7/36 veículos alcançáveis em cada perfil avaliado, igualdade com os escopos e 0 contextos fora de Auditoria, e o usuário aprovou os testes em PROD.
 - **Segurança V-01/V-06 — validado em DEV, PROD pendente (2026-08-12)**: buckets `vehicle-documents` e `driver-documents` privados com URL assinada (`getPrivateDocumentSignedUrl`, `extractStoragePath` para compatibilidade) e Edge Function `gemini-ocr` com cota atômica e validação server-side. Migrations criadas e aplicadas em DEV; **PROD segue intocado**. Pré-checagem de perfis sem tenant concluída (só `Workshop` e `Admin Master`) — promover a PROD com autorização expressa.
 - **Plano de Ação a partir de Chamado (2026-08-07)**: implementado; migration `20260807020000_action_plan_from_fleet_ticket.sql` **criada e NÃO aplicada** (ver Pendências).
 - **Filtros multisseleção em Cadastros (2026-08-17)**: ver seção dedicada.
@@ -20,6 +21,7 @@ Todos os filtros suspensos de listagem de Veículos e Motoristas viraram multiss
 
 ## Pendências
 
+- **E2E de placas do Gestor de Operações**: a comparação explícita permanece bloqueada até configurar `TEST_GESTOROP_EXPECTED_VEHICLE_PLATES`; os outros três cenários do fluxo novo foram validados em DEV e os testes em PROD foram aprovados pelo usuário.
 - **Aplicar V-01/V-06 em PROD** (autorização expressa).
 - **Migration `20260807020000_action_plan_from_fleet_ticket.sql` NÃO aplicada** em nenhum banco; aplicar em DEV primeiro (rollback em `supabase/migrations/rollback/`). Validação manual de 14 passos bloqueada até lá.
 - **Financeiro → PROD (autorização expressa)**: `20260803000000_add_budget_discounts.sql` (confirmar 2 TRIGGERs de exclusividade), `20260710000000_add_invoice_number_to_payment_installments.sql`, `20260723000000_add_nota_fiscal_url_2.sql` + `20260723000100_...`. Validação manual guiada do fluxo completo pendente.

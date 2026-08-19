@@ -3,6 +3,7 @@ import {
   AUDITOR_ONLY_CONTEXTS,
   filterTemplatesByContext,
   filterVehiclesForContext,
+  getFreeVehicleChoiceContexts,
   isAuditorOnlyContext,
 } from '../lib/checklistContextRules';
 import type { ChecklistContext } from '../types/checklist';
@@ -43,5 +44,40 @@ describe('Checklists context filtering (lógica pura)', () => {
     ];
     const result = filterVehiclesForContext(vehicles, 'Devolução');
     expect(result.map((v) => v.id)).toEqual(['b', 'd']);
+  });
+});
+
+describe('Checklists free vehicle choice templates by role', () => {
+  const templates = [
+    { id: 'rotina', context: 'Rotina' as ChecklistContext },
+    { id: 'auditoria', context: 'Auditoria' as ChecklistContext },
+    { id: 'entrega', context: 'Entrega' as ChecklistContext },
+    { id: 'devolucao', context: 'Devolução' as ChecklistContext },
+  ];
+
+  it('offers only Auditoria to Operations Manager', () => {
+    const contexts = getFreeVehicleChoiceContexts('Operations Manager');
+    const offered = templates.filter((template) => contexts.includes(template.context));
+    expect(offered.map((template) => template.context)).toEqual(['Auditoria']);
+  });
+
+  it('offers all three auditor-only contexts to Yard Auditor', () => {
+    const contexts = getFreeVehicleChoiceContexts('Yard Auditor');
+    const offered = templates.filter((template) => contexts.includes(template.context));
+    expect(offered.map((template) => template.context)).toEqual(['Auditoria', 'Entrega', 'Devolução']);
+  });
+
+  it('offers no templates to Fleet Assistant', () => {
+    const contexts = getFreeVehicleChoiceContexts('Fleet Assistant');
+    const offered = templates.filter((template) => contexts.includes(template.context));
+    expect(offered).toEqual([]);
+  });
+
+  it('returns an empty result for both free-choice roles when templates are empty', () => {
+    const emptyTemplates: typeof templates = [];
+    for (const role of ['Operations Manager', 'Yard Auditor'] as const) {
+      const contexts = getFreeVehicleChoiceContexts(role);
+      expect(emptyTemplates.filter((template) => contexts.includes(template.context))).toEqual([]);
+    }
   });
 });

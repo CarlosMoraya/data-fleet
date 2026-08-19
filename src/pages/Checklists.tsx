@@ -15,7 +15,7 @@ import VehicleLoanAlert from '../components/VehicleLoanAlert';
 import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePersistentTabState, usePersistentFilterState, useSessionUiState } from '../hooks/usePersistentUiState';
-import { AUDITOR_ONLY_CONTEXTS, requiresHandoverEvidence, filterTemplatesByContext, filterAuditorVehiclesForContext, shouldCreateLoanOnHandover, getAvailableContextsForDriver } from '../lib/checklistContextRules';
+import { requiresHandoverEvidence, filterTemplatesByContext, filterAuditorVehiclesForContext, shouldCreateLoanOnHandover, getAvailableContextsForDriver, getFreeVehicleChoiceContexts } from '../lib/checklistContextRules';
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
 import { getChecklistStartBlockMessage, getTireInspectionStartBlockMessage } from '../lib/checklistStartGuard';
 import { templateFromRow, type ChecklistTemplateRow } from '../lib/checklistTemplateMappers';
@@ -78,6 +78,10 @@ export default function Checklists() {
   const isDriver = user?.role === 'Driver';
   const isAuditor = user?.role === 'Yard Auditor';
   const isDriverOrAuditor = isDriver || isAuditor;
+  const isOperationsManager = user?.role === 'Operations Manager';
+  const freeChoiceContexts = getFreeVehicleChoiceContexts(user?.role);
+  const isFreeChoiceExecutor = freeChoiceContexts.length > 0;
+  const hasOwnChecklistFlow = isDriverOrAuditor || isOperationsManager;
   const isAssistantPlus = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'].includes(user?.role ?? '');
   const isAnalystPlus = ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'].includes(user?.role ?? '');
   const isAdminMaster = user?.role === 'Admin Master';
@@ -294,7 +298,7 @@ export default function Checklists() {
         driverName: Array.isArray(v.drivers) ? v.drivers[0]?.name ?? null : v.drivers?.name ?? null,
       }));
     },
-    enabled: isAuditor && !!currentClient?.id
+    enabled: isFreeChoiceExecutor && !!currentClient?.id
   });
 
   const auditorVehicleIds = useMemo(() => auditorVehicles.map((v) => v.id), [auditorVehicles]);
@@ -328,18 +332,18 @@ export default function Checklists() {
   );
 
   const { data: auditorTemplates = [] } = useQuery({
-    queryKey: ['auditorTemplates', selectedAuditorVehicle?.category, currentClient?.id],
+    queryKey: ['auditorTemplates', selectedAuditorVehicle?.category, currentClient?.id, freeChoiceContexts.join(',')],
     queryFn: async () => {
       const { data } = await supabase
         .from('checklist_templates')
         .select('*')
         .eq('client_id', currentClient!.id)
         .eq('vehicle_category', selectedAuditorVehicle!.category)
-        .in('context', AUDITOR_ONLY_CONTEXTS)
+        .in('context', freeChoiceContexts)
         .eq('status', 'published');
       return (data ?? []).map(r => templateFromRow(r as ChecklistTemplateRow));
     },
-    enabled: isAuditor && !!selectedAuditorVehicle?.category && !!currentClient?.id,
+    enabled: isFreeChoiceExecutor && !!selectedAuditorVehicle?.category && !!currentClient?.id,
     // Templates publicados devem refletir imediatamente: ignorar o cache persistido
     // (o staleTime global de 3 min + persister em localStorage atrasava a aparição
     // de templates recém-publicados de auditoria, exigindo refresh repetido pelo Auditor).
@@ -445,7 +449,7 @@ export default function Checklists() {
       const data = response.data as ChecklistRow | null;
       return data ? checklistFromRow(data as ChecklistRow) : null;
     },
-    enabled: isDriverOrAuditor && !!user?.id && !!currentClient?.id
+    enabled: hasOwnChecklistFlow && !!user?.id && !!currentClient?.id
   });
 
   const { data: checklists = [], isLoading: loadingChecklists } = useQuery({
@@ -779,7 +783,7 @@ export default function Checklists() {
             Checklists
           </h1>
           <p className="mt-1 hidden text-sm text-zinc-500 tall:block">
-            {isDriverOrAuditor ? 'Inicie ou continue um checklist' : 'Histórico de inspeções do tenant'}
+            {hasOwnChecklistFlow ? 'Inicie ou continue um checklist' : 'Histórico de inspeções do tenant'}
           </p>
         </div>
       </div>
@@ -902,7 +906,7 @@ export default function Checklists() {
       )}
 
       {/* ── Auditor view ─────────────────────────────── */}
-      {isAuditor && (
+      {isFreeChoiceExecutor && (
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
           {openChecklist && (
             <div className="flex items-center gap-4 rounded-2xl border border-orange-200 bg-orange-50 p-4">
@@ -946,7 +950,7 @@ export default function Checklists() {
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
               >
                 <option value="">— Selecione um contexto —</option>
-                {AUDITOR_ONLY_CONTEXTS.map(ctx => (
+                {freeChoiceContexts.map(ctx => (
                   <option key={ctx} value={ctx}>{ctx}</option>
                 ))}
               </select>
@@ -966,7 +970,7 @@ export default function Checklists() {
               </select>
             </div>
 
-            {selectedAuditorVehicle && (
+            {isAuditor && selectedAuditorVehicle && (
               <div className="flex items-center gap-2 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2">
                 <User className="h-4 w-4 flex-shrink-0 text-zinc-400" />
                 <span className="text-sm text-zinc-700">
@@ -975,7 +979,7 @@ export default function Checklists() {
               </div>
             )}
 
-            {selectedContext === 'Devolução' && activeDevolucaoLoan && (
+            {isAuditor && selectedContext === 'Devolução' && activeDevolucaoLoan && (
               <VehicleLoanAlert
                 variant="active"
                 tempDriverName={activeDevolucaoLoan.driverName}
@@ -983,7 +987,7 @@ export default function Checklists() {
               />
             )}
 
-            {isEntregaDifferentFromTitular && (
+            {isAuditor && isEntregaDifferentFromTitular && (
               <VehicleLoanAlert
                 variant="will_create"
                 tempDriverName={unassignedDrivers.find((d) => d.id === selectedDriverId)?.name}
@@ -991,7 +995,7 @@ export default function Checklists() {
               />
             )}
 
-            {requiresHandoverEvidence(selectedContext || undefined) && (
+            {isAuditor && requiresHandoverEvidence(selectedContext || undefined) && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-zinc-500">Motorista da entrega/devolução</label>
                 <select
@@ -1007,7 +1011,7 @@ export default function Checklists() {
               </div>
             )}
 
-            {requiresLoanJustification && (
+            {isAuditor && requiresLoanJustification && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-zinc-500">
                   Justificativa do empréstimo <span className="text-red-500">*</span>
@@ -1054,7 +1058,7 @@ export default function Checklists() {
               <p className="mt-2 text-xs text-red-600">{startError}</p>
             )}
             {/* Inspeção de Pneus — Auditor */}
-            {selectedVehicleId && (
+            {isAuditor && selectedVehicleId && (
               <div className="space-y-1 border-t border-zinc-100 pt-2">
                 {tireInspectionError && (
                   <p className="text-xs text-red-600">{tireInspectionError}</p>

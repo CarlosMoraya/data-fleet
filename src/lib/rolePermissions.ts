@@ -103,7 +103,7 @@ export const TENANT_USER_ROLE_OPTIONS: Role[] = [
   'Financeiro',
 ];
 
-const OPERATIONS_MANAGER_ALLOWED_ROUTES = ['/agendamentos', '/manutencao', '/chamados', '/conta/senha'] as const;
+const OPERATIONS_MANAGER_ALLOWED_ROUTES = ['/agendamentos', '/manutencao', '/chamados', '/checklists', '/conta/senha'] as const;
 const COUPLING_AGENT_ALLOWED_ROUTES = ['/controle-carretas/engate', '/checklists/preencher', '/conta/senha'] as const;
 const FINANCEIRO_ALLOWED_ROUTES = ['/financeiro', '/conta/senha'] as const;
 
