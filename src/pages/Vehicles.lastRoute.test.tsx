@@ -32,6 +32,8 @@ vi.mock('../context/AuthContext', () => ({ useAuth: (): unknown => useAuthMock()
 vi.mock('../services/vehicleLastRouteService', () => ({
   buildLastRouteText: (info: { lastRouteDate: string; routeId: string } | null | undefined) =>
     info == null ? null : `Últ. rota 15/08/2026 · #${info.routeId}`,
+  buildLastRouteDateText: (info: { lastRouteDate: string; routeId: string } | null | undefined) =>
+    info == null ? null : 'Últ. rota 15/08/2026',
   getVehicleLastRouteMap: getVehicleLastRouteMapMock,
   normalizeFleetPlate: (value: string | null | undefined) => (value ?? '')
     .replace(/[^A-Za-z0-9]/g, '')

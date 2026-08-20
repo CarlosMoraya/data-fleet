@@ -69,6 +69,7 @@ O dashboard utiliza o princípio de "Progressive Disclosure", mostrando KPIs ger
 - Cada dimensão permite marcar várias opções; dentro da dimensão as opções combinam com OR e entre dimensões com AND.
 - O contêiner dos filtros usa `flex-wrap` para quebrar linha sem overflow na largura suportada.
 - Disponibilidade reflete a regra de indisponibilidade por ordem de manutenção; Última rota permanece exclusiva do tenant Deluna Transportes.
+- A data da última rota também aparece como linha de apoio na listagem de Manutenção, exclusiva do tenant Deluna.
 
 ### Responsividade — densidade adaptativa por altura de tela
 

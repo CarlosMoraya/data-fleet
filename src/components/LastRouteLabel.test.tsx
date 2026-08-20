@@ -36,4 +36,21 @@ describe('LastRouteLabel', () => {
 
     expect(container.innerHTML).toBe('');
   });
+
+  it('renderiza somente a data na variante dateOnly', () => {
+    act(() => {
+      root.render(<LastRouteLabel info={{ lastRouteDate: '2026-08-15', routeId: '425129405' }} variant="dateOnly" />);
+    });
+
+    expect(container.textContent).toBe('Últ. rota 15/08/2026');
+    expect(container.textContent).not.toContain('425129405');
+  });
+
+  it('não renderiza elemento na variante dateOnly quando não há rota', () => {
+    act(() => {
+      root.render(<LastRouteLabel info={undefined} variant="dateOnly" />);
+    });
+
+    expect(container.innerHTML).toBe('');
+  });
 });

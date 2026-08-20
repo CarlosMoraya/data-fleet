@@ -3,6 +3,7 @@ import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, B
 import React from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 
+import LastRouteLabel from '../components/LastRouteLabel';
 import MaintenanceDetailModal from '../components/MaintenanceDetailModal';
 import MaintenanceForm from '../components/MaintenanceForm';
 import MultiSelectDropdown from '../components/MultiSelectDropdown';
@@ -10,6 +11,7 @@ import SelectClientNotice from '../components/SelectClientNotice';
 import WorkshopProfileBanner from '../components/WorkshopProfileBanner';
 import { useAuth } from '../context/AuthContext';
 import { useSessionUiState, usePersistentFilterState } from '../hooks/usePersistentUiState';
+import { useVehicleLastRoutes } from '../hooks/useVehicleLastRoutes';
 import { requiresClientSelection } from '../lib/clientScope';
 import { formatDate } from '../lib/dateUtils';
 import { downloadBlobFile } from '../lib/downloadBlobFile';
@@ -29,6 +31,7 @@ import {
   updateMaintenanceStatus,
   cancelMaintenanceOrder,
 } from '../services/maintenanceService';
+import { normalizeFleetPlate } from '../services/vehicleLastRouteService';
 
 import type { MaintenanceExportRow } from '../lib/maintenanceExportRows';
 import type { MaintenanceCardKey } from '../lib/maintenanceFilters';
@@ -139,6 +142,7 @@ export default function Maintenance() {
   const canWriteMaintenance = !operationsManager && !isWorkshopUser && !blockWrite;
   const canFillWorkshop = canWorkshopActOnOrders(profile?.role, workshopAccount);
   const canExportSpreadsheet = canExportMaintenanceSpreadsheet(profile?.role);
+  const { showLastRoute, lastRouteMap } = useVehicleLastRoutes();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = usePersistentFilterState<string[]>('maintenance', 'statuses', []);
   const [search, setSearch] = usePersistentFilterState<string>('maintenance', 'search', '');
@@ -641,6 +645,13 @@ export default function Maintenance() {
                           {o.currentKm ? (
                             <span className="text-xs text-zinc-400">{o.currentKm.toLocaleString('pt-BR')} km</span>
                           ) : null}
+                          {showLastRoute && (
+                            <LastRouteLabel
+                              info={lastRouteMap.get(normalizeFleetPlate(o.licensePlate))}
+                              variant="dateOnly"
+                              className="text-xs text-zinc-400"
+                            />
+                          )}
                         </div>
                       </td>
                       <td className="max-w-[240px] px-4 py-3">

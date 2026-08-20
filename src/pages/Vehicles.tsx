@@ -15,6 +15,7 @@ import VehicleForm from '../components/VehicleForm';
 import VehicleLoanChangeTitularModal from '../components/VehicleLoanChangeTitularModal';
 import { useAuth } from '../context/AuthContext';
 import { usePersistentUiState, useSessionUiState } from '../hooks/usePersistentUiState';
+import { useVehicleLastRoutes } from '../hooks/useVehicleLastRoutes';
 import { requiresClientSelection } from '../lib/clientScope';
 import { computeOverdueChecklistVehicleIds } from '../lib/dashboardKpi';
 import { resolveExportSelection } from '../lib/exportSelection';
@@ -49,9 +50,7 @@ import {
 import { vehicleFromRow, VehicleRow } from '../lib/vehicleMappers';
 import { XlsxVehicleProvider } from '../services/vehicleExport/xlsxVehicleProvider';
 import {
-  getVehicleLastRouteMap,
   normalizeFleetPlate,
-  type VehicleLastRouteInfo,
 } from '../services/vehicleLastRouteService';
 import { completeVehicleLoan, getActiveVehicleLoan, getActiveLoansForVehicles } from '../services/vehicleLoanService';
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
@@ -72,8 +71,7 @@ export default function Vehicles() {
   const { currentClient, user, clients } = useAuth();
   const queryClient = useQueryClient();
   const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
-  const lastRouteClientId = import.meta.env.VITE_LAST_ROUTE_CLIENT_ID as string | undefined;
-  const showLastRoute = !!lastRouteClientId && currentClient?.id === lastRouteClientId;
+  const { showLastRoute, lastRouteMap } = useVehicleLastRoutes();
   const [searchParams, setSearchParams] = useSearchParams();
   const search = parseSearchFromParams(searchParams);
   const filters = useMemo(() => parseVehicleFiltersFromParams(searchParams), [searchParams]);
@@ -502,14 +500,6 @@ export default function Vehicles() {
   );
 
   const maintenanceOrdersReady = !loadingMaintenanceOrders && !maintenanceOrdersError;
-
-  const { data: lastRouteMap = new Map<string, VehicleLastRouteInfo>() } = useQuery({
-    queryKey: ['vehicleLastRoutes', currentClient?.id],
-    queryFn: getVehicleLastRouteMap,
-    enabled: showLastRoute,
-    staleTime: 5 * 60 * 1000,
-    retry: false,
-  });
 
   const filteredVehicles = useMemo(() => {
     const list = applyVehicleFilters(

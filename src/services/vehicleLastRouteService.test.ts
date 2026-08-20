@@ -9,6 +9,7 @@ vi.mock('../lib/invokeEdgeFn', () => ({
 }));
 
 import {
+  buildLastRouteDateText,
   buildLastRouteText,
   getVehicleLastRouteMap,
   normalizeFleetPlate,
@@ -42,6 +43,31 @@ describe('buildLastRouteText', () => {
   it('devolve null quando não há rota', () => {
     expect(buildLastRouteText(undefined)).toBeNull();
     expect(buildLastRouteText(null)).toBeNull();
+  });
+});
+
+describe('buildLastRouteDateText', () => {
+  it('monta o texto da última rota apenas com a data', () => {
+    expect(buildLastRouteDateText({
+      lastRouteDate: '2026-08-15',
+      routeId: '425129405',
+    })).toBe('Últ. rota 15/08/2026');
+  });
+
+  it('devolve null quando não há rota', () => {
+    expect(buildLastRouteDateText(undefined)).toBeNull();
+    expect(buildLastRouteDateText(null)).toBeNull();
+  });
+
+  it('não vaza o ID da rota nem para a versão só-data nem o remove da versão completa', () => {
+    expect(buildLastRouteDateText({
+      lastRouteDate: '2026-08-15',
+      routeId: '425129405',
+    })).toBe('Últ. rota 15/08/2026');
+    expect(buildLastRouteText({
+      lastRouteDate: '2026-08-15',
+      routeId: '425129405',
+    })).toBe('Últ. rota 15/08/2026 · #425129405');
   });
 });
 

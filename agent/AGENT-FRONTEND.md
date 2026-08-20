@@ -94,6 +94,7 @@ Filtros de navegação acionável vivem em query params da URL. São filtros de 
 
 - `lastRoute` só é aplicável quando `VITE_LAST_ROUTE_CLIENT_ID` existe e `currentClient.id` é igual a ele.
 - Outros tenants não consultam, renderizam nem aplicam `lastRoute`; o parâmetro canônico é ignorado e removido da URL.
+- A tela Manutenção exibe **somente a data** (`Últ. rota dd/mm/aaaa`, variante `dateOnly` de `LastRouteLabel`) dentro da célula "Placa / Status", sem filtro e sem deep link; Cadastros → Veículos continua exibindo data + ID; a regra de visibilidade e a query vivem em `src/hooks/useVehicleLastRoutes.ts` e são compartilhadas pelas duas telas.
 
 **Valores de `issue` — VEÍCULOS:**
 

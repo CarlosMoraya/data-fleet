@@ -36,3 +36,10 @@ export function buildLastRouteText(
   if (info == null) return null;
   return `Últ. rota ${formatDate(info.lastRouteDate)} · #${info.routeId}`;
 }
+
+export function buildLastRouteDateText(
+  info: VehicleLastRouteInfo | null | undefined
+): string | null {
+  if (info == null) return null;
+  return `Últ. rota ${formatDate(info.lastRouteDate)}`;
+}

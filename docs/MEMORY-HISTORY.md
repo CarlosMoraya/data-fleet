@@ -4,6 +4,22 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 
 ## Arquivamento — 2026-08-20
 
+### Sessão — 2026-08-20: Data da última rota do veículo na listagem de Manutenção
+
+Implementado o escopo fechado de `IMPLEMENTATION.md`. A tela Manutenção (`/manutencao`) passou a exibir, dentro da coluna "Placa / Status" de cada OS, uma linha discreta `Últ. rota dd/mm/aaaa` — somente a data, **sem o ID da rota**, sem filtro e sem deep link — exclusiva do tenant Deluna Transportes.
+
+**Padrões aplicados:**
+- *Facade*: o gate de tenant (`!!lastRouteClientId && currentClient?.id === lastRouteClientId`) e a query de última rota, antes inline em `Vehicles.tsx`, foram extraídos para `src/hooks/useVehicleLastRoutes.ts`, agora a única fonte de verdade da regra e consumido pelas duas telas. `queryKey` e `staleTime`/`retry` preservados, então navegar de Veículos para Manutenção reaproveita o cache e não dispara chamada extra à Edge Function.
+- *Variante via prop com default retrocompatível*: `LastRouteLabel` ganhou a prop opcional `variant?: 'full' | 'dateOnly'`; sem ela, o texto continua data + ID intacto.
+- *DRY*: `buildLastRouteDateText` no serviço `vehicleLastRouteService.ts` formata o texto só-data; `buildLastRouteText`, `getVehicleLastRouteMap`, `normalizeFleetPlate` e `VehicleLastRouteInfo` permanecem intocados.
+
+**Decisões que não devem ser "corrigidas" por sessões futuras:** Manutenção exibe somente a data e Veículos exibe data + ID — divergência intencional (pedido explícito do usuário); nada de última rota no `MaintenanceDetailModal`; sem filtro/ordenação por última rota na tela Manutenção; nenhuma migration; a Edge Function `vehicle-last-routes` não foi tocada.
+
+**Segurança:** nenhum gatilho ativado. O gate de tenant na UI permanece `!!lastRouteClientId && currentClient?.id === lastRouteClientId`; usuários de Oficina e Admin Master sem cliente selecionado não veem a informação em Manutenção, como esperado. Falha da Edge Function e veículo sem rota falham em silêncio (`null`), sem placeholder.
+
+**Validação automatizada:** testes direcionados das Etapas 1, 2 e 4 passando; `npx tsc --noEmit` com 0 erros; `npm run lint` com 0 erros e warnings pré-existentes aceitos; `npm run test:unit` com 208 arquivos e 1.907 testes passando (1.898 anteriores + 9 novos); `npm run test:smoke` com 7/7. O E2E de navegação Motoristas↔Veículos não foi executado — nenhum arquivo-gatilho do roteamento por impacto entrou no diff. Validação visual manual (logado como Deluna) pendente.
+
+
 ### Sessão — 2026-08-20: Percentual de aderência, identificação operacional e exportação XLSX de Checklists
 
 Implementado o escopo fechado de `IMPLEMENTATION.md` na página Checklists. `groupOverdueVehiclesByDimension` passou a devolver, além da contagem de vencidos, `adherenceRate` calculado exclusivamente por `calculateChecklistComplianceRate`. O gráfico continua ordenado pela contagem e não inclui grupos sem vencidos. No segundo nível do drill-down, o denominador agora usa todos os veículos ativos do embarcador selecionado, e não apenas os vencidos. `VehicleTypeBarChart` recebeu a prop opcional `subLabelByName`; sem ela, eixo, tooltip e Dashboard preservam o comportamento anterior.
