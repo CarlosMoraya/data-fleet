@@ -4,6 +4,7 @@ import {
   buildAdherenceCards,
   buildAdherenceTableRows,
   filterAdherenceRowsByGroup,
+  filterVehiclesByShipperName,
   groupOverdueVehiclesByDimension,
   type AdherenceTableRow,
   type AdherenceVehicle,
@@ -93,8 +94,8 @@ describe('groupOverdueVehiclesByDimension', () => {
     ];
     const result = groupOverdueVehiclesByDimension(vehicles, new Set(['v1', 'v2', 'v3']), 'shipper');
     expect(result).toEqual([
-      { name: 'Embarcador B', value: 2 },
-      { name: 'Embarcador A', value: 1 },
+      { name: 'Embarcador B', value: 2, adherenceRate: 0 },
+      { name: 'Embarcador A', value: 1, adherenceRate: 0 },
     ]);
   });
 
@@ -111,7 +112,7 @@ describe('groupOverdueVehiclesByDimension', () => {
   it('veículo sem unidade operacional entra na fatia Sem Unidade', () => {
     const vehicles = [makeVehicle({ id: 'v1', operational_unit_name: null })];
     const result = groupOverdueVehiclesByDimension(vehicles, new Set(['v1']), 'operationalUnit');
-    expect(result).toEqual([{ name: 'Sem Unidade', value: 1 }]);
+    expect(result).toEqual([{ name: 'Sem Unidade', value: 1, adherenceRate: 0 }]);
   });
 
   it('nenhum veículo vencido produz array vazio', () => {
@@ -126,6 +127,96 @@ describe('groupOverdueVehiclesByDimension', () => {
     ];
     const result = groupOverdueVehiclesByDimension(vehicles, new Set(['v1', 'v2']), 'shipper');
     expect(result.map((s) => s.name)).toEqual(['Alfa', 'Zeta']);
+  });
+
+  it('calcula o percentual de aderência por embarcador a partir do total do grupo', () => {
+    const vehicles = [
+      makeVehicle({ id: 'v1', shipper_name: 'ML' }),
+      makeVehicle({ id: 'v2', shipper_name: 'ML' }),
+      makeVehicle({ id: 'v3', shipper_name: 'ML' }),
+      makeVehicle({ id: 'v4', shipper_name: 'ML' }),
+      makeVehicle({ id: 'v5', shipper_name: 'Todos vencidos' }),
+      makeVehicle({ id: 'v6', shipper_name: 'Todos vencidos' }),
+    ];
+
+    const result = groupOverdueVehiclesByDimension(
+      vehicles,
+      new Set(['v1', 'v5', 'v6']),
+      'shipper',
+    );
+
+    expect(result.find((slice) => slice.name === 'ML')).toEqual({
+      name: 'ML',
+      value: 1,
+      adherenceRate: 75,
+    });
+    expect(result.find((slice) => slice.name === 'Todos vencidos')).toEqual({
+      name: 'Todos vencidos',
+      value: 2,
+      adherenceRate: 0,
+    });
+  });
+
+  it('grupo sem veículo vencido não aparece no gráfico', () => {
+    const vehicles = [
+      makeVehicle({ id: 'v1', shipper_name: 'Sem vencidos' }),
+      makeVehicle({ id: 'v2', shipper_name: 'Sem vencidos' }),
+      makeVehicle({ id: 'v3', shipper_name: 'Sem vencidos' }),
+      makeVehicle({ id: 'v4', shipper_name: 'Com vencido' }),
+    ];
+
+    const result = groupOverdueVehiclesByDimension(vehicles, new Set(['v4']), 'shipper');
+
+    expect(result.map((slice) => slice.name)).toEqual(['Com vencido']);
+  });
+
+  it('a ordenação continua por contagem de vencidos, não por percentual', () => {
+    const vehicles = [
+      ...Array.from({ length: 100 }, (_, index) => makeVehicle({
+        id: `a-${index}`,
+        shipper_name: 'A',
+      })),
+      ...Array.from({ length: 3 }, (_, index) => makeVehicle({
+        id: `b-${index}`,
+        shipper_name: 'B',
+      })),
+    ];
+    const overdueIds = new Set([
+      ...Array.from({ length: 5 }, (_, index) => `a-${index}`),
+      ...Array.from({ length: 3 }, (_, index) => `b-${index}`),
+    ]);
+
+    const result = groupOverdueVehiclesByDimension(vehicles, overdueIds, 'shipper');
+
+    expect(result).toEqual([
+      { name: 'A', value: 5, adherenceRate: 95 },
+      { name: 'B', value: 3, adherenceRate: 0 },
+    ]);
+  });
+});
+
+describe('filterVehiclesByShipperName', () => {
+  it('filtra veículos pelo rótulo do embarcador', () => {
+    const vehicles = [
+      makeVehicle({ id: 'v1', shipper_name: 'Alvo' }),
+      makeVehicle({ id: 'v2', shipper_name: 'Outro' }),
+      makeVehicle({ id: 'v3', shipper_name: 'Alvo' }),
+    ];
+
+    expect(filterVehiclesByShipperName(vehicles, 'Alvo').map((vehicle) => vehicle.id)).toEqual([
+      'v1',
+      'v3',
+    ]);
+  });
+
+  it('veículos sem embarcador são alcançáveis pelo rótulo Sem Embarcador', () => {
+    const vehicles = [
+      makeVehicle({ id: 'v1', shipper_name: null }),
+      makeVehicle({ id: 'v2', shipper_name: 'Outro' }),
+    ];
+
+    expect(filterVehiclesByShipperName(vehicles, 'Sem Embarcador').map((vehicle) => vehicle.id))
+      .toEqual(['v1']);
   });
 });
 

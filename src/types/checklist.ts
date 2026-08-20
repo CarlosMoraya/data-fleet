@@ -68,6 +68,8 @@ export interface Checklist {
   versionNumber: number;
   vehicleId?: string;
   vehicleLicensePlate?: string; // from join
+  vehicleShipperName?: string; // from join
+  vehicleOperationalUnitName?: string; // from join
   filledBy: string;
   filledByName?: string; // from join
   startedAt: string;

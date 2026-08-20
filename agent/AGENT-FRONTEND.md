@@ -53,7 +53,8 @@ O módulo de preenchimento de checklists é crítico e deve funcionar sem intern
 Os gráficos do Dashboard devem ser interativos:
 - **Filtros**: Clicar em uma barra ou fatia do gráfico deve filtrar os dados da página.
 - **Performance**: Todos os filtros de dashboard são processados client-side via `useMemo` para evitar latência.
-- **Drill-down (sub-aba Aderência)**: a sub-aba "Aderência" de `src/pages/Checklists.tsx` reutiliza `VehicleTypeBarChart` **sem modificá-lo** em dois níveis: nível 1 agrupa os veículos vencidos por embarcador; ao selecionar uma barra, o nível 2 agrupa por unidade operacional dentro daquele embarcador. Trocar de contexto zera embarcador e unidade; trocar de embarcador zera a unidade.
+- **Drill-down (sub-aba Aderência)**: a sub-aba "Aderência" de `src/pages/Checklists.tsx` reutiliza `VehicleTypeBarChart` em dois níveis: nível 1 agrupa os veículos vencidos por embarcador; ao selecionar uma barra, o nível 2 agrupa por unidade operacional dentro daquele embarcador. O componente aceita a prop opcional `subLabelByName` para exibir uma segunda linha no eixo e no tooltip; quando a prop está ausente, o comportamento permanece idêntico ao anterior e o Dashboard não é afetado. Trocar de contexto zera embarcador e unidade; trocar de embarcador zera a unidade.
+- **Percentual de aderência por grupo**: vem de `groupOverdueVehiclesByDimension` em `src/lib/checklistAdherence.ts`, derivado de `calculateChecklistComplianceRate`; nunca recalcular o percentual na camada de componente.
 - **Rótulos de agrupamento**: os fallbacks `'Sem Embarcador'` e `'Sem Unidade'` vêm de `OVERVIEW_DIMENSIONS` (`src/lib/overviewFleetFilters.ts`), resolvidos por `resolveDimensionValue`. Não criar constantes de rótulo novas — veículos sem vínculo precisam aparecer no gráfico, nunca sumir da contagem.
 
 ---

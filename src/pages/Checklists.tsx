@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle, AlertTriangle, Disc, Gauge, MapPinOff } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, Play, Eye, Trash2, Truck, Loader2, Search, User, AlertCircle, AlertTriangle, Disc, Gauge, MapPinOff, Ticket, TicketX, Download } from 'lucide-react';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,6 +9,8 @@ import ChecklistAdherencePanel from '../components/checklists/ChecklistAdherence
 import CreateActionPlanModal from '../components/CreateActionPlanModal';
 import DriverLoanNotifications from '../components/DriverLoanNotifications';
 import LastKmLabel from '../components/LastKmLabel';
+import MarkChecklistTreatedByTicketModal from '../components/MarkChecklistTreatedByTicketModal';
+import MultiSelectDropdown from '../components/MultiSelectDropdown';
 import SelectClientNotice from '../components/SelectClientNotice';
 import TireInspectionDetailModal from '../components/TireInspectionDetailModal';
 import VehicleLinkDivergenceModal from '../components/VehicleLinkDivergenceModal';
@@ -17,10 +19,21 @@ import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePersistentTabState, usePersistentFilterState, useSessionUiState } from '../hooks/usePersistentUiState';
 import {
+  CHECKLIST_ACTION_PLAN_FILTER_OPTIONS,
+  matchesChecklistActionPlanFilter,
+} from '../lib/checklistActionPlanFilter';
+import {
+  checklistActionPlanStampColor,
+  checklistActionPlanStampLabel,
+  computeChecklistActionPlanStamp,
+  type ChecklistActionPlanStamp,
+} from '../lib/checklistActionPlanStamp';
+import {
   ADHERENCE_CONTEXT_LABELS,
   buildAdherenceCards,
   buildAdherenceTableRows,
   filterAdherenceRowsByGroup,
+  filterVehiclesByShipperName,
   groupOverdueVehiclesByDimension,
   type AdherenceTableRow,
   type AdherenceVehicle,
@@ -29,6 +42,11 @@ import { requiresHandoverEvidence, filterTemplatesByContext, filterAuditorVehicl
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
 import { getChecklistStartBlockMessage, getTireInspectionStartBlockMessage } from '../lib/checklistStartGuard';
 import { templateFromRow, type ChecklistTemplateRow } from '../lib/checklistTemplateMappers';
+import {
+  canCreateActionPlanFromChecklist,
+  canMarkTreatedByTicket,
+  canUnmarkTreatedByTicket,
+} from '../lib/checklistTreatmentPermissions';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import {
   buildLastChecklistByVehicleAndContext,
@@ -36,6 +54,7 @@ import {
   type ChecklistAdherenceContext,
   type ChecklistDayIntervalsByContext,
 } from '../lib/dashboardKpi';
+import { downloadBlobFile } from '../lib/downloadBlobFile';
 import { buildVehicleRecordLink } from '../lib/linkedRecordNavigation';
 import { supabase } from '../lib/supabase';
 import { tireInspectionFromRow, type TireInspectionRow } from '../lib/tireInspectionMappers';
@@ -50,6 +69,13 @@ import {
   type VehicleLinkDivergence,
 } from '../lib/vehicleLinkDivergence';
 import {
+  getChecklistActionPlanStatuses,
+  getChecklistTicketTreatments,
+  unmarkChecklistTreatedByTicket,
+} from '../services/checklistActionPlanService';
+import { fetchChecklistIssueDetails } from '../services/checklistExport/checklistIssueFetcher';
+import { XlsxChecklistProvider } from '../services/checklistExport/xlsxChecklistProvider';
+import {
   validateTireInspectionEligibility,
   createTireInspection,
   findOpenTireInspection,
@@ -58,6 +84,7 @@ import { getActiveVehicleLoan, getActiveLoansForVehicles, getLoanDeliveryCheckli
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 import { ODOMETER_UPDATE_CONTEXT } from '../types';
 
+import type { ChecklistExportRow } from '../lib/checklistExportRows';
 import type { Checklist, ChecklistContext, ChecklistTemplate, TireInspection, AxleConfigEntry } from '../types';
 import type { VehicleStatus } from '../types/vehicle';
 import type { VehicleLoan } from '../types/vehicleLoan';
@@ -74,6 +101,13 @@ export function isValidChecklistTab(value: unknown): value is 'checklists' | 'ti
 
 function isValidHistoryStatusFilter(value: unknown): value is 'all' | 'in_progress' | 'completed' {
   return value === 'all' || value === 'in_progress' || value === 'completed';
+}
+
+function isValidChecklistActionPlanFilter(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => (
+    typeof item === 'string'
+    && CHECKLIST_ACTION_PLAN_FILTER_OPTIONS.some((option) => option.value === item)
+  ));
 }
 
 export function getStoredChecklistTab(raw: string | null): 'checklists' | 'tireInspections' | 'adherence' {
@@ -106,7 +140,6 @@ export default function Checklists() {
   const isFreeChoiceExecutor = freeChoiceContexts.length > 0;
   const hasOwnChecklistFlow = isDriverOrAuditor || isOperationsManager;
   const isAssistantPlus = ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'].includes(user?.role ?? '');
-  const isAnalystPlus = ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'].includes(user?.role ?? '');
   const isAdminMaster = user?.role === 'Admin Master';
 
   const [activeTab, setActiveTab] = usePersistentTabState('checklists', 'active', 'checklists', {
@@ -116,6 +149,9 @@ export default function Checklists() {
   const [historySearch, setHistorySearch] = usePersistentFilterState('checklists', 'history-search', '');
   const [historyStatusFilter, setHistoryStatusFilter] = usePersistentFilterState<'all' | 'in_progress' | 'completed'>(
     'checklists', 'history-status', 'all', { validator: isValidHistoryStatusFilter },
+  );
+  const [actionPlanFilter, setActionPlanFilter] = usePersistentFilterState<string[]>(
+    'checklists', 'action-plan', [], { validator: isValidChecklistActionPlanFilter },
   );
   const [onlyWithIssues, setOnlyWithIssues] = useSessionUiState<boolean>(
     'checklists', 'filter', 'only-with-issues', false,
@@ -139,9 +175,12 @@ export default function Checklists() {
 
   // Local UI state
   const [starting, setStarting] = useState<string | null>(null);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [viewChecklist, setViewChecklist] = useState<Checklist | null>(null);
   const [viewTireInspection, setViewTireInspection] = useState<TireInspection | null>(null);
   const [createPlanChecklist, setCreatePlanChecklist] = useState<Checklist | null>(null);
+  const [markTreatedChecklist, setMarkTreatedChecklist] = useState<Checklist | null>(null);
+  const [confirmUnmarkChecklist, setConfirmUnmarkChecklist] = useState<Checklist | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Checklist | null>(null);
   const [tireInspectionError, setTireInspectionError] = useState<string | null>(null);
   const [startingTireInspection, setStartingTireInspection] = useState(false);
@@ -490,7 +529,7 @@ export default function Checklists() {
     queryFn: async () => {
       let query = supabase
         .from('checklists')
-        .select('*, vehicles!vehicle_id(license_plate, driver:drivers!driver_id(name)), profiles(name), checklist_templates(name, context), drivers!driver_id(name), assigned_driver:drivers!vehicle_link_assigned_driver_id(name), executor_vehicle:vehicles!vehicle_link_executor_vehicle_id(license_plate)')
+        .select('*, vehicles!vehicle_id(license_plate, driver:drivers!driver_id(name), shippers(name), operational_units(name)), profiles(name), checklist_templates(name, context), drivers!driver_id(name), assigned_driver:drivers!vehicle_link_assigned_driver_id(name), executor_vehicle:vehicles!vehicle_link_executor_vehicle_id(license_plate)')
         .order('started_at', { ascending: false });
 
       if (currentClient?.id) {
@@ -545,6 +584,38 @@ export default function Checklists() {
     () => new Set(Array.isArray(rawIssueChecklistIds) ? rawIssueChecklistIds : []),
     [rawIssueChecklistIds]
   );
+
+  const checklistActionPlanStatusesQuery = useQuery({
+    queryKey: ['checklistActionPlanStatuses', checklists.map((c) => c.id)],
+    queryFn: () => getChecklistActionPlanStatuses(checklists.map((c) => c.id)),
+    enabled: isAssistantPlus && checklists.length > 0,
+  });
+
+  const checklistTicketTreatmentsQuery = useQuery({
+    queryKey: ['checklistTicketTreatments', checklists.map((c) => c.id)],
+    queryFn: () => getChecklistTicketTreatments(checklists.map((c) => c.id)),
+    enabled: isAssistantPlus && checklists.length > 0,
+  });
+
+  const checklistStampMap = useMemo(() => {
+    const result = new Map<string, ChecklistActionPlanStamp>();
+    for (const checklist of checklists) result.set(checklist.id, 'none');
+    if (checklistActionPlanStatusesQuery.isError || checklistTicketTreatmentsQuery.isError) return result;
+
+    for (const checklist of checklists) {
+      result.set(checklist.id, computeChecklistActionPlanStamp({
+        planStatuses: checklistActionPlanStatusesQuery.data?.get(checklist.id) ?? [],
+        treatedByTicket: checklistTicketTreatmentsQuery.data?.has(checklist.id) ?? false,
+      }));
+    }
+    return result;
+  }, [
+    checklists,
+    checklistActionPlanStatusesQuery.data,
+    checklistActionPlanStatusesQuery.isError,
+    checklistTicketTreatmentsQuery.data,
+    checklistTicketTreatmentsQuery.isError,
+  ]);
 
   // Checklists de Entrega que geraram empréstimo — sinaliza o selo
   // "Empréstimo" no histórico (cards do Auditor/Motorista e tabela Assistant+).
@@ -762,15 +833,12 @@ export default function Checklists() {
 
   const adherenceUnitSlices = useMemo(() => {
     if (adherenceShipper === null) return [];
-    const idsInShipper = new Set(
-      filterAdherenceRowsByGroup(adherenceAllRows, adherenceShipper, null).map((row) => row.vehicleId),
-    );
     return groupOverdueVehiclesByDimension(
-      activeAdherenceVehicles.filter((vehicle) => idsInShipper.has(vehicle.id)),
+      filterVehiclesByShipperName(activeAdherenceVehicles, adherenceShipper),
       adherenceOverdueIds,
       'operationalUnit',
     );
-  }, [adherenceShipper, adherenceAllRows, activeAdherenceVehicles, adherenceOverdueIds]);
+  }, [adherenceShipper, activeAdherenceVehicles, adherenceOverdueIds]);
 
   const adherenceRows = useMemo(
     () => filterAdherenceRowsByGroup(adherenceAllRows, adherenceShipper, adherenceUnit),
@@ -1017,6 +1085,15 @@ export default function Checklists() {
     deleteMutation.mutate(confirmDelete);
   };
 
+  const unmarkTreatmentMutation = useMutation({
+    mutationFn: (checklist: Checklist) => unmarkChecklistTreatedByTicket(checklist.id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['checklistActionPlanStatuses'] });
+      void queryClient.invalidateQueries({ queryKey: ['checklistTicketTreatments'] });
+      setConfirmUnmarkChecklist(null);
+    },
+  });
+
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -1031,6 +1108,18 @@ export default function Checklists() {
     });
   }, [checklists, historyStatusFilter, historySearch]);
 
+  const visibleChecklists = useMemo(
+    () => checklists
+      .filter(c => !onlyWithIssues || issueChecklistIds.has(c.id))
+      .filter(c => !onlyOdometer || isOdometerUpdateChecklist(c))
+      .filter(c => matchesChecklistActionPlanFilter({
+        stamp: checklistStampMap.get(c.id) ?? 'none',
+        hasIssues: issueChecklistIds.has(c.id),
+        selected: actionPlanFilter,
+      })),
+    [checklists, onlyWithIssues, issueChecklistIds, onlyOdometer, checklistStampMap, actionPlanFilter],
+  );
+
   const isLoading = loadingVehicleInfo || loadingChecklists;
 
   const clientNameMap = useMemo(() => {
@@ -1038,6 +1127,48 @@ export default function Checklists() {
     clients.forEach(c => map.set(c.id, c.name));
     return map;
   }, [clients]);
+
+  const handleExportXlsx = async (): Promise<void> => {
+    try {
+      setExportingXlsx(true);
+      if (visibleChecklists.length === 0) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      const issuesByChecklist = await fetchChecklistIssueDetails(visibleChecklists.map(c => c.id));
+      const exportRows: ChecklistExportRow[] = visibleChecklists.map((c) => {
+        const lastKm = c.vehicleId ? checklistLastKmMap.get(c.vehicleId) : undefined;
+        return {
+          clientDisplayName: c.clientId ? (clientNameMap.get(c.clientId) ?? '') : '',
+          templateName: c.templateName ?? '',
+          templateContext: c.templateContext ?? '',
+          licensePlate: c.vehicleLicensePlate ?? '',
+          shipperName: c.vehicleShipperName ?? '',
+          operationalUnitName: c.vehicleOperationalUnitName ?? '',
+          vehicleDriverName: c.vehicleDriverName ?? '',
+          filledByName: c.filledByName ?? '',
+          startedAt: c.startedAt,
+          statusLabel: STATUS_LABEL[c.status],
+          lastKmText: lastKm ? lastKm.value.toLocaleString('pt-BR') : '',
+          actionPlanLabel: checklistActionPlanStampLabel(checklistStampMap.get(c.id) ?? 'none') ?? '',
+          locationDeniedLabel: c.locationStatus === 'denied' ? 'Sim' : '',
+          vehicleLinkDivergenceLabel: c.vehicleLinkDivergenceReasons ? 'Sim' : '',
+          issues: issuesByChecklist.get(c.id) ?? [],
+        };
+      });
+      const provider = new XlsxChecklistProvider(blockWrite);
+      const result = await provider.exportData(currentClient?.id ?? '', exportRows);
+      if (!result.blob) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      downloadBlobFile(result.blob, `checklists_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Falha ao gerar XLSX.');
+    } finally {
+      setExportingXlsx(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -1448,6 +1579,20 @@ export default function Checklists() {
                     <Gauge className="h-3 w-3" />
                     Hodômetro
                   </button>
+                  <MultiSelectDropdown
+                    label="Plano de ação"
+                    options={[...CHECKLIST_ACTION_PLAN_FILTER_OPTIONS]}
+                    selected={actionPlanFilter}
+                    onChange={setActionPlanFilter}
+                  />
+                  <button
+                    onClick={() => { void handleExportXlsx(); }}
+                    disabled={exportingXlsx}
+                    className="ml-auto flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-200 disabled:opacity-50"
+                  >
+                    {exportingXlsx ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                    Baixar XLSX
+                  </button>
                 </div>
 
                 {checklists.length === 0 ? (
@@ -1468,18 +1613,27 @@ export default function Checklists() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-50">
-                        {checklists
-                          .filter(c => !onlyWithIssues || issueChecklistIds.has(c.id))
-                          .filter(c => !onlyOdometer || isOdometerUpdateChecklist(c))
-                          .map(c => (
-                            <tr key={c.id} className="hover:bg-zinc-50">
-                              {blockWrite && (
-                                <td className="px-4 py-2 text-sm text-zinc-600 tall:py-3">
-                                  <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
-                                    {c.clientId ? (clientNameMap.get(c.clientId) ?? '—') : '—'}
-                                  </span>
-                                </td>
-                              )}
+                        {visibleChecklists.map(c => {
+                            const stamp = checklistStampMap.get(c.id) ?? 'none';
+                            const stampLabel = checklistActionPlanStampLabel(stamp);
+                            const treatment = checklistTicketTreatmentsQuery.data?.get(c.id);
+                            const permissionInput = {
+                              role: user?.role ?? '',
+                              checklistStatus: c.status,
+                              hasIssues: issueChecklistIds.has(c.id),
+                              blockWrite,
+                              stamp,
+                            };
+
+                            return (
+                              <tr key={c.id} className="hover:bg-zinc-50">
+                                {blockWrite && (
+                                  <td className="px-4 py-2 text-sm text-zinc-600 tall:py-3">
+                                    <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                                      {c.clientId ? (clientNameMap.get(c.clientId) ?? '—') : '—'}
+                                    </span>
+                                  </td>
+                                )}
                               <td className="px-4 py-2 text-sm text-zinc-900 tall:py-3">
                                 <div className="flex items-center gap-1.5">
                                   {issueChecklistIds.has(c.id) && (
@@ -1507,6 +1661,11 @@ export default function Checklists() {
                                       className="text-xs text-zinc-400"
                                     />
                                     <ChecklistMapLink latitude={c.latitude} longitude={c.longitude} />
+                                    {(c.vehicleShipperName || c.vehicleOperationalUnitName) && (
+                                      <div className="text-xs text-zinc-400">
+                                        {[c.vehicleShipperName, c.vehicleOperationalUnitName].filter(Boolean).join(' · ')}
+                                      </div>
+                                    )}
                                     {c.locationStatus === 'denied' && (
                                       <span
                                         className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
@@ -1534,19 +1693,55 @@ export default function Checklists() {
                                 <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[c.status])}>
                                   {STATUS_LABEL[c.status]}
                                 </span>
+                                {stampLabel && (
+                                  <div className="mt-1">
+                                    <span
+                                      className={cn(
+                                        'rounded-full px-2 py-0.5 text-xs font-medium',
+                                        checklistActionPlanStampColor(stamp),
+                                      )}
+                                      title={stamp === 'treated_by_ticket'
+                                        ? `Chamado ${treatment?.fleetTicketNumber ?? '—'}`
+                                        : undefined}
+                                    >
+                                      {stampLabel}
+                                    </span>
+                                  </div>
+                                )}
                               </td>
                               <td className="px-4 py-2 tall:py-3">
                                 <div className="flex items-center gap-1">
                                   <button onClick={() => setViewChecklist(c)} className="rounded p-1.5 hover:bg-zinc-100" title="Visualizar">
                                     <Eye className="h-4 w-4 text-zinc-400" />
                                   </button>
-                                  {isAnalystPlus && c.status === 'completed' && issueChecklistIds.has(c.id) && !blockWrite && (
+                                  {canCreateActionPlanFromChecklist(permissionInput) && (
                                     <button
                                       onClick={() => setCreatePlanChecklist(c)}
                                       className="rounded p-1.5 text-orange-400 hover:bg-orange-50"
                                       title="Criar Plano de Ação"
                                     >
                                       <ClipboardList className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                  {canMarkTreatedByTicket(permissionInput) && (
+                                    <button
+                                      onClick={() => setMarkTreatedChecklist(c)}
+                                      className="rounded p-1.5 text-orange-400 hover:bg-orange-50"
+                                      title="Marcar como tratado por chamado"
+                                    >
+                                      <Ticket className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                  {canUnmarkTreatedByTicket(permissionInput) && (
+                                    <button
+                                      onClick={() => {
+                                        unmarkTreatmentMutation.reset();
+                                        setConfirmUnmarkChecklist(c);
+                                      }}
+                                      className="rounded p-1.5 text-orange-400 hover:bg-orange-50"
+                                      title="Desfazer tratamento por chamado"
+                                    >
+                                      <TicketX className="h-4 w-4" />
                                     </button>
                                   )}
                                   {isAdminMaster && (
@@ -1560,8 +1755,9 @@ export default function Checklists() {
                                   )}
                                 </div>
                               </td>
-                            </tr>
-                          ))}
+                                </tr>
+                            );
+                          })}
                       </tbody>
                     </table>
                   </div>
@@ -1698,8 +1894,61 @@ export default function Checklists() {
           onCreated={() => { 
             setCreatePlanChecklist(null);
             void queryClient.invalidateQueries({ queryKey: ['checklists', currentClient?.id] });
+            void queryClient.invalidateQueries({ queryKey: ['checklistActionPlanStatuses'] });
           }}
         />
+      )}
+
+      {markTreatedChecklist && (
+        <MarkChecklistTreatedByTicketModal
+          checklist={markTreatedChecklist}
+          onClose={() => setMarkTreatedChecklist(null)}
+          onMarked={() => {
+            setMarkTreatedChecklist(null);
+            void queryClient.invalidateQueries({ queryKey: ['checklistActionPlanStatuses'] });
+            void queryClient.invalidateQueries({ queryKey: ['checklistTicketTreatments'] });
+          }}
+        />
+      )}
+
+      {confirmUnmarkChecklist && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-red-700">Desfazer tratamento por chamado</h3>
+            <p className="text-sm text-zinc-600">
+              Ao desfazer a marcação, será novamente possível criar plano de ação a partir deste checklist.
+            </p>
+            <p className="text-sm font-medium text-zinc-900">
+              Template: <span className="text-orange-600">{confirmUnmarkChecklist.templateName}</span>
+            </p>
+            {unmarkTreatmentMutation.isError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+                {unmarkTreatmentMutation.error instanceof Error
+                  ? unmarkTreatmentMutation.error.message
+                  : (unmarkTreatmentMutation.error as { message?: string })?.message
+                    ?? 'Não foi possível desfazer esta marcação.'}
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmUnmarkChecklist(null)}
+                disabled={unmarkTreatmentMutation.isPending}
+                className="px-4 py-2 text-sm text-zinc-600"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => unmarkTreatmentMutation.mutate(confirmUnmarkChecklist)}
+                disabled={unmarkTreatmentMutation.isPending}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {unmarkTreatmentMutation.isPending ? 'Desfazendo...' : 'Desfazer marcação'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {confirmDelete && (

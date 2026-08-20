@@ -32,6 +32,7 @@ export interface AdherenceCardData {
 export interface AdherenceGroupSlice {
   name: string;
   value: number;
+  adherenceRate: number;
 }
 
 export interface AdherenceTableRow {
@@ -111,14 +112,28 @@ export function groupOverdueVehiclesByDimension(
 ): AdherenceGroupSlice[] {
   const overviewDimension = findDimension(dimension);
   const countByName = new Map<string, number>();
+  const totalByName = new Map<string, number>();
   for (const vehicle of vehicles) {
-    if (!overdueIds.has(vehicle.id)) continue;
     const name = resolveGroupLabel(vehicle, overviewDimension);
+    totalByName.set(name, (totalByName.get(name) ?? 0) + 1);
+    if (!overdueIds.has(vehicle.id)) continue;
     countByName.set(name, (countByName.get(name) ?? 0) + 1);
   }
   return [...countByName.entries()]
-    .map(([name, value]) => ({ name, value }))
+    .map(([name, value]) => ({
+      name,
+      value,
+      adherenceRate: calculateChecklistComplianceRate(totalByName.get(name) ?? 0, value),
+    }))
     .sort((a, b) => (b.value - a.value) || a.name.localeCompare(b.name, 'pt-BR'));
+}
+
+export function filterVehiclesByShipperName(
+  vehicles: AdherenceVehicle[],
+  shipperName: string,
+): AdherenceVehicle[] {
+  const dimension = findDimension('shipper');
+  return vehicles.filter((v) => resolveGroupLabel(v, dimension) === shipperName);
 }
 
 export function buildAdherenceTableRows(params: {

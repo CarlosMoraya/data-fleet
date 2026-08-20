@@ -21,11 +21,37 @@ interface VehicleTypeBarChartProps {
   onSelect?: (name: string, additive: boolean) => void;
   onClearAll?: () => void;
   multiSelectHint?: boolean;
+  subLabelByName?: Record<string, string>;
+}
+
+interface GroupedAxisTickProps {
+  x?: number;
+  y?: number;
+  payload?: { value?: string };
+  subLabelByName: Record<string, string>;
 }
 
 const ACTIVE_COLOR = '#2563eb';
 const DIMMED_COLOR = '#bfdbfe';
 const LONG_PRESS_MS = 600;
+
+function GroupedAxisTick({
+  x,
+  y,
+  payload,
+  subLabelByName,
+}: GroupedAxisTickProps): React.ReactElement {
+  const name = payload?.value ?? '';
+  const sub = subLabelByName[name] ?? '';
+  return (
+    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
+      <text x={0} y={0} dy={12} textAnchor="middle" fill="#71717a" fontSize={11}>{name}</text>
+      {sub !== '' && (
+        <text x={0} y={0} dy={26} textAnchor="middle" fill="#a1a1aa" fontSize={10}>{sub}</text>
+      )}
+    </g>
+  );
+}
 
 export default function VehicleTypeBarChart({
   data,
@@ -38,8 +64,10 @@ export default function VehicleTypeBarChart({
   onSelect,
   onClearAll,
   multiSelectHint,
+  subLabelByName,
 }: VehicleTypeBarChartProps) {
   const isMultiMode = typeof onSelect === 'function';
+  const hasSubLabels = subLabelByName !== undefined && Object.keys(subLabelByName).length > 0;
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
@@ -172,8 +200,11 @@ export default function VehicleTypeBarChart({
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#71717a', fontSize: 11 }}
-              dy={10}
+              tick={hasSubLabels
+                ? <GroupedAxisTick subLabelByName={subLabelByName!} />
+                : { fill: '#71717a', fontSize: 11 }}
+              dy={hasSubLabels ? undefined : 10}
+              height={hasSubLabels ? 40 : undefined}
             />
             <YAxis
               axisLine={false}
@@ -187,6 +218,9 @@ export default function VehicleTypeBarChart({
               formatter={(value: number) =>
                 valueFormatter ? [valueFormatter(value), ''] : [value, '']
               }
+              labelFormatter={hasSubLabels
+                ? (name: string) => subLabelByName![name] ? `${name} — ${subLabelByName![name]}` : name
+                : undefined}
               contentStyle={{
                 borderRadius: '12px',
                 border: '1px solid #e4e4e7',

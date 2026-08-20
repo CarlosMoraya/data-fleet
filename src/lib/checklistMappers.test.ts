@@ -68,6 +68,34 @@ describe('checklistFromRow', () => {
     expect(checklist.vehicleDriverName).toBeUndefined();
   });
 
+  it('mapeia embarcador e unidade operacional do veículo', () => {
+    const row: ChecklistRow = {
+      ...baseRow,
+      vehicles: {
+        license_plate: 'ABC1D23',
+        shippers: { name: 'MERCADO LIVRE' },
+        operational_units: { name: 'SRJ10' },
+      },
+    };
+
+    const checklist = checklistFromRow(row);
+
+    expect(checklist.vehicleShipperName).toBe('MERCADO LIVRE');
+    expect(checklist.vehicleOperationalUnitName).toBe('SRJ10');
+  });
+
+  it('veículo sem embarcador ou unidade devolve undefined', () => {
+    const row: ChecklistRow = {
+      ...baseRow,
+      vehicles: { license_plate: 'ABC1D23' },
+    };
+
+    const checklist = checklistFromRow(row);
+
+    expect(checklist.vehicleShipperName).toBeUndefined();
+    expect(checklist.vehicleOperationalUnitName).toBeUndefined();
+  });
+
   it('uma linha de histórico antigo (sem os campos novos) resulta em undefined sem lançar erro', () => {
     const checklist = checklistFromRow(baseRow);
 

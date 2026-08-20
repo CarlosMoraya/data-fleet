@@ -95,7 +95,11 @@ Contexto com intervalo `NULL` é ignorado: o veículo não entra no conjunto daq
 - `computeOverdueChecklistVehicleIds(...)` é um wrapper fino que devolve `aggregated`, preservando o contrato consumido por Dashboard e Veículos.
 - `buildLastChecklistByVehicleAndContext(...)` e `isContextOverdue(...)` são as auxiliares puras da regra.
 
-A agregação por embarcador/unidade e as linhas da tabela da sub-aba ficam em `src/lib/checklistAdherence.ts`, sem duplicar a regra de vencimento.
+A agregação por embarcador/unidade e as linhas da tabela da sub-aba ficam em `src/lib/checklistAdherence.ts`, sem duplicar a regra de vencimento. `groupOverdueVehiclesByDimension(...)` devolve também o percentual de aderência do grupo, derivado de `calculateChecklistComplianceRate(...)`. No nível 2 do drill-down, o denominador é o total de veículos ativos do embarcador selecionado, nunca apenas o subconjunto vencido.
+
+### Exportação de checklists
+
+A sub-aba "Checklists" exporta um único arquivo XLSX com duas abas: `Checklists`, com uma linha por checklist, e `Inconformidades`, com uma linha por inconformidade. Somente a foto de resposta de item com `status = 'issue'` pode entrar na planilha; fotos de CNH, assinatura e hodômetro (`cnh_photo_url`, `signature_url` e `odometer_photo_url`) nunca são exportadas.
 
 ---
 

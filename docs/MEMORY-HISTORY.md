@@ -2,9 +2,39 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Arquivamento — 2026-08-20
+
+### Sessão — 2026-08-20: Percentual de aderência, identificação operacional e exportação XLSX de Checklists
+
+Implementado o escopo fechado de `IMPLEMENTATION.md` na página Checklists. `groupOverdueVehiclesByDimension` passou a devolver, além da contagem de vencidos, `adherenceRate` calculado exclusivamente por `calculateChecklistComplianceRate`. O gráfico continua ordenado pela contagem e não inclui grupos sem vencidos. No segundo nível do drill-down, o denominador agora usa todos os veículos ativos do embarcador selecionado, e não apenas os vencidos. `VehicleTypeBarChart` recebeu a prop opcional `subLabelByName`; sem ela, eixo, tooltip e Dashboard preservam o comportamento anterior.
+
+A consulta da listagem passou a trazer `shippers(name)` e `operational_units(name)`. Os dois valores são mapeados para `Checklist` e aparecem empilhados dentro da coluna Veículo, antes dos alertas de localização negada e divergência de vínculo, sem criar coluna nova.
+
+A exportação segue o Provider Pattern existente. `checklistExportRows.ts` monta de forma pura as abas `Checklists` (uma linha por checklist) e `Inconformidades` (uma linha por inconformidade); `XlsxChecklistProvider` apenas serializa. O botão usa `visibleChecklists`, a mesma lista filtrada renderizada na tabela. As inconformidades são buscadas somente no clique e os ids são deduplicados e fatiados em blocos de 200 para o PostgREST.
+
+**Segurança:** somente `photo_url` de `checklist_responses` com `status = 'issue'` é exportada. `cnh_photo_url`, `signature_url` e `odometer_photo_url` não são consultados nem aparecem nas planilhas. O link da foto de inconformidade permanece público e sem expiração porque o bucket `checklist-photos` já é público; a ampliação de distribuição foi aceita conscientemente em 2026-08-20 em troca da evidência na fila de tratativas. Fechar o bucket e migrar os consumidores para URL assinada exige sessão dedicada de prioridade alta.
+
+**Validação automatizada:** 51/51 testes direcionados; `npx tsc --noEmit` com 0 erros; `npm run lint` com 0 erros e os mesmos 257 warnings pré-existentes; `npm run test:unit` com 207 arquivos e 1.898 testes passando; `npm run test:smoke` com 7/7. O E2E Motoristas↔Veículos não foi executado porque nenhum arquivo-gatilho entrou no diff. A validação manual visual e do arquivo XLSX permanece pendente.
+
+**Oportunidades futuras registradas, sem implementação nesta sessão:** fechar `checklist-photos`; aplicar o fatiamento também à query `rawIssueChecklistIds`; avaliar auditoria transversal das exportações; e avaliar Testing Library em sessão própria.
+
 ## Arquivamento — 2026-08-19
 
 Bloco movido de `docs/MEMORY.md` nesta data, sem perda de informação.
+
+### Sessão — 2026-08-19: Carimbo de plano de ação e tratamento por chamado em Checklists
+
+Implementado o escopo fechado de `IMPLEMENTATION.md`: a tabela de Checklists para Fleet Assistant+ passa a calcular e exibir os estados **Plano de ação em andamento**, **Plano de ação concluído** e **Tratado por chamado**, além de filtrar esses estados por multisseleção persistida em `bf:v1:ui`. A regra é derivada de `action_plans`, nunca persistida: tratamento por chamado prevalece; depois, qualquer plano aberto prevalece sobre concluídos; apenas concluídos gera o selo verde; conjunto vazio ou somente `cancelled` não gera selo. A opção **Sem plano** inclui somente checklists com inconformidades.
+
+Criados `checklistActionPlanStamp.ts`, `checklistActionPlanFilter.ts` e `checklistTreatmentPermissions.ts` como regras puras. A allowlist de escrita é literal (`Fleet Analyst`, `Supervisor`, `Manager`, `Coordinator`, `Director`, `Admin Master`), espelhando a RLS; Fleet Assistant pode ler os selos, mas não recebe gatilhos de criação, marcação ou desmarcação. A criação duplicada de planos já permitida pelo produto foi preservada: checklists com selo de plano continuam exibindo o gatilho de criar; somente `treated_by_ticket` o esconde.
+
+`checklistActionPlanService.ts` carrega status e tratamentos em lote, sem N+1, e traduz os erros previstos de trigger, unicidade e RLS. Por autorização expressa do usuário durante a implementação, a mesma consulta traz `fleet_tickets(ticket_number)` para que o `title` do selo use o número amigável do chamado. Falha em qualquer uma das queries produz tela sem carimbos, nunca com estado derivado parcial.
+
+O modal `MarkChecklistTreatedByTicketModal.tsx` reutiliza `listFleetTickets`, restringe a seleção ao veículo do checklist e ordena chamados não encerrados primeiro. Marcação e desmarcação invalidam as duas queries derivadas; desmarcar exige confirmação. O risco aceito permanece: o `DELETE` remove também a autoria anterior, pois uma tabela histórica seria desproporcional ao volume e ao impacto operacional esperados.
+
+A migration `20260819100000_create_checklist_ticket_treatments.sql` e seu rollback foram criados, mas **não aplicados pelo agente naquela sessão**. A tabela separada preserva a imutabilidade de `checklists`, com RLS de leitura para Fleet Assistant+ e escrita/remoção para Fleet Analyst+. O trigger normativo impede marcar checklists com plano não cancelado. A segunda exceção expressamente autorizada adiciona o trigger inverso em `action_plans`: inserção ou reativação de plano não cancelado é bloqueada quando a marcação já existe, sem alterar colunas, policies ou constraints de `action_plans`. Em 2026-08-20, o usuário confirmou que a migration e as alterações estavam em PROD; o diagnóstico estrutural retornou 11/11 objetos com status `OK`, cobrindo tabela, RLS, dois índices, três policies, duas funções e dois triggers.
+
+**Validação automatizada:** testes direcionados 45/45; `npx tsc --noEmit` com 0 erros; `npm run lint` com 0 erros e 257 warnings pré-existentes; `npm run test:unit` com 204 arquivos e 1.874 testes passando; `npm run test:smoke` com 7/7. O E2E de navegação Motoristas↔Veículos não foi executado porque nenhum arquivo-gatilho do roteamento por impacto entrou no diff. Em 2026-08-20, a implantação e os 11 objetos estruturais da migration foram confirmados em PROD; permanecem pendentes os 12 passos de validação funcional manual.
 
 ### Filtros multisseleção em Cadastros (2026-08-17)
 

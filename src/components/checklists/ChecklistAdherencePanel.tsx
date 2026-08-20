@@ -150,6 +150,10 @@ function AdherenceTable({ rows, caption, onRowClick }: AdherenceTableProps) {
   );
 }
 
+export function buildAdherenceSubLabels(slices: AdherenceGroupSlice[]): Record<string, string> {
+  return Object.fromEntries(slices.map((slice) => [slice.name, `${slice.adherenceRate}%`]));
+}
+
 export default function ChecklistAdherencePanel({
   cards,
   selectedContext,
@@ -234,6 +238,7 @@ export default function ChecklistAdherencePanel({
             title="Veículos vencidos por Embarcador"
             onSelect={(name) => onSelectShipper(name)}
             selectedValues={[]}
+            subLabelByName={buildAdherenceSubLabels(shipperSlices)}
           />
         ) : (
           <VehicleTypeBarChart
@@ -241,6 +246,7 @@ export default function ChecklistAdherencePanel({
             title={`Veículos vencidos por Unidade — ${selectedShipper}`}
             onSelect={(name) => onSelectUnit(name)}
             selectedValues={selectedUnit ? [selectedUnit] : []}
+            subLabelByName={buildAdherenceSubLabels(unitSlices)}
           />
         )}
       </div>
