@@ -350,7 +350,7 @@ export default function VehicleDetailModal({ vehicle, lastRoute, onClose, onEdit
               </div>
             </>
           ) : activeTab === 'kmHistory' ? (
-            <VehicleKmHistoryTab vehicleId={vehicle.id} />
+            <VehicleKmHistoryTab vehicleId={vehicle.id} initialKm={vehicle.initialKm} />
           ) : activeTab === 'loans' ? (
             <VehicleLoanHistory
               vehicleId={vehicle.id}

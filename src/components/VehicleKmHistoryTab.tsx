@@ -191,7 +191,7 @@ function CorrectKmModal({
   );
 }
 
-export default function VehicleKmHistoryTab({ vehicleId }: { vehicleId: string }) {
+export default function VehicleKmHistoryTab({ vehicleId, initialKm }: { vehicleId: string; initialKm?: number }) {
   const { user } = useAuth();
   const [editingReading, setEditingReading] = useState<OdometerReading | null>(null);
   const canCorrect = canCorrectOdometer(user?.role);
@@ -209,6 +209,17 @@ export default function VehicleKmHistoryTab({ vehicleId }: { vehicleId: string }
   }
 
   if (readings.length === 0) {
+    if (initialKm !== undefined) {
+      return (
+        <div className="space-y-2 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+          <p className="text-lg font-semibold text-zinc-900">{formatKm(initialKm)} km</p>
+          <p className="text-sm font-medium text-zinc-700">Km Inicial (cadastro)</p>
+          <p className="text-sm text-zinc-500">
+            Este veículo ainda não tem leitura de KM vinda de checklist. Para ajustar o valor, use Editar → Km Inicial.
+          </p>
+        </div>
+      );
+    }
     return <p className="text-sm text-zinc-500">Nenhuma leitura de KM registrada para este veículo.</p>;
   }
 

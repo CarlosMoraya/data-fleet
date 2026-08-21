@@ -1199,7 +1199,9 @@ export default function Checklists() {
             <div className="flex items-center gap-4 rounded-2xl border border-orange-200 bg-orange-50 p-4">
               <ClipboardCheck className="h-8 w-8 flex-shrink-0 text-orange-500" />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-orange-800">Checklist em andamento</p>
+                <p className="text-sm font-semibold text-orange-800">
+                  Checklist em andamento · {openChecklist.vehicleLicensePlate ?? 'Placa não informada'}
+                </p>
                 <p className="truncate text-xs text-orange-600">
                   {openChecklist.templateContext && <span className="font-medium">{openChecklist.templateContext} · </span>}
                   {openChecklist.templateName} — {formatDate(openChecklist.startedAt)}
@@ -1248,6 +1250,11 @@ export default function Checklists() {
                     ))}
                   </select>
                 </div>
+                {openChecklist && (
+                  <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Você tem um checklist em andamento na placa {openChecklist.vehicleLicensePlate ?? 'não informada'}. Finalize ou cancele esse checklist antes de iniciar um novo — inclusive para outro veículo.
+                  </p>
+                )}
                 {driverVisibleTemplates.length > 0 ? (
                   <div className="space-y-2">
                     {driverVisibleTemplates.map(t => (
@@ -1316,7 +1323,9 @@ export default function Checklists() {
             <div className="flex items-center gap-4 rounded-2xl border border-orange-200 bg-orange-50 p-4">
               <ClipboardCheck className="h-8 w-8 flex-shrink-0 text-orange-500" />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-orange-800">Checklist em andamento</p>
+                <p className="text-sm font-semibold text-orange-800">
+                  Checklist em andamento · {openChecklist.vehicleLicensePlate ?? 'Placa não informada'}
+                </p>
                 <p className="truncate text-xs text-orange-600">
                   {openChecklist.templateContext && <span className="font-medium">{openChecklist.templateContext} · </span>}
                   {openChecklist.templateName} — {formatDate(openChecklist.startedAt)}
@@ -1429,6 +1438,12 @@ export default function Checklists() {
                   className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
                 />
               </div>
+            )}
+
+            {openChecklist && (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Você tem um checklist em andamento na placa {openChecklist.vehicleLicensePlate ?? 'não informada'}. Finalize ou cancele esse checklist antes de iniciar um novo — inclusive para outro veículo.
+              </p>
             )}
 
             {selectedVehicleId && contextFilteredAuditorTemplates.length === 0 && (

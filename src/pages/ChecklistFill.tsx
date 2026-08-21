@@ -452,7 +452,6 @@ export default function ChecklistFill() {
           checklistId,
         );
         queryClient.setQueryData(['checklist', checklistId], (old: Checklist | undefined) => old ? { ...old, status: 'completed', completedAt } : old);
-        queryClient.setQueriesData({ queryKey: ['openChecklist'] }, null);
         return;
       }
 
@@ -586,6 +585,8 @@ export default function ChecklistFill() {
       }
     },
     onSuccess: () => {
+      // Remove o checklist aberto do cache imediatamente para evitar flash
+      queryClient.setQueriesData({ queryKey: ['openChecklist'] }, null);
       if (!navigator.onLine) {
         void navigate('/checklists');
         return;
@@ -593,8 +594,6 @@ export default function ChecklistFill() {
       if (checklistId) {
         void offlineDb.couplingDrafts.delete(checklistId);
       }
-      // Remove o checklist aberto do cache imediatamente para evitar flash
-      queryClient.setQueriesData({ queryKey: ['openChecklist'] }, null);
       // Invalida as queries de referência de hodômetro do veículo para que o
       // próximo checklist exija um valor estritamente maior que o recém-registrado.
       if (checklist?.vehicleId) {
@@ -768,6 +767,7 @@ export default function ChecklistFill() {
   });
   const totalAnswered = itemStates.filter(s => s.status !== null).length;
   const progress = itemStates.length > 0 ? Math.round((totalAnswered / itemStates.length) * 100) : 0;
+  const isSyncPending = isOnline && pendingCount > 0;
 
   const isLoading = isLoadingChecklist || isLoadingItems || isLoadingResponses;
 
@@ -784,6 +784,32 @@ export default function ChecklistFill() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-zinc-50">
         <p className="text-red-600">{error}</p>
         <button onClick={() => { void navigate('/checklists'); }} className="text-sm text-orange-500 hover:underline">Voltar</button>
+      </div>
+    );
+  }
+
+  if (checklist?.status === 'completed') {
+    const completedAt = new Date(checklist.completedAt!).toLocaleString('pt-BR', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4">
+        <div className="w-full max-w-md space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-base font-semibold text-zinc-900">
+            Este checklist já foi concluído em {completedAt} e não pode mais ser editado.
+          </p>
+          {checklist.vehicleLicensePlate && (
+            <p className="text-sm font-medium text-zinc-600">{checklist.vehicleLicensePlate}</p>
+          )}
+          <button
+            type="button"
+            onClick={() => { void navigate('/checklists'); }}
+            className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
+          >
+            Voltar
+          </button>
+        </div>
       </div>
     );
   }
@@ -1086,9 +1112,14 @@ export default function ChecklistFill() {
           {handoverGateBlocked && (
             <p className="text-center text-xs text-amber-600">Para finalizar, informe o motorista, a foto com a CNH e a assinatura.</p>
           )}
+          {isSyncPending && (
+            <p className="text-center text-xs text-amber-600">
+              Aguarde: {pendingCount} respostas ainda estão sendo sincronizadas. O checklist poderá ser finalizado assim que a sincronização terminar.
+            </p>
+          )}
           <button
             onClick={() => finishChecklistMutation.mutate()}
-            disabled={!mandatoryAnswered || finishChecklistMutation.isPending || !workshopReady || !kmConfirmed || odometerPhotoGateBlocked || handoverGateBlocked}
+            disabled={!mandatoryAnswered || finishChecklistMutation.isPending || !workshopReady || !kmConfirmed || odometerPhotoGateBlocked || handoverGateBlocked || isSyncPending}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-40"
           >
             {finishChecklistMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}

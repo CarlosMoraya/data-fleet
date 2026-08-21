@@ -51,7 +51,6 @@ export const PERSIST_ALLOWLIST: Record<string, number> = {
   checklistResponses: CACHE_TTL.offline,
   vehicleInitialKm: CACHE_TTL.offline,
   lastOdometerKm: CACHE_TTL.offline,
-  openChecklist: CACHE_TTL.offline,
   tireInspection: CACHE_TTL.offline,
   tireInspectionResponses: CACHE_TTL.offline,
   tireInspectionItems: CACHE_TTL.offline,
