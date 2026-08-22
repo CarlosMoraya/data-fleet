@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, Ban, RotateCcw, X, Download } from 'lucide-react';
+import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, Ban, RotateCcw, X, Download, PlayCircle } from 'lucide-react';
 import React from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 
@@ -15,9 +15,10 @@ import { useVehicleLastRoutes } from '../hooks/useVehicleLastRoutes';
 import { requiresClientSelection } from '../lib/clientScope';
 import { formatDate } from '../lib/dateUtils';
 import { downloadBlobFile } from '../lib/downloadBlobFile';
+import { type BudgetLockKind } from '../lib/maintenanceBudgetLock';
 import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, matchesMaintenanceCard, countVehiclesNotWithdrawn, BUDGET_STATUS_FILTER_OPTIONS, daysInWorkshop } from '../lib/maintenanceFilters';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
-import { canWorkshopFillOrder } from '../lib/maintenanceWorkshop';
+import { canWorkshopFillOrder, canWorkshopStartService } from '../lib/maintenanceWorkshop';
 import { isOperationsManager, canExportMaintenanceSpreadsheet } from '../lib/rolePermissions';
 import { openPrivateDocument } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
@@ -30,6 +31,7 @@ import {
   saveMaintenanceOrder,
   updateMaintenanceStatus,
   cancelMaintenanceOrder,
+  startWorkshopService,
 } from '../services/maintenanceService';
 import { normalizeFleetPlate } from '../services/vehicleLastRouteService';
 
@@ -263,6 +265,13 @@ export default function Maintenance() {
     },
   });
 
+  const startServiceMutation = useMutation({
+    mutationFn: async (id: string) => { await startWorkshopService(id); },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
+    },
+  });
+
   const cancelMutation = useMutation({
     mutationFn: async (order: MaintenanceOrder) => {
       await cancelMaintenanceOrder(order.id, profile?.id ?? null);
@@ -280,11 +289,13 @@ export default function Maintenance() {
       budgetItems,
       budgetFile,
       pendingPartPhotos,
+      budgetLock,
     }: {
       data: Partial<MaintenanceOrder>;
       budgetItems: BudgetItem[];
       budgetFile: File | null;
       pendingPartPhotos: PartPhotoDraft[];
+      budgetLock: BudgetLockKind | null;
     }) => {
       if (!profile) throw new Error('Sessão inválida');
       const orderId = await saveMaintenanceOrder({
@@ -293,6 +304,7 @@ export default function Maintenance() {
         budgetFile,
         profileId: profile.id,
         currentClientId: currentClient?.id,
+        budgetLock: budgetLock ?? undefined,
       });
       if (pendingPartPhotos.length > 0) {
         const clientId = data.clientId ?? currentClient?.id;
@@ -713,6 +725,16 @@ export default function Maintenance() {
                               <Edit className="h-4 w-4" />
                             </button>
                           )}
+                          {canFillWorkshop && canWorkshopStartService(o.status, o.budgetStatus) && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); startServiceMutation.mutate(o.id); }}
+                              disabled={startServiceMutation.isPending}
+                              title="Iniciar serviço"
+                              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-purple-50 hover:text-purple-600 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <PlayCircle className="h-4 w-4" />
+                            </button>
+                          )}
                           {canWriteMaintenance && o.status === 'Concluído' && (
                             <button
                               onClick={(e) => handleComplete(o.id, e)}
@@ -801,8 +823,8 @@ export default function Maintenance() {
             setPrefillData(undefined);
             clearMaintenanceDraft();
           }}
-          onSave={async (data, budgetItems, budgetFile, pendingPartPhotos) => {
-            await saveMutation.mutateAsync({ data, budgetItems, budgetFile, pendingPartPhotos });
+          onSave={async (data, budgetItems, budgetFile, pendingPartPhotos, budgetLock) => {
+            await saveMutation.mutateAsync({ data, budgetItems, budgetFile, pendingPartPhotos, budgetLock });
           }}
         />
       )}

@@ -1,4 +1,5 @@
 import { normalizeBudgetSystem } from '../lib/budgetSystems';
+import { type BudgetLockKind } from '../lib/maintenanceBudgetLock';
 import { budgetItemFromRow } from '../lib/maintenanceMappers';
 import { uploadMaintenanceBudget } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
@@ -13,6 +14,12 @@ export interface SaveMaintenancePayload {
   budgetFile: File | null;
   profileId: string;
   currentClientId?: string;
+  /**
+   * Preenchido quando a OS editada tem orçamento aprovado — nenhuma coluna de
+   * orçamento (itens, descontos, PDF, custos) é gravada. 'workshop' grava só os
+   * campos operacionais; 'client' grava todo o resto da OS.
+   */
+  budgetLock?: BudgetLockKind;
 }
 
 export interface MaintenanceBudgetApprovalDetails {
@@ -45,7 +52,24 @@ export function generateOSNumber(): string {
 export async function saveMaintenanceOrder(
   payload: SaveMaintenancePayload,
 ): Promise<string> {
-  const { data, budgetItems, budgetFile, profileId, currentClientId } = payload;
+  const { data, budgetItems, budgetFile, profileId, currentClientId, budgetLock } = payload;
+
+  // Orçamento aprovado: a oficina só registra a execução do serviço. Nenhuma
+  // coluna de orçamento é enviada e os itens não são tocados.
+  if (budgetLock === 'workshop') {
+    if (!data.id) throw new Error('Orçamento aprovado só pode ser atualizado em edição.');
+    const { error } = await supabase
+      .from('maintenance_orders')
+      .update({
+        expected_exit_date: data.expectedExitDate ?? null,
+        workshop_os_number: data.workshopOs ?? null,
+        mechanic_name: data.mechanicName ?? null,
+        current_km: data.currentKm ?? null,
+      })
+      .eq('id', data.id);
+    if (error) throw error;
+    return data.id;
+  }
 
   // Em edição (Workshop ou Assistant), o client_id da própria OS prevalece;
   // em criação, usa o cliente selecionado.
@@ -63,13 +87,17 @@ export async function saveMaintenanceOrder(
     status: data.status,
     description: data.description ?? null,
     mechanic_name: data.mechanicName ?? null,
-    estimated_cost: data.estimatedCost ?? 0,
-    approved_cost: data.approvedCost ?? null,
     notes: data.notes ?? null,
     workshop_os_number: data.workshopOs ?? null,
     current_km: data.currentKm ?? null,
     warranty_revision_event_id: data.warrantyRevisionEventId ?? null,
-    budget_discount: 0,
+    ...(budgetLock
+      ? {}
+      : {
+        estimated_cost: data.estimatedCost ?? 0,
+        approved_cost: data.approvedCost ?? null,
+        budget_discount: 0,
+      }),
   };
 
   let orderId: string;
@@ -97,7 +125,7 @@ export async function saveMaintenanceOrder(
   // Upload do PDF de orçamento.
   // 'vehicle-documents' é privado: persistimos o CAMINHO do objeto, nunca a URL
   // assinada (que é temporária e não pode ser gravada no banco).
-  if (budgetFile) {
+  if (budgetFile && !budgetLock) {
     const pdfPath = await uploadMaintenanceBudget(effectiveClientId, orderId, budgetFile);
     const { error } = await supabase
       .from('maintenance_orders')
@@ -113,7 +141,7 @@ export async function saveMaintenanceOrder(
 
   // Substituir itens de orçamento
   const hasSignificantItems = budgetItems.some(i => i.itemName.trim().length > 0);
-  if (hasSignificantItems || budgetFile) {
+  if (!budgetLock && (hasSignificantItems || budgetFile)) {
     await supabase
       .from('maintenance_budget_items')
       .delete()
@@ -139,7 +167,7 @@ export async function saveMaintenanceOrder(
   }
 
   const finalBudgetDiscount = data.budgetDiscount ?? 0;
-  if (finalBudgetDiscount > 0) {
+  if (!budgetLock && finalBudgetDiscount > 0) {
     const { error } = await supabase
       .from('maintenance_orders')
       .update({ budget_discount: finalBudgetDiscount })
@@ -188,6 +216,18 @@ export async function getMaintenanceBudgetApprovalDetails(
     workshopName: row.workshops?.name ?? '—',
     items: (itemRows as MaintenanceBudgetItemRow[]).map(budgetItemFromRow),
   };
+}
+
+/**
+ * Oficina inicia o serviço de uma OS com orçamento aprovado.
+ * Só muda o status — nenhuma outra coluna é tocada.
+ */
+export async function startWorkshopService(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('maintenance_orders')
+    .update({ status: 'Serviço em execução' })
+    .eq('id', id);
+  if (error) throw error;
 }
 
 /**

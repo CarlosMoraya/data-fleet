@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { canAddMorePartPhotos, canWorkshopFillOrder, PART_PHOTO_LIMIT, remainingPartPhotoSlots } from './maintenanceWorkshop';
+import { canAddMorePartPhotos, canWorkshopFillOrder, canWorkshopStartService, PART_PHOTO_LIMIT, remainingPartPhotoSlots } from './maintenanceWorkshop';
 
 describe('maintenanceWorkshop helpers', () => {
   it('allows Workshop only for fillable statuses', () => {
@@ -26,5 +26,13 @@ describe('maintenanceWorkshop helpers', () => {
     expect(remainingPartPhotoSlots(9)).toBe(1);
     expect(remainingPartPhotoSlots(10)).toBe(0);
     expect(remainingPartPhotoSlots(12)).toBe(0);
+  });
+
+  it('permite a oficina iniciar o serviço só a partir de Orçamento aprovado', () => {
+    expect(canWorkshopStartService('Orçamento aprovado', 'aprovado')).toBe(true);
+    expect(canWorkshopStartService('Serviço em execução', 'aprovado')).toBe(false);
+    expect(canWorkshopStartService('Aguardando aprovação', 'aprovado')).toBe(false);
+    expect(canWorkshopStartService('Orçamento aprovado', 'pendente')).toBe(false);
+    expect(canWorkshopStartService('Concluído', 'aprovado')).toBe(false);
   });
 });

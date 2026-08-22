@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { extractBudgetData } from '../lib/budgetOcr';
 import { isKnownBudgetSystem } from '../lib/budgetSystems';
+import { isApprovedBudgetLocked, type BudgetLockKind } from '../lib/maintenanceBudgetLock';
 import { validateMaintenanceCurrentKm } from '../lib/maintenanceKmValidation';
 import { budgetItemFromRow, calcBudgetSubtotal, type MaintenanceBudgetItemRow, BudgetItem } from '../lib/maintenanceMappers';
 import { openPrivateDocument, validateFile } from '../lib/storageHelpers';
@@ -61,7 +62,7 @@ interface MaintenanceFormProps {
   mode?: 'default' | 'workshop';
   blockedVehicleIds?: Set<string>;
   onClose: () => void;
-  onSave: (order: Partial<MaintenanceOrder>, budgetItems: BudgetItem[], budgetFile: File | null, pendingPartPhotos: PartPhotoDraft[]) => Promise<void>;
+  onSave: (order: Partial<MaintenanceOrder>, budgetItems: BudgetItem[], budgetFile: File | null, pendingPartPhotos: PartPhotoDraft[], budgetLock: BudgetLockKind | null) => Promise<void>;
 }
 
 interface VehicleOption { id: string; licensePlate: string; initialKm: number | null; }
@@ -264,6 +265,8 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
   };
 
   const discountsLocked = order?.budgetStatus === 'aprovado' || order?.budgetStatus === 'reprovado';
+  const budgetLocked = isApprovedBudgetLocked(order?.budgetStatus);
+  const budgetLock: BudgetLockKind | null = budgetLocked ? (isWorkshopMode ? 'workshop' : 'client') : null;
 
   const selectableVehicles = useMemo(
     () => (order ? vehicles : vehicles.filter((v) => !(blockedVehicleIds?.has(v.id)))),
@@ -272,14 +275,16 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (hasBudgetItemWithoutSystem(budgetItems)) {
+    if (!budgetLocked && hasBudgetItemWithoutSystem(budgetItems)) {
       setError('Selecione o sistema dos itens do orçamento ou use Outros.');
       return;
     }
-    const discountError = validateBudgetDiscounts(budgetItems, formData.budgetDiscount ?? 0);
-    if (discountError) {
-      setError(discountError);
-      return;
+    if (!budgetLocked) {
+      const discountError = validateBudgetDiscounts(budgetItems, formData.budgetDiscount ?? 0);
+      if (discountError) {
+        setError(discountError);
+        return;
+      }
     }
     if (isWorkshopMode) {
       // Modo Workshop: validar apenas os 5 campos obrigatórios
@@ -287,7 +292,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
         setError('Preencha todos os campos obrigatórios: Previsão de Saída, OS da Oficina, Mecânico Responsável e Km do Veículo.');
         return;
       }
-      if (!budgetFile && !existingBudgetPdfUrl) {
+      if (!budgetLocked && !budgetFile && !existingBudgetPdfUrl) {
         setError('O upload do orçamento em PDF é obrigatório.');
         return;
       }
@@ -312,7 +317,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
     setSaving(true);
     setError(null);
     try {
-      await onSave(formData, budgetItems, budgetFile, partPhotoDrafts);
+      await onSave(formData, budgetItems, budgetFile, partPhotoDrafts, budgetLock);
       handleClose();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao salvar. Tente novamente.');
@@ -418,32 +423,49 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
 
                   {/* Upload do orçamento (obrigatório para Workshop) */}
                   <div className="space-y-3">
-                    <div>
-                      <Label htmlFor="budgetPdf" required>PDF do Orçamento</Label>
-                      <input
-                        id="budgetPdf"
-                        type="file"
-                        accept="application/pdf,image/*"
-                        onChange={(e) => { void handleBudgetUpload(e); }}
-                        className="mt-1 block w-full cursor-pointer text-sm text-zinc-500 transition-colors file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100"
-                      />
-                      {existingBudgetPdfUrl && !budgetFile && (
-                        <button
-                          type="button"
-                          onClick={() => { void openPrivateDocument(existingBudgetPdfUrl, 'vehicle-documents'); }}
-                          className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                        >
-                          <FileText className="h-3 w-3" />
-                          Ver PDF atual
-                          <ExternalLink className="h-3 w-3" />
-                        </button>
-                      )}
-                      {budgetFile && (
-                        <p className="mt-1 text-xs text-zinc-500">
-                          Arquivo selecionado: {budgetFile.name}
-                        </p>
-                      )}
-                    </div>
+                    {budgetLocked ? (
+                      existingBudgetPdfUrl && (
+                        <div>
+                          <Label>PDF do Orçamento aprovado</Label>
+                          <button
+                            type="button"
+                            onClick={() => { void openPrivateDocument(existingBudgetPdfUrl, 'vehicle-documents'); }}
+                            className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                          >
+                            <FileText className="h-3 w-3" />
+                            Ver PDF atual
+                            <ExternalLink className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      <div>
+                        <Label htmlFor="budgetPdf" required>PDF do Orçamento</Label>
+                        <input
+                          id="budgetPdf"
+                          type="file"
+                          accept="application/pdf,image/*"
+                          onChange={(e) => { void handleBudgetUpload(e); }}
+                          className="mt-1 block w-full cursor-pointer text-sm text-zinc-500 transition-colors file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100"
+                        />
+                        {existingBudgetPdfUrl && !budgetFile && (
+                          <button
+                            type="button"
+                            onClick={() => { void openPrivateDocument(existingBudgetPdfUrl, 'vehicle-documents'); }}
+                            className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                          >
+                            <FileText className="h-3 w-3" />
+                            Ver PDF atual
+                            <ExternalLink className="h-3 w-3" />
+                          </button>
+                        )}
+                        {budgetFile && (
+                          <p className="mt-1 text-xs text-zinc-500">
+                            Arquivo selecionado: {budgetFile.name}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     {extractionWarning && (
                       <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
@@ -452,14 +474,28 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
                       </div>
                     )}
 
-                    <BudgetItemsTable
-                      items={budgetItems}
-                      onChange={setBudgetItems}
-                      extracting={extracting}
-                      orderDiscount={formData.budgetDiscount ?? 0}
-                      onOrderDiscountChange={(value) => setFormData(prev => ({ ...prev, budgetDiscount: value }))}
-                      discountsLocked={discountsLocked}
-                    />
+                    {budgetLocked ? (
+                      <>
+                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                          Orçamento aprovado — os itens, os descontos e o PDF não podem mais ser alterados. Registre a execução do serviço e anexe as fotos das peças.
+                        </div>
+
+                        <BudgetItemsTable
+                          items={budgetItems}
+                          readOnly
+                          orderDiscount={formData.budgetDiscount ?? 0}
+                        />
+                      </>
+                    ) : (
+                      <BudgetItemsTable
+                        items={budgetItems}
+                        onChange={setBudgetItems}
+                        extracting={extracting}
+                        orderDiscount={formData.budgetDiscount ?? 0}
+                        onOrderDiscountChange={(value) => setFormData(prev => ({ ...prev, budgetDiscount: value }))}
+                        discountsLocked={discountsLocked}
+                      />
+                    )}
 
                     {order?.id && user?.id && order.clientId && (
                       <PartPhotosSection
@@ -646,32 +682,49 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
 
                   {/* Upload de orçamento + tabela de itens */}
                   <div className="space-y-3">
-                    <div>
-                      <Label htmlFor="budgetPdf">PDF do Orçamento (Opcional)</Label>
-                      <input
-                        id="budgetPdf"
-                        type="file"
-                        accept="application/pdf,image/*"
-                        onChange={(e) => { void handleBudgetUpload(e); }}
-                        className="mt-1 block w-full cursor-pointer text-sm text-zinc-500 transition-colors file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100"
-                      />
-                      {existingBudgetPdfUrl && !budgetFile && (
-                        <button
-                          type="button"
-                          onClick={() => { void openPrivateDocument(existingBudgetPdfUrl, 'vehicle-documents'); }}
-                          className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                        >
-                          <FileText className="h-3 w-3" />
-                          Ver PDF atual
-                          <ExternalLink className="h-3 w-3" />
-                        </button>
-                      )}
-                      {budgetFile && (
-                        <p className="mt-1 text-xs text-zinc-500">
-                          Arquivo selecionado: {budgetFile.name}
-                        </p>
-                      )}
-                    </div>
+                    {budgetLocked ? (
+                      existingBudgetPdfUrl && (
+                        <div>
+                          <Label>PDF do Orçamento aprovado</Label>
+                          <button
+                            type="button"
+                            onClick={() => { void openPrivateDocument(existingBudgetPdfUrl, 'vehicle-documents'); }}
+                            className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                          >
+                            <FileText className="h-3 w-3" />
+                            Ver PDF atual
+                            <ExternalLink className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      <div>
+                        <Label htmlFor="budgetPdf">PDF do Orçamento (Opcional)</Label>
+                        <input
+                          id="budgetPdf"
+                          type="file"
+                          accept="application/pdf,image/*"
+                          onChange={(e) => { void handleBudgetUpload(e); }}
+                          className="mt-1 block w-full cursor-pointer text-sm text-zinc-500 transition-colors file:mr-3 file:rounded-lg file:border-0 file:bg-orange-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-orange-600 hover:file:bg-orange-100"
+                        />
+                        {existingBudgetPdfUrl && !budgetFile && (
+                          <button
+                            type="button"
+                            onClick={() => { void openPrivateDocument(existingBudgetPdfUrl, 'vehicle-documents'); }}
+                            className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                          >
+                            <FileText className="h-3 w-3" />
+                            Ver PDF atual
+                            <ExternalLink className="h-3 w-3" />
+                          </button>
+                        )}
+                        {budgetFile && (
+                          <p className="mt-1 text-xs text-zinc-500">
+                            Arquivo selecionado: {budgetFile.name}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     {extractionWarning && (
                       <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
@@ -680,14 +733,28 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
                       </div>
                     )}
 
-                    <BudgetItemsTable
-                      items={budgetItems}
-                      onChange={setBudgetItems}
-                      extracting={extracting}
-                      orderDiscount={formData.budgetDiscount ?? 0}
-                      onOrderDiscountChange={(value) => setFormData(prev => ({ ...prev, budgetDiscount: value }))}
-                      discountsLocked={discountsLocked}
-                    />
+                    {budgetLocked ? (
+                      <>
+                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                          Orçamento aprovado — os itens, os descontos e o PDF não podem mais ser alterados por nenhum perfil. Os demais campos da OS continuam editáveis.
+                        </div>
+
+                        <BudgetItemsTable
+                          items={budgetItems}
+                          readOnly
+                          orderDiscount={formData.budgetDiscount ?? 0}
+                        />
+                      </>
+                    ) : (
+                      <BudgetItemsTable
+                        items={budgetItems}
+                        onChange={setBudgetItems}
+                        extracting={extracting}
+                        orderDiscount={formData.budgetDiscount ?? 0}
+                        onOrderDiscountChange={(value) => setFormData(prev => ({ ...prev, budgetDiscount: value }))}
+                        discountsLocked={discountsLocked}
+                      />
+                    )}
                   </div>
 
                   {/* Mecânico Responsável */}
@@ -759,7 +826,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
               disabled={saving || loadingOptions || extracting}
               className="flex min-w-[120px] items-center justify-center rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : isWorkshopMode ? 'Enviar Orçamento' : order ? 'Salvar Edição' : 'Criar Manutenção'}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : isWorkshopMode ? (budgetLocked ? 'Salvar Alterações' : 'Enviar Orçamento') : order ? 'Salvar Edição' : 'Criar Manutenção'}
             </button>
           </div>
         </div>

@@ -10,7 +10,7 @@ vi.mock('../lib/supabase', () => ({
   },
 }));
 
-import { getMaintenanceBudgetApprovalDetails } from './maintenanceService';
+import { getMaintenanceBudgetApprovalDetails, saveMaintenanceOrder } from './maintenanceService';
 
 function orderQuery(data: unknown, error: unknown = null) {
   return {
@@ -112,5 +112,152 @@ describe('getMaintenanceBudgetApprovalDetails', () => {
     });
 
     await expect(getMaintenanceBudgetApprovalDetails('mo-4')).rejects.toBeTruthy();
+  });
+});
+
+describe('saveMaintenanceOrder — orçamento aprovado', () => {
+  function mockSupabase() {
+    const orderUpdate = vi.fn((_payload: Record<string, unknown>) => ({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }));
+    const itemsDelete = vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }));
+    const itemsInsert = vi.fn((_rows: Record<string, unknown>[]) => Promise.resolve({ error: null }));
+
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'maintenance_orders') return { update: orderUpdate };
+      if (table === 'maintenance_budget_items') return { delete: itemsDelete, insert: itemsInsert };
+      throw new Error(`Tabela inesperada: ${table}`);
+    });
+
+    return { orderUpdate, itemsDelete, itemsInsert };
+  }
+
+  const approvedOrderData = {
+    id: 'os-1',
+    clientId: 'c1',
+    vehicleId: 'v1',
+    workshopId: 'w1',
+    entryDate: '2026-08-20',
+    expectedExitDate: '2026-08-30',
+    type: 'Preventiva' as const,
+    status: 'Serviço em execução' as const,
+    description: 'Troca de pastilhas',
+    notes: 'Observação interna',
+    workshopOs: 'OS-9',
+    mechanicName: 'Paulo',
+    currentKm: 92000,
+    estimatedCost: 350,
+    approvedCost: 350,
+    budgetDiscount: 50,
+  };
+
+  const item = { itemName: 'Pastilha', system: 'freios', quantity: 2, value: 100, discount: 0, sortOrder: 0 };
+
+  beforeEach(() => {
+    fromMock.mockReset();
+  });
+
+  it('com a oficina travada grava só os campos operacionais e não toca nos itens', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    const orderId = await saveMaintenanceOrder({
+      data: approvedOrderData,
+      budgetItems: [item],
+      budgetFile: null,
+      profileId: 'p1',
+      budgetLock: 'workshop',
+    });
+
+    expect(orderId).toBe('os-1');
+    expect(fromMock).toHaveBeenCalledWith('maintenance_orders');
+    expect(fromMock).not.toHaveBeenCalledWith('maintenance_budget_items');
+    expect(orderUpdate).toHaveBeenCalledTimes(1);
+
+    const payload = orderUpdate.mock.calls[0][0];
+    expect(Object.keys(payload).sort()).toEqual([
+      'current_km',
+      'expected_exit_date',
+      'mechanic_name',
+      'workshop_os_number',
+    ]);
+    expect(payload).toEqual({
+      expected_exit_date: '2026-08-30',
+      workshop_os_number: 'OS-9',
+      mechanic_name: 'Paulo',
+      current_km: 92000,
+    });
+  });
+
+  it('sem trava mantém a substituição de itens', async () => {
+    const { itemsDelete, itemsInsert } = mockSupabase();
+
+    await saveMaintenanceOrder({
+      data: approvedOrderData,
+      budgetItems: [item],
+      budgetFile: null,
+      profileId: 'p1',
+    });
+
+    expect(fromMock).toHaveBeenCalledWith('maintenance_budget_items');
+    expect(itemsDelete).toHaveBeenCalledTimes(1);
+    expect(itemsInsert).toHaveBeenCalledTimes(1);
+    expect(itemsInsert.mock.calls[0][0][0]).toMatchObject({
+      maintenance_order_id: 'os-1',
+      item_name: 'Pastilha',
+      quantity: 2,
+      value: 100,
+    });
+  });
+
+  it('com o cliente travado grava o resto da OS, mas nenhuma coluna de orçamento', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    const orderId = await saveMaintenanceOrder({
+      data: approvedOrderData,
+      budgetItems: [item],
+      budgetFile: null,
+      profileId: 'p1',
+      budgetLock: 'client',
+    });
+
+    expect(orderId).toBe('os-1');
+    expect(fromMock).not.toHaveBeenCalledWith('maintenance_budget_items');
+    expect(orderUpdate).toHaveBeenCalledTimes(1);
+
+    const payload = orderUpdate.mock.calls[0][0];
+    // O que o cliente continua podendo gravar numa OS aprovada
+    expect(payload).toMatchObject({
+      status: 'Serviço em execução',
+      description: 'Troca de pastilhas',
+      notes: 'Observação interna',
+      mechanic_name: 'Paulo',
+      current_km: 92000,
+      expected_exit_date: '2026-08-30',
+    });
+    // O que nunca pode ser reescrito
+    expect(payload).not.toHaveProperty('budget_discount');
+    expect(payload).not.toHaveProperty('estimated_cost');
+    expect(payload).not.toHaveProperty('approved_cost');
+    expect(payload).not.toHaveProperty('budget_status');
+    expect(payload).not.toHaveProperty('budget_pdf_url');
+  });
+
+  it('com o cliente travado ignora um PDF novo em vez de reabrir a aprovação', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    await saveMaintenanceOrder({
+      data: approvedOrderData,
+      budgetItems: [item],
+      budgetFile: new File(['x'], 'novo-orcamento.pdf', { type: 'application/pdf' }),
+      profileId: 'p1',
+      budgetLock: 'client',
+    });
+
+    // Uma única escrita, sem o update que devolveria a OS para 'Aguardando aprovação'
+    expect(orderUpdate).toHaveBeenCalledTimes(1);
+    expect(orderUpdate.mock.calls[0][0]).not.toHaveProperty('budget_status');
+    expect(fromMock).not.toHaveBeenCalledWith('maintenance_budget_items');
   });
 });
