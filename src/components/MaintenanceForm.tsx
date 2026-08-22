@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { extractBudgetData } from '../lib/budgetOcr';
 import { isKnownBudgetSystem } from '../lib/budgetSystems';
 import { isApprovedBudgetLocked, type BudgetLockKind } from '../lib/maintenanceBudgetLock';
+import { canReopenBudget, isBudgetDiscountLocked, isBudgetUnderRevision } from '../lib/maintenanceBudgetReopen';
 import { validateMaintenanceCurrentKm } from '../lib/maintenanceKmValidation';
 import { budgetItemFromRow, calcBudgetSubtotal, type MaintenanceBudgetItemRow, BudgetItem } from '../lib/maintenanceMappers';
 import { openPrivateDocument, validateFile } from '../lib/storageHelpers';
@@ -63,6 +64,8 @@ interface MaintenanceFormProps {
   blockedVehicleIds?: Set<string>;
   onClose: () => void;
   onSave: (order: Partial<MaintenanceOrder>, budgetItems: BudgetItem[], budgetFile: File | null, pendingPartPhotos: PartPhotoDraft[], budgetLock: BudgetLockKind | null) => Promise<void>;
+  /** A página é que abre o modal de justificativa da reabertura de orçamento. */
+  onRequestReopen?: () => void;
 }
 
 interface VehicleOption { id: string; licensePlate: string; initialKm: number | null; }
@@ -70,7 +73,7 @@ interface WorkshopOption { id: string; name: string; }
 interface WarrantyEventOption { id: string; sequence: number; label: string; targetKm: number; }
 type VehicleMaxKmRpcResult = number | null;
 
-export default function MaintenanceForm({ order, prefill, mode = 'default', blockedVehicleIds, onClose, onSave }: MaintenanceFormProps) {
+export default function MaintenanceForm({ order, prefill, mode = 'default', blockedVehicleIds, onClose, onSave, onRequestReopen }: MaintenanceFormProps) {
   const { user, currentClient } = useAuth();
   const isWorkshopMode = mode === 'workshop';
 
@@ -264,8 +267,10 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
     return items.some(item => item.itemName.trim().length > 0 && !isKnownBudgetSystem(item.system));
   };
 
-  const discountsLocked = order?.budgetStatus === 'aprovado' || order?.budgetStatus === 'reprovado';
+  const discountsLocked = isBudgetDiscountLocked(order?.budgetStatus);
   const budgetLocked = isApprovedBudgetLocked(order?.budgetStatus);
+  const budgetUnderRevision = isBudgetUnderRevision(order?.budgetStatus);
+  const canReopen = !isWorkshopMode && canReopenBudget(order?.budgetStatus, user?.role, false);
   const budgetLock: BudgetLockKind | null = budgetLocked ? (isWorkshopMode ? 'workshop' : 'client') : null;
 
   const selectableVehicles = useMemo(
@@ -733,6 +738,12 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
                       </div>
                     )}
 
+                    {budgetUnderRevision && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        Orçamento reaberto para revisão. Ao salvar com os itens e o PDF preenchidos, ele volta para a fila de aprovação.
+                      </div>
+                    )}
+
                     {budgetLocked ? (
                       <>
                         <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
@@ -813,6 +824,15 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
             </p>
           )}
           <div className="flex justify-end gap-3">
+            {canReopen && (
+              <button
+                type="button"
+                onClick={() => { onRequestReopen?.(); handleClose(); }}
+                className="mr-auto rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-50"
+              >
+                Reabrir orçamento
+              </button>
+            )}
             <button
               type="button"
               onClick={handleClose}

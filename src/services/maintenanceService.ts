@@ -1,10 +1,11 @@
 import { normalizeBudgetSystem } from '../lib/budgetSystems';
 import { type BudgetLockKind } from '../lib/maintenanceBudgetLock';
+import { shouldResubmitReopenedBudget } from '../lib/maintenanceBudgetReopen';
 import { budgetItemFromRow } from '../lib/maintenanceMappers';
 import { uploadMaintenanceBudget } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 
-import type { MaintenanceOrder, BudgetItem, MaintenanceBudgetItemRow } from '../types/maintenance';
+import type { MaintenanceOrder, BudgetItem, BudgetStatus, MaintenanceBudgetItemRow } from '../types/maintenance';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,8 @@ export interface SaveMaintenancePayload {
    * campos operacionais; 'client' grava todo o resto da OS.
    */
   budgetLock?: BudgetLockKind;
+  /** Estado do orçamento ANTES deste salvamento — usado para o reenvio de OS reaberta. */
+  currentBudgetStatus?: BudgetStatus;
 }
 
 export interface MaintenanceBudgetApprovalDetails {
@@ -52,7 +55,7 @@ export function generateOSNumber(): string {
 export async function saveMaintenanceOrder(
   payload: SaveMaintenancePayload,
 ): Promise<string> {
-  const { data, budgetItems, budgetFile, profileId, currentClientId, budgetLock } = payload;
+  const { data, budgetItems, budgetFile, profileId, currentClientId, budgetLock, currentBudgetStatus } = payload;
 
   // Orçamento aprovado: a oficina só registra a execução do serviço. Nenhuma
   // coluna de orçamento é enviada e os itens não são tocados.
@@ -164,6 +167,21 @@ export async function saveMaintenanceOrder(
         .insert(rows);
       if (error) throw error;
     }
+  }
+
+  // Orçamento reaberto: com itens e PDF presentes, o salvamento devolve a OS
+  // para a fila de aprovação.
+  const resubmit = shouldResubmitReopenedBudget({
+    budgetStatus: currentBudgetStatus,
+    hasSignificantItems,
+    hasBudgetPdf: Boolean(budgetFile) || Boolean(data.budgetPdfUrl),
+  });
+  if (resubmit) {
+    const { error } = await supabase
+      .from('maintenance_orders')
+      .update({ budget_status: 'pendente', status: 'Aguardando aprovação' })
+      .eq('id', orderId);
+    if (error) throw error;
   }
 
   const finalBudgetDiscount = data.budgetDiscount ?? 0;

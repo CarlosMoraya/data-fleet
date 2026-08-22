@@ -13,6 +13,7 @@ export const BUDGET_STATUS_FILTER_OPTIONS: { value: BudgetStatus; label: string 
   { value: 'pendente', label: 'Aguardando Aprovação' },
   { value: 'aprovado', label: 'Aprovado' },
   { value: 'reprovado', label: 'Reprovado' },
+  { value: 'reaberto', label: 'Reaberto' },
 ];
 
 function normalizeName(value?: string): string | null {

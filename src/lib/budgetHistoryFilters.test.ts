@@ -27,15 +27,16 @@ const ALL: Row[] = [
   row({ budgetStatus: 'aprovado', os: 'OS-002', licensePlate: 'ABC1D23', workshopOs: '99999' }),
   row({ budgetStatus: 'reprovado', os: 'OS-003', licensePlate: 'XYZ9K88', workshopOs: '77777', workshop: 'Oficina Norte' }),
   row({ budgetStatus: 'reprovado', os: 'OS-004', licensePlate: 'DEF2G34', workshopOs: '88888', workshop: 'Oficina Norte' }),
+  row({ budgetStatus: 'reaberto', os: 'OS-005', licensePlate: 'GHI3J45', workshopOs: '66666', workshop: 'Oficina Norte' }),
 ];
 
 const EMPTY: BudgetHistoryFilters = { decision: '', workshop: '', search: '' };
 
 describe('BUDGET_DECISION_OPTIONS', () => {
-  it('contém exatamente 2 entradas com rótulos vindos de BUDGET_STATUS_FILTER_OPTIONS', () => {
-    expect(BUDGET_DECISION_OPTIONS).toHaveLength(2);
-    expect(BUDGET_DECISION_OPTIONS.map(o => o.value)).toEqual(['aprovado', 'reprovado']);
-    expect(BUDGET_DECISION_OPTIONS.map(o => o.label)).toEqual(['Aprovado', 'Reprovado']);
+  it('contém exatamente 3 entradas com rótulos vindos de BUDGET_STATUS_FILTER_OPTIONS', () => {
+    expect(BUDGET_DECISION_OPTIONS).toHaveLength(3);
+    expect(BUDGET_DECISION_OPTIONS.map(o => o.value)).toEqual(['aprovado', 'reprovado', 'reaberto']);
+    expect(BUDGET_DECISION_OPTIONS.map(o => o.label)).toEqual(['Aprovado', 'Reprovado', 'Reaberto']);
   });
 });
 
@@ -43,6 +44,11 @@ describe('applyBudgetHistoryFilters', () => {
   it('cenário feliz: decision reprovado devolve só as 2 reprovadas', () => {
     const out = applyBudgetHistoryFilters(ALL, { ...EMPTY, decision: 'reprovado' });
     expect(out.map(o => o.os)).toEqual(['OS-003', 'OS-004']);
+  });
+
+  it('decision reaberto devolve só a OS reaberta', () => {
+    const out = applyBudgetHistoryFilters(ALL, { ...EMPTY, decision: 'reaberto' });
+    expect(out.map(o => o.os)).toEqual(['OS-005']);
   });
 
   it('filtros combinados (decisão + oficina + busca) reduzem corretamente', () => {

@@ -167,6 +167,15 @@ describe('applyMaintenanceListFilters — budgetStatuses', () => {
     expect(result.map(o => o.id)).toEqual(['1', '2']);
   });
 
+  it('filtra por "Reaberto" e devolve só as OS reabertas', () => {
+    const withReopened = [
+      ...budgetOrders,
+      { ...makeBudgetOrder({ budgetStatus: 'reaberto' }), id: '5' },
+    ] as typeof budgetOrders;
+    const result = applyMaintenanceListFilters(withReopened, { statuses: [], shippers: [], operationalUnits: [], workshops: [], budgetStatuses: ['Reaberto'] });
+    expect(result.map(o => o.id)).toEqual(['5']);
+  });
+
   it('undefined budgetStatus is treated as "Sem Orçamento"', () => {
     const result = applyMaintenanceListFilters(budgetOrders, { statuses: [], shippers: [], operationalUnits: [], workshops: [], budgetStatuses: ['Sem Orçamento'] });
     expect(result.map(o => o.id)).toEqual(['4']);

@@ -57,6 +57,15 @@ describe('buildBudgetHistoryExportCells', () => {
     expect(cells[BUDGET_HISTORY_EXPORT_HEADERS.indexOf('Motivo da Reprovação')]).toBe('Valor acima do praticado');
   });
 
+  it('cenário reaberto: decisão Reaberto e Valor Aprovado vazio', () => {
+    const cells = buildBudgetHistoryExportCells(
+      makeOrder({ budgetStatus: 'reaberto', approvedCost: undefined }),
+    );
+
+    expect(cells[BUDGET_HISTORY_EXPORT_HEADERS.indexOf('Decisão')]).toBe('Reaberto');
+    expect(cells[BUDGET_HISTORY_EXPORT_HEADERS.indexOf('Valor Aprovado')]).toBe('');
+  });
+
   it('edge case: budgetDiscount=0 e approvedCost undefined → ambas vazias', () => {
     const cells = buildBudgetHistoryExportCells(
       makeOrder({ budgetDiscount: 0, approvedCost: undefined }),

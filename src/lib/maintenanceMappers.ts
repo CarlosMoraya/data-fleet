@@ -1,6 +1,8 @@
 import {
   MaintenanceOrder,
   BudgetItem,
+  BudgetReviewDecision,
+  BudgetReviewEvent,
   MaintenanceOrderRow,
   MaintenanceBudgetItemRow,
   MaintenancePartPhoto,
@@ -12,6 +14,8 @@ import { normalizeBudgetSystem } from './budgetSystems';
 // Re-export para compatibilidade com código que importa daqui
 export type {
   BudgetItem,
+  BudgetReviewDecision,
+  BudgetReviewEvent,
   MaintenanceBudgetItemRow,
   MaintenanceOrderRow,
   MaintenancePartPhoto,
@@ -29,6 +33,30 @@ export function budgetItemFromRow(row: MaintenanceBudgetItemRow): BudgetItem {
     value: Number(row.value),
     discount: Number(row.discount ?? 0),
     sortOrder: row.sort_order,
+  };
+}
+
+export interface MaintenanceBudgetReviewRow {
+  id: string;
+  maintenance_order_id: string;
+  decision: BudgetReviewDecision;
+  reason: string | null;
+  budget_total: number | string | null;
+  decided_at: string;
+  decided_by_profile?: { name: string } | null;
+}
+
+export function budgetReviewFromRow(row: MaintenanceBudgetReviewRow): BudgetReviewEvent {
+  return {
+    id: row.id,
+    maintenanceOrderId: row.maintenance_order_id,
+    decision: row.decision,
+    reason: row.reason ?? undefined,
+    budgetTotal: row.budget_total !== null && row.budget_total !== undefined
+      ? Number(row.budget_total)
+      : undefined,
+    decidedByName: row.decided_by_profile?.name ?? undefined,
+    decidedAt: row.decided_at,
   };
 }
 

@@ -24,6 +24,7 @@ import {
 import { openPrivateDocument } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
+import { recordBudgetReview } from '../services/maintenanceBudgetReviewService';
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 
 import type { User } from '../types';
@@ -48,6 +49,7 @@ export function canApprove(
 
 interface PendingOrder {
   id: string;
+  clientId?: string;
   os: string;
   vehicleId?: string;
   licensePlate: string;
@@ -242,7 +244,7 @@ export default function BudgetApprovals({ embedded = false }: BudgetApprovalsPro
       let query = supabase
         .from('maintenance_orders')
         .select(`
-          id, os_number, entry_date, workshop_os_number, current_km,
+          id, client_id, os_number, entry_date, workshop_os_number, current_km,
           budget_pdf_url, created_at, vehicle_id, budget_discount,
           vehicles(license_plate),
           workshops(name),
@@ -259,7 +261,7 @@ export default function BudgetApprovals({ embedded = false }: BudgetApprovalsPro
       if (error) throw error;
 
       type OrderQueryRow = {
-        id: string; os_number: string; entry_date: string; workshop_os_number: string | null;
+        id: string; client_id: string | null; os_number: string; entry_date: string; workshop_os_number: string | null;
         current_km: number | null; budget_pdf_url: string | null; created_at: string;
         vehicle_id: string | null; budget_discount: number | null;
         vehicles: { license_plate: string } | null;
@@ -268,6 +270,7 @@ export default function BudgetApprovals({ embedded = false }: BudgetApprovalsPro
       };
       return (data as unknown as OrderQueryRow[]).map((row) => ({
         id: row.id,
+        clientId: row.client_id ?? undefined,
         os: row.os_number,
         vehicleId: row.vehicle_id ?? undefined,
         licensePlate: row.vehicles?.license_plate ?? 'N/A',
@@ -338,6 +341,19 @@ export default function BudgetApprovals({ embedded = false }: BudgetApprovalsPro
         })
         .eq('id', id);
       if (error) throw error;
+
+      // Livro-razão de decisões: aprovação e reprovação passam a ficar
+      // registradas com autor, motivo e valor.
+      const clientId = currentClient?.id ?? orders.find(o => o.id === id)?.clientId;
+      if (!clientId) throw new Error('Não foi possível identificar o cliente da OS.');
+      await recordBudgetReview({
+        maintenanceOrderId: id,
+        clientId,
+        decision: approve ? 'aprovado' : 'reprovado',
+        reason: approve ? undefined : reason,
+        budgetTotal: approve ? total : undefined,
+        profileId: user!.id,
+      });
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });

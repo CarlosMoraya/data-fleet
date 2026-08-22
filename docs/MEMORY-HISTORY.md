@@ -2,6 +2,29 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-08-22: Reabertura de orçamento reprovado, com justificativa obrigatória e livro-razão de decisões
+
+Implementado o escopo fechado de `IMPLEMENTATION.md`. `budget_status` ganhou o quarto valor **`reaberto`** e o módulo de Manutenção passou a permitir que papéis do cliente devolvam um orçamento **reprovado** ao estado editável, mediante justificativa obrigatória, sem tocar em nada do comportamento de orçamento aprovado.
+
+**Padrões aplicados:**
+- *Audit Trail / Append-only Event Log*: `public.maintenance_budget_reviews` registra toda decisão de orçamento (`aprovado`, `reprovado`, `reaberto`) com autor, motivo, valor e timestamp. Imutável por duas defesas independentes — ausência de policy de `UPDATE`/`DELETE` e o gatilho `trg_budget_reviews_append_only`, que levanta `BUDGET_REVIEW_LEDGER_IS_APPEND_ONLY`. O histórico da reprovação anterior permanece visível depois de qualquer número de reaberturas, que era o requisito central do usuário.
+- *Explicit State Machine*: as transições válidas vivem em funções puras em `src/lib/maintenanceBudgetReopen.ts` (`canReopenBudget`, `isBudgetUnderRevision`, `shouldResubmitReopenedBudget`, `isBudgetDiscountLocked`), no mesmo espírito de `canTransitionStatus` em `paymentInstallments.ts` — nenhuma regra espalhada em condicional de UI.
+- *Defense in Depth*: a regra "só `reprovado` vira `reaberto`" existe na UI (`canReopenBudget` esconde a ação), no serviço (`reopenRejectedBudget` relê `budget_status` no banco antes de escrever) e no banco (`trg_guard_budget_reopen`, redundante em relação a `trg_lock_approved_budget_order_columns` de propósito).
+- *Allowlist literal de papéis*: `BUDGET_REOPEN_ROLES` espelha, palavra por palavra, a allowlist da policy de `INSERT` do ledger, acrescida de `'Admin Master'`. Sem rank.
+
+**Fluxo entregue:** ícone `Undo2` "Reabrir orçamento" na linha da OS reprovada e botão equivalente no rodapé do formulário de edição (o formulário só sinaliza; quem abre o modal é a página, sem duplicar o modal). O modal exibe o motivo da reprovação anterior e mantém "Confirmar reabertura" desabilitado enquanto a justificativa estiver vazia. Ao confirmar, `reopenRejectedBudget` grava o evento no ledger **antes** de qualquer escrita na OS — ordenamento obrigatório, para que uma falha parcial nunca perca o histórico — e só então move a OS para `budget_status = 'reaberto'`, `status = 'Aguardando orçamento'`, `budget_rejection_reason = NULL`. O salvamento seguinte, com itens significativos **e** PDF presentes, devolve a OS para `Aguardando aprovação`.
+
+**Correção deliberada de comportamento:** `MaintenanceForm.tsx` travava os campos de desconto tanto em `aprovado` quanto em `reprovado`. O segundo caso contradizia a decisão vigente de que o reenvio é permitido enquanto o orçamento não estiver aprovado — `isBudgetDiscountLocked` agora só trava `aprovado`.
+
+**Decisões que não devem ser "corrigidas" por sessões futuras:** quarto estado explícito em vez de reaproveitar `pendente` (sem ele o salvamento não distinguiria "reaberto que deve voltar à fila" de "OS deliberadamente deixada em Aguardando orçamento"); livro-razão em vez de colunas na OS (colunas seriam sobrescritas na segunda reabertura); reabrir devolve ao estado editável e não direto à fila; reabertura exclusiva de papéis do cliente — a oficina propõe, não decide, e mantém o reenvio por upload de PDF; backfill aditivo e idempotente que **não** altera `approved_cost`; a ação chama-se "Reabrir orçamento" com ícone `Undo2` para não colidir com o "Reabrir (nova OS)" de OS cancelada, que usa `RotateCcw` e ficou intocado.
+
+**Segurança:** a separação de papéis vive no backend, não só na UI — a policy de `INSERT` do ledger não inclui `Workshop`, e `trg_enforce_workshop_maintenance_columns` já recusava qualquer `budget_status` diferente de `'pendente'` vindo daquele papel. A justificativa é validada em três camadas. Riscos aceitos registrados em `docs/MEMORY.md`: nome de quem reabriu exibido em tela e o escape hatch `auth.uid() IS NULL` dos gatilhos de orçamento aprovado (`fn_guard_budget_reopen` não tem esse escape). As falhas de RLS (`42501`), de CHECK (`23514`) e dos gatilhos (`P0001`) são traduzidas por `describeReopenError` em `Maintenance.tsx`; nenhum erro é engolido em silêncio.
+
+**Desvios do plano, com motivo:** três arquivos de teste fora da lista do `IMPLEMENTATION.md` precisaram ser tocados, todos por consequência direta das mudanças especificadas — `src/services/budgetHistoryService.test.ts` afirmava o `.in('budget_status', ['aprovado','reprovado'])` antigo e falhava; `src/pages/BudgetApprovals.test.tsx` e `src/components/financeiro/BudgetHistoryTab.test.tsx` não tinham branch de mock para `maintenance_budget_reviews`, e passariam em falso verde exercitando o caminho de erro. Além disso, o comando de E2E da oficina no plano vinha com `--project=chromium`, projeto que ignora `role-workshop`; o correto é `--project=workshop`.
+
+**Validação automatizada:** `npx tsc --noEmit` com 0 erros; `npm run lint` com 0 erros (264 warnings, todos do padrão pré-existente do repositório); `npm run test:unit` com **216 arquivos e 1.972 testes passando, 0 falhando** (1.925 anteriores + 47 novos); `npm run test:smoke` 7/7; `role-workshop.spec.ts` 6/6 sob `--project=workshop`, sem regressão frente ao baseline. A migration **não foi aplicada** — o agente não aplica migrations; a aplicação em DEV, a consulta de conferência da Etapa 8.1 e os 10 passos de validação manual da Etapa 8.2 permanecem pendentes.
+
+
 ## Arquivamento — 2026-08-20
 
 ### Sessão — 2026-08-20: Data da última rota do veículo na listagem de Manutenção

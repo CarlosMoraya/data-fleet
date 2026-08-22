@@ -66,6 +66,8 @@ const orderRows = [
 ];
 
 const updateMock = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+// Livro-razão de decisões de orçamento: toda aprovação/reprovação grava uma linha.
+const reviewInsertMock = vi.fn().mockResolvedValue({ error: null });
 
 beforeEach(() => {
   container = document.createElement('div');
@@ -75,6 +77,7 @@ beforeEach(() => {
   fromMock.mockReset();
   rpcMock.mockReset();
   updateMock.mockReset().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+  reviewInsertMock.mockReset().mockResolvedValue({ error: null });
 
   fromMock.mockImplementation((table: string) => {
     if (table === 'maintenance_orders') {
@@ -97,6 +100,9 @@ beforeEach(() => {
           }),
         }),
       };
+    }
+    if (table === 'maintenance_budget_reviews') {
+      return { insert: reviewInsertMock };
     }
     throw new Error(`unexpected table: ${table}`);
   });
@@ -248,6 +254,13 @@ describe('BudgetApprovals — motivo de reprovação', () => {
         budget_rejection_reason: 'Valor acima do combinado',
       }),
     );
+    expect(reviewInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        decision: 'reprovado',
+        reason: 'Valor acima do combinado',
+        decided_by: 'user-1',
+      }),
+    );
   });
 });
 
@@ -347,7 +360,10 @@ describe('BudgetApprovals — desconto e total líquido', () => {
           }),
         };
       }
-      throw new Error(`unexpected table: ${table}`);
+      if (table === 'maintenance_budget_reviews') {
+      return { insert: reviewInsertMock };
+    }
+    throw new Error(`unexpected table: ${table}`);
     });
 
     const root = createRoot(container);

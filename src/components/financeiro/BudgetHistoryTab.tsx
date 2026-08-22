@@ -21,9 +21,10 @@ import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { XlsxBudgetHistoryProvider } from '../../services/budgetHistoryExport/xlsxBudgetHistoryProvider';
 import { listReviewedBudgets } from '../../services/budgetHistoryService';
+import { listBudgetReviewEvents } from '../../services/maintenanceBudgetReviewService';
 import BudgetItemsTable from '../BudgetItemsTable';
 
-import type { MaintenanceOrder } from '../../types/maintenance';
+import type { BudgetReviewEvent, MaintenanceOrder } from '../../types/maintenance';
 
 function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -57,6 +58,19 @@ function HistoryRow({ order }: HistoryRowProps) {
 
   const isApproved = order.budgetStatus === 'aprovado';
   const isRejected = order.budgetStatus === 'reprovado';
+  const isReopened = order.budgetStatus === 'reaberto';
+
+  // Linha do tempo de decisões: só é buscada quando a linha está expandida,
+  // para não disparar uma query por linha da tabela.
+  const {
+    data: reviewEvents = [],
+    isLoading: loadingEvents,
+    isError: eventsError,
+  } = useQuery<BudgetReviewEvent[]>({
+    queryKey: ['budgetReviews', order.id],
+    queryFn: () => listBudgetReviewEvents(order.id),
+    enabled: expanded,
+  });
 
   return (
     <>
@@ -91,6 +105,7 @@ function HistoryRow({ order }: HistoryRowProps) {
               'rounded-full px-2 py-0.5 text-xs font-medium',
               isApproved && 'bg-green-100 text-green-700',
               isRejected && 'bg-red-100 text-red-700',
+              isReopened && 'bg-amber-100 text-amber-700',
             )}
           >
             {decisionLabel(order.budgetStatus)}
@@ -116,6 +131,36 @@ function HistoryRow({ order }: HistoryRowProps) {
         <tr className="border-b border-zinc-100 bg-zinc-50">
           <td colSpan={10} className="px-6 py-4">
             <div className="space-y-3">
+              <div className="rounded-lg border border-zinc-200 bg-white p-3">
+                <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Histórico de decisões</p>
+                {eventsError ? (
+                  <p className="text-sm text-red-600">Não foi possível carregar o histórico de decisões desta OS.</p>
+                ) : loadingEvents ? (
+                  <p className="text-sm text-zinc-400">Carregando histórico de decisões...</p>
+                ) : reviewEvents.length === 0 ? (
+                  <p className="text-sm text-zinc-400">Sem decisões registradas.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {reviewEvents.map(event => (
+                      <li key={event.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                        <span className="text-zinc-500">{formatDate(event.decidedAt)}</span>
+                        <span
+                          className={cn(
+                            'rounded-full px-2 py-0.5 text-xs font-medium',
+                            event.decision === 'aprovado' && 'bg-green-100 text-green-700',
+                            event.decision === 'reprovado' && 'bg-red-100 text-red-700',
+                            event.decision === 'reaberto' && 'bg-amber-100 text-amber-700',
+                          )}
+                        >
+                          {decisionLabel(event.decision)}
+                        </span>
+                        <span className="text-zinc-700">{event.decidedByName ?? '—'}</span>
+                        {event.reason && <span className="text-zinc-500">— {event.reason}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               {isRejected && order.budgetRejectionReason && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                   <span className="font-medium">Motivo da reprovação:</span>{' '}

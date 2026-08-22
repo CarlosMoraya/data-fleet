@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 
-import { budgetItemFromRow, maintenanceFromRow } from './maintenanceMappers';
+import { budgetItemFromRow, budgetReviewFromRow, maintenanceFromRow } from './maintenanceMappers';
+
+import type { MaintenanceBudgetReviewRow } from './maintenanceMappers';
 
 import type { MaintenanceBudgetItemRow, MaintenanceOrderRow } from '../types/maintenance';
 
@@ -180,5 +182,58 @@ describe('maintenanceFromRow — vehicleModel', () => {
   it('returns undefined when vehicles is missing', () => {
     const row = makeMaintenanceRow({ vehicles: undefined });
     expect(maintenanceFromRow(row).vehicleModel).toBeUndefined();
+  });
+});
+
+describe('budgetReviewFromRow', () => {
+  function makeReviewRow(over: Partial<MaintenanceBudgetReviewRow> = {}): MaintenanceBudgetReviewRow {
+    return {
+      id: 'rev-1',
+      maintenance_order_id: 'mo-1',
+      decision: 'reprovado',
+      reason: 'Valor acima do praticado',
+      budget_total: 1370,
+      decided_at: '2026-08-22T10:00:00Z',
+      decided_by_profile: { name: 'Data Stack' },
+      ...over,
+    };
+  }
+
+  it('cenário feliz: linha completa de reprovação vira evento com motivo e autor', () => {
+    const event = budgetReviewFromRow(makeReviewRow());
+
+    expect(event).toEqual({
+      id: 'rev-1',
+      maintenanceOrderId: 'mo-1',
+      decision: 'reprovado',
+      reason: 'Valor acima do praticado',
+      budgetTotal: 1370,
+      decidedByName: 'Data Stack',
+      decidedAt: '2026-08-22T10:00:00Z',
+    });
+  });
+
+  it('edge case: reason e decided_by_profile nulos viram undefined sem lançar', () => {
+    const event = budgetReviewFromRow(
+      makeReviewRow({ decision: 'aprovado', reason: null, decided_by_profile: null, budget_total: null }),
+    );
+
+    expect(event.reason).toBeUndefined();
+    expect(event.decidedByName).toBeUndefined();
+    expect(event.budgetTotal).toBeUndefined();
+    expect(event.decision).toBe('aprovado');
+  });
+
+  it('edge case: budget_total em string vira número', () => {
+    const event = budgetReviewFromRow(makeReviewRow({ budget_total: '1370.00' }));
+    expect(event.budgetTotal).toBe(1370);
+  });
+
+  it('mapeia a decisão reaberto', () => {
+    const event = budgetReviewFromRow(
+      makeReviewRow({ decision: 'reaberto', reason: 'Oficina revisou o valor' }),
+    );
+    expect(event.decision).toBe('reaberto');
+    expect(event.reason).toBe('Oficina revisou o valor');
   });
 });
