@@ -85,9 +85,18 @@ beforeEach(() => {
   fromMock.mockReset();
   listMock.mockReset();
 
-  // Items query for expanded rows returns empty by default.
+  // Items query and budget-review ledger for expanded rows return empty by default.
   fromMock.mockImplementation((table: string) => {
     if (table === 'maintenance_budget_items') {
+      return {
+        select: () => ({
+          eq: () => ({
+            order: () => Promise.resolve({ data: [], error: null }),
+          }),
+        }),
+      };
+    }
+    if (table === 'maintenance_budget_reviews') {
       return {
         select: () => ({
           eq: () => ({
@@ -220,6 +229,8 @@ describe('BudgetHistoryTab', () => {
     await waitForAssertion(() => {
       expect(container.textContent).toContain('Motivo da reprovação:');
       expect(container.textContent).toContain('Valor acima do praticado');
+      // Livro-razão vazio no mock padrão: a linha do tempo mostra o estado vazio.
+      expect(container.textContent).toContain('Sem decisões registradas.');
     });
   });
 

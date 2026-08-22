@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, Ban, RotateCcw, X, Download, PlayCircle } from 'lucide-react';
+import { Wrench, Search, Eye, CheckCircle2, Loader2, Plus, Edit, ExternalLink, Ban, RotateCcw, Undo2, X, Download, PlayCircle } from 'lucide-react';
 import React from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 
@@ -16,6 +16,7 @@ import { requiresClientSelection } from '../lib/clientScope';
 import { formatDate } from '../lib/dateUtils';
 import { downloadBlobFile } from '../lib/downloadBlobFile';
 import { type BudgetLockKind } from '../lib/maintenanceBudgetLock';
+import { canReopenBudget } from '../lib/maintenanceBudgetReopen';
 import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, matchesMaintenanceCard, countVehiclesNotWithdrawn, BUDGET_STATUS_FILTER_OPTIONS, daysInWorkshop } from '../lib/maintenanceFilters';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
 import { canWorkshopFillOrder, canWorkshopStartService } from '../lib/maintenanceWorkshop';
@@ -25,6 +26,7 @@ import { supabase } from '../lib/supabase';
 import { buildUiStateKey, removeUiState } from '../lib/uiStateStorage';
 import { cn } from '../lib/utils';
 import { canWorkshopActOnOrders } from '../lib/workshopProfile';
+import { reopenRejectedBudget } from '../services/maintenanceBudgetReviewService';
 import { XlsxMaintenanceProvider } from '../services/maintenanceExport/xlsxMaintenanceProvider';
 import { savePendingPartPhotos, type PartPhotoDraft } from '../services/maintenancePartPhotoService';
 import {
@@ -71,11 +73,13 @@ function budgetStatusBadge(budgetStatus?: BudgetStatus, pdfUrl?: string) {
     pendente: 'bg-yellow-100 text-yellow-800',
     aprovado: 'bg-green-100 text-green-800',
     reprovado: 'bg-red-100 text-red-800',
+    reaberto: 'bg-amber-100 text-amber-800',
   };
   const labels: Record<string, string> = {
     pendente: 'Aguardando',
     aprovado: 'Aprovado',
     reprovado: 'Reprovado',
+    reaberto: 'Reaberto',
   };
   return (
     <div className="flex items-center gap-1">
@@ -97,6 +101,21 @@ function budgetStatusBadge(budgetStatus?: BudgetStatus, pdfUrl?: string) {
       )}
     </div>
   );
+}
+
+/**
+ * Traduz as falhas de reabertura de orçamento — locais, de RLS e dos gatilhos
+ * de banco — na mensagem que o usuário vê.
+ */
+export function describeReopenError(err: unknown): string {
+  const code = (err as { code?: string } | null)?.code;
+  const message = err instanceof Error ? err.message : (err as { message?: string } | null)?.message ?? '';
+
+  if (code === '42501') return 'Você não tem permissão para reabrir orçamentos.';
+  if (code === '23514') return 'Recurso indisponível: a atualização do banco ainda não foi aplicada. Fale com o administrador.';
+  if (message.includes('ONLY_REJECTED_BUDGET_CAN_BE_REOPENED')) return 'Não foi possível reabrir: este orçamento não está reprovado.';
+  if (message.includes('Orcamento aprovado')) return 'Orçamento aprovado não pode ser alterado.';
+  return message || 'Falha ao reabrir o orçamento.';
 }
 
 function typeColor(type: MaintenanceType) {
@@ -189,6 +208,8 @@ export default function Maintenance() {
     () => (operationsManager ? undefined : (location.state as { prefillMaintenance?: Partial<MaintenanceOrder> } | null)?.prefillMaintenance ?? undefined)
   );
   const [orderToCancel, setOrderToCancel] = React.useState<MaintenanceOrder | null>(null);
+  const [orderToReopen, setOrderToReopen] = React.useState<MaintenanceOrder | null>(null);
+  const [reopenReason, setReopenReason] = React.useState('');
   const [mobileFiltersOpen, setMobileFiltersOpen] = React.useState(false);
 
   const clearMaintenanceDraft = () => {
@@ -283,6 +304,30 @@ export default function Maintenance() {
     },
   });
 
+  const reopenMutation = useMutation({
+    mutationFn: async ({ order, reason }: { order: MaintenanceOrder; reason: string }) => {
+      if (!profile) throw new Error('Sessão inválida');
+      const clientId = order.clientId ?? currentClient?.id;
+      if (!clientId) throw new Error('Não foi possível identificar o cliente da OS.');
+      await reopenRejectedBudget({
+        maintenanceOrderId: order.id,
+        clientId,
+        reason,
+        profileId: profile.id,
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['maintenanceOrders'] });
+      void queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
+      void queryClient.invalidateQueries({ queryKey: ['budgetHistory'] });
+      setOrderToReopen(null);
+      setReopenReason('');
+    },
+    onError: (err: unknown) => {
+      window.alert(describeReopenError(err));
+    },
+  });
+
   const saveMutation = useMutation({
     mutationFn: async ({
       data,
@@ -290,12 +335,14 @@ export default function Maintenance() {
       budgetFile,
       pendingPartPhotos,
       budgetLock,
+      currentBudgetStatus,
     }: {
       data: Partial<MaintenanceOrder>;
       budgetItems: BudgetItem[];
       budgetFile: File | null;
       pendingPartPhotos: PartPhotoDraft[];
       budgetLock: BudgetLockKind | null;
+      currentBudgetStatus?: BudgetStatus;
     }) => {
       if (!profile) throw new Error('Sessão inválida');
       const orderId = await saveMaintenanceOrder({
@@ -305,6 +352,7 @@ export default function Maintenance() {
         profileId: profile.id,
         currentClientId: currentClient?.id,
         budgetLock: budgetLock ?? undefined,
+        currentBudgetStatus,
       });
       if (pendingPartPhotos.length > 0) {
         const clientId = data.clientId ?? currentClient?.id;
@@ -713,6 +761,15 @@ export default function Maintenance() {
                               <Edit className="h-4 w-4" />
                             </button>
                           )}
+                          {canReopenBudget(o.budgetStatus, profile?.role, isWorkshopUser) && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setOrderToReopen(o); setReopenReason(''); }}
+                              title="Reabrir orçamento"
+                              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-amber-50 hover:text-amber-600"
+                            >
+                              <Undo2 className="h-4 w-4" />
+                            </button>
+                          )}
                           {canFillWorkshop && canWorkshopFillOrder(o.status) && (
                             <button
                               onClick={() => {
@@ -824,9 +881,68 @@ export default function Maintenance() {
             clearMaintenanceDraft();
           }}
           onSave={async (data, budgetItems, budgetFile, pendingPartPhotos, budgetLock) => {
-            await saveMutation.mutateAsync({ data, budgetItems, budgetFile, pendingPartPhotos, budgetLock });
+            await saveMutation.mutateAsync({
+              data,
+              budgetItems,
+              budgetFile,
+              pendingPartPhotos,
+              budgetLock,
+              currentBudgetStatus: orderToEdit?.budgetStatus,
+            });
+          }}
+          onRequestReopen={() => {
+            if (orderToEdit) {
+              setOrderToReopen(orderToEdit);
+              setReopenReason('');
+            }
           }}
         />
+      )}
+
+      {orderToReopen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-base font-semibold text-zinc-900">Reabrir Orçamento</h3>
+            <div className="space-y-1 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">
+              <div><span className="font-medium text-zinc-700">OS:</span> <span className="font-mono">{orderToReopen.os}</span></div>
+              <div><span className="font-medium text-zinc-700">Placa:</span> {orderToReopen.licensePlate}</div>
+            </div>
+            {orderToReopen.budgetRejectionReason && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <span className="font-medium">Motivo da reprovação anterior:</span>{' '}
+                {orderToReopen.budgetRejectionReason}
+              </div>
+            )}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">
+                Justificativa da reabertura <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={reopenReason}
+                onChange={e => setReopenReason(e.target.value)}
+                rows={4}
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => { setOrderToReopen(null); setReopenReason(''); }}
+                disabled={reopenMutation.isPending}
+                className="rounded-lg px-4 py-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => reopenMutation.mutate({ order: orderToReopen, reason: reopenReason })}
+                disabled={reopenReason.trim() === '' || reopenMutation.isPending}
+                className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+              >
+                {reopenMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Confirmar reabertura
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {orderToCancel && (

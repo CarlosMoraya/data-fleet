@@ -261,3 +261,125 @@ describe('saveMaintenanceOrder — orçamento aprovado', () => {
     expect(fromMock).not.toHaveBeenCalledWith('maintenance_budget_items');
   });
 });
+
+describe('saveMaintenanceOrder — orçamento reaberto', () => {
+  function mockSupabase() {
+    const orderUpdate = vi.fn((_payload: Record<string, unknown>) => ({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }));
+    const itemsDelete = vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }));
+    const itemsInsert = vi.fn((_rows: Record<string, unknown>[]) => Promise.resolve({ error: null }));
+
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'maintenance_orders') return { update: orderUpdate };
+      if (table === 'maintenance_budget_items') return { delete: itemsDelete, insert: itemsInsert };
+      throw new Error(`Tabela inesperada: ${table}`);
+    });
+
+    return { orderUpdate, itemsDelete, itemsInsert };
+  }
+
+  const reopenedOrderData = {
+    id: 'os-2',
+    clientId: 'c1',
+    vehicleId: 'v1',
+    workshopId: 'w1',
+    entryDate: '2026-08-20',
+    expectedExitDate: '2026-08-30',
+    type: 'Corretiva' as const,
+    status: 'Aguardando orçamento' as const,
+    description: 'Revisão do orçamento',
+    budgetPdfUrl: 'c1/os-2/orcamento.pdf',
+    estimatedCost: 350,
+  };
+
+  const item = { itemName: 'Pastilha', system: 'freios', quantity: 2, value: 100, discount: 0, sortOrder: 0 };
+
+  const resubmitPayload = { budget_status: 'pendente', status: 'Aguardando aprovação' };
+
+  beforeEach(() => {
+    fromMock.mockReset();
+  });
+
+  it('cenário feliz: reaberto com itens e PDF volta para a fila de aprovação', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    await saveMaintenanceOrder({
+      data: reopenedOrderData,
+      budgetItems: [item],
+      budgetFile: null,
+      profileId: 'p1',
+      currentBudgetStatus: 'reaberto',
+    });
+
+    const payloads = orderUpdate.mock.calls.map(c => c[0]);
+    expect(payloads).toContainEqual(resubmitPayload);
+  });
+
+  it('CRÍTICO: orçamento aprovado não sofre o update de reenvio e mantém o payload restrito', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    await saveMaintenanceOrder({
+      data: { ...reopenedOrderData, status: 'Serviço em execução' as const },
+      budgetItems: [item],
+      budgetFile: null,
+      profileId: 'p1',
+      budgetLock: 'client',
+      currentBudgetStatus: 'aprovado',
+    });
+
+    expect(orderUpdate).toHaveBeenCalledTimes(1);
+    const payload = orderUpdate.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('budget_status');
+    expect(payload).not.toHaveProperty('approved_cost');
+    expect(payload).not.toHaveProperty('estimated_cost');
+    expect(payload).not.toHaveProperty('budget_discount');
+    expect(fromMock).not.toHaveBeenCalledWith('maintenance_budget_items');
+  });
+
+  it('edge: reaberto sem PDF não dispara o reenvio', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    await saveMaintenanceOrder({
+      data: { ...reopenedOrderData, budgetPdfUrl: undefined },
+      budgetItems: [item],
+      budgetFile: null,
+      profileId: 'p1',
+      currentBudgetStatus: 'reaberto',
+    });
+
+    const payloads = orderUpdate.mock.calls.map(c => c[0]);
+    expect(payloads).not.toContainEqual(resubmitPayload);
+  });
+
+  it('edge: reaberto sem itens significativos não dispara o reenvio', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    await saveMaintenanceOrder({
+      data: reopenedOrderData,
+      budgetItems: [{ ...item, itemName: '  ' }],
+      budgetFile: null,
+      profileId: 'p1',
+      currentBudgetStatus: 'reaberto',
+    });
+
+    const payloads = orderUpdate.mock.calls.map(c => c[0]);
+    expect(payloads).not.toContainEqual(resubmitPayload);
+  });
+
+  it('sem currentBudgetStatus o comportamento de hoje não muda', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    await saveMaintenanceOrder({
+      data: reopenedOrderData,
+      budgetItems: [item],
+      budgetFile: null,
+      profileId: 'p1',
+    });
+
+    const payloads = orderUpdate.mock.calls.map(c => c[0]);
+    expect(payloads).not.toContainEqual(resubmitPayload);
+  });
+});

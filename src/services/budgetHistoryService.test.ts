@@ -117,7 +117,7 @@ describe('listReviewedBudgets', () => {
     const result = await listReviewedBudgets('c1');
 
     const inCall = record.find(c => c.method === 'in');
-    expect(inCall).toEqual({ method: 'in', args: ['budget_status', ['aprovado', 'reprovado']] });
+    expect(inCall).toEqual({ method: 'in', args: ['budget_status', ['aprovado', 'reprovado', 'reaberto']] });
 
     const eqCall = record.find(c => c.method === 'eq' && c.args[0] === 'client_id');
     expect(eqCall).toEqual({ method: 'eq', args: ['client_id', 'c1'] });

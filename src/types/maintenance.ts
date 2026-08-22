@@ -2,7 +2,7 @@
 
 export type MaintenanceStatus = 'Aguardando orçamento' | 'Aguardando aprovação' | 'Orçamento aprovado' | 'Serviço em execução' | 'Concluído' | 'Veículo retirado' | 'Cancelado';
 export type MaintenanceType = 'Preventiva' | 'Preditiva' | 'Corretiva';
-export type BudgetStatus = 'sem_orcamento' | 'pendente' | 'aprovado' | 'reprovado';
+export type BudgetStatus = 'sem_orcamento' | 'pendente' | 'aprovado' | 'reprovado' | 'reaberto';
 
 export interface MaintenanceOrder {
   id: string;
@@ -39,6 +39,19 @@ export interface MaintenanceOrder {
   operationalUnitName?: string;
   warrantyRevisionEventId?: string; // Vínculo opcional a um evento de revisão em garantia
   actualExitDate?: string;
+}
+
+export type BudgetReviewDecision = 'aprovado' | 'reprovado' | 'reaberto';
+
+/** Evento do livro-razão append-only de decisões de orçamento. */
+export interface BudgetReviewEvent {
+  id: string;
+  maintenanceOrderId: string;
+  decision: BudgetReviewDecision;
+  reason?: string;
+  budgetTotal?: number;
+  decidedByName?: string;
+  decidedAt: string;
 }
 
 export interface BudgetItem {

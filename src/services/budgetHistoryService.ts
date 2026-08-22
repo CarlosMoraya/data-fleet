@@ -12,7 +12,7 @@ export async function listReviewedBudgets(clientId?: string): Promise<Maintenanc
     budget_reviewer:profiles!budget_reviewed_by (name),
     clients (name)
   `)
-    .in('budget_status', ['aprovado', 'reprovado'])
+    .in('budget_status', ['aprovado', 'reprovado', 'reaberto'])
     .order('budget_reviewed_at', { ascending: false, nullsFirst: false });
 
   if (clientId) {

@@ -3,7 +3,7 @@ import { BUDGET_STATUS_FILTER_OPTIONS } from './maintenanceFilters';
 import type { MaintenanceOrder } from '../types/maintenance';
 
 
-export type BudgetDecision = 'aprovado' | 'reprovado';
+export type BudgetDecision = 'aprovado' | 'reprovado' | 'reaberto';
 
 export interface BudgetHistoryFilters {
   decision: BudgetDecision | '';
@@ -13,7 +13,7 @@ export interface BudgetHistoryFilters {
 
 export const BUDGET_DECISION_OPTIONS: { value: BudgetDecision; label: string }[] =
   BUDGET_STATUS_FILTER_OPTIONS.filter(
-    (o) => o.value === 'aprovado' || o.value === 'reprovado',
+    (o) => o.value === 'aprovado' || o.value === 'reprovado' || o.value === 'reaberto',
   ) as { value: BudgetDecision; label: string }[];
 
 export function buildBudgetHistoryWorkshopOptions(
