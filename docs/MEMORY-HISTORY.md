@@ -2,6 +2,18 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-08-25: Correção de chamados críticos e diagnóstico Telegram
+
+Implementado o escopo fechado de `IMPLEMENTATION_FIXBUG.md`. A Etapa 0 confirmou que o chamado de teste foi gravado no tenant Grupo PRALOG por causa do dropdown cross-tenant do Admin Master; o Bug 3 foi descartado e o Passo 6 foi removido.
+
+**Correções** — `listVehiclesForFleetTicketReport` passou a exigir `clientId` e filtrar veículos ativos pelo cliente selecionado, com o id preservado na `queryKey` do modal. `createFleetTicketReport` passou a notificar chamados nascidos como `critical` ou `high` somente depois dos anexos, reutilizando o best-effort existente e retornando `telegramWarning` opcional. `canTriggerTicketNotification` passou a aceitar o autor do chamado quando ele pertence ao mesmo tenant, mantendo o piso de `Fleet Analyst`, o ramo `sos_created`, o Admin Master e o caminho de teste intactos. `TelegramSettingsPanel` passou a extrair o campo `error` do JSON da Edge Function e exibir o motivo real; em erro sem JSON, preserva a mensagem bruta; sem mensagem, mantém o texto genérico.
+
+**Testes** — adicionados os casos de notificação em `critical`/`high`, ausência de notificação em `medium`/`low`, best-effort, filtro por cliente e diagnóstico real/genérico do painel: 7 testes novos.
+
+**Validação local** — `npx tsc --noEmit` sem erros; `npm run lint` com exit 0, 262 warnings e nenhum erro; `npm run test:unit` com 216 arquivos e 1.979 testes passando; `npm run test:smoke` com 7/7. O deploy de `notify-fleet-ticket-telegram` em DEV e PROD não foi feito pelo agente, conforme o plano; permanece pendente para ação do usuário, seguido da validação manual guiada.
+
+**Validação manual subsequente** — o usuário publicou `notify-fleet-ticket-telegram` em DEV e PROD. O `chat_id` antigo foi substituído pelo identificador do supergrupo, as mensagens de teste chegaram corretamente em DEV e PROD, e os fluxos Crítico, Alto, ausência de envio para Médio, Fleet Assistant e filtro de veículos por cliente passaram. Os chamados de teste no cliente PRALOG não exigem limpeza, pois esse cliente é destinado a testes.
+
 ## Sessão — 2026-08-26: Auditoria Fase 3 — eventos append-only por gatilho em cadastros P2 (pneus, embarcadores, unidades operacionais, clientes)
 
 Implementado o escopo fechado de `IMPLEMENTATION.md` (Fase 3 da padronização de auditoria, P2 de cadastros). A sessão é **DDL puro**: nenhum arquivo em `src/` foi criado ou alterado. Entregas aplicadas em DEV e PROD e validadas em ambos os ambientes.

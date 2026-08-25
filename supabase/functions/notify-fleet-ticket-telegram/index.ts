@@ -106,8 +106,9 @@ function canTriggerTicketNotification(
         && profile.client_id === ticket.client_id);
   }
 
-  return roleRank(profile.role) >= ROLE_RANK["Fleet Analyst"]
-    && profile.client_id === ticket.client_id;
+  return (roleRank(profile.role) >= ROLE_RANK["Fleet Analyst"]
+    && profile.client_id === ticket.client_id)
+    || (ticket.opened_by === profile.id && profile.client_id === ticket.client_id);
 }
 
 function mapsUrl(ticket: TicketRow): string | null {

@@ -26,6 +26,7 @@ import {
   getFleetTicketAttachmentUrls,
   listFleetTicketIdsWithActionPlan,
   listFleetTickets,
+  listVehiclesForFleetTicketReport,
 } from './fleetTicketService';
 
 function queryFor<T>(result: { data: T; error: unknown }) {
@@ -125,23 +126,66 @@ describe('createSosTicket', () => {
 });
 
 describe('createFleetTicketReport', () => {
+  const input = {
+    clientId: 'client-1',
+    vehicleId: 'vehicle-1',
+    title: 'Pneu furado',
+    description: 'Pneu dianteiro furado',
+    files: [],
+    odometerKm: 50000,
+  };
+
   it('sends odometer and criticality to the create RPC', async () => {
     rpcMock
       .mockResolvedValueOnce({ data: 'ticket-2', error: null })
       .mockResolvedValueOnce({ data: null, error: null });
 
     await createFleetTicketReport({
-      clientId: 'client-1',
-      vehicleId: 'vehicle-1',
-      title: 'Pneu furado',
-      description: 'Pneu dianteiro furado',
-      files: [],
-      odometerKm: 50000,
+      ...input,
       criticality: 'medium',
     });
 
     expect(rpcMock.mock.calls[0][0]).toBe('create_fleet_ticket_report');
     expect(rpcMock.mock.calls[0][1]).toMatchObject({ p_odometer_km: 50000, p_criticality: 'medium' });
+  });
+
+  it('createFleetTicketReport notifica o Telegram quando a criticidade é critical', async () => {
+    rpcMock.mockResolvedValue({ data: 'ticket-2', error: null });
+
+    await createFleetTicketReport({ ...input, criticality: 'critical' });
+
+    expect(invokeMock).toHaveBeenCalledWith('notify-fleet-ticket-telegram', {
+      action: 'ticket', ticketId: 'ticket-2', reason: 'critical_classified',
+    });
+  });
+
+  it('createFleetTicketReport notifica com reason high quando a criticidade é high', async () => {
+    rpcMock.mockResolvedValue({ data: 'ticket-2', error: null });
+
+    await createFleetTicketReport({ ...input, criticality: 'high' });
+
+    expect(invokeMock).toHaveBeenCalledWith('notify-fleet-ticket-telegram', {
+      action: 'ticket', ticketId: 'ticket-2', reason: 'high_classified',
+    });
+  });
+
+  it('createFleetTicketReport não notifica quando a criticidade é medium ou low', async () => {
+    rpcMock.mockResolvedValue({ data: 'ticket-2', error: null });
+
+    await createFleetTicketReport({ ...input, criticality: 'medium' });
+    await createFleetTicketReport({ ...input, criticality: 'low' });
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it('falha do Telegram não derruba a criação do chamado', async () => {
+    rpcMock.mockResolvedValue({ data: 'ticket-2', error: null });
+    invokeMock.mockRejectedValue(new Error('Telegram indisponível'));
+
+    const result = await createFleetTicketReport({ ...input, criticality: 'critical' });
+
+    expect(result.ticketId).toBe('ticket-2');
+    expect(result.telegramWarning).toBe('Telegram indisponível');
   });
 });
 
@@ -195,6 +239,21 @@ describe('listFleetTicketIdsWithActionPlan', () => {
     const result = await listFleetTicketIdsWithActionPlan(['ticket-1', 'ticket-2']);
 
     expect(result).toEqual(new Set(['ticket-1', 'ticket-2']));
+  });
+});
+
+describe('listVehiclesForFleetTicketReport', () => {
+  it('listVehiclesForFleetTicketReport filtra pelo cliente informado', async () => {
+    const query = queryFor({
+      data: [{ id: 'vehicle-1', license_plate: 'ABC1D23' }],
+      error: null,
+    });
+    fromMock.mockReturnValue({ select: vi.fn(() => query) });
+
+    await listVehiclesForFleetTicketReport('client-1');
+
+    expect(query.eq).toHaveBeenCalledWith('client_id', 'client-1');
+    expect(query.eq).toHaveBeenCalledWith('active', true);
   });
 });
 

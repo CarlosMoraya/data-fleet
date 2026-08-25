@@ -90,6 +90,33 @@ describe('TelegramSettingsPanel', () => {
     act(() => testButton.click());
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
     expect(container.textContent).toContain('Não foi possível enviar. Verifique se o bot foi adicionado ao grupo e se o chat_id está correto.');
+    expect(container.textContent).toContain('Telegram indisponível');
+    act(() => root.unmount());
+  });
+
+  it('exibe o motivo real devolvido pelo Telegram ao falhar o teste', async () => {
+    getMock.mockResolvedValue(saved);
+    testMock.mockRejectedValue(new Error('Edge function error: 502 {"error":"Não foi possível enviar a notificação Telegram: Bad Request: chat not found"}'));
+    const root = await renderPanel();
+    const testButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Enviar mensagem de teste')) as HTMLButtonElement;
+
+    act(() => testButton.click());
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+
+    expect(container.textContent).toContain('chat not found');
+    act(() => root.unmount());
+  });
+
+  it('mantém o texto genérico quando o erro não traz mensagem', async () => {
+    getMock.mockResolvedValue(saved);
+    testMock.mockRejectedValue(new Error(''));
+    const root = await renderPanel();
+    const testButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Enviar mensagem de teste')) as HTMLButtonElement;
+
+    act(() => testButton.click());
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+
+    expect(container.textContent).toContain('Não foi possível enviar a mensagem de teste.');
     act(() => root.unmount());
   });
 });

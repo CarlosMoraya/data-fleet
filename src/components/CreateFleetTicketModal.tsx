@@ -8,9 +8,10 @@ import {
   evaluateFleetTicketOdometer,
   requiresFleetTicketPhoto,
 } from '../lib/fleetTicketRules';
+import { supabase } from '../lib/supabase';
 import { createFleetTicketReport, listVehiclesForFleetTicketReport } from '../services/fleetTicketService';
 import { getVehicleLastKmMap } from '../services/vehicleOdometerService';
-import { supabase } from '../lib/supabase';
+
 import CameraCapture from './CameraCapture';
 import LastKmLabel from './LastKmLabel';
 
@@ -47,7 +48,7 @@ export default function CreateFleetTicketModal({ open, onClose, onCreated }: Cre
 
   const vehiclesQuery = useQuery({
     queryKey: ['fleetTicketReportVehicles', currentClient?.id],
-    queryFn: listVehiclesForFleetTicketReport,
+    queryFn: () => listVehiclesForFleetTicketReport(currentClient!.id),
     enabled: open && !!currentClient?.id,
   });
 

@@ -63,9 +63,23 @@ export default function TelegramSettingsPanel({ clientId, userId }: TelegramSett
     },
     onError: (mutationError: Error) => {
       setSuccess(null);
-      setError(mutationError.message
-        ? 'Não foi possível enviar. Verifique se o bot foi adicionado ao grupo e se o chat_id está correto.'
-        : 'Não foi possível enviar a mensagem de teste.');
+      if (!mutationError.message) {
+        setError('Não foi possível enviar a mensagem de teste.');
+        return;
+      }
+
+      let reason = mutationError.message;
+      const jsonStart = mutationError.message.indexOf('{');
+      if (jsonStart >= 0) {
+        try {
+          const parsed = JSON.parse(mutationError.message.slice(jsonStart)) as { error?: unknown };
+          if (typeof parsed.error === 'string' && parsed.error) reason = parsed.error;
+        } catch {
+          // Keep the raw error message when the response body is not valid JSON.
+        }
+      }
+
+      setError(`Não foi possível enviar. Verifique se o bot foi adicionado ao grupo e se o chat_id está correto.\n\nMotivo: ${reason}`);
     },
   });
 

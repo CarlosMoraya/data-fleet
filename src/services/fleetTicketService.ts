@@ -122,6 +122,7 @@ export async function createSosTicket(input: CreateSosTicketInput): Promise<{
 
 export async function createFleetTicketReport(input: CreateFleetTicketReportInput): Promise<{
   ticketId: string;
+  telegramWarning?: string;
   uploadWarnings: string[];
 }> {
   const { data, error } = await supabase.rpc('create_fleet_ticket_report', {
@@ -138,7 +139,15 @@ export async function createFleetTicketReport(input: CreateFleetTicketReportInpu
   const uploadWarnings = [...uploadResult.warnings];
   await appendTicketFiles(ticketId, uploadResult.paths, uploadWarnings);
 
-  return { ticketId, uploadWarnings };
+  let telegramWarning: string | undefined;
+  if (input.criticality === 'critical' || input.criticality === 'high') {
+    telegramWarning = await notifyTicketTelegramBestEffort(
+      ticketId,
+      input.criticality === 'critical' ? 'critical_classified' : 'high_classified',
+    );
+  }
+
+  return { ticketId, telegramWarning, uploadWarnings };
 }
 
 export async function classifyFleetTicket(
@@ -219,10 +228,11 @@ export async function listFleetTicketIdsWithActionPlan(ticketIds: string[]): Pro
   );
 }
 
-export async function listVehiclesForFleetTicketReport(): Promise<Array<{ id: string; licensePlate: string }>> {
+export async function listVehiclesForFleetTicketReport(clientId: string): Promise<Array<{ id: string; licensePlate: string }>> {
   const { data, error } = await supabase
     .from('vehicles')
     .select('id, license_plate')
+    .eq('client_id', clientId)
     .eq('active', true)
     .order('license_plate');
   if (error) throw error;
