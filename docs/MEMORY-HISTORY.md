@@ -10,9 +10,9 @@ Implementado o escopo fechado de `IMPLEMENTATION_FIXBUG.md`. A Etapa 0 confirmou
 
 **Testes** — adicionados os casos de notificação em `critical`/`high`, ausência de notificação em `medium`/`low`, best-effort, filtro por cliente e diagnóstico real/genérico do painel: 7 testes novos.
 
-**Validação local** — `npx tsc --noEmit` sem erros; `npm run lint` com exit 0, 262 warnings e nenhum erro; `npm run test:unit` com 216 arquivos e 1.979 testes passando; `npm run test:smoke` com 7/7. O deploy de `notify-fleet-ticket-telegram` em DEV e PROD não foi feito pelo agente, conforme o plano; permanece pendente para ação do usuário, seguido da validação manual guiada.
+**Validação local** — `npx tsc --noEmit` sem erros; `npm run lint` com exit 0, 262 warnings e nenhum erro; `npm run test:unit` com 216 arquivos e 1.979 testes passando; `npm run test:smoke` com 7/7.
 
-**Validação manual subsequente** — o usuário publicou `notify-fleet-ticket-telegram` em DEV e PROD. O `chat_id` antigo foi substituído pelo identificador do supergrupo, as mensagens de teste chegaram corretamente em DEV e PROD, e os fluxos Crítico, Alto, ausência de envio para Médio, Fleet Assistant e filtro de veículos por cliente passaram. Os chamados de teste no cliente PRALOG não exigem limpeza, pois esse cliente é destinado a testes.
+**Validação manual subsequente** — o usuário publicou `notify-fleet-ticket-telegram` em DEV e PROD. O `chat_id` antigo foi substituído pelo identificador do supergrupo, as mensagens de teste chegaram corretamente em DEV e PROD, e os fluxos Crítico, Alto, ausência de envio para Médio, Fleet Assistant e filtro de veículos por cliente passaram. O commit `c3879af` foi criado na `main` e enviado ao repositório remoto. Não há pendências desta correção. Os chamados de teste no cliente PRALOG não exigem limpeza, pois esse cliente é destinado a testes.
 
 ## Sessão — 2026-08-26: Auditoria Fase 3 — eventos append-only por gatilho em cadastros P2 (pneus, embarcadores, unidades operacionais, clientes)
 
