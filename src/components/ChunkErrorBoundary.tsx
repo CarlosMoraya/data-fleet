@@ -48,6 +48,7 @@ export default class ChunkErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, _errorInfo: ErrorInfo): void {
+    console.error('[ChunkErrorBoundary]', error.name, error.message, error.stack);
     if (CHUNK_ERROR.test(error.message)) {
       const alreadyAttempted = sessionStorage.getItem(RELOAD_FLAG);
       if (!alreadyAttempted) {

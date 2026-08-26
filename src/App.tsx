@@ -10,8 +10,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import ChunkErrorBoundary from './components/ChunkErrorBoundary';
 import Layout from './components/Layout';
 import RouteFallback from './components/RouteFallback';
+import UpdateAvailableBanner from './components/UpdateAvailableBanner';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
+import { usePwaUpdate } from './hooks/usePwaUpdate';
 import { shouldPersistQuery } from './lib/cachePolicy';
 import { queryClient, persister } from './lib/react-query';
 import { getDefaultRouteForRole } from './lib/rolePermissions';
@@ -63,6 +65,11 @@ function OfflineSyncBoot() {
   return null;
 }
 
+function PwaUpdateGate() {
+  const { needRefresh, update, dismiss } = usePwaUpdate();
+  return <UpdateAvailableBanner visible={needRefresh} onUpdate={update} onDismiss={dismiss} />;
+}
+
 export default function App() {
   return (
     <PersistQueryClientProvider
@@ -77,6 +84,7 @@ export default function App() {
       }}
     >
       <OfflineSyncBoot />
+      <PwaUpdateGate />
       <AuthProvider>
         <Router>
           <ChunkErrorBoundary>
