@@ -10,7 +10,7 @@ vi.mock('../lib/supabase', () => ({
   },
 }));
 
-import { getMaintenanceBudgetApprovalDetails, saveMaintenanceOrder } from './maintenanceService';
+import { getMaintenanceBudgetApprovalDetails, saveMaintenanceOrder, updateMaintenanceStatus } from './maintenanceService';
 
 function orderQuery(data: unknown, error: unknown = null) {
   return {
@@ -381,5 +381,46 @@ describe('saveMaintenanceOrder — orçamento reaberto', () => {
 
     const payloads = orderUpdate.mock.calls.map(c => c[0]);
     expect(payloads).not.toContainEqual(resubmitPayload);
+  });
+});
+
+describe('updateMaintenanceStatus', () => {
+  beforeEach(() => {
+    fromMock.mockReset();
+  });
+
+  it.each(['Serviço em execução', 'Concluído', 'Veículo retirado'] as const)(
+    'rejeita %s quando o orçamento está pendente sem chamar o update',
+    async (status) => {
+      await expect(updateMaintenanceStatus('os-1', status, 'pendente')).rejects.toThrow(
+        `Não é possível mudar para "${status}": o orçamento ainda está aguardando aprovação.`,
+      );
+      expect(fromMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('grava normalmente com orçamento aprovado', async () => {
+    const update = vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }));
+    fromMock.mockReturnValue({ update });
+
+    await updateMaintenanceStatus('os-1', 'Concluído', 'aprovado');
+
+    expect(update).toHaveBeenCalledWith({
+      status: 'Concluído',
+      actual_exit_date: null,
+    });
+  });
+
+  it('grava normalmente sem orçamento', async () => {
+    const update = vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }));
+    fromMock.mockReturnValue({ update });
+
+    await updateMaintenanceStatus('os-1', 'Serviço em execução', 'sem_orcamento');
+
+    expect(update).toHaveBeenCalledTimes(1);
   });
 });

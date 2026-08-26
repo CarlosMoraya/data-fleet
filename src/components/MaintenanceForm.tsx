@@ -8,6 +8,7 @@ import { isApprovedBudgetLocked, type BudgetLockKind } from '../lib/maintenanceB
 import { canReopenBudget, isBudgetDiscountLocked, isBudgetUnderRevision } from '../lib/maintenanceBudgetReopen';
 import { validateMaintenanceCurrentKm } from '../lib/maintenanceKmValidation';
 import { budgetItemFromRow, calcBudgetSubtotal, type MaintenanceBudgetItemRow, BudgetItem } from '../lib/maintenanceMappers';
+import { canAdvanceMaintenanceStatus, describeStatusBlockReason } from '../lib/maintenanceStatusCoherence';
 import { openPrivateDocument, validateFile } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
@@ -25,6 +26,14 @@ const inputClass =
   'focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500';
 
 const labelClass = 'block text-sm font-medium text-zinc-700';
+
+const EDITABLE_STATUS_OPTIONS: MaintenanceStatus[] = [
+  'Aguardando orçamento',
+  'Aguardando aprovação',
+  'Orçamento aprovado',
+  'Serviço em execução',
+  'Concluído',
+];
 
 export function validateBudgetDiscounts(items: BudgetItem[], orderDiscount: number): string | null {
   for (const item of items) {
@@ -582,11 +591,20 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
                         onChange={handleChange}
                         className={inputClass}
                       >
-                        <option value="Aguardando orçamento">Aguardando orçamento</option>
-                        <option value="Aguardando aprovação">Aguardando aprovação</option>
-                        <option value="Orçamento aprovado">Orçamento aprovado</option>
-                        <option value="Serviço em execução">Serviço em execução</option>
-                        <option value="Concluído">Concluído</option>
+                        {EDITABLE_STATUS_OPTIONS.map((status) => {
+                          const isCurrentStatus = formData.status === status;
+                          const disabled = !isCurrentStatus && !canAdvanceMaintenanceStatus(status, order?.budgetStatus);
+                          return (
+                            <option
+                              key={status}
+                              value={status}
+                              disabled={disabled}
+                              title={disabled ? describeStatusBlockReason(status, order?.budgetStatus) : undefined}
+                            >
+                              {status}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
 

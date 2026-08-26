@@ -193,6 +193,32 @@ describe('listApprovedOrdersForPayment', () => {
     expect(query.eq).toHaveBeenCalledWith('budget_status', 'aprovado');
     expect(query.eq).toHaveBeenCalledWith('client_id', 'client-1');
   });
+
+  it('lê e devolve o status operacional da OS', async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      data: [
+        {
+          id: 'os-5',
+          os_number: 'OS-005',
+          client_id: 'client-1',
+          status: 'Veículo retirado',
+          approved_cost: 500,
+          budget_pdf_url: null,
+          workshops: null,
+          payment_installments: [],
+        },
+      ],
+      error: null,
+    };
+    fromMock.mockReturnValue(query);
+
+    const result = await listApprovedOrdersForPayment('client-1');
+
+    expect(result[0]?.status).toBe('Veículo retirado');
+  });
 });
 
 describe('createPaymentInstallmentsBatch', () => {

@@ -19,6 +19,7 @@ import { type BudgetLockKind } from '../lib/maintenanceBudgetLock';
 import { canReopenBudget } from '../lib/maintenanceBudgetReopen';
 import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, matchesMaintenanceCard, countVehiclesNotWithdrawn, BUDGET_STATUS_FILTER_OPTIONS, daysInWorkshop } from '../lib/maintenanceFilters';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
+import { canAdvanceMaintenanceStatus, describeStatusBlockReason } from '../lib/maintenanceStatusCoherence';
 import { canWorkshopFillOrder, canWorkshopStartService } from '../lib/maintenanceWorkshop';
 import { isOperationsManager, canExportMaintenanceSpreadsheet } from '../lib/rolePermissions';
 import { openPrivateDocument } from '../lib/storageHelpers';
@@ -278,11 +279,14 @@ export default function Maintenance() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: MaintenanceStatus }) => {
-      await updateMaintenanceStatus(id, status);
+    mutationFn: async ({ id, status, budgetStatus }: { id: string; status: MaintenanceStatus; budgetStatus?: BudgetStatus | null }) => {
+      await updateMaintenanceStatus(id, status, budgetStatus);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
+    },
+    onError: (err: unknown) => {
+      window.alert(err instanceof Error ? err.message : 'Falha ao atualizar o status da OS.');
     },
   });
 
@@ -439,9 +443,9 @@ export default function Maintenance() {
     }
   };
 
-  const handleComplete = (id: string, e: React.MouseEvent) => {
+  const handleComplete = (id: string, budgetStatus: BudgetStatus | undefined, e: React.MouseEvent) => {
     e.stopPropagation();
-    updateStatusMutation.mutate({ id, status: 'Veículo retirado' });
+    updateStatusMutation.mutate({ id, status: 'Veículo retirado', budgetStatus });
   };
 
   return (
@@ -794,9 +798,10 @@ export default function Maintenance() {
                           )}
                           {canWriteMaintenance && o.status === 'Concluído' && (
                             <button
-                              onClick={(e) => handleComplete(o.id, e)}
-                              title="Retirar Veículo"
-                              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-green-50 hover:text-green-600"
+                              onClick={(e) => handleComplete(o.id, o.budgetStatus, e)}
+                              disabled={!canAdvanceMaintenanceStatus('Veículo retirado', o.budgetStatus)}
+                              title={describeStatusBlockReason('Veículo retirado', o.budgetStatus) ?? 'Retirar Veículo'}
+                              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-green-50 hover:text-green-600 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               <CheckCircle2 className="h-4 w-4" />
                             </button>
@@ -807,7 +812,7 @@ export default function Maintenance() {
                               onChange={(e) => {
                                 const next = e.target.value;
                                 if (next) {
-                                  updateStatusMutation.mutate({ id: o.id, status: next as MaintenanceStatus });
+                                  updateStatusMutation.mutate({ id: o.id, status: next as MaintenanceStatus, budgetStatus: o.budgetStatus });
                                   e.target.value = '';
                                 }
                               }}
@@ -817,7 +822,13 @@ export default function Maintenance() {
                             >
                               <option value="">Ações</option>
                               {o.status === 'Serviço em execução' && (
-                                <option value="Concluído">Concluído</option>
+                                <option
+                                  value="Concluído"
+                                  disabled={!canAdvanceMaintenanceStatus('Concluído', o.budgetStatus)}
+                                  title={describeStatusBlockReason('Concluído', o.budgetStatus)}
+                                >
+                                  Concluído
+                                </option>
                               )}
                               {o.status === 'Concluído' && (
                                 <option value="Veículo retirado">Veículo retirado</option>

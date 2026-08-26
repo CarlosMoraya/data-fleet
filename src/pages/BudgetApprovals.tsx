@@ -28,6 +28,7 @@ import { recordBudgetReview } from '../services/maintenanceBudgetReviewService';
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 
 import type { User } from '../types';
+import type { BudgetStatus, MaintenanceStatus } from '../types/maintenance';
 
 // ─── Permission helpers ───────────────────────────────────────────────────────
 
@@ -50,6 +51,7 @@ export function canApprove(
 interface PendingOrder {
   id: string;
   clientId?: string;
+  status: MaintenanceStatus;
   os: string;
   vehicleId?: string;
   licensePlate: string;
@@ -245,12 +247,12 @@ export default function BudgetApprovals({ embedded = false }: BudgetApprovalsPro
         .from('maintenance_orders')
         .select(`
           id, client_id, os_number, entry_date, workshop_os_number, current_km,
-          budget_pdf_url, created_at, vehicle_id, budget_discount,
+          budget_pdf_url, created_at, vehicle_id, budget_discount, status, budget_status,
           vehicles(license_plate),
           workshops(name),
           profiles!created_by_id(name)
         `)
-        .eq('status', 'Aguardando aprovação')
+        .eq('budget_status', 'pendente')
         .order('created_at', { ascending: true });
 
       if (currentClient?.id) {
@@ -263,7 +265,7 @@ export default function BudgetApprovals({ embedded = false }: BudgetApprovalsPro
       type OrderQueryRow = {
         id: string; client_id: string | null; os_number: string; entry_date: string; workshop_os_number: string | null;
         current_km: number | null; budget_pdf_url: string | null; created_at: string;
-        vehicle_id: string | null; budget_discount: number | null;
+        vehicle_id: string | null; budget_discount: number | null; status: MaintenanceStatus; budget_status: BudgetStatus;
         vehicles: { license_plate: string } | null;
         workshops: { name: string } | null;
         profiles: { name: string } | null;
@@ -271,6 +273,7 @@ export default function BudgetApprovals({ embedded = false }: BudgetApprovalsPro
       return (data as unknown as OrderQueryRow[]).map((row) => ({
         id: row.id,
         clientId: row.client_id ?? undefined,
+        status: row.status,
         os: row.os_number,
         vehicleId: row.vehicle_id ?? undefined,
         licensePlate: row.vehicles?.license_plate ?? 'N/A',
@@ -329,11 +332,14 @@ export default function BudgetApprovals({ embedded = false }: BudgetApprovalsPro
         }
       }
 
+      const currentOrder = orders.find(o => o.id === id);
       const { error } = await supabase
         .from('maintenance_orders')
         .update({
           budget_status: approve ? 'aprovado' : 'reprovado',
-          status: approve ? 'Orçamento aprovado' : 'Aguardando orçamento',
+          ...(currentOrder?.status === 'Aguardando aprovação'
+            ? { status: approve ? 'Orçamento aprovado' : 'Aguardando orçamento' }
+            : {}),
           budget_reviewed_by: user!.id,
           budget_reviewed_at: new Date().toISOString(),
           budget_rejection_reason: approve ? null : (reason ?? null),

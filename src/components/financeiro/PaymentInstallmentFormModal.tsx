@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
 import { extractInvoiceNumber } from '../../lib/invoiceOcr';
+import { isOrderPayable } from '../../lib/maintenanceStatusCoherence';
 import {
   exceedsBudget,
   generateInstallmentDrafts,
@@ -93,7 +94,7 @@ export default function PaymentInstallmentFormModal({
     [approvedOrders, orderId],
   );
   const ordersWithRemainingBudget = useMemo(
-    () => approvedOrders.filter((o) => o.remainingBudget > 0),
+    () => approvedOrders.filter((o) => o.remainingBudget > 0 && isOrderPayable(o.status, 'aprovado')),
     [approvedOrders],
   );
 

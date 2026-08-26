@@ -54,6 +54,7 @@ export async function autoRetireVehicleFromWorkshop(
     .eq('vehicle_id', vehicleId)
     .eq('workshop_id', workshopId)
     .eq('status', 'Concluído')
+    .not('budget_status', 'in', '("pendente","reaberto")')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();

@@ -2,6 +2,7 @@ import { normalizeBudgetSystem } from '../lib/budgetSystems';
 import { type BudgetLockKind } from '../lib/maintenanceBudgetLock';
 import { shouldResubmitReopenedBudget } from '../lib/maintenanceBudgetReopen';
 import { budgetItemFromRow } from '../lib/maintenanceMappers';
+import { canAdvanceMaintenanceStatus, describeStatusBlockReason } from '../lib/maintenanceStatusCoherence';
 import { uploadMaintenanceBudget } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 
@@ -254,7 +255,12 @@ export async function startWorkshopService(id: string): Promise<void> {
 export async function updateMaintenanceStatus(
   id: string,
   status: MaintenanceOrder['status'],
+  budgetStatus: BudgetStatus | undefined | null,
 ): Promise<void> {
+  if (!canAdvanceMaintenanceStatus(status, budgetStatus)) {
+    throw new Error(describeStatusBlockReason(status, budgetStatus) ?? 'Não foi possível atualizar o status da OS.');
+  }
+
   const { error } = await supabase
     .from('maintenance_orders')
     .update({

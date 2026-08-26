@@ -2,6 +2,7 @@ import { remainingBudget } from '../lib/paymentInstallments';
 import { paymentInstallmentFromRow } from '../lib/paymentMappers';
 import { supabase } from '../lib/supabase';
 
+import type { MaintenanceStatus } from '../types/maintenance';
 import type {
   PaymentApprovalResult,
   PaymentApprovalSnapshot,
@@ -72,6 +73,7 @@ export interface CreateInstallmentBatchInput {
 export interface ApprovedOrderForPayment {
   id: string;
   osNumber: string;
+  status: MaintenanceStatus;
   approvedCost: number;
   remainingBudget: number;
   budgetPdfUrl?: string;
@@ -351,7 +353,7 @@ export async function listApprovedOrdersForPayment(
   let query = supabase
     .from('maintenance_orders')
     .select(`
-      id, os_number, client_id, approved_cost, budget_pdf_url,
+      id, os_number, client_id, status, approved_cost, budget_pdf_url,
       workshops(name, cnpj),
       payment_installments(value, status)
     `)
@@ -369,6 +371,7 @@ export async function listApprovedOrdersForPayment(
     id: string;
     os_number: string;
     client_id: string;
+    status: MaintenanceStatus;
     approved_cost: number | null;
     budget_pdf_url: string | null;
     workshops: { name: string; cnpj: string | null } | null;
@@ -387,6 +390,7 @@ export async function listApprovedOrdersForPayment(
     return {
       id: row.id,
       osNumber: row.os_number,
+      status: row.status,
       approvedCost,
       remainingBudget: remainingBudget(approvedCost, installments),
       budgetPdfUrl: row.budget_pdf_url ?? undefined,
