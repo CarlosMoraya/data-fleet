@@ -19,7 +19,6 @@ vi.mock('../../services/paymentInstallmentService', () => ({
 vi.mock('../../lib/storageHelpers', () => ({
   getFinancialDocumentSignedUrl: vi.fn().mockResolvedValue('https://signed.example/doc.pdf'),
 }));
-vi.mock('../dashboard/ActionQueue', () => ({ default: () => null }));
 vi.mock('./PaymentInstallmentEditModal', () => ({ default: () => null }));
 vi.mock('./PaymentInstallmentFormModal', () => ({ default: () => null }));
 vi.mock('./PaymentInstallmentViewModal', () => ({ default: () => null }));
@@ -101,14 +100,107 @@ afterEach(() => {
 });
 
 describe('PaymentsTab', () => {
-  it('mantém exportação CSV/XLSX para Financeiro/Admin Master', async () => {
+  it('oferece apenas exportação XLSX (CSV removido)', async () => {
     listInstallmentsMock.mockResolvedValue([installment()]);
     renderTab();
 
     await waitForAssertion(() => {
       const buttons = Array.from(container.querySelectorAll('button')).map((b) => b.textContent);
-      expect(buttons.some((t) => t?.includes('Baixar CSV'))).toBe(true);
       expect(buttons.some((t) => t?.includes('Baixar XLSX'))).toBe(true);
+      expect(buttons.some((t) => t?.includes('Baixar CSV'))).toBe(false);
+    });
+  });
+
+  it('não renderiza mais o card de Pendências de pagamento', async () => {
+    listInstallmentsMock.mockResolvedValue([installment({
+      status: 'pendente_aprovacao',
+      paymentMethod: 'boleto',
+      boletoUrl: undefined,
+    })]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      expect(container.textContent).not.toContain('Pendências de pagamento');
+      expect(container.textContent).not.toContain('Parcelas sem dados de pagamento');
+    });
+  });
+
+  it('não oferece mais os filtros de forma de pagamento e de cliente', async () => {
+    listInstallmentsMock.mockResolvedValue([installment()]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      const options = Array.from(container.querySelectorAll('select option')).map((o) => o.textContent);
+      expect(options).not.toContain('Todas as formas');
+      expect(options).not.toContain('Boleto');
+      expect(options).not.toContain('Pix');
+      expect(options).not.toContain('Todos os clientes');
+    });
+  });
+
+  it('exibe a coluna Placa com a placa da OS de manutenção', async () => {
+    listInstallmentsMock.mockResolvedValue([
+      installment({ maintenanceOrderVehiclePlate: 'ABC1D23' }),
+    ]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      const headers = Array.from(container.querySelectorAll('th')).map((th) => th.textContent);
+      expect(headers).toContain('Placa');
+      expect(container.querySelector('tbody')?.textContent).toContain('ABC1D23');
+    });
+  });
+
+  it('exibe a placa de parcelas de origem extra', async () => {
+    listInstallmentsMock.mockResolvedValue([installment({
+      sourceType: 'extra_payment',
+      maintenanceOrderId: undefined,
+      extraPaymentVehiclePlate: 'XYZ9K88',
+    })]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      expect(container.querySelector('tbody')?.textContent).toContain('XYZ9K88');
+    });
+  });
+
+  it('filtra a tabela por placa', async () => {
+    listInstallmentsMock.mockResolvedValue([
+      installment({ id: 'i1', maintenanceOrderVehiclePlate: 'ABC1D23' }),
+      installment({ id: 'i2', maintenanceOrderVehiclePlate: 'XYZ9K88' }),
+    ]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      expect(container.querySelectorAll('tbody tr')).toHaveLength(2);
+    });
+
+    const input = container.querySelector('[aria-label="Filtrar por placa"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('Filtro de placa não encontrado');
+    const valueDescriptor = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value',
+    ) as { set?: (this: HTMLInputElement, value: string) => void } | undefined;
+    act(() => {
+      valueDescriptor?.set?.call(input, 'abc');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    await waitForAssertion(() => {
+      const rows = container.querySelectorAll('tbody tr');
+      expect(rows).toHaveLength(1);
+      expect(rows[0].textContent).toContain('ABC1D23');
+      expect(rows[0].textContent).not.toContain('XYZ9K88');
+    });
+  });
+
+  it('mostra travessão quando a parcela não tem placa', async () => {
+    listInstallmentsMock.mockResolvedValue([installment()]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      const cells = container.querySelectorAll('tbody tr td');
+      expect(cells[2]?.textContent).toBe('—');
     });
   });
 

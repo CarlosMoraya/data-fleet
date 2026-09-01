@@ -79,6 +79,7 @@ export interface ApprovedOrderForPayment {
   budgetPdfUrl?: string;
   workshopName: string;
   workshopCnpj?: string;
+  vehiclePlate?: string;
   clientId: string;
 }
 
@@ -88,7 +89,7 @@ const INSTALLMENT_SELECT = `
   nota_fiscal_url, nota_fiscal_url_2, invoice_number, pix_key_type, pix_key, pix_beneficiary_name, categoria,
   centro_custo, descricao, notes, created_by_id, payment_approved_by,
   payment_approved_at, paid_by, paid_at, created_at, updated_at,
-  maintenance_orders(os_number, budget_pdf_url, approved_cost, budget_reviewed_by, workshops(name, cnpj), budget_reviewer:profiles!maintenance_orders_budget_reviewed_by_fkey(name)),
+  maintenance_orders(os_number, budget_pdf_url, approved_cost, budget_reviewed_by, workshops(name, cnpj), vehicles(license_plate), budget_reviewer:profiles!maintenance_orders_budget_reviewed_by_fkey(name)),
   extra_payment_requests(request_number, category, supplier_name, supplier_document, approved_by, approved_at, vehicles(license_plate), drivers(name), approver:profiles!extra_payment_requests_approved_by_fkey(name))
 `;
 
@@ -355,6 +356,7 @@ export async function listApprovedOrdersForPayment(
     .select(`
       id, os_number, client_id, status, approved_cost, budget_pdf_url,
       workshops(name, cnpj),
+      vehicles(license_plate),
       payment_installments(value, status)
     `)
     .eq('budget_status', 'aprovado')
@@ -375,6 +377,7 @@ export async function listApprovedOrdersForPayment(
     approved_cost: number | null;
     budget_pdf_url: string | null;
     workshops: { name: string; cnpj: string | null } | null;
+    vehicles: { license_plate: string } | null;
     payment_installments:
       | { value: number | string | null; status?: PaymentInstallmentStatus | null }[]
       | null;
@@ -396,6 +399,7 @@ export async function listApprovedOrdersForPayment(
       budgetPdfUrl: row.budget_pdf_url ?? undefined,
       workshopName: row.workshops?.name ?? '—',
       workshopCnpj: row.workshops?.cnpj ?? undefined,
+      vehiclePlate: row.vehicles?.license_plate ?? undefined,
       clientId: row.client_id,
     };
   });

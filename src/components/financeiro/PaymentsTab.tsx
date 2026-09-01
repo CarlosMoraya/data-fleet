@@ -4,11 +4,11 @@ import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
 import { resolveExportSelection } from '../../lib/paymentExportSelection';
-import { buildPaymentPendingQueue } from '../../lib/paymentPendingDocs';
+import { resolvePaymentVehiclePlate } from '../../lib/paymentVehiclePlate';
 import { canCreatePayments, canMarkPaid } from '../../lib/rolePermissions';
 import { getFinancialDocumentSignedUrl, openPrivateDocument } from '../../lib/storageHelpers';
+import { normalizeSearchText } from '../../lib/textSearch';
 import { cn } from '../../lib/utils';
-import { SpreadsheetPaymentProvider } from '../../services/financialExport/spreadsheetPaymentProvider';
 import { XlsxPaymentProvider } from '../../services/financialExport/xlsxPaymentProvider';
 import {
   listPaymentInstallments,
@@ -16,13 +16,12 @@ import {
   markInstallmentsPaid,
   type ApprovedOrderForPayment,
 } from '../../services/paymentInstallmentService';
-import ActionQueue from '../dashboard/ActionQueue';
 
 import PaymentInstallmentEditModal from './PaymentInstallmentEditModal';
 import PaymentInstallmentFormModal from './PaymentInstallmentFormModal';
 import PaymentInstallmentViewModal from './PaymentInstallmentViewModal';
 
-import type { PaymentInstallment, PaymentInstallmentStatus, PaymentMethod, PaymentSourceType } from '../../types/payment';
+import type { PaymentInstallment, PaymentInstallmentStatus, PaymentSourceType } from '../../types/payment';
 
 const SOURCE_OPTIONS: { value: '' | PaymentSourceType; label: string }[] = [
   { value: '', label: 'Todos' },
@@ -57,12 +56,6 @@ const STATUS_OPTIONS: { value: '' | PaymentInstallmentStatus; label: string }[] 
   { value: 'pago', label: 'Pago' },
 ];
 
-const METHOD_OPTIONS: { value: '' | PaymentMethod; label: string }[] = [
-  { value: '', label: 'Todas as formas' },
-  { value: 'boleto', label: 'Boleto' },
-  { value: 'pix', label: 'Pix' },
-];
-
 function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -82,26 +75,23 @@ async function openSignedUrl(path: string): Promise<void> {
 }
 
 export default function PaymentsTab(): React.ReactElement {
-  const { user, currentClient, clients } = useAuth();
+  const { user, currentClient } = useAuth();
   const queryClient = useQueryClient();
   const role = user?.role;
 
   const canCreate = canCreatePayments(role);
   const canPaid = canMarkPaid(role);
   const canExport = canPaid; // só Financeiro/Admin Master (canMarkPaid)
-  const showClientFilter = role === 'Admin Master' && clients.length > 0;
-
   const [filterInvoice, setFilterInvoice] = useState('');
+  const [filterPlate, setFilterPlate] = useState('');
   const [filterStatus, setFilterStatus] = useState<'' | PaymentInstallmentStatus>('');
-  const [filterMethod, setFilterMethod] = useState<'' | PaymentMethod>('');
   const [filterSource, setFilterSource] = useState<'' | PaymentSourceType>('');
-  const [filterClientId, setFilterClientId] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<PaymentInstallment | null>(null);
   const [viewing, setViewing] = useState<PaymentInstallment | null>(null);
 
-  const activeClientId = showClientFilter ? (filterClientId || undefined) : (currentClient?.id ?? undefined);
+  const activeClientId = currentClient?.id ?? undefined;
 
   const { data: installments = [], isLoading } = useQuery({
     queryKey: ['paymentInstallments', { clientId: activeClientId }],
@@ -133,19 +123,20 @@ export default function PaymentsTab(): React.ReactElement {
     return m;
   }, [approvedOrders]);
 
-  const pendingQueue = useMemo(() => buildPaymentPendingQueue(installments), [installments]);
-
   const filtered = useMemo(() => {
     return installments.filter((i) => {
       if (filterInvoice && !(i.invoiceNumber ?? '').toLowerCase().includes(filterInvoice.toLowerCase())) {
         return false;
       }
+      if (filterPlate) {
+        const plate = normalizeSearchText(resolvePaymentVehiclePlate(i));
+        if (!plate.includes(normalizeSearchText(filterPlate))) return false;
+      }
       if (filterStatus && i.status !== filterStatus) return false;
-      if (filterMethod && i.paymentMethod !== filterMethod) return false;
       if (filterSource && i.sourceType !== filterSource) return false;
       return true;
     });
-  }, [installments, filterInvoice, filterStatus, filterMethod, filterSource]);
+  }, [installments, filterInvoice, filterPlate, filterStatus, filterSource]);
 
   const selectedInstallments = useMemo(
     () => filtered.filter((i) => selected.has(i.id)),
@@ -183,34 +174,6 @@ export default function PaymentsTab(): React.ReactElement {
     },
   });
 
-  const handleExport = async () => {
-    try {
-      const provider = new SpreadsheetPaymentProvider();
-      const exportRows = resolveExportSelection(filtered, selected);
-      if (exportRows.length === 0) {
-        window.alert('Nada a exportar.');
-        return;
-      }
-      const result = await provider.exportData(activeClientId ?? '', exportRows);
-      if (!result.success || !result.content) {
-        window.alert('Nada a exportar.');
-        return;
-      }
-      const blob = new Blob([result.content], { type: 'text/csv;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `pagamentos_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Falha ao gerar CSV.';
-      window.alert(msg);
-    }
-  };
-
   const handleExportXlsx = async () => {
     try {
       const provider = new XlsxPaymentProvider();
@@ -240,11 +203,6 @@ export default function PaymentsTab(): React.ReactElement {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      {/* Pending docs card */}
-      {pendingQueue.length > 0 && (
-        <ActionQueue items={pendingQueue} title="Pendências de pagamento" />
-      )}
-
       {/* Filters + actions */}
       <div className="flex flex-wrap items-center gap-2">
         <input
@@ -252,56 +210,36 @@ export default function PaymentsTab(): React.ReactElement {
           placeholder="Filtrar por NF/Fatura…"
           value={filterInvoice}
           onChange={(e) => setFilterInvoice(e.target.value)}
-          className="rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+          className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none sm:w-44"
+        />
+        <input
+          type="text"
+          placeholder="Filtrar por placa…"
+          aria-label="Filtrar por placa"
+          value={filterPlate}
+          onChange={(e) => setFilterPlate(e.target.value)}
+          className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none sm:w-36"
         />
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value as '' | PaymentInstallmentStatus)}
-          className="rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+          className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none sm:w-44"
         >
           {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         <select
-          value={filterMethod}
-          onChange={(e) => setFilterMethod(e.target.value as '' | PaymentMethod)}
-          className="rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
-        >
-          {METHOD_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        <select
           value={filterSource}
           onChange={(e) => setFilterSource(e.target.value as '' | PaymentSourceType)}
-          className="rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+          className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none sm:w-36"
         >
           {SOURCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        {showClientFilter && (
-          <select
-            value={filterClientId}
-            onChange={(e) => setFilterClientId(e.target.value)}
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
-          >
-            <option value="">Todos os clientes</option>
-            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
-          {canExport && (
-            <button
-              type="button"
-              onClick={() => { void handleExport(); }}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
-            >
-              <Download className="h-4 w-4" />
-              Baixar CSV
-            </button>
-          )}
+        <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
           {canExport && (
             <button
               type="button"
               onClick={() => { void handleExportXlsx(); }}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium whitespace-nowrap text-zinc-700 transition-colors hover:bg-zinc-50"
             >
               <Download className="h-4 w-4" />
               Baixar XLSX
@@ -311,7 +249,7 @@ export default function PaymentsTab(): React.ReactElement {
             <button
               type="button"
               onClick={() => setModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+              className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium whitespace-nowrap text-white transition-colors hover:bg-orange-600"
             >
               <Plus className="h-4 w-4" />
               Cadastrar Pagamento
@@ -375,6 +313,7 @@ export default function PaymentsTab(): React.ReactElement {
                     </th>
                   )}
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">NF / Fatura</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Placa</th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Origem</th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Parc.</th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Valor</th>
@@ -399,6 +338,7 @@ export default function PaymentsTab(): React.ReactElement {
                         </td>
                       )}
                       <td className="px-3 py-2.5 font-mono text-xs font-semibold text-zinc-700">{i.invoiceNumber ?? '—'}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs text-zinc-600">{resolvePaymentVehiclePlate(i) ?? '—'}</td>
                       <td className="px-3 py-2.5">
                         <span className={cn(
                           'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',

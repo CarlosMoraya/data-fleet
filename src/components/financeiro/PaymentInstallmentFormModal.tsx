@@ -3,8 +3,11 @@ import { Loader2, X } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
+import {
+  filterApprovedOrdersByQuery,
+  selectSelectableApprovedOrders,
+} from '../../lib/approvedOrderSearch';
 import { extractInvoiceNumber } from '../../lib/invoiceOcr';
-import { isOrderPayable } from '../../lib/maintenanceStatusCoherence';
 import {
   exceedsBudget,
   generateInstallmentDrafts,
@@ -24,10 +27,14 @@ import {
   createPaymentInstallmentsBatch,
   listApprovedOrdersForPayment,
 } from '../../services/paymentInstallmentService';
+import SearchableSelect from '../common/SearchableSelect';
 
 import InstallmentDraftTable from './InstallmentDraftTable';
 
-import type { InstallmentDraftInput } from '../../services/paymentInstallmentService';
+import type {
+  ApprovedOrderForPayment,
+  InstallmentDraftInput,
+} from '../../services/paymentInstallmentService';
 import type {
   InstallmentDraft,
   InstallmentInterval,
@@ -50,6 +57,10 @@ function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function buildOrderOptionLabel(order: ApprovedOrderForPayment): string {
+  return `${order.vehiclePlate ?? '—'} · ${order.osNumber} · ${order.workshopName} · ${formatCurrency(order.approvedCost)}`;
+}
+
 export default function PaymentInstallmentFormModal({
   open,
   onClose,
@@ -58,6 +69,7 @@ export default function PaymentInstallmentFormModal({
   const queryClient = useQueryClient();
 
   const [orderId, setOrderId] = useState('');
+  const [orderQuery, setOrderQuery] = useState('');
   const [batchMode, setBatchMode] = useState<BatchMode>('batch');
   const [count, setCount] = useState(1);
   const [firstDueDate, setFirstDueDate] = useState('');
@@ -93,9 +105,13 @@ export default function PaymentInstallmentFormModal({
     () => approvedOrders.find((o) => o.id === orderId) ?? null,
     [approvedOrders, orderId],
   );
-  const ordersWithRemainingBudget = useMemo(
-    () => approvedOrders.filter((o) => o.remainingBudget > 0 && isOrderPayable(o.status, 'aprovado')),
+  const selectableOrders = useMemo(
+    () => selectSelectableApprovedOrders(approvedOrders),
     [approvedOrders],
+  );
+  const visibleOrders = useMemo(
+    () => filterApprovedOrdersByQuery(selectableOrders, orderQuery),
+    [selectableOrders, orderQuery],
   );
 
   const { data: existingInstallments = [] } = useQuery({
@@ -126,7 +142,7 @@ export default function PaymentInstallmentFormModal({
   if (!open) return null;
 
   const reset = () => {
-    setOrderId(''); setBatchMode('batch'); setCount(1); setFirstDueDate('');
+    setOrderId(''); setOrderQuery(''); setBatchMode('batch'); setCount(1); setFirstDueDate('');
     setInterval('mensal'); setPaymentMethod('boleto'); setPixKeyType('aleatoria');
     setPixKey(''); setPixBeneficiaryName(''); setCategoria(''); setCentroCusto('');
     setCompetenciaDate(''); setDescricao(''); setNotaFile(null); setNotaFile2(null); setDrafts([]);
@@ -326,18 +342,19 @@ export default function PaymentInstallmentFormModal({
                 <Loader2 className="h-4 w-4 animate-spin" /> <span className="text-sm">Carregando OS…</span>
               </div>
             ) : (
-              <select
+              <SearchableSelect
+                options={visibleOrders.map((o) => ({
+                  value: o.id,
+                  label: buildOrderOptionLabel(o),
+                }))}
                 value={orderId}
-                onChange={(e) => { setOrderId(e.target.value); setDrafts([]); }}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
-              >
-                <option value="">— Selecione —</option>
-                {ordersWithRemainingBudget.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.osNumber} — {o.workshopName} ({formatCurrency(o.approvedCost)})
-                  </option>
-                ))}
-              </select>
+                onChange={(next) => { setOrderId(next); setDrafts([]); }}
+                query={orderQuery}
+                onQueryChange={setOrderQuery}
+                ariaLabel="Ordem de Serviço (orçamento aprovado)"
+                placeholder="Busque por placa, OS ou oficina…"
+                emptyLabel="Nenhuma OS encontrada"
+              />
             )}
           </div>
 

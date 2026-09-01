@@ -51,6 +51,7 @@ describe('paymentInstallmentFromRow', () => {
         budget_pdf_url: 'https://public/budget.pdf',
         approved_cost: null,
         workshops: null,
+        vehicles: null,
         budget_reviewer: { name: 'Fulano Aprovador' },
       },
     });
@@ -91,6 +92,7 @@ describe('paymentInstallmentFromRow', () => {
         budget_pdf_url: null,
         approved_cost: 1500.5,
         workshops: null,
+        vehicles: null,
         budget_reviewer: null,
       },
     }));
@@ -98,6 +100,34 @@ describe('paymentInstallmentFromRow', () => {
 
     const withoutOrder = paymentInstallmentFromRow(baseRow());
     expect(withoutOrder.maintenanceOrderApprovedCost).toBeUndefined();
+  });
+
+  it('mapeia a placa do veículo da OS de manutenção', () => {
+    const withPlate = paymentInstallmentFromRow(baseRow({
+      maintenance_orders: {
+        os_number: 'OS-1',
+        budget_pdf_url: null,
+        approved_cost: 1500.5,
+        workshops: null,
+        vehicles: { license_plate: 'ABC1D23' },
+        budget_reviewer: null,
+      },
+    }));
+    expect(withPlate.maintenanceOrderVehiclePlate).toBe('ABC1D23');
+  });
+
+  it('mapeia placa de manutenção nula como undefined', () => {
+    const withoutPlate = paymentInstallmentFromRow(baseRow({
+      maintenance_orders: {
+        os_number: 'OS-1',
+        budget_pdf_url: null,
+        approved_cost: 1500.5,
+        workshops: null,
+        vehicles: null,
+        budget_reviewer: null,
+      },
+    }));
+    expect(withoutPlate.maintenanceOrderVehiclePlate).toBeUndefined();
   });
 
   it('mapeia parcela de manutenção como antes (sourceType maintenance_order)', () => {

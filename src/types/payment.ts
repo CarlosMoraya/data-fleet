@@ -48,6 +48,7 @@ export interface PaymentInstallment {
   workshopCnpj?: string;
   maintenanceOrderOs?: string;
   maintenanceOrderApprovedCost?: number;
+  maintenanceOrderVehiclePlate?: string;
   // Campos derivados de origem extra (Pagamentos Extras / Serviços Avulsos)
   extraPaymentNumber?: string;
   extraPaymentCategory?: string;
@@ -95,6 +96,7 @@ export interface PaymentInstallmentRow {
     budget_pdf_url: string | null;
     approved_cost: number | null;
     workshops: { name: string; cnpj: string | null } | null;
+    vehicles: { license_plate: string } | null;
     budget_reviewer: { name: string } | null;
   } | null;
   extra_payment_requests?: {

@@ -256,9 +256,9 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
       await expect(markPaidButton).toBeEnabled({ timeout: 10000 });
 
       const downloadPromise = page.waitForEvent('download');
-      await page.getByRole('button', { name: /Baixar planilha/ }).click();
+      await page.getByRole('button', { name: /Baixar XLSX/ }).click();
       const download = await downloadPromise;
-      expect(download.suggestedFilename()).toMatch(/^pagamentos_.*\.csv$/);
+      expect(download.suggestedFilename()).toMatch(/^pagamentos_.*\.xlsx$/);
 
       await markPaidButton.click();
       await expect(row.getByText('Pago')).toBeVisible({ timeout: 15000 });
@@ -419,7 +419,7 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
     }
   });
 
-  test('11 — Financeiro vê Cliente/Fornecedor e CNPJ/CPF no detalhe da parcela e no CSV (RLS)', async ({ browser }) => {
+  test('11 — Financeiro vê Cliente/Fornecedor e CNPJ/CPF no detalhe da parcela e no XLSX (RLS)', async ({ browser }) => {
     const email = optionalEnv('TEST_FINANCEIRO_EMAIL');
     const password = optionalEnv('TEST_FINANCEIRO_PASSWORD');
     if (!email || !password || !osId || !workshopName) {
@@ -447,10 +447,10 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
       await expect(page.getByText(osNumber).first()).toBeVisible({ timeout: 15000 });
 
       const downloadPromise = page.waitForEvent('download');
-      await page.getByRole('button', { name: /Baixar planilha|Baixar CSV/ }).click();
+      await page.getByRole('button', { name: /Baixar XLSX/ }).click();
       const download = await downloadPromise;
-      const csvPath = await download.path();
-      expect(csvPath).toBeTruthy();
+      const xlsxPath = await download.path();
+      expect(xlsxPath).toBeTruthy();
     } finally {
       await page.context().close();
     }
