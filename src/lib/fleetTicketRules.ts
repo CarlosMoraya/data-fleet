@@ -179,6 +179,13 @@ export const FLEET_TICKET_CRITICALITY_DESCRIPTIONS: Record<FleetTicketCriticalit
   low: 'Para problemas em que uma parada não programada pode gerar um prejuízo ao equipamento no longo prazo',
 };
 
+export const FLEET_TICKET_CRITICALITY_ORDER: readonly FleetTicketCriticality[] = [
+  'critical',
+  'high',
+  'medium',
+  'low',
+];
+
 export interface FleetTicketOdometerInput {
   rawValue: string;
   lastOfficialKm: number | null;

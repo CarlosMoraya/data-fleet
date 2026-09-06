@@ -32,7 +32,9 @@ vi.mock('../services/vehicleOdometerService', () => ({
     fullText: info?.value == null ? 'Último Km: sem leitura' : `Último Km: ${info.value} km`,
   }),
 }));
-vi.mock('../components/CreateFleetTicketModal', () => ({ default: () => null }));
+vi.mock('../components/CreateFleetTicketModal', () => ({
+  default: ({ open }: { open: boolean }) => (open ? <div>MODAL_CRIACAO_ABERTO</div> : null),
+}));
 vi.mock('../components/FleetTicketModal', () => ({ default: () => null }));
 
 import FleetTickets from './FleetTickets';
@@ -297,6 +299,45 @@ describe('FleetTickets', () => {
     });
     expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
     expect(container.textContent).toContain('ABC1D23');
+    act(() => root.unmount());
+  });
+
+  it('clicar em "Novo chamado" abre o aviso de duplicidade e não abre o modal de criação', async () => {
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    const newTicketButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Novo chamado'))!;
+    act(() => newTicketButton.click());
+    expect(container.textContent).toContain('Tem certeza que o problema que você vai relatar já não foi informado por meio de um checklist realizado pelo motorista desse veículo?');
+    expect(container.textContent).toContain('Passo 1 de 2');
+    expect(container.textContent).not.toContain('MODAL_CRIACAO_ABERTO');
+    act(() => root.unmount());
+  });
+
+  it('cancelar o primeiro aviso não abre o modal de criação', async () => {
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    const newTicketButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Novo chamado'))!;
+    act(() => newTicketButton.click());
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    const cancelButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Cancelar')!;
+    act(() => cancelButton.click());
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.textContent).not.toContain('MODAL_CRIACAO_ABERTO');
+    act(() => root.unmount());
+  });
+
+  it('prosseguir nos dois avisos abre o modal de criação', async () => {
+    const root = await renderPage();
+    await waitForText('XYZ9K88');
+    const newTicketButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Novo chamado'))!;
+    act(() => newTicketButton.click());
+    const proceedButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Prosseguir')!;
+    act(() => proceedButton.click());
+    expect(container.textContent).toContain('Abra o chamado seguindo o guia de classificação abaixo:');
+    const proceedButtonStepTwo = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Prosseguir')!;
+    act(() => proceedButtonStepTwo.click());
+    expect(container.textContent).toContain('MODAL_CRIACAO_ABERTO');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
     act(() => root.unmount());
   });
 });

@@ -61,6 +61,10 @@ test.describe('Chamados/S.O.S. — fluxo pendente DEV', () => {
       skipPendingScenario('e2e/.auth/carlos.json', 'Yard Auditor');
       await page.goto('/chamados');
       await page.getByRole('button', { name: 'Novo chamado' }).click();
+      await page.getByRole('button', { name: 'Prosseguir' }).click();
+      await expect(page.getByRole('heading', { name: 'Guia de classificação' })).toBeVisible();
+      await page.getByRole('button', { name: 'Prosseguir' }).click();
+      await expect(page.locator('#fleet-ticket-vehicle')).toBeVisible();
       await page.locator('#fleet-ticket-vehicle').selectOption({ index: 1 });
       await page.locator('#fleet-ticket-title').fill('Pneu danificado na base');
       await page.locator('#fleet-ticket-description').fill('O pneu precisa de inspeção antes da próxima saída.');

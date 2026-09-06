@@ -8,6 +8,7 @@ import FleetTicketAgeBadge from '../components/FleetTicketAgeBadge';
 import FleetTicketCriticalityCards from '../components/FleetTicketCriticalityCards';
 import FleetTicketModal from '../components/FleetTicketModal';
 import LastKmLabel from '../components/LastKmLabel';
+import NewFleetTicketGuardModal from '../components/NewFleetTicketGuardModal';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { usePersistentFilterState } from '../hooks/usePersistentUiState';
@@ -65,6 +66,7 @@ export default function FleetTickets() {
   const [slaFilter, setSlaFilter] = usePersistentFilterState<FleetTicketSlaFilter>('fleet-tickets', 'sla', '', { validator: isFleetTicketSlaFilter });
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [guardOpen, setGuardOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
 
   const ticketsQuery = useQuery({
@@ -150,7 +152,7 @@ export default function FleetTickets() {
           <p className="mt-1 text-sm text-zinc-500">Comunique, classifique e acompanhe problemas operacionais da frota.</p>
         </div>
         {canOpenFleetTicketReport(user?.role) && currentClient?.id && (
-          <button type="button" onClick={() => setCreateOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600"><Plus className="h-4 w-4" /> Novo chamado</button>
+          <button type="button" onClick={() => setGuardOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600"><Plus className="h-4 w-4" /> Novo chamado</button>
         )}
       </div>
 
@@ -265,6 +267,11 @@ export default function FleetTickets() {
         )}
       </div>
 
+      <NewFleetTicketGuardModal
+        open={guardOpen}
+        onCancel={() => setGuardOpen(false)}
+        onProceed={() => { setGuardOpen(false); setCreateOpen(true); }}
+      />
       <CreateFleetTicketModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={handleCreated} />
       {selectedTicket && <FleetTicketModal ticket={selectedTicket} onClose={closeTicket} onSaved={() => { void queryClient.invalidateQueries({ queryKey: ['fleetTickets'] }); }} />}
     </div>

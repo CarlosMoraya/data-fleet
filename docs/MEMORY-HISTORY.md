@@ -2,6 +2,26 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-09-06: Fricção deliberada antes da abertura de chamado
+
+Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 3 — alteração em funcionalidade existente). Entre o clique no botão "Novo chamado" (tela `/chamados`) e a abertura do modal de criação passaram a existir **dois pop-ups sequenciais e obrigatórios**: (1) alerta sobre duplicidade com checklists de motorista e (2) guia de classificação de criticidade. A fricção é **deliberada e intencional** — objetivo declarado do usuário: dificultar a abertura de chamados desnecessários ou duplicados. Nenhuma regra de negócio, campo, tabela, permissão ou contrato de API foi alterado.
+
+**Entrega** — cinco arquivos:
+- `src/lib/fleetTicketRules.ts`: nova constante exportada `FLEET_TICKET_CRITICALITY_ORDER` (ordem canônica `critical`, `high`, `medium`, `low`), imediatamente após `FLEET_TICKET_CRITICALITY_DESCRIPTIONS`, que permaneceu byte a byte idêntica.
+- `src/components/NewFleetTicketGuardModal.tsx` (novo): componente apresentacional com dois passos internos (`step: 1 | 2`, resetado a `1` sempre que `open` vira `true`). Contrato fechado `open`/`onProceed`/`onCancel` — sem serviço, sem query, sem persistência, sem dados de domínio nas props. Moldura acessível em `GuardDialogShell` (não exportada): `role="dialog"`, `aria-modal`, `aria-labelledby` via `useId`, Escape via listener em `document`, `stopPropagation` no card, clique no overlay cancela, botão `X` com `aria-label="Fechar"`. Passo 1 usa ícone `AlertTriangle` e bloco amber com o texto exato do alerta de duplicidade; passo 2 itera `FLEET_TICKET_CRITICALITY_ORDER` renderizando rótulos de `fleetTicketCriticalityLabel` e descrições de `FLEET_TICKET_CRITICALITY_DESCRIPTIONS` — nenhum dos oito textos como literal no componente.
+- `src/pages/FleetTickets.tsx`: exatamente quatro mudanças — import do guard, estado `guardOpen`, handler do botão "Novo chamado" (`setGuardOpen(true)`; `type`, `className`, ícone e rótulo preservados) e render do guard imediatamente antes de `<CreateFleetTicketModal>`, que passa a abrir exclusivamente pela conclusão do segundo aviso.
+- `src/components/NewFleetTicketGuardModal.test.tsx` (novo, 10 testes): render nula com `open=false`; passo 1 com contrato de acessibilidade asserido; ausência do guia no passo 1; `Cancelar` no passo 1; `Prosseguir` no passo 1 avança sem chamar `onProceed`; guia com as quatro criticidades na ordem do domínio **comparado contra as fontes importadas** (impede duplicação de texto por regressão); `Cancelar` no passo 2 não volta ao passo 1; `Prosseguir` no passo 2 chama `onProceed` 1x; Escape em ambos os passos; reabrir volta ao passo 1 (prova executável de que não existe memória entre aberturas).
+- `src/pages/FleetTickets.test.tsx`: mock de `CreateFleetTicketModal` ajustado para renderizar marcador `MODAL_CRIACAO_ABERTO` quando aberto + 3 testes de integração (abre aviso sem abrir modal; cancelar não abre modal; prosseguir nos dois abre modal).
+- `e2e/pending/fleet-tickets-flow.spec.ts` (cenário 3): dois avanços "Prosseguir" com asserção intermediária `Guia de classificação` (anti-flakiness) entre o clique em "Novo chamado" e o preenchimento do formulário.
+
+**Restrições respeitadas** — `CreateFleetTicketModal.tsx` e `SosTicket.tsx` intocados; nenhuma dependência instalada; nenhuma migration; nenhum storage/query param/estado global; a condição de exibição do botão (`canOpenFleetTicketReport` + `currentClient?.id`) permanece a única gate.
+
+**Validação** — `npx tsc --noEmit` 0 erros; `npx eslint src/` 0 erros (262 warnings, mesmo patamar); `npm run test:unit` 223 arquivos / 2.028 testes passando (2.015 anteriores + 13 novos); `npm run test:smoke` 7/7. E2E de Chamados: **bloqueado** (exige ambiente DEV autenticado com `e2e/.auth/carlos.json`) — registrado como pendência, não tratado como passado.
+
+**Decisões da sessão** — fricção é o requisito, não efeito colateral; um componente com dois passos internos em vez de dois genéricos; "Cancelar" no passo 2 fecha tudo (desistir é saída limpa); "check list" grafado "checklist" por ajuste autorizado; modal de criação intocado; `FLEET_TICKET_CRITICALITY_ORDER` como dado de domínio.
+
+**Observações para sessões futuras** — `docs/MEMORY.md` excedeu o tamanho ideal (candidato a arquivamento, fora de escopo por decisão do usuário); `agent/AGENT-FRONTEND.md` passou de duas páginas; `CreateFleetTicketModal.tsx` mantém array local `CRITICALITY_OPTIONS` com rótulos literais (débito pequeno, candidato à sessão que der destaque ao guia interno do modal); oportunidade de produto: verificar de fato checklists recentes do veículo em vez de texto genérico no aviso de duplicidade.
+
 ## Sessão — 2026-08-25: Correção de chamados críticos e diagnóstico Telegram
 
 Implementado o escopo fechado de `IMPLEMENTATION_FIXBUG.md`. A Etapa 0 confirmou que o chamado de teste foi gravado no tenant Grupo PRALOG por causa do dropdown cross-tenant do Admin Master; o Bug 3 foi descartado e o Passo 6 foi removido.
