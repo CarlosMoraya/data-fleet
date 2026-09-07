@@ -313,6 +313,16 @@ export default function VehicleDetailModal({ vehicle, lastRoute, onClose, onEdit
             </div>
           </div>
 
+          {/* Logística */}
+          <div className="space-y-3">
+            <SectionTitle title="Logística" />
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <DetailField label="Embarcador" value={vehicle.shipperName} />
+              <DetailField label="Unidade Operacional" value={vehicle.operationalUnitName} />
+              <BoolField label="Veículo dedicado" value={vehicle.isDedicated} />
+            </div>
+          </div>
+
           {/* Documentos */}
           <div className="space-y-3">
             <SectionTitle title="Documentos" />

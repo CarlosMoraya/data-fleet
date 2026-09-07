@@ -43,6 +43,16 @@ describe('vehicleToRow', () => {
     const row = vehicleToRow({}, 'c1');
     expect(row.operation_start_date).toBeNull();
   });
+
+  it('vehicleToRow grava is_dedicated true', () => {
+    const row = vehicleToRow({ isDedicated: true }, 'c1');
+    expect(row.is_dedicated).toBe(true);
+  });
+
+  it('vehicleToRow usa false quando isDedicated está indefinido', () => {
+    const row = vehicleToRow({}, 'c1');
+    expect(row.is_dedicated).toBe(false);
+  });
 });
 
 describe('vehicleFromRow', () => {
@@ -92,6 +102,29 @@ describe('vehicleFromRow', () => {
 
     const vehicle = vehicleFromRow(row);
     expect(vehicle.operationStartDate).toBeUndefined();
+  });
+
+  it('vehicleFromRow mapeia is_dedicated true', () => {
+    const row = {
+      id: 'v1',
+      is_dedicated: true,
+    } as unknown as VehicleRow;
+
+    const vehicle = vehicleFromRow(row);
+    expect(vehicle.isDedicated).toBe(true);
+  });
+
+  it('vehicleFromRow usa false quando is_dedicated está ausente ou nulo', () => {
+    const rowWithoutValue = {
+      id: 'v1',
+    } as unknown as VehicleRow;
+    const rowWithNull = {
+      id: 'v2',
+      is_dedicated: null,
+    } as unknown as VehicleRow;
+
+    expect(vehicleFromRow(rowWithoutValue).isDedicated).toBe(false);
+    expect(vehicleFromRow(rowWithNull).isDedicated).toBe(false);
   });
 
   it('vehicleFromRow mantém acquisition_date e operation_start_date independentes', () => {

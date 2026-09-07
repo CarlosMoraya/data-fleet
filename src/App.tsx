@@ -51,6 +51,7 @@ const ControleCarretas = lazy(() => import('./pages/ControleCarretas'));
 const SosTicket = lazy(() => import('./pages/SosTicket'));
 const FleetTickets = lazy(() => import('./pages/FleetTickets'));
 const FuelSupplies = lazy(() => import('./pages/FuelSupplies'));
+const MeliUtilization = lazy(() => import('./pages/MeliUtilization'));
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -130,6 +131,7 @@ export default function App() {
                 <Route path="minha-oficina" element={<MyWorkshop />} />
                 <Route path="financeiro" element={<Financeiro />} />
                 <Route path="abastecimento" element={<FuelSupplies />} />
+                <Route path="utilizacao-meli" element={<MeliUtilization />} />
                 <Route path="conta/senha" element={<ChangePassword />} />
                 <Route path="revisoes-garantia" element={<WarrantyRevisions />} />
                 <Route path="settings" element={<Settings />} />

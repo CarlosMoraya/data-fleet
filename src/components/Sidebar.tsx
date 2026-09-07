@@ -17,6 +17,7 @@ import {
   Siren,
   MessagesSquare,
   Fuel,
+  TrendingUp,
 } from 'lucide-react';
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
@@ -48,6 +49,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'Manutenção', to: '/manutencao', icon: Wrench, roles: ['Workshop', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Financeiro', to: '/financeiro', icon: Wallet, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master', 'Workshop', 'Financeiro'] },
   { name: 'Abastecimento', to: '/abastecimento', icon: Fuel, roles: ['Fleet Analyst', 'Supervisor', 'Coordinator', 'Manager', 'Director', 'Admin Master'] },
+  { name: 'Utilização MELI', to: '/utilizacao-meli', icon: TrendingUp, roles: ['Fleet Analyst', 'Supervisor', 'Coordinator', 'Manager', 'Director', 'Admin Master'] },
   { name: 'Revisões de Garantia', to: '/revisoes-garantia', icon: ShieldCheck, roles: ['Fleet Analyst', 'Supervisor', 'Coordinator', 'Manager', 'Director', 'Admin Master'] },
   { name: 'Templates', to: '/checklist-templates', icon: FileStack, roles: ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Configurações', to: '/settings', icon: Settings, roles: ['Coordinator', 'Manager', 'Director', 'Admin Master'] },
@@ -69,6 +71,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const userRole = user?.role;
   const veloeClientId = import.meta.env.VITE_VELOE_CLIENT_ID as string | undefined;
+  const lastRouteClientId = import.meta.env.VITE_LAST_ROUTE_CLIENT_ID as string | undefined;
 
   const visibleNavItems = userRole === 'Coupling Agent'
     ? NAV_ITEMS.filter((item) => item.to === '/controle-carretas')
@@ -80,6 +83,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           // Abastecimento é exclusivo do tenant habilitado para a integração Veloe.
           if (item.to === '/abastecimento') {
             return !!veloeClientId && currentClient?.id === veloeClientId;
+          }
+          if (item.to === '/utilizacao-meli') {
+            return !!lastRouteClientId && currentClient?.id === lastRouteClientId;
           }
           return true;
         });

@@ -274,4 +274,96 @@ describe('Sidebar', () => {
 
     expect(container.textContent).not.toContain('Abastecimento');
   });
+
+  it('tenant habilitado + Director vê o item "Utilização MELI"', () => {
+    vi.stubEnv('VITE_LAST_ROUTE_CLIENT_ID', '6c5daeb6-df37-4e61-93c4-41975bf846c6');
+    authState = {
+      user: {
+        id: 'u11',
+        name: 'Director Deluna',
+        email: 'director@deluna.com',
+        role: 'Director',
+        clientId: '6c5daeb6-df37-4e61-93c4-41975bf846c6',
+        budgetApprovalLimit: 0,
+      },
+      currentClient: {
+        id: '6c5daeb6-df37-4e61-93c4-41975bf846c6',
+        name: 'Deluna Transportes',
+      } as Client,
+      logout: async () => {},
+    };
+
+    renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
+
+    expect(container.textContent).toContain('Utilização MELI');
+  });
+
+  it('tenant diferente + Director não vê o item "Utilização MELI"', () => {
+    vi.stubEnv('VITE_LAST_ROUTE_CLIENT_ID', '6c5daeb6-df37-4e61-93c4-41975bf846c6');
+    authState = {
+      user: {
+        id: 'u12',
+        name: 'Director Outro',
+        email: 'director@outro.com',
+        role: 'Director',
+        clientId: '00000000-0000-0000-0000-000000000002',
+        budgetApprovalLimit: 0,
+      },
+      currentClient: {
+        id: '00000000-0000-0000-0000-000000000002',
+        name: 'Outro Cliente',
+      } as Client,
+      logout: async () => {},
+    };
+
+    renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
+
+    expect(container.textContent).not.toContain('Utilização MELI');
+  });
+
+  it('sem VITE_LAST_ROUTE_CLIENT_ID o item "Utilização MELI" fica ausente', () => {
+    vi.stubEnv('VITE_LAST_ROUTE_CLIENT_ID', '');
+    authState = {
+      user: {
+        id: 'u13',
+        name: 'Director Deluna',
+        email: 'director@deluna.com',
+        role: 'Director',
+        clientId: '6c5daeb6-df37-4e61-93c4-41975bf846c6',
+        budgetApprovalLimit: 0,
+      },
+      currentClient: {
+        id: '6c5daeb6-df37-4e61-93c4-41975bf846c6',
+        name: 'Deluna Transportes',
+      } as Client,
+      logout: async () => {},
+    };
+
+    renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
+
+    expect(container.textContent).not.toContain('Utilização MELI');
+  });
+
+  it('tenant habilitado + Driver não vê o item "Utilização MELI"', () => {
+    vi.stubEnv('VITE_LAST_ROUTE_CLIENT_ID', '6c5daeb6-df37-4e61-93c4-41975bf846c6');
+    authState = {
+      user: {
+        id: 'u14',
+        name: 'Driver Deluna',
+        email: 'driver@deluna.com',
+        role: 'Driver',
+        clientId: '6c5daeb6-df37-4e61-93c4-41975bf846c6',
+        budgetApprovalLimit: 0,
+      },
+      currentClient: {
+        id: '6c5daeb6-df37-4e61-93c4-41975bf846c6',
+        name: 'Deluna Transportes',
+      } as Client,
+      logout: async () => {},
+    };
+
+    renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
+
+    expect(container.textContent).not.toContain('Utilização MELI');
+  });
 });

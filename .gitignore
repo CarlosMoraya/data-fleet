@@ -31,3 +31,7 @@ supabase/.temp/
 
 # ESLint transient report
 eslint-report.txt
+
+# Andaime de ferramentas executoras (skills/plugins materializados no repo pelo
+# próprio CLI, não código do produto). Ex.: Codex vendoriza .agents/skills/.
+.agents/
