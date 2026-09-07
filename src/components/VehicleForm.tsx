@@ -161,6 +161,7 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
     coolingEquipment: false,
     acquisition: 'Owned',
     spareKey: false,
+    isDedicated: false,
     vehicleManual: false,
     warranty: false,
     hasInsurance: false,
@@ -981,6 +982,19 @@ export default function VehicleForm({ vehicle, fieldSettings, availableDrivers, 
                   {!formData.shipperId && (
                     <p className="mt-1 text-xs text-zinc-400">Selecione um embarcador primeiro.</p>
                   )}
+                </div>
+                <div className="flex items-center sm:col-span-2">
+                  <input
+                    id="isDedicated"
+                    name="isDedicated"
+                    type="checkbox"
+                    checked={formData.isDedicated || false}
+                    onChange={handleChange}
+                    className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600"
+                  />
+                  <label htmlFor="isDedicated" className="ml-2 block text-sm text-zinc-900">
+                    Veículo dedicado
+                  </label>
                 </div>
               </div>
             </div>

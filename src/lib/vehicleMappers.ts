@@ -51,6 +51,7 @@ export interface VehicleRow {
   driver_id: string | null;
   shipper_id: string | null;
   operational_unit_id: string | null;
+  is_dedicated: boolean;
   pbt: number | null;
   cmt: number | null;
   eixos: number | null;
@@ -122,6 +123,7 @@ export function vehicleFromRow(row: VehicleRow): Vehicle {
     shipperName: (row as VehicleRow & { shippers?: { name: string } }).shippers?.name ?? undefined,
     operationalUnitId: row.operational_unit_id ?? undefined,
     operationalUnitName: (row as VehicleRow & { operational_units?: { name: string } }).operational_units?.name ?? undefined,
+    isDedicated: row.is_dedicated ?? false,
     pbt: row.pbt ?? undefined,
     cmt: row.cmt ?? undefined,
     eixos: row.eixos ?? undefined,
@@ -183,6 +185,7 @@ export function vehicleToRow(vehicle: Partial<Vehicle>, clientId: string): Omit<
     driver_id: vehicle.driverId ?? null,
     shipper_id: vehicle.shipperId ?? null,
     operational_unit_id: vehicle.operationalUnitId ?? null,
+    is_dedicated: vehicle.isDedicated ?? false,
     pbt: vehicle.pbt != null ? commaToFloat(vehicle.pbt) : null,
     cmt: vehicle.cmt != null ? commaToFloat(vehicle.cmt) : null,
     eixos: vehicle.eixos != null ? parseInt(String(vehicle.eixos), 10) : null,

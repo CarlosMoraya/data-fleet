@@ -64,6 +64,7 @@ export interface Vehicle {
   shipperName?: string;            // from JOIN
   operationalUnitId?: string;      // FK → operational_units.id (nullable)
   operationalUnitName?: string;    // from JOIN
+  isDedicated?: boolean;
 
   // Garantia & Revisões
   warranty?: boolean;

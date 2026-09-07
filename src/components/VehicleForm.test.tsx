@@ -235,4 +235,79 @@ describe('VehicleForm', () => {
 
     expect(container.textContent).not.toContain(OPERATION_START_BEFORE_ACQUISITION_WARNING);
   });
+
+  it('renderiza o checkbox Veículo dedicado na seção Logística', () => {
+    renderWithAct(
+      <VehicleForm
+        vehicle={null}
+        fieldSettings={null}
+        availableDrivers={[]}
+        availableShippers={[]}
+        availableOperationalUnits={[]}
+        restoreFiles={false}
+        onClose={() => {}}
+        onSave={async () => {}}
+      />,
+    );
+
+    const checkbox = container.querySelector('input[name="isDedicated"]');
+    expect(container.textContent).toContain('Logística');
+    expect(checkbox).toBeInstanceOf(HTMLInputElement);
+    expect(checkbox?.nextElementSibling?.textContent).toBe('Veículo dedicado');
+  });
+
+  it('envia isDedicated true ao marcar o checkbox e salvar', async () => {
+    const onSave = vi.fn<React.ComponentProps<typeof VehicleForm>['onSave']>(() => Promise.resolve());
+    const optionalUploads = {
+      ...defaultFieldSettings('client-1'),
+      crlvUploadOptional: true,
+      sanitaryInspectionOptional: true,
+      grUploadOptional: true,
+    };
+    renderWithAct(
+      <VehicleForm
+        vehicle={null}
+        fieldSettings={optionalUploads}
+        availableDrivers={[]}
+        availableShippers={[]}
+        availableOperationalUnits={[]}
+        restoreFiles={false}
+        onClose={() => {}}
+        onSave={onSave}
+      />,
+    );
+
+    const checkbox = container.querySelector('input[name="isDedicated"]');
+    const form = container.querySelector('form');
+    await act(async () => {
+      if (!(checkbox instanceof HTMLInputElement) || !(form instanceof HTMLFormElement)) {
+        throw new Error('Dedicated checkbox or vehicle form not found');
+      }
+      checkbox.click();
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0]).toMatchObject({ isDedicated: true });
+  });
+
+  it('abre marcado para um veículo dedicado', () => {
+    renderWithAct(
+      <VehicleForm
+        vehicle={{ id: '', isDedicated: true } as never}
+        fieldSettings={null}
+        availableDrivers={[]}
+        availableShippers={[]}
+        availableOperationalUnits={[]}
+        restoreFiles={false}
+        onClose={() => {}}
+        onSave={async () => {}}
+      />,
+    );
+
+    const checkbox = container.querySelector('input[name="isDedicated"]');
+    expect(checkbox).toBeInstanceOf(HTMLInputElement);
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+  });
 });

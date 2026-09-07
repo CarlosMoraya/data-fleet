@@ -5,7 +5,12 @@ import {
   type User,
 } from "https://esm.sh/@supabase/supabase-js@2";
 
-import { fetchLastRoutesByPlate, normalizePlate } from "./neonRoutes.ts";
+import {
+  fetchLastRoutesByPlate,
+  fetchRouteHistoryByPlate,
+  normalizePlate,
+} from "./neonRoutes.ts";
+import { parseHistoryRange } from "./range.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -110,6 +115,8 @@ serve(async (req: Request) => {
     }
 
     const plates = await loadFleetPlates(auth.supabase, effectiveClientId);
+    const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+    const mode = typeof body.mode === "string" ? body.mode : undefined;
     const connectionString = Deno.env.get("NEON_DATABASE_URL");
     if (!connectionString) {
       console.error("[vehicle-last-routes] secret ausente: NEON_DATABASE_URL");
@@ -117,6 +124,20 @@ serve(async (req: Request) => {
     }
 
     try {
+      if (mode === "history") {
+        const range = parseHistoryRange(body);
+        if (!range) {
+          return json({ error: "Intervalo de datas inválido." }, 400);
+        }
+        const routes = await fetchRouteHistoryByPlate(
+          connectionString,
+          plates,
+          range.from,
+          range.to,
+        );
+        return json({ routes }, 200);
+      }
+
       const routes = await fetchLastRoutesByPlate(connectionString, plates);
       return json({ routes }, 200);
     } catch (error) {
