@@ -50,6 +50,7 @@ const CouplingsPanel = lazy(() => import('./pages/CouplingsPanel'));
 const ControleCarretas = lazy(() => import('./pages/ControleCarretas'));
 const SosTicket = lazy(() => import('./pages/SosTicket'));
 const FleetTickets = lazy(() => import('./pages/FleetTickets'));
+const FuelSupplies = lazy(() => import('./pages/FuelSupplies'));
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -128,6 +129,7 @@ export default function App() {
                 <Route path="chamados" element={<FleetTickets />} />
                 <Route path="minha-oficina" element={<MyWorkshop />} />
                 <Route path="financeiro" element={<Financeiro />} />
+                <Route path="abastecimento" element={<FuelSupplies />} />
                 <Route path="conta/senha" element={<ChangePassword />} />
                 <Route path="revisoes-garantia" element={<WarrantyRevisions />} />
                 <Route path="settings" element={<Settings />} />

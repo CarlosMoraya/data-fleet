@@ -2,13 +2,17 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { User } from '../types';
+import type { Client, User } from '../types';
+
+const DELUNA_CLIENT_ID = '11111111-1111-1111-1111-111111111111';
 
 let authState: {
   user: User | null;
+  currentClient: Client | null;
   logout: () => Promise<void>;
 } = {
   user: null,
+  currentClient: null,
   logout: async () => {},
 };
 
@@ -59,8 +63,10 @@ afterEach(() => {
   document.body.removeChild(container);
   authState = {
     user: null,
+    currentClient: null,
     logout: async () => {},
   };
+  vi.unstubAllEnvs();
 });
 
 function renderWithAct(ui: React.ReactElement) {
@@ -82,6 +88,7 @@ describe('Sidebar', () => {
         clientId: 'c1',
         budgetApprovalLimit: 0,
       },
+      currentClient: null,
       logout: async () => {},
     };
 
@@ -103,6 +110,7 @@ describe('Sidebar', () => {
         clientId: 'c1',
         budgetApprovalLimit: 0,
       },
+      currentClient: null,
       logout: async () => {},
     };
 
@@ -122,6 +130,7 @@ describe('Sidebar', () => {
         clientId: 'c1',
         budgetApprovalLimit: 0,
       },
+      currentClient: null,
       logout: async () => {},
     };
 
@@ -140,6 +149,7 @@ describe('Sidebar', () => {
         clientId: 'c1',
         budgetApprovalLimit: 0,
       },
+      currentClient: null,
       logout: async () => {},
     };
 
@@ -158,6 +168,7 @@ describe('Sidebar', () => {
         clientId: 'c1',
         budgetApprovalLimit: 0,
       },
+      currentClient: null,
       logout: async () => {},
     };
 
@@ -176,11 +187,91 @@ describe('Sidebar', () => {
         clientId: 'c1',
         budgetApprovalLimit: 0,
       },
+      currentClient: null,
       logout: async () => {},
     };
 
     renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
 
     expect(container.querySelectorAll('nav a')).toHaveLength(12);
+  });
+  it('tenant Deluna + Manager vê o item "Abastecimento"', () => {
+    vi.stubEnv('VITE_VELOE_CLIENT_ID', DELUNA_CLIENT_ID);
+    authState = {
+      user: {
+        id: 'u7',
+        name: 'Manager Deluna',
+        email: 'manager@deluna.com',
+        role: 'Manager',
+        clientId: DELUNA_CLIENT_ID,
+        budgetApprovalLimit: 0,
+      },
+      currentClient: { id: DELUNA_CLIENT_ID, name: 'Deluna Transportes' } as Client,
+      logout: async () => {},
+    };
+
+    renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
+
+    expect(container.textContent).toContain('Abastecimento');
+  });
+
+  it('tenant diferente + Manager não vê o item "Abastecimento"', () => {
+    vi.stubEnv('VITE_VELOE_CLIENT_ID', DELUNA_CLIENT_ID);
+    authState = {
+      user: {
+        id: 'u8',
+        name: 'Manager Outro',
+        email: 'manager@outro.com',
+        role: 'Manager',
+        clientId: 'outro-tenant',
+        budgetApprovalLimit: 0,
+      },
+      currentClient: { id: 'outro-tenant', name: 'Outro Cliente' } as Client,
+      logout: async () => {},
+    };
+
+    renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
+
+    expect(container.textContent).not.toContain('Abastecimento');
+  });
+
+  it('sem VITE_VELOE_CLIENT_ID o item "Abastecimento" fica ausente', () => {
+    vi.stubEnv('VITE_VELOE_CLIENT_ID', '');
+    authState = {
+      user: {
+        id: 'u9',
+        name: 'Manager Deluna',
+        email: 'manager@deluna.com',
+        role: 'Manager',
+        clientId: DELUNA_CLIENT_ID,
+        budgetApprovalLimit: 0,
+      },
+      currentClient: { id: DELUNA_CLIENT_ID, name: 'Deluna Transportes' } as Client,
+      logout: async () => {},
+    };
+
+    renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
+
+    expect(container.textContent).not.toContain('Abastecimento');
+  });
+
+  it('tenant Deluna + Operations Manager não vê o item "Abastecimento"', () => {
+    vi.stubEnv('VITE_VELOE_CLIENT_ID', DELUNA_CLIENT_ID);
+    authState = {
+      user: {
+        id: 'u10',
+        name: 'Gestor de Operações',
+        email: 'ops@deluna.com',
+        role: 'Operations Manager',
+        clientId: DELUNA_CLIENT_ID,
+        budgetApprovalLimit: 0,
+      },
+      currentClient: { id: DELUNA_CLIENT_ID, name: 'Deluna Transportes' } as Client,
+      logout: async () => {},
+    };
+
+    renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
+
+    expect(container.textContent).not.toContain('Abastecimento');
   });
 });

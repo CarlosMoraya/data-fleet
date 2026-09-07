@@ -16,6 +16,7 @@ import {
   Wallet,
   Siren,
   MessagesSquare,
+  Fuel,
 } from 'lucide-react';
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
@@ -46,6 +47,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: 'Minha Oficina', to: '/minha-oficina', icon: Wrench, roles: ['Workshop'] },
   { name: 'Manutenção', to: '/manutencao', icon: Wrench, roles: ['Workshop', 'Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Operations Manager', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Financeiro', to: '/financeiro', icon: Wallet, roles: ['Fleet Assistant', 'Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master', 'Workshop', 'Financeiro'] },
+  { name: 'Abastecimento', to: '/abastecimento', icon: Fuel, roles: ['Fleet Analyst', 'Supervisor', 'Coordinator', 'Manager', 'Director', 'Admin Master'] },
   { name: 'Revisões de Garantia', to: '/revisoes-garantia', icon: ShieldCheck, roles: ['Fleet Analyst', 'Supervisor', 'Coordinator', 'Manager', 'Director', 'Admin Master'] },
   { name: 'Templates', to: '/checklist-templates', icon: FileStack, roles: ['Fleet Analyst', 'Supervisor', 'Manager', 'Coordinator', 'Director', 'Admin Master'] },
   { name: 'Configurações', to: '/settings', icon: Settings, roles: ['Coordinator', 'Manager', 'Director', 'Admin Master'] },
@@ -57,7 +59,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
-  const { user, logout } = useAuth();
+  const { user, currentClient, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -66,6 +68,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   };
 
   const userRole = user?.role;
+  const veloeClientId = import.meta.env.VITE_VELOE_CLIENT_ID as string | undefined;
 
   const visibleNavItems = userRole === 'Coupling Agent'
     ? NAV_ITEMS.filter((item) => item.to === '/controle-carretas')
@@ -73,7 +76,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       ? NAV_ITEMS.filter((item) => item.to === '/agendamentos' || item.to === '/manutencao' || item.to === '/chamados' || item.to === '/checklists')
       : NAV_ITEMS.filter((item) => {
           if (!userRole) return false;
-          return item.roles.includes(userRole);
+          if (!item.roles.includes(userRole)) return false;
+          // Abastecimento é exclusivo do tenant habilitado para a integração Veloe.
+          if (item.to === '/abastecimento') {
+            return !!veloeClientId && currentClient?.id === veloeClientId;
+          }
+          return true;
         });
 
   return (
