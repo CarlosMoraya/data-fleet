@@ -2,6 +2,28 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-09-08: Usuários — exclusão restrita ao Admin Master e inativação transacional
+
+Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 4 — mudança estrutural), em 10 etapas. A tela Cadastros → Usuários ganhou inativação/reativação espelhando Veículos e Motoristas, e a exclusão definitiva passou a ser exclusiva do `Admin Master`. Commit `ef00efa` na `main`.
+
+**Desenho.** A revisão 1 do plano fazia o frontend executar três escritas em sequência — `profiles`, `drivers` e o banimento no Auth — sem transação que as abraçasse, porque a terceira é uma chamada HTTP a outro serviço. O modo de falha concreto: as duas primeiras gravam, a terceira falha por timeout de cold start, e a tela mostra o usuário como Inativo enquanto ele continua conseguindo logar. Falha silenciosa cujo sintoma é o oposto do esperado. A revisão 2 fechou o buraco movendo a operação inteira para a ação `set_active` da Edge Function `create-user`, na ordem autorizar → Auth → banco, com compensação. A ordem é deliberada: falha na autorização não toca em nada; falha no Auth não deixa resíduo; falha no banco reverte o Auth; falha da compensação deixa o resíduo seguro ("aparece Ativo e não consegue entrar").
+
+**A armadilha central.** A Edge Function escreve com o JWT de quem chamou, jamais com `service_role`. Com `service_role`, `auth.uid()` seria NULL, o escape hatch do gatilho `trg_guard_profile_activation` seria acionado e as quatro invariantes de segurança seriam puladas em silêncio, sem quebrar nenhum teste. É o erro mais provável de quem for "simplificar" esse código no futuro.
+
+**Fonte única da regra.** As quatro invariantes — não alterar o próprio status; piso `Coordinator`, exceto papel `Driver` cujo piso é `Fleet Analyst`; só perfis de rank estritamente inferior; nunca inativar o último `Admin Master` ativo — vivem em `fn_profile_activation_denial_reason`, consultada pelo gatilho (que barra) e pela Edge Function (que pergunta antes de banir). Não há cópia em TypeScript. `set_profile_activation` é `SECURITY INVOKER` e grava `profiles` e `drivers` numa transação só.
+
+**Migrations.** Cinco, de `20260908000000` a `20260908000400`, com rollback para cada uma. Aplicadas e verificadas em DEV pelo agente via MCP e em PROD pelo usuário via SQL Editor, cada uma aprovada na sua consulta estrutural. O pré-voo de PROD não encontrou drift: `fn_audit_profile_security` e os gatilhos de `profiles` eram byte a byte iguais aos de DEV.
+
+**Correção de segurança durante a validação.** A Etapa 3 fazia `REVOKE` apenas no wrapper de 2 argumentos, deixando `fn_profile_activation_denial_reason(UUID, UUID, BOOLEAN)` — que aceita `p_actor_id` arbitrário — executável por `anon` via PostgREST. Não havia escalonamento de privilégio, já que toda escrita usa `auth.uid()`, mas era um oráculo não autenticado de existência de perfil. A migration e o plano ganharam `REVOKE ALL ... FROM PUBLIC, anon, authenticated`. Os dois chamadores legítimos são `SECURITY DEFINER` e executam como o dono, então nada quebrou — reverificado nos seis casos comportamentais.
+
+**Validação comportamental.** Em DEV, 17 casos com JWT simulado dentro da transação via `set_config('request.jwt.claims', ...)`, mais 12 casos por HTTP real com JWT de Coordinator, Fleet Analyst e Fleet Assistant — incluindo o ciclo inativação → login barrado (`User is banned`) → reativação → login liberado. Em PROD, 9 invariantes conferidas por SQL e 8 casos por HTTP no tenant de testes Grupo PRALOG, com alvos sintéticos que nunca fizeram login. Provado nos dois ambientes que o `banned_until` do ator permanece `NULL` quando a autorização recusa — evidência de que o passo do Auth não chega a rodar. Estado revertido integralmente nos dois, sem resíduo.
+
+**Achados registrados, não corrigidos.** (a) `block`/`unblock` e `set_active` gravam no mesmo `banned_until` sem se conhecerem: reativar por `set_active` alguém bloqueado por `block` desfaz o bloqueio em silêncio. (b) Sem backfill, `profiles.active` nasce `true` e discorda de `drivers.active` para quem já estava inativado — 5 casos em PROD. (c) A Invariante 4 é inalcançável, porque a 3 sempre dispara antes; o piso segue garantido, mas pela 3.
+
+**Execução delegada.** Oito etapas rodaram em executores externos sob supervisão do agente planejador, com revisão linha a linha — registros #010 a #017 em `docs/EXECUTOR-TRACK-RECORD.md`. Duas combinações atingiram os 4 registros que dão autoridade ao histórico sobre o benchmark. As cinco falhas acumuladas até aqui foram todas do plano, nenhuma do modelo.
+
+**Validação:** typecheck 0 erros; lint 0 erros e 263 warnings (+1 aceito, `rules-of-hooks` pré-existente em `Users.tsx`); `npm run test:unit` 2.195/2.195 em 241 arquivos; `npm run test:smoke` 7/7.
+
 ## Sessão — 2026-09-07: Carga em massa dos CRLVs TKS 2026 em PROD
 
 Implementada e executada a carga aprovada para o cliente Deluna `da9ad1ff-9a9a-43ba-96c5-05f14fd5f5b4`. Os 38 PDFs diretamente contidos em `public/downloads/DOC 2026 TKS` foram associados por placa a 38 veículos distintos do mesmo tenant, sem OCR e sem alterar os dados cadastrais não relacionados ao CRLV.
