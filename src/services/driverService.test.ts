@@ -34,39 +34,48 @@ describe('toggleDriverActive', () => {
     fromMock.mockReturnValue({ update: updateMock });
   });
 
-  it('blocks auth access when deactivating a driver with profile', async () => {
+  it('motorista com conta inativa pela Edge Function', async () => {
     const driver = { id: 'driver-1', active: true, profileId: 'profile-1' } as Driver;
-
     await toggleDriverActive(driver, 'editor-1');
+    expect(invokeEdgeFunctionMock).toHaveBeenCalledTimes(1);
+    expect(invokeEdgeFunctionMock).toHaveBeenCalledWith('create-user', { action: 'set_active', user_id: 'profile-1', active: false });
+    expect(fromMock).not.toHaveBeenCalled();
+  });
 
+  it('motorista com conta reativa pela Edge Function', async () => {
+    const driver = { id: 'driver-2', active: false, profileId: 'profile-2' } as Driver;
+    await toggleDriverActive(driver, 'editor-2');
+    expect(invokeEdgeFunctionMock).toHaveBeenCalledWith('create-user', { action: 'set_active', user_id: 'profile-2', active: true });
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it('motorista sem conta grava direto em drivers', async () => {
+    const driver = { id: 'driver-3', active: true } as Driver;
+    await toggleDriverActive(driver, 'editor-3');
+    expect(fromMock).toHaveBeenCalledWith('drivers');
     expect(updateMock).toHaveBeenCalledWith({
       active: false,
       inactivated_at: '2026-07-02T12:00:00.000Z',
-      inactivated_by: 'editor-1',
+      inactivated_by: 'editor-3',
     });
-    expect(invokeEdgeFunctionMock).toHaveBeenCalledWith('create-user', {
-      action: 'block',
-      user_id: 'profile-1',
-    });
-  });
-
-  it('unblocks auth access when reactivating a driver with profile', async () => {
-    const driver = { id: 'driver-2', active: false, profileId: 'profile-2' } as Driver;
-
-    await toggleDriverActive(driver, 'editor-2');
-
-    expect(invokeEdgeFunctionMock).toHaveBeenCalledWith('create-user', {
-      action: 'unblock',
-      user_id: 'profile-2',
-    });
-  });
-
-  it('does not call edge function when profileId is absent', async () => {
-    const driver = { id: 'driver-3', active: true } as Driver;
-
-    await toggleDriverActive(driver, 'editor-3');
-
+    expect(eqMock).toHaveBeenCalledWith('id', 'driver-3');
     expect(invokeEdgeFunctionMock).not.toHaveBeenCalled();
+  });
+
+  it('motorista sem conta é reativado direto em drivers', async () => {
+    const driver = { id: 'driver-4', active: false } as Driver;
+    await toggleDriverActive(driver, 'editor-4');
+    expect(updateMock).toHaveBeenCalledWith({
+      active: true,
+      inactivated_at: null,
+      inactivated_by: null,
+    });
+  });
+
+  it('propaga o erro da Edge Function', async () => {
+    invokeEdgeFunctionMock.mockRejectedValueOnce(new Error('Edge function error: 403 recusado'));
+    const driver = { id: 'driver-5', active: true, profileId: 'profile-5' } as Driver;
+    await expect(toggleDriverActive(driver, 'editor-5')).rejects.toThrow('Edge function error: 403');
   });
 });
 

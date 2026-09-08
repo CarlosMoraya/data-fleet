@@ -7,8 +7,10 @@ import {
   canApprovePayments,
   canCorrectOdometer,
   canCreateExtraPayments,
+  canDeleteUsers,
   canExportMaintenanceSpreadsheet,
   canFillCoupling,
+  canInactivateUsers,
   canMarkExtraPaymentsPaid,
   canMarkPaid,
   canViewBudgetTab,
@@ -188,5 +190,29 @@ describe('canExportMaintenanceSpreadsheet', () => {
   it('returns false for undefined and null', () => {
     expect(canExportMaintenanceSpreadsheet(undefined)).toBe(false);
     expect(canExportMaintenanceSpreadsheet(null)).toBe(false);
+  });
+});
+
+describe('canDeleteUsers', () => {
+  it('allows only Admin Master', () => {
+    expect(canDeleteUsers('Admin Master')).toBe(true);
+    expect(canDeleteUsers('Director')).toBe(false);
+    expect(canDeleteUsers('Manager')).toBe(false);
+    expect(canDeleteUsers('Coordinator')).toBe(false);
+    expect(canDeleteUsers('Fleet Assistant')).toBe(false);
+    expect(canDeleteUsers(undefined)).toBe(false);
+  });
+});
+
+describe('canInactivateUsers', () => {
+  it('allows Coordinator, Manager, Director and Admin Master', () => {
+    expect(canInactivateUsers('Coordinator')).toBe(true);
+    expect(canInactivateUsers('Manager')).toBe(true);
+    expect(canInactivateUsers('Director')).toBe(true);
+    expect(canInactivateUsers('Admin Master')).toBe(true);
+    expect(canInactivateUsers('Supervisor')).toBe(false);
+    expect(canInactivateUsers('Fleet Analyst')).toBe(false);
+    expect(canInactivateUsers('Fleet Assistant')).toBe(false);
+    expect(canInactivateUsers(undefined)).toBe(false);
   });
 });

@@ -70,6 +70,15 @@ serve(async (req: Request) => {
       return json({ error: "Acesso negado. Papel insuficiente." }, 403);
     }
 
+    // Exclusão definitiva é exclusiva do Admin Master (2026-09-08). Esta função
+    // está publicada e acessível nos dois ambientes ainda que nenhum ponto de
+    // src/ a chame — deixá-la aberta manteria a porta que a policy
+    // tenant_managers_delete_profiles fechou no banco.
+    if (callerProfile.role !== "Admin Master") {
+      console.error(`[delete-user] Acesso negado: ${callerProfile.role} não é Admin Master`);
+      return json({ error: "Apenas o Admin Master pode excluir usuários." }, 403);
+    }
+
     const body = await req.json();
     const { user_id } = body;
     if (!user_id) return json({ error: "user_id é obrigatório." }, 400);

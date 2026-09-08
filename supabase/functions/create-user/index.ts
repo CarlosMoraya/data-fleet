@@ -224,6 +224,12 @@ serve(async (req: Request) => {
       const { user_id } = body;
       if (!user_id) return json({ error: "user_id é obrigatório." }, 400);
 
+      // Exclusão definitiva é exclusiva do Admin Master. As demais validações
+      // deste bloco (rank do alvo, tenant) permanecem como redundância.
+      if (callerProfile.role !== "Admin Master") {
+        return json({ error: "Apenas o Admin Master pode excluir usuários." }, 403);
+      }
+
       const { data: targetProfile } = await supabaseAdmin
         .from("profiles")
         .select("role, client_id")
@@ -278,6 +284,91 @@ serve(async (req: Request) => {
       const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(user_id, { ban_duration });
       if (banError) return json({ error: banError.message }, 500);
       return json({ success: true, user_id, action: body.action }, 200);
+    }
+
+    // Inativação/reativação de usuário: operação transacional sobre dois
+    // sistemas que não compartilham transação (Supabase Auth e Postgres).
+    //
+    // A ordem é deliberada — autorizar, depois Auth, depois banco:
+    //   • falha na autorização não toca em nada;
+    //   • falha no Auth não deixa resíduo, porque o banco ainda não foi escrito;
+    //   • falha no banco dispara compensação do Auth;
+    //   • se até a compensação falhar, o resíduo é "aparece Ativo e não consegue
+    //     entrar" — incômodo, nunca inseguro.
+    //
+    // A ordem inversa (banco primeiro) produziria o resíduo perigoso: perfil
+    // marcado como Inativo com a conta ainda liberada para login.
+    if (body.action === "set_active") {
+      const { user_id, active } = body;
+      if (!user_id) return json({ error: "user_id é obrigatório." }, 400);
+      if (typeof active !== "boolean") {
+        return json({ error: "active é obrigatório e deve ser booleano." }, 400);
+      }
+
+      // Cliente ligado ao JWT de quem chamou. NÃO usar supabaseAdmin para as
+      // escritas: com service_role, auth.uid() é NULL, o escape hatch do
+      // gatilho trg_guard_profile_activation é acionado e as quatro invariantes
+      // de segurança são puladas silenciosamente, sem quebrar nenhum teste.
+      const supabaseAsCaller = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        {
+          global: { headers: { Authorization: authHeader } },
+          auth: { autoRefreshToken: false, persistSession: false },
+        }
+      );
+
+      // PASSO 1 — perguntar antes de agir. Nenhuma mutação aconteceu ainda.
+      const { data: denialReason, error: denialError } = await supabaseAsCaller
+        .rpc("profile_activation_denial_reason", {
+          p_target_id: user_id,
+          p_next_active: active,
+        });
+
+      if (denialError) {
+        console.error(`[set_active] Falha ao consultar autorização: ${denialError.message}`);
+        return json({ error: "Não foi possível validar a permissão para esta operação." }, 500);
+      }
+
+      if (denialReason) {
+        return json({ error: denialReason }, 403);
+      }
+
+      // PASSO 2 — Auth primeiro: é o participante que não fala transação.
+      const ban_duration = active ? "none" : "87600h";
+      const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(
+        user_id,
+        { ban_duration }
+      );
+      if (banError) {
+        console.error(`[set_active] Falha no Auth: ${banError.message}`);
+        return json({ error: "Não foi possível alterar o acesso do usuário. Nada foi alterado." }, 502);
+      }
+
+      // PASSO 3 — banco, atômico entre profiles e drivers.
+      const { error: writeError } = await supabaseAsCaller
+        .rpc("set_profile_activation", {
+          p_target_id: user_id,
+          p_next_active: active,
+        });
+
+      if (writeError) {
+        // COMPENSAÇÃO — desfaz o passo 2.
+        const { error: revertError } = await supabaseAdmin.auth.admin.updateUserById(
+          user_id,
+          { ban_duration: active ? "87600h" : "none" }
+        );
+        if (revertError) {
+          console.error(`[set_active] COMPENSACAO FALHOU para ${user_id}: ${revertError.message}`);
+          return json({
+            error: "A operação falhou e o acesso do usuário ficou inconsistente. Acione o Admin Master.",
+          }, 500);
+        }
+        console.error(`[set_active] Escrita recusada, Auth revertido: ${writeError.message}`);
+        return json({ error: writeError.message }, 403);
+      }
+
+      return json({ success: true, user_id, active }, 200);
     }
 
     if (body.action === "sync_operations_scope") {

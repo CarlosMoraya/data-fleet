@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Trash2, Plus, Search, X, Loader2 } from 'lucide-react';
+import { Pencil, Trash2, Plus, Search, X, Loader2, ToggleLeft, ToggleRight } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
+import { usePersistentUiState } from '../hooks/usePersistentUiState';
 import { capitalizeWords } from '../lib/inputHelpers';
 import { invokeEdgeFunction } from '../lib/invokeEdgeFn';
 import {
@@ -11,15 +12,19 @@ import {
   normalizeOperationsManagerScope,
   validateOperationsManagerScope,
 } from '../lib/operationsManagerScope';
+import { filterByActive } from '../lib/registryActiveFilter';
 import {
   ROLE_COLORS,
   getCreatableRoles,
   getRoleLabel,
   getRoleRank,
+  canDeleteUsers,
+  canInactivateUsers,
   canManageOperationsManagerScope,
   isOperationsManager,
 } from '../lib/rolePermissions';
 import { supabase } from '../lib/supabase';
+import { toggleUserActive } from '../services/userService';
 
 import type { OperationalUnit, OperationsManagerScope, Role, Shipper } from '../types';
 
@@ -29,6 +34,7 @@ export interface UserRow {
   role: Role;
   budget_approval_limit: number;
   created_at: string;
+  active: boolean;
 }
 
 interface ScopeFormProps {
@@ -761,6 +767,13 @@ export default function Users() {
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
+  const [showInactive, setShowInactive] = usePersistentUiState<boolean>({
+    module: 'users',
+    stateKind: 'filter',
+    name: 'show-inactive',
+    scope: 'preference',
+    defaultValue: false,
+  });
 
   if (!user || !CAN_MANAGE_USERS.includes(user.role)) return <Navigate to="/" replace />;
 
@@ -772,7 +785,7 @@ export default function Users() {
     queryFn: async () => {
       let query = supabase
         .from('profiles')
-        .select('id, name, role, budget_approval_limit, created_at');
+        .select('id, name, role, budget_approval_limit, created_at, active');
 
       if (currentClient?.id) {
         query = query.eq('client_id', currentClient.id);
@@ -791,9 +804,15 @@ export default function Users() {
   );
 
   const filtered = useMemo(
-    () => visibleUsers.filter((listedUser) => listedUser.name.toLowerCase().includes(search.toLowerCase())),
-    [visibleUsers, search]
+    () => filterByActive(
+      visibleUsers.filter((listedUser) => listedUser.name.toLowerCase().includes(search.toLowerCase())),
+      showInactive
+    ),
+    [visibleUsers, search, showInactive]
   );
+
+  const canDelete = canDeleteUsers(user.role);
+  const canToggleActive = canInactivateUsers(user.role);
 
   const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -804,6 +823,19 @@ export default function Users() {
     },
     onError: (err: unknown) => {
       alert((err as { message?: string }).message || 'Erro ao deletar usuário.');
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: async (targetUser: UserRow) => {
+      await toggleUserActive({ id: targetUser.id, active: targetUser.active });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['users', currentClient?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['drivers', currentClient?.id] });
+    },
+    onError: (err: unknown) => {
+      alert((err as { message?: string }).message || 'Erro ao alterar o status do usuário.');
     },
   });
 
@@ -832,15 +864,26 @@ export default function Users() {
         )}
       </div>
 
-      <div className="relative max-w-xs">
-        <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-        <input
-          type="text"
-          placeholder="Buscar por nome..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="block w-full rounded-xl border border-zinc-200 py-2 pr-3 pl-9 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-        />
+      <div className="flex items-center gap-2">
+        <div className="relative w-full max-w-xs">
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          <input
+            type="text"
+            placeholder="Buscar por nome..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="block w-full rounded-xl border border-zinc-200 py-2 pr-3 pl-9 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+          />
+        </div>
+        {canToggleActive && (
+          <button
+            type="button"
+            onClick={() => setShowInactive((previous) => !previous)}
+            className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
+          >
+            {showInactive ? 'Ocultar inativos' : 'Mostrar inativos'}
+          </button>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
@@ -859,6 +902,7 @@ export default function Users() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Usuário</th>
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Cargo</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-zinc-500 uppercase">Cadastrado em</th>
                   <th className="px-6 py-3" />
                 </tr>
@@ -875,6 +919,17 @@ export default function Users() {
                     <td className="px-6 py-4">
                       <RoleBadge role={listedUser.role} />
                     </td>
+                    <td className="px-6 py-4">
+                      {listedUser.active === false ? (
+                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
+                          Inativo
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                          Ativo
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-sm text-zinc-500">
                       {new Date(listedUser.created_at).toLocaleDateString('pt-BR')}
                     </td>
@@ -889,7 +944,17 @@ export default function Users() {
                             <Pencil className="h-4 w-4" />
                           </button>
                         )}
-                        {listedUser.id !== user.id && (
+                        {canToggleActive && listedUser.id !== user.id && (
+                          <button
+                            onClick={() => toggleActiveMutation.mutate(listedUser)}
+                            title={listedUser.active === false ? 'Reativar' : 'Inativar'}
+                            className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+                          >
+                            {listedUser.active === false ? <ToggleLeft className="h-4 w-4" /> : <ToggleRight className="h-4 w-4" />}
+                            <span className="sr-only">{listedUser.active === false ? 'Reativar' : 'Inativar'}</span>
+                          </button>
+                        )}
+                        {canDelete && listedUser.id !== user.id && (
                           <button
                             onClick={() => handleDelete(listedUser)}
                             className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600"

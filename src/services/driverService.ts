@@ -109,6 +109,21 @@ export async function saveDriver(
 
 export async function toggleDriverActive(driver: Driver, profileId: string): Promise<void> {
   const nextActive = !driver.active;
+
+  // Motorista COM conta de usuário é uma pessoa que faz login: a operação
+  // precisa ser transacional e envolver o Auth. A ação set_active da Edge
+  // Function cuida das duas tabelas e do banimento, com compensação.
+  if (driver.profileId) {
+    await invokeEdgeFunction('create-user', {
+      action: 'set_active',
+      user_id: driver.profileId,
+      active: nextActive,
+    });
+    return;
+  }
+
+  // Motorista SEM conta é apenas registro de frota: não há Auth envolvido e
+  // não existe estado parcial possível. O caminho direto continua correto.
   const { error } = await supabase
     .from('drivers')
     .update({
@@ -118,13 +133,6 @@ export async function toggleDriverActive(driver: Driver, profileId: string): Pro
     })
     .eq('id', driver.id);
   if (error) throw error;
-
-  if (driver.profileId) {
-    await invokeEdgeFunction('create-user', {
-      action: nextActive ? 'unblock' : 'block',
-      user_id: driver.profileId,
-    });
-  }
 }
 
 /**

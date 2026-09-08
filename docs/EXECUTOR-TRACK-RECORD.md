@@ -422,6 +422,119 @@ Iniciativa correta não pedida: acrescentou `\b` à regex (`/\bUtilizado\b/g`) p
 
 ---
 
+### #010 a #013 — 2026-09-08 · Usuários: inativação — Etapas 1 a 4 (migrations por transcrição)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado / transcrição (rebaixadas de `Não delegável` pelo Passo 4.1) |
+| **Forma** | migration |
+| **Camada** | database |
+| **Ferramenta** | opencode (`opencode run`) |
+| **Modelo** | `muse-spark-1.2-contributor-free` — **custo zero absoluto** |
+| **Evidência de aptidão** | AA 57 por mapeamento de gêmeo pago (`muse-spark-1.2` a $1,25/$4,25 = linha do `model-cache.md`). Primeiro gratuito do parque a atingir o piso de `Supervisionado`. **Estreia neste projeto** |
+| **Escopo** | 2 arquivos novos por etapa (migration + rollback), 8 no total |
+
+**Condições da especificação:** manifesto sim · conteúdo literal e completo no plano · baseline sim.
+
+**Resultado:** escopo_ok sim nas 4 · portão 1ª vez sim nas 4 · ciclos 0 · regressões 0.
+
+**Verificação independente:** `scripts/verify-transcription.mjs` comparou byte a byte cada arquivo gerado com o bloco correspondente do prompt — **8/8 idênticos**. Conferido explicitamente que `SECURITY INVOKER` sobreviveu na Etapa 4 (a armadilha de falha silenciosa sinalizada no plano) e que os delimitadores `$$` e o `GET DIAGNOSTICS` da Etapa 3 ficaram intactos.
+
+**Veredito:** aprovado sem correções. **Atribuição de falha: nenhuma.**
+
+**Aprendizado:** transcrição de SQL literal é a forma mais segura de delegação identificada até agora — o verificador byte a byte elimina o julgamento da revisão. Vale generalizar: sempre que o plano contiver o artefato completo, gerar o prompt em blocos `=== ARQUIVO: caminho ===` para habilitar essa verificação.
+
+---
+
+### #014 — 2026-09-08 · Usuários: inativação — Etapa 7 (userService + testes)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Forma** | arquivo novo (lógica de serviço) + teste transcrito |
+| **Camada** | backend |
+| **Modelo** | `big-pickle` (opencode) — custo zero absoluto |
+| **Escopo** | 2 arquivos novos |
+
+**Condições da especificação:** manifesto sim · serviço literal, 5 casos de teste com entrada e saída literais · baseline sim.
+
+**Resultado:** escopo_ok sim · portão 1ª vez sim · ciclos 0 · regressões 0.
+
+**Verificação independente:** serviço byte a byte idêntico. Testes lidos integralmente com olhar adversarial — nenhum mock anula o alvo, `toHaveBeenCalledTimes(1)` presente, cenário de erro usa `mockRejectedValueOnce` real. `npx vitest run` 5/5.
+
+**Veredito:** aprovado sem correções. Quarto registro limpo de `big-pickle` — a combinação "Delegável / arquivo novo + teste" atinge agora os 4 registros que dão autoridade ao histórico sobre o benchmark.
+
+---
+
+### #015 — 2026-09-08 · Usuários: inativação — Etapa 8 (driverService)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | edição em arquivo existente + substituição de testes pré-existentes |
+| **Camada** | backend |
+| **Modelo** | `muse-spark-1.2-contributor-free` — custo zero absoluto |
+| **Escopo** | 2 arquivos a modificar |
+
+**Condições da especificação:** manifesto sim · função nova transcrita por inteiro, 5 casos literais, lista explícita do que preservar · baseline sim.
+
+**Resultado:** escopo_ok sim · portão 1ª vez sim · ciclos 0 · regressões 0.
+
+**Verificação independente:** diff conferido linha a linha. Substituiu exatamente os 3 testes do `describe('toggleDriverActive')` e preservou byte a byte o `beforeEach` e o `describe('resetDriverPassword')`. `npx vitest run` 13/13 (5 novos + 8 pré-existentes).
+
+**Veredito:** aprovado sem correções.
+
+---
+
+### #016 — 2026-09-08 · Usuários: inativação — Etapa 9 (tela Usuários)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | edição em arquivo existente (integração de página em produção, 928 linhas) |
+| **Camada** | frontend |
+| **Ferramenta** | codex (`codex exec`) |
+| **Modelo** | `gpt-5.6-luna`, reasoning effort **`medium`** — substituindo `gpt-5.6-sol`/`high` por restrição de janela |
+| **Evidência de aptidão** | SWE-Bench 93,0% (`model-cache.md`), contra 96,2% do Sol, com output $1,20 vs $20-30. **Estreia neste projeto** |
+| **Escopo** | 3 arquivos a modificar |
+
+**Condições da especificação:** manifesto sim · 7 mudanças descritas literalmente, incluindo JSX · 14 assertivas literais · baseline sim.
+
+**Resultado:** escopo_ok sim · portão 1ª vez **não** (2 warnings de `import/order`, corrigidos por `eslint --fix`) · ciclos 0 · regressões 0.
+
+**Verificação independente:** diff conferido linha a linha. As 7 mudanças aplicadas exatamente como especificadas; nenhum dos componentes e helpers da lista de preservação foi tocado; não introduziu `colSpan` inexistente.
+
+**Veredito:** aprovado com 1 correção do revisor. **Atribuição de falha: falha do plano** — a especificação mandava colocar o botão "Mostrar inativos" dentro do container `max-w-xs` da busca, o que espremeria o campo em 320px. O executor obedeceu literalmente, comportamento correto. Corrigido pelo revisor reestruturando o container.
+
+**Conclusão sobre o modelo:** `gpt-5.6-luna` com effort `medium` entregou integração de página em arquivo de 928 linhas sem nenhuma falha de modelo, com uma fração da queima de janela do Sol. Indício forte de que Sol era overkill para etapa de transcrição.
+
+---
+
+### #017 — 2026-09-08 · Usuários: inativação — Etapa 10 (E2E)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | teste (arquivo novo) |
+| **Camada** | frontend + backend |
+| **Modelo previsto** | `grok-code` — **não executou** |
+| **Modelo efetivo** | `muse-spark-1.2-contributor-free` (fallback) |
+| **Escopo** | 1 arquivo novo |
+
+**Resultado:** ciclos 2 · escopo_ok sim · portão 1ª vez sim (na 3ª tentativa) · regressões 0.
+
+**Tentativa 1 e 2 — `grok-code`:** ambas retornaram `{"type":"error","name":"UnknownError","message":"Unexpected server error"}` do provedor, sem o modelo chegar a processar o prompt. **Atribuição: indisponibilidade de provedor, NÃO falha do modelo.** Pela regra de queima do Passo 4.2, isto **não** conta contra o `grok-code`, que segue sem nenhum registro de desempenho e pode ser estreado em sessão futura.
+
+**Tentativa 3 — `muse-spark`:** terminou sem produzir o arquivo. O log mostrou `permission requested: read (.env.local); auto-rejecting`, seguido de encerramento. **Atribuição: falha do plano** — o prompt referenciava variáveis de ambiente sem dizer que elas são apenas referenciadas em código, nunca lidas em disco. Corrigido no prompt com proibição explícita de ler arquivos de ambiente e com a frase "sua única entrega é escrever o arquivo".
+
+**Tentativa 4 — `muse-spark`, após a correção do prompt:** 317 linhas, 8 cenários, gating correto, toda variável ausente gerando `test.skip` com mensagem — nenhum teste que passa em silêncio.
+
+**Verificação independente:** leitura integral com olhar adversarial. **Uma lacuna encontrada:** o cenário "autoinativação é recusada sem tocar no Auth" afirmava no nome e no comentário que o Auth ficava intacto, mas só verificava o status 403 — asserção que confirma a si mesma. Corrigido pelo revisor com checagem de `banned_until` via `auth.admin.getUserById`. **Atribuição: falha do plano** — a especificação do cenário 6 descrevia a verificação em prosa mas não a transformou em assertiva literal.
+
+**Veredito:** aprovado com 1 correção do revisor.
+
+---
+
 ## 9. Sumário por combinação
 
 Atualizar a cada registro novo.
@@ -434,7 +547,19 @@ Atualizar a cada registro novo.
 | Delegável | arquivo novo, cópia de padrão existente | opencode / `big-pickle` **(gratuito)** | 1 | 1/1 | 0 | 0 |
 | Supervisionado | edição em arquivo existente + integração | codex / `gpt-5.6-sol` (high) | 2 | 1/2 | 0,5 | 0 |
 | Supervisionado | edição em arquivo existente | codex / `gpt-5.6-sol` (high) | 3 | 3/3 | 0 | 0 |
+| Supervisionado / transcrição | migration (SQL literal) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 4 | 4/4 | 0 | 0 |
+| Delegável | arquivo novo + teste | opencode / `big-pickle` **(gratuito)** | 4 | 4/4 | 0 | 0 |
+| Supervisionado | edição em arquivo existente | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 0 | 0 |
+| Supervisionado | integração de página | codex / `gpt-5.6-luna` (medium) | 1 | 0/1¹ | 0 | 0 |
+| Supervisionado | teste (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 2² | 0 |
 
-**Estado atual: amostra insuficiente na maioria das combinações.** "Supervisionado / edição em arquivo existente" com `gpt-5.6-sol` já soma 3 registros — falta 1 para os 4 exigidos pela Seção 6. As demais seguem por benchmark (`model-cache.md`), citando estes registros como indício.
+¹ Reprovou o portão por 2 warnings de `import/order`, resolvidos por `eslint --fix`; nenhuma falha de modelo.
+² Os 2 ciclos foram indisponibilidade de provedor (`grok-code`) e falha do plano, não do modelo.
 
-**Padrão emergente, ainda sem valor estatístico (N=2):** as duas únicas falhas até aqui foram **do plano**, nenhuma do modelo. Ambas do mesmo tipo — o planejador especificou um contrato sem abrir o arquivo ou a config que precisaria suportá-lo. Se o padrão se confirmar, o gargalo de qualidade deste fluxo é a verificação de premissas na etapa de planejamento, não a capacidade do executor.
+**Estado atual (2026-09-08): duas combinações atingiram autoridade estatística.** "Supervisionado / transcrição de migration" com `muse-spark-1.2-contributor-free` e "Delegável / arquivo novo + teste" com `big-pickle` chegaram aos **4 registros** exigidos pela Seção 6 — nessas duas, o histórico agora manda e o benchmark é ignorado. "Supervisionado / edição em arquivo existente" com `gpt-5.6-sol` segue em 3, mas foi **superada na prática**: `gpt-5.6-luna` (effort `medium`) e `muse-spark` gratuito entregaram a mesma forma sem falha de modelo, com fração da queima de janela.
+
+**Executores sem nenhum registro:** `grok-code` (duas tentativas abortadas por erro do provedor, sem chegar a processar — não conta como falha e pode ser estreado de novo).
+
+**Padrão confirmado (N=5):** as cinco falhas registradas até hoje foram **todas do plano**, nenhuma do modelo. O gargalo de qualidade deste fluxo é a especificação, não a capacidade do executor. As três de 2026-09-08 foram do mesmo tipo das anteriores — o planejador descreveu em prosa algo que precisava ser literal (o container do botão, a assertiva de `banned_until`) ou omitiu uma premissa do ambiente (variáveis de ambiente são referenciadas, não lidas em disco).
+
+**Consequência prática:** vale investir mais em fechar a especificação do que em subir o tier do executor. Um modelo gratuito com spec fechada superou, nesta sessão, o histórico do `gpt-5.6-sol` com spec parcial.

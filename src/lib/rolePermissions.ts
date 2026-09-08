@@ -326,3 +326,20 @@ export function canManagePartPhotos(role: Role | undefined | null): boolean {
 export function canExportMaintenanceSpreadsheet(role: Role | undefined | null): boolean {
   return getRoleRank(role ?? undefined) >= ROLE_RANK['Fleet Assistant'];
 }
+
+export const ROLES_CAN_DELETE_USERS: Role[] = ['Admin Master'];
+
+export const ROLES_CAN_INACTIVATE_USERS: Role[] = [
+  'Coordinator',
+  'Manager',
+  'Director',
+  'Admin Master',
+];
+
+export function canDeleteUsers(role: Role | undefined | null): boolean {
+  return ROLES_CAN_DELETE_USERS.includes(role);
+}
+
+export function canInactivateUsers(role: Role | undefined | null): boolean {
+  return ROLES_CAN_INACTIVATE_USERS.includes(role);
+}

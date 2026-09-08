@@ -2,6 +2,18 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-09-07: Carga em massa dos CRLVs TKS 2026 em PROD
+
+Implementada e executada a carga aprovada para o cliente Deluna `da9ad1ff-9a9a-43ba-96c5-05f14fd5f5b4`. Os 38 PDFs diretamente contidos em `public/downloads/DOC 2026 TKS` foram associados por placa a 38 veículos distintos do mesmo tenant, sem OCR e sem alterar os dados cadastrais não relacionados ao CRLV.
+
+Os arquivos foram enviados ao bucket privado `vehicle-documents` em `client_id/vehicle_id/crlv.pdf`, com `upsert: true`. Em cada veículo foram atualizadas exclusivamente as colunas `crlv_upload`, `crlv_year` e `crlv_expiration_date`, respectivamente para o caminho canônico, `2026` e `2027-06-01`. Ponteiros legados foram substituídos no banco pelo caminho canônico privado; nenhum objeto legado foi excluído.
+
+O fluxo usou pré-voo fechado, backup temporário e compensação em caso de falha. O dry-run retornou `source=38`, `matched=38`, `duplicates=0`, `invalid=0`, `ready=38`. A aplicação em PROD concluiu `38/38` uploads, updates e verificações pós-update, sem falha e sem rollback. A verificação read-only posterior confirmou `38/38` estados e 0 divergências, incluindo tamanho e SHA-256 dos objetos contra os arquivos fonte.
+
+Artefatos operacionais temporários: aplicação/backup em `/tmp/beta-fleet-vehicle-crlv/2026-09-08T01-52-00-946Z/`; verificação em `/tmp/beta-fleet-vehicle-crlv/2026-09-08T01-54-30-900Z/report-verify.json`. Não foram registrados conteúdo dos PDFs, signed URLs, tokens ou credenciais.
+
+Validação do código: `npx tsc --noEmit` passou com 0 erros; typecheck explícito do script passou com 0 erros; `npm run lint` passou com 0 erros e 262 warnings, no mesmo patamar do baseline; `npm run test:unit` passou com 2.186/2.186 em 240 arquivos; `npm run test:smoke` passou com 7/7. O executor foi o Claude Code usando o alias de modelo `sonnet` disponível na instalação; a CLI não expôs identificador literal `Sonnet 5`.
+
 ## Sessão — 2026-09-06: Módulo de Abastecimento integrado à API Veloe (Deluna Transportes)
 
 Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 2 — adição com integração ao sistema existente, com componente de Tipo 4: nova tabela, RLS, nova Edge Function e segredos externos). Novo módulo somente-leitura em `/abastecimento`, alimentado diariamente pela API Veloe `fuel-supply-data` (endpoint "Histórico de Abastecimento", PDF v1.4.0), **exclusivo do tenant Deluna Transportes**.
