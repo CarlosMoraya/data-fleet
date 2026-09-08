@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { formatDate } from '../../lib/dateUtils';
+import { formatOdometerDistanceKm } from '../../lib/meliUtilization';
 
 import type { MeliUtilizationRow } from '../../types/meliUtilization';
 
@@ -15,14 +16,6 @@ const COLUMNS = [
   'KM rodado',
   'Status',
 ];
-
-function formatDistance(value: number | null): string {
-  if (value === null) return EMPTY;
-  return value.toLocaleString('pt-BR', {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  });
-}
 
 export default function MeliUtilizationTable({
   rows,
@@ -110,7 +103,7 @@ export default function MeliUtilizationTable({
                 </td>
                 <td className="px-4 py-3 text-zinc-700">{row.cycle ?? EMPTY}</td>
                 <td className="px-4 py-3 whitespace-nowrap text-zinc-700">
-                  {formatDistance(row.odometerDistanceKm)}
+                  {formatOdometerDistanceKm(row.odometerDistanceKm)}
                 </td>
                 <td className="px-4 py-3 text-zinc-700">
                   <p>{row.unavailableOnDate ? 'Indisponível' : 'Disponível'}</p>

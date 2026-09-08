@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Download } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 
@@ -7,17 +8,26 @@ import MeliUtilizationKpiCards from '../components/meli/MeliUtilizationKpiCards'
 import MeliUtilizationTable from '../components/meli/MeliUtilizationTable';
 import { useAuth } from '../context/AuthContext';
 import { useMeliUtilizationAccess } from '../hooks/useMeliUtilizationAccess';
+import { downloadBlobFile } from '../lib/downloadBlobFile';
 import {
   buildUtilizationRows,
   calculateUtilizationKpis,
   defaultDateRange,
+  filterRowsByPlate,
   filterRowsByUnit,
+  filterRowsByUtilization,
+  parseMeliUtilizationStatusFilter,
 } from '../lib/meliUtilization';
 import { supabase } from '../lib/supabase';
 import { appendMultiValueParam, readMultiValueParam } from '../lib/vehicleFilters';
+import { XlsxMeliUtilizationProvider } from '../services/meliExport/xlsxMeliUtilizationProvider';
 import { getMeliRouteHistory } from '../services/meliUtilizationService';
 
-import type { MeliEligibleVehicle, MeliMaintenanceWindow } from '../types/meliUtilization';
+import type {
+  MeliEligibleVehicle,
+  MeliMaintenanceWindow,
+  MeliUtilizationStatusFilter,
+} from '../types/meliUtilization';
 
 export default function MeliUtilization() {
   const { currentClient } = useAuth();
@@ -26,6 +36,8 @@ export default function MeliUtilization() {
   const [range, setRange] = useState(() => defaultDateRange(new Date()));
 
   const selectedUnits = useMemo(() => readMultiValueParam(searchParams, 'unit'), [searchParams]);
+  const plateQuery = searchParams.get('plate') ?? '';
+  const utilizationFilter = parseMeliUtilizationStatusFilter(searchParams.get('utilization'));
 
   const vehiclesQuery = useQuery({
     queryKey: ['meliUtilizationVehicles', currentClient?.id],
@@ -104,7 +116,14 @@ export default function MeliUtilization() {
     });
   }, [eligibleVehicles, historyQuery.data, maintenanceWindows, range.from, range.to]);
 
-  const filteredRows = useMemo(() => filterRowsByUnit(rows, selectedUnits), [rows, selectedUnits]);
+  const filteredRows = useMemo(
+    () =>
+      filterRowsByUtilization(
+        filterRowsByPlate(filterRowsByUnit(rows, selectedUnits), plateQuery),
+        utilizationFilter,
+      ),
+    [rows, selectedUnits, plateQuery, utilizationFilter],
+  );
   const kpis = useMemo(() => calculateUtilizationKpis(filteredRows), [filteredRows]);
 
   const unitOptions = useMemo(() => {
@@ -126,21 +145,70 @@ export default function MeliUtilization() {
     setSearchParams(params);
   };
 
+  const handlePlateQueryChange = (next: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (next) params.set('plate', next);
+    else params.delete('plate');
+    setSearchParams(params);
+  };
+
+  const handleUtilizationFilterChange = (next: MeliUtilizationStatusFilter) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'all') params.delete('utilization');
+    else params.set('utilization', next);
+    setSearchParams(params);
+  };
+
+  const handleExportXlsx = async () => {
+    try {
+      if (filteredRows.length === 0) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      const provider = new XlsxMeliUtilizationProvider();
+      const result = await provider.exportData(currentClient?.id ?? '', filteredRows);
+      if (!result.success || !result.blob) {
+        window.alert('Nada a exportar.');
+        return;
+      }
+      downloadBlobFile(result.blob, `utilizacao_meli_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Falha ao gerar XLSX.');
+    }
+  };
+
   const loading =
     vehiclesQuery.isLoading || historyQuery.isLoading || maintenanceQuery.isLoading;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Utilização MELI</h1>
-        <p className="text-sm text-zinc-500">
-          Espelho do histórico de rotas do Mercado Livre cruzado com a frota dedicada.
-        </p>
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-900">Utilização MELI</h1>
+          <p className="text-sm text-zinc-500">
+            Espelho do histórico de rotas do Mercado Livre cruzado com a frota dedicada.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => { void handleExportXlsx(); }}
+            className="flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+          >
+            <Download className="h-4 w-4" />
+            Baixar XLSX
+          </button>
+        </div>
       </div>
 
       <MeliUtilizationFiltersBar
         range={range}
         onRangeChange={setRange}
+        plateQuery={plateQuery}
+        onPlateQueryChange={handlePlateQueryChange}
+        utilizationFilter={utilizationFilter}
+        onUtilizationFilterChange={handleUtilizationFilterChange}
         unitOptions={unitOptions}
         selectedUnits={selectedUnits}
         onUnitsChange={handleUnitsChange}

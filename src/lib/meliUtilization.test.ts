@@ -4,9 +4,13 @@ import {
   buildUtilizationRows,
   calculateUtilizationKpis,
   defaultDateRange,
+  filterRowsByPlate,
   filterRowsByUnit,
+  filterRowsByUtilization,
+  formatOdometerDistanceKm,
   isVehicleUnavailableOnDate,
   namesDiverge,
+  parseMeliUtilizationStatusFilter,
 } from './meliUtilization';
 
 import type {
@@ -269,5 +273,73 @@ describe('filterRowsByUnit', () => {
 
   it('mantém linhas utilizadas e não utilizadas da unidade selecionada', () => {
     expect(filterRowsByUnit(rows, ['SRJ1']).map((row) => row.key)).toEqual(['used', 'idle']);
+  });
+});
+
+describe('filtros e formatação de utilização MELI', () => {
+  const rowUsed: MeliUtilizationRow = {
+    key: 'v1:111',
+    vehicleId: 'v1',
+    licensePlate: 'ABC1D23',
+    vehicleDescription: 'Fiat Fiorino',
+    utilized: true,
+    routeDate: '2026-09-06',
+    routeId: '111',
+    driverName: 'Ana',
+    fleetDriverName: 'Ana',
+    driverDivergent: false,
+    unitCode: 'SRJ1',
+    fleetUnitCode: 'SRJ1',
+    unitDivergent: false,
+    unavailableOnDate: false,
+    statusDivergent: false,
+    cycle: 'A',
+    odometerDistanceKm: 15.5,
+  };
+  const rowUnused: MeliUtilizationRow = {
+    key: 'v2:2026-09-06:idle',
+    vehicleId: 'v2',
+    licensePlate: 'ABC2D34',
+    vehicleDescription: 'Fiat Fiorino',
+    utilized: false,
+    routeDate: '2026-09-06',
+    routeId: null,
+    driverName: null,
+    fleetDriverName: 'Bruno',
+    driverDivergent: false,
+    unitCode: 'SRJ1',
+    fleetUnitCode: 'SRJ1',
+    unitDivergent: false,
+    unavailableOnDate: false,
+    statusDivergent: false,
+    cycle: null,
+    odometerDistanceKm: null,
+  };
+
+  it('formata a distância percorrida', () => {
+    expect(formatOdometerDistanceKm(15.5)).toBe('15,5');
+    expect(formatOdometerDistanceKm(null)).toBe('—');
+  });
+
+  it('filtra linhas por placa', () => {
+    expect(filterRowsByPlate([rowUsed, rowUnused], 'ABC2D34')).toEqual([rowUnused]);
+    expect(filterRowsByPlate([rowUsed, rowUnused], 'abc1')).toEqual([rowUsed]);
+    expect(filterRowsByPlate([rowUsed, rowUnused], '')).toEqual([rowUsed, rowUnused]);
+  });
+
+  it('filtra linhas por utilização', () => {
+    expect(filterRowsByUtilization([rowUsed, rowUnused], 'used')).toEqual([rowUsed]);
+    expect(filterRowsByUtilization([rowUsed, rowUnused], 'unused')).toEqual([rowUnused]);
+    expect(filterRowsByUtilization([rowUsed, rowUnused], 'all')).toEqual([
+      rowUsed,
+      rowUnused,
+    ]);
+  });
+
+  it('interpreta o filtro de utilização', () => {
+    expect(parseMeliUtilizationStatusFilter('used')).toBe('used');
+    expect(parseMeliUtilizationStatusFilter('unused')).toBe('unused');
+    expect(parseMeliUtilizationStatusFilter('bogus')).toBe('all');
+    expect(parseMeliUtilizationStatusFilter(null)).toBe('all');
   });
 });

@@ -6,6 +6,7 @@ import type {
   MeliMaintenanceWindow,
   MeliUtilizationKpis,
   MeliUtilizationRow,
+  MeliUtilizationStatusFilter,
 } from '../types/meliUtilization';
 
 function normalizeName(value: string): string {
@@ -19,6 +20,14 @@ function normalizeName(value: string): string {
 
 function normalizePlate(value: string): string {
   return filterPlate(value).slice(-7);
+}
+
+export function formatOdometerDistanceKm(value: number | null): string {
+  if (value === null) return '—';
+  return value.toLocaleString('pt-BR', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
 }
 
 function normalizeUnitCode(value: string): string {
@@ -187,4 +196,26 @@ export function filterRowsByUnit(
   return rows.filter(
     (row) => row.unitCode !== null && selectedCodes.has(normalizeUnitCode(row.unitCode)),
   );
+}
+
+export function filterRowsByPlate(
+  rows: MeliUtilizationRow[],
+  plateQuery: string,
+): MeliUtilizationRow[] {
+  const normalizedQuery = normalizePlate(plateQuery);
+  if (!normalizedQuery) return rows;
+  return rows.filter((row) => normalizePlate(row.licensePlate).includes(normalizedQuery));
+}
+
+export function filterRowsByUtilization(
+  rows: MeliUtilizationRow[],
+  filter: MeliUtilizationStatusFilter,
+): MeliUtilizationRow[] {
+  if (filter === 'all') return rows;
+  const wantUtilized = filter === 'used';
+  return rows.filter((row) => row.utilized === wantUtilized);
+}
+
+export function parseMeliUtilizationStatusFilter(value: string | null): MeliUtilizationStatusFilter {
+  return value === 'used' || value === 'unused' ? value : 'all';
 }

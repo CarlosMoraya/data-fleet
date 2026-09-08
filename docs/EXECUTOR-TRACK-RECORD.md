@@ -312,6 +312,116 @@ Iniciativa correta não pedida: acrescentou `\b` à regex (`/\bUtilizado\b/g`) p
 
 ---
 
+### #005 — 2026-09-07 · Módulo Utilização MELI, melhorias — Etapa 1 (linhas/cabeçalhos de exportação)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Forma** | lógica pura + teste, só arquivos novos |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/big-pickle` |
+| **Custo** | zero absoluto |
+| **Escopo** | 2 arquivos novos, nenhum existente |
+
+**Condições da especificação:** manifesto sim (2 arquivos) · testes literais sim (2 linhas completas + contagem de headers) · baseline sim (238 arq / 2.160 testes / 262 warnings).
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não · portão 1ª vez sim · ciclos 0 · regressões 0.
+
+**Verificação independente:** `npx vitest run src/lib/meliUtilizationExportRows.test.ts` — 3/3. Transcreveu literalmente as duas linhas de entrada/saída e o `MELI_UTILIZATION_EXPORT_HEADERS.length === 15` do plano, sem desvio.
+
+**Veredito:** aprovado sem correções.
+
+---
+
+### #006 — 2026-09-07 · Módulo Utilização MELI, melhorias — Etapa 2 (provider XLSX)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Forma** | arquivo novo, cópia de padrão existente |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/big-pickle` |
+| **Custo** | zero absoluto |
+| **Escopo** | 1 arquivo novo |
+
+**Condições da especificação:** manifesto sim (1 arquivo) · testes literais N/A (etapa sem teste dedicado, decisão registrada no próprio plano) · baseline sim.
+
+**Resultado:** escopo_ok sim (só criou `src/services/meliExport/xlsxMeliUtilizationProvider.ts`) · portão 1ª vez sim · ciclos 0 · regressões 0.
+
+**Verificação independente:** cópia estrutural fiel de `xlsxDriverProvider.ts`, só trocando os três campos de identificação e os imports de `meliUtilizationExportRows.ts`. `npx tsc --noEmit` só acusava o erro esperado (Etapa 5 ainda não integrada).
+
+**Veredito:** aprovado sem correções.
+
+---
+
+### #007 — 2026-09-07 · Módulo Utilização MELI, melhorias — Etapa 3 (filtros puros + extração de formatação)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | edição em arquivo existente (lógica pura + extração) |
+| **Camada** | frontend |
+| **Ferramenta** | codex (`codex exec`, sandbox `workspace-write`) |
+| **Modelo** | `gpt-5.6-sol`, reasoning effort `high` |
+| **Custo marginal** | zero (assinatura ChatGPT) |
+| **Escopo** | 4 arquivos a modificar |
+
+**Condições da especificação:** manifesto sim (4 arquivos) · testes literais sim (rowUsed/rowUnused + 4 casos por função) · baseline sim.
+
+**Resultado:** escopo_ok sim — só os 4 arquivos do manifesto · alterou_teste_preexistente não (só adicionou casos novos) · portão 1ª vez sim · ciclos 0 · regressões 0.
+
+**Verificação independente:** `npx tsc --noEmit` 0 erros · `npx vitest run` nos dois arquivos afetados — 41/41. Diff conferido linha a linha: extração de `formatOdometerDistanceKm` idêntica em comportamento à função local removida de `MeliUtilizationTable.tsx`; nenhuma outra linha da tabela tocada; `normalizePlate` reutilizada, não recriada.
+
+**Veredito:** aprovado sem correções.
+
+---
+
+### #008 — 2026-09-07 · Módulo Utilização MELI, melhorias — Etapa 4 (barra de filtros)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | edição em arquivo existente (componente de apresentação) |
+| **Camada** | frontend |
+| **Ferramenta** | codex (`codex exec`, sandbox `workspace-write`) |
+| **Modelo** | `gpt-5.6-sol`, reasoning effort `high` |
+| **Custo marginal** | zero (assinatura ChatGPT) |
+| **Escopo** | 1 arquivo a modificar |
+
+**Condições da especificação:** manifesto sim (1 arquivo) · testes literais N/A (componente sem teste dedicado, decisão registrada no plano) · baseline sim.
+
+**Resultado:** escopo_ok sim (só `MeliUtilizationFiltersBar.tsx`) · portão 1ª vez sim · ciclos 0 · regressões 0.
+
+**Verificação independente:** diff conferido linha a linha — os dois inputs de data e o `MultiSelectDropdown` de unidade permaneceram intocados; os dois campos novos foram inseridos exatamente na ordem especificada.
+
+**Veredito:** aprovado sem correções.
+
+---
+
+### #009 — 2026-09-07 · Módulo Utilização MELI, melhorias — Etapa 5 (integração de página)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | edição em arquivo existente (integração de página em produção) |
+| **Camada** | frontend |
+| **Ferramenta** | codex (`codex exec`, sandbox `workspace-write`) |
+| **Modelo** | `gpt-5.6-sol`, reasoning effort `high` |
+| **Custo marginal** | zero (assinatura ChatGPT) |
+| **Escopo** | 2 arquivos a modificar |
+
+**Condições da especificação:** manifesto sim (2 arquivos) · testes literais sim (6 cenários com fixture já existente no arquivo) · baseline sim.
+
+**Resultado:** escopo_ok sim — só `MeliUtilization.tsx` e `MeliUtilization.test.tsx` · alterou_teste_preexistente não · portão 1ª vez sim · ciclos 0 · regressões 0.
+
+**Verificação independente:** `npx tsc --noEmit` 0 erros (zerou o erro esperado das etapas anteriores) · `npm run lint` 0 erros / 262 warnings (mesmo patamar) · `npm run test:unit` **239 arq / 2.173 testes** (+13 desde o baseline de 2.160) · `npm run test:smoke` 7/7. Revisão elevada para linha a linha (acima do mínimo de "revisão dirigida"): as três `useQuery`, `eligibleVehicles`, `maintenanceWindows`, `rows`, `unitOptions`, `handleUnitsChange`, o gate `canView` e o tratamento de erro de `historyQuery` foram conferidos como intocados.
+
+**Veredito:** aprovado sem correções.
+
+---
+
 ## 9. Sumário por combinação
 
 Atualizar a cada registro novo.
@@ -320,9 +430,11 @@ Atualizar a cada registro novo.
 |---|---|---|---|---|---|---|
 | Delegável | lógica pura + UI + teste | codex / `gpt-5.6-sol` (high) | 1 | 1/1 | 0 | 0 |
 | Delegável | componente de UI + teste | opencode / `big-pickle` **(gratuito)** | 1 | 1/1 | 0 | 0 |
-| Supervisionado | edição em arquivo existente + integração | codex / `gpt-5.6-sol` (high) | 1 | 0/1 | 1 | 0 |
-| Supervisionado | edição em arquivo existente | codex / `gpt-5.6-sol` (high) | 1 | 1/1 | 0 | 0 |
+| Delegável | lógica pura + teste, só arquivos novos | opencode / `big-pickle` **(gratuito)** | 1 | 1/1 | 0 | 0 |
+| Delegável | arquivo novo, cópia de padrão existente | opencode / `big-pickle` **(gratuito)** | 1 | 1/1 | 0 | 0 |
+| Supervisionado | edição em arquivo existente + integração | codex / `gpt-5.6-sol` (high) | 2 | 1/2 | 0,5 | 0 |
+| Supervisionado | edição em arquivo existente | codex / `gpt-5.6-sol` (high) | 3 | 3/3 | 0 | 0 |
 
-**Estado atual: amostra insuficiente em todas as combinações.** Nenhuma atingiu os 4 registros exigidos pela Seção 6. Até lá, a escolha de executor segue por benchmark (`model-cache.md`), citando estes registros como indício.
+**Estado atual: amostra insuficiente na maioria das combinações.** "Supervisionado / edição em arquivo existente" com `gpt-5.6-sol` já soma 3 registros — falta 1 para os 4 exigidos pela Seção 6. As demais seguem por benchmark (`model-cache.md`), citando estes registros como indício.
 
 **Padrão emergente, ainda sem valor estatístico (N=2):** as duas únicas falhas até aqui foram **do plano**, nenhuma do modelo. Ambas do mesmo tipo — o planejador especificou um contrato sem abrir o arquivo ou a config que precisaria suportá-lo. Se o padrão se confirmar, o gargalo de qualidade deste fluxo é a verificação de premissas na etapa de planejamento, não a capacidade do executor.

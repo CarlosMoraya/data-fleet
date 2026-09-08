@@ -226,6 +226,67 @@ describe('MeliUtilization', () => {
     expect(cardValue('% Utilização')).toBe('100,0%');
   });
 
+  it('filtro de placa isolado recalcula tabela e cards', async () => {
+    await render('/utilizacao-meli?plate=ABC2D34');
+
+    expect(bodyRows()).toHaveLength(1);
+    expect(cardValue('Total de veículos (MELI + Dedicado)')).toBe('1');
+    expect(cardValue('Veículos Utilizados')).toBe('0');
+    expect(cardValue('Não Utilizados')).toBe('1');
+    expect(cardValue('% Utilização')).toBe('0,0%');
+  });
+
+  it('filtro de utilização used recalcula tabela e cards', async () => {
+    await render('/utilizacao-meli?utilization=used');
+
+    expect(bodyRows()).toHaveLength(3);
+    expect(cardValue('Total de veículos (MELI + Dedicado)')).toBe('3');
+    expect(cardValue('Veículos Utilizados')).toBe('3');
+    expect(cardValue('Não Utilizados')).toBe('0');
+    expect(cardValue('% Utilização')).toBe('100,0%');
+  });
+
+  it('filtro de utilização unused recalcula tabela e cards', async () => {
+    await render('/utilizacao-meli?utilization=unused');
+
+    expect(bodyRows()).toHaveLength(1);
+    expect(cardValue('Total de veículos (MELI + Dedicado)')).toBe('1');
+    expect(cardValue('Veículos Utilizados')).toBe('0');
+    expect(cardValue('Não Utilizados')).toBe('1');
+    expect(cardValue('% Utilização')).toBe('0,0%');
+  });
+
+  it('combina filtros de unidade e utilização', async () => {
+    await render('/utilizacao-meli?unit=SRJ10&utilization=used');
+
+    const rows = bodyRows();
+    expect(rows).toHaveLength(2);
+    expect(rows[0].textContent).toContain('ABC3D45');
+    expect(rows[1].textContent).toContain('ABC4D56');
+    expect(cardValue('Total de veículos (MELI + Dedicado)')).toBe('2');
+    expect(cardValue('Veículos Utilizados')).toBe('2');
+    expect(cardValue('Não Utilizados')).toBe('0');
+    expect(cardValue('% Utilização')).toBe('100,0%');
+  });
+
+  it('combina filtros de unidade e placa', async () => {
+    await render('/utilizacao-meli?unit=SRJ1&plate=ABC1D23');
+
+    const rows = bodyRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain('ABC1D23');
+    expect(cardValue('Total de veículos (MELI + Dedicado)')).toBe('1');
+    expect(cardValue('Veículos Utilizados')).toBe('1');
+    expect(cardValue('Não Utilizados')).toBe('0');
+    expect(cardValue('% Utilização')).toBe('100,0%');
+  });
+
+  it('exibe o botão de exportação XLSX', async () => {
+    await render();
+
+    expect(container.textContent).toContain('Baixar XLSX');
+  });
+
   it('com relógio em 2026-09-07, os inputs de data abrem em 2026-09-06', async () => {
     await render();
 

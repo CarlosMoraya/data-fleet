@@ -58,3 +58,5 @@ export interface BuildRowsInput {
   from: string;
   to: string;
 }
+
+export type MeliUtilizationStatusFilter = 'all' | 'used' | 'unused';
