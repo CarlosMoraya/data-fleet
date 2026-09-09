@@ -2,6 +2,30 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-09-09: Agendamentos — visualização somente-leitura para todos os papéis
+
+Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 3 — alteração em funcionalidade existente), em 4 etapas, inteiramente no frontend.
+
+**O problema real, que não era o problema aparente.** O pedido inicial foi entendido como "exibir as observações da oficina". O usuário corrigiu: o campo desejado é `workshop_schedules.notes`, escrito pelo time de frota ("Agendado para 10h. Procurar o mecânico Tião"). A correção mudou o plano inteiro — a versão anterior propunha buscar `workshops.notes`, alterar a consulta de hidratação e acrescentar campo ao tipo. Nada disso foi necessário. **A lição de planejamento: o espelhamento de entendimento evitou uma etapa de backend inteira construída sobre a premissa errada.**
+
+**Causa raiz.** O time de frota colava o endereço da oficina à mão dentro do campo de observações porque o endereço não era legível dentro do sistema — existia apenas como o link "Ver endereço", que leva para fora, ao Google Maps. E o Gestor de Operações, que não tem permissão de escrita, não tinha caminho nenhum para ler as observações: o único acesso era pelo modal de **edição**. Os demais papéis liam abrindo um formulário com "Salvar Alterações" ativo.
+
+**O que já existia e foi reutilizado.** Metade do trabalho estava pronta: `formatWorkshopAddress` e `buildGoogleMapsUrl` já existiam em `workshopScheduleMappers.ts`, e `hydrateWorkshopScheduleRows` já trazia os sete campos de endereço da oficina. A verificação de completude de contrato, feita antes de escrever o plano, confirmou que **todo rótulo do modal tinha origem no tipo `WorkshopSchedule`** — por isso a sessão não tocou banco, RLS, Edge Function, consulta nem tipo.
+
+**O que foi entregue.** `src/components/ScheduleDetailModal.tsx`, apresentacional puro (sem supabase, sem query, sem persistência, sem nenhum `input`/`select`/`textarea`/`form`), aberto por um ícone de olho **incondicional** — primeiro filho da coluna Ações, fora de todo `canWriteSchedules`/`canDelete`/`isScheduled` — e também pelo cartão da visão do Motorista. Rótulos de status, classes de badge e formatação de data saíram de `WorkshopSchedules.tsx` para `src/lib/workshopScheduleDisplay.ts`, sem alteração de valor, para não duplicar três constantes entre tabela e modal.
+
+**Decisão registrada para não ser "corrigida" no futuro.** O estado `detailSchedule` **não** é persistido, ao contrário de `isFormOpen` e `editingSchedule` no mesmo componente. A assimetria é deliberada: rascunho de formulário merece sobreviver a um recarregamento; "qual registro eu estava lendo" não.
+
+**Distribuição e custo.** As 4 etapas rodaram em executores de **custo zero absoluto** — `big-pickle` (Etapas 1 e 2) e `muse-spark-1.2-contributor-free` (Etapas 3 e 4) —, sem consumir janela de assinatura nenhuma. A Etapa 3, única que edita arquivo em produção, foi aprovada **sem nenhuma correção**: o plano enumerava nove mudanças numeradas com o JSX literal de cada botão, em vez de descrevê-las em prosa. A Etapa 4 foi deliberadamente separada da Etapa 3 e dada a outro executor, para que a asserção não viesse de quem fez a integração.
+
+**As três falhas da sessão foram todas do plano.** Uma assertiva que confirmava a si mesma (`toContain('Agendado')`, que casa com o prefixo do texto de observações e passaria com o badge ausente), um caso literal apontando o seletor do X do cabeçalho quando o alvo era o botão do rodapé, e uma asserção de ausência sem âncora de presença. Nenhuma detectável por comando de verificação — só por leitura adversarial. Detalhes em `docs/EXECUTOR-TRACK-RECORD.md`, registros #018-#021.
+
+**Controle negativo.** Para provar que o teste de integração não é vacuoso, o botão de olho foi temporariamente envolvido em `{canWriteSchedules && ...}`: os 3 cenários falharam. Revertido, voltaram a 3/3. É a evidência de que o teste captura o requisito central — "todos os papéis veem" — e não apenas a renderização da tela.
+
+**Portão final.** typecheck 0 erros · lint 0 erros / 263 warnings (patamar do baseline preservado) · unitários 2.222/2.222 em 245 arquivos (+27 testes, +4 arquivos) · smoke 7/7. `git status` conferido contra o manifesto: exatamente 6 arquivos novos e 1 modificado.
+
+**Pendente ao fim da sessão:** validação em tela pelo usuário (6 passos) e commit. A limpeza dos endereços colados à mão nas observações ficou registrada como sessão própria — é correção de dado em produção e exige decisão sobre como preservar o texto útil misturado ao endereço.
+
 ## Sessão — 2026-09-08: Usuários — exclusão restrita ao Admin Master e inativação transacional
 
 Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 4 — mudança estrutural), em 10 etapas. A tela Cadastros → Usuários ganhou inativação/reativação espelhando Veículos e Motoristas, e a exclusão definitiva passou a ser exclusiva do `Admin Master`. Commit `ef00efa` na `main`.

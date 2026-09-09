@@ -535,6 +535,105 @@ Iniciativa correta não pedida: acrescentou `\b` à regex (`/\bUtilizado\b/g`) p
 
 ---
 
+### #018 — 2026-09-09 · Agendamentos: modal de detalhe — Etapa 1 (módulo de apresentação)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Forma** | lógica pura + teste, só arquivos novos |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/big-pickle` |
+| **Custo** | **zero absoluto** — não consome cota |
+| **Escopo** | 3 arquivos novos, nenhum existente |
+
+**Condições da especificação:** `manifesto` sim (3 arquivos) · `testes_literais` sim (17 assertivas `entrada → saída`, incluindo a URL do Google Maps já percent-encoded) · `baseline` sim (241 arq / 2.195 testes / 263 warnings).
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não · portão_1a **não** · ciclos 0 · regressões 0 · lacunas 0.
+
+**Por que o portão reprovou:** 1 warning novo de `import/order` em `workshopScheduleMappers.test.ts` (import de valor depois de import de tipo). Resolvido pelo revisor com `npx eslint --fix`, voltando ao patamar de 263. **Atribuição: nenhuma** — mesma classe do rodapé do registro #016; não é falha de modelo nem de plano, é ruído de ordenação que a ferramenta corrige sozinha.
+
+**Verificação independente:** leitura integral. `formatScheduleDate` é byte a byte equivalente ao `formatDate` privado que substitui; os seis valores de rótulo e classe de badge foram transcritos sem alteração. Auditoria adversarial dos testes: nenhum mock, as três funções sob teste rodam de verdade, e nenhum valor esperado é derivado da própria função.
+
+**Veredito:** aprovado com 1 correção mecânica do revisor.
+
+---
+
+### #019 — 2026-09-09 · Agendamentos: modal de detalhe — Etapa 2 (`ScheduleDetailModal`)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Forma** | componente de UI + teste, só arquivos novos |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/big-pickle` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | 2 arquivos novos, nenhum existente |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim (fixture completo + 6 cenários) · `baseline` sim. A Etapa 2 do plano trazia a árvore JSX inteira, classe por classe.
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não · portão_1a **sim** · ciclos 0 · regressões 0 · lacunas 2 (ambas do plano).
+
+**Verificação independente — duas lacunas, as duas de origem no plano:**
+
+1. A assertiva `expect(container.textContent).toContain('Agendado')` **confirmava a si mesma**: a string `'Agendado'` também é prefixo de `'Agendado para 10h...'`, o texto de observações do fixture. O teste passaria com o badge de status ausente. Corrigido pelo revisor para `expect(container.querySelector('.rounded-full')?.textContent).toBe('Agendado')`. **Atribuição: falha do plano** — o caso literal fui eu que escrevi, e escrevi um que não discrimina.
+2. O botão "Fechar" do rodapé ficou sem cobertura: o caso literal do plano apontava o seletor `[aria-label="Fechar"]`, que é o X do cabeçalho. O executor transcreveu corretamente o que estava escrito. Corrigido pelo revisor com um sétimo cenário. **Atribuição: falha do plano.**
+
+**Veredito:** aprovado com 2 correções do revisor, nenhuma atribuível ao modelo.
+
+---
+
+### #020 — 2026-09-09 · Agendamentos: modal de detalhe — Etapa 3 (integração de página)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | edição em arquivo existente (integração de página em produção, 785 linhas) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| **Custo** | **zero absoluto** — não consome janela de assinatura nenhuma |
+| **Escopo** | 1 arquivo existente, nenhum novo |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` n/a (a etapa proíbe escrever teste de propósito — a cobertura é a Etapa 4, por outro executor) · `baseline` sim. O plano listava **nove** mudanças numeradas, com o JSX literal de cada botão e a lista do que permanece intocado.
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não · portão_1a **sim** · ciclos 0 · regressões 0 · lacunas 0.
+
+**Verificação independente:** diff completo linha a linha (54 inserções / 39 remoções). As nove mudanças aplicadas exatamente como especificadas. Conferido item a item: o botão de olho é o primeiro filho da coluna de ações e está **fora** de todo condicional de permissão (`canWriteSchedules`, `canDelete`, `isScheduled`); nenhuma consulta ao Supabase foi tocada; `hydrateWorkshopScheduleRows` intacta; `detailSchedule` **não** usa `sessionStorage`, ao contrário de `isFormOpen`/`editingSchedule` no mesmo componente; a violação pré-existente de `react-hooks/rules-of-hooks` em `DriverView` não foi "corrigida"; as 7 referências às constantes removidas foram todas repontadas.
+
+**Veredito:** aprovado **sem nenhuma correção**. **Atribuição de falha: nenhuma.**
+
+**Conclusão sobre o modelo:** segundo registro de `muse-spark-1.2-contributor-free` em edição de página em produção, ambos sem falha de modelo. Confirma o modelo gratuito como opção real para `Supervisionado` quando a spec enumera as mudanças em vez de descrevê-las.
+
+---
+
+### #021 — 2026-09-09 · Agendamentos: modal de detalhe — Etapa 4 (teste de integração de página)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Forma** | teste (arquivo novo, com mock de página) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | 1 arquivo novo, nenhum existente |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim (dados literais das 4 tabelas + 3 cenários) · `baseline` sim.
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não · portão_1a **sim** · ciclos 0 · regressões 0 · lacunas 1 (do plano).
+
+**Iniciativa correta não pedida:** acrescentou `buildLastKmDisplayParts` ao mock de `vehicleOdometerService`. Não é escopo excedido — `vi.mock` substitui o módulo inteiro, e `LastKmLabel` (renderizado pela linha da tabela) importa essa função. Sem isso o teste quebraria. O plano não previu.
+
+**Verificação independente — uma lacuna, do plano:** o cenário 3 afirmava a ausência de controles de edição sem antes provar que o modal havia aberto; passaria mesmo se o clique não tivesse efeito. Corrigido pelo revisor com uma âncora de presença antes das duas asserções de ausência. **Atribuição: falha do plano** — mesmo padrão do registro #017.
+
+**Controle negativo executado pelo revisor.** Para provar que o teste não é vacuoso, o botão de olho foi temporariamente envolvido em `{canWriteSchedules && ...}` na página: **os 3 cenários falharam**. Revertido em seguida, com a suíte voltando a 3/3. É a evidência de que o teste captura o requisito central da sessão, e não apenas a renderização da tela.
+
+**Veredito:** aprovado com 1 correção do revisor.
+
+---
+
 ## 9. Sumário por combinação
 
 Atualizar a cada registro novo.
@@ -542,24 +641,26 @@ Atualizar a cada registro novo.
 | Classe | Forma | Ferramenta / Modelo | N | portão 1ª vez | ciclos médios | Falhas do modelo |
 |---|---|---|---|---|---|---|
 | Delegável | lógica pura + UI + teste | codex / `gpt-5.6-sol` (high) | 1 | 1/1 | 0 | 0 |
-| Delegável | componente de UI + teste | opencode / `big-pickle` **(gratuito)** | 1 | 1/1 | 0 | 0 |
-| Delegável | lógica pura + teste, só arquivos novos | opencode / `big-pickle` **(gratuito)** | 1 | 1/1 | 0 | 0 |
+| Delegável | componente de UI + teste | opencode / `big-pickle` **(gratuito)** | 2 | 2/2 | 0 | 0 |
+| Delegável | lógica pura + teste, só arquivos novos | opencode / `big-pickle` **(gratuito)** | 2 | 1/2³ | 0 | 0 |
 | Delegável | arquivo novo, cópia de padrão existente | opencode / `big-pickle` **(gratuito)** | 1 | 1/1 | 0 | 0 |
 | Supervisionado | edição em arquivo existente + integração | codex / `gpt-5.6-sol` (high) | 2 | 1/2 | 0,5 | 0 |
 | Supervisionado | edição em arquivo existente | codex / `gpt-5.6-sol` (high) | 3 | 3/3 | 0 | 0 |
 | Supervisionado / transcrição | migration (SQL literal) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 4 | 4/4 | 0 | 0 |
 | Delegável | arquivo novo + teste | opencode / `big-pickle` **(gratuito)** | 4 | 4/4 | 0 | 0 |
-| Supervisionado | edição em arquivo existente | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 0 | 0 |
+| Supervisionado | edição em arquivo existente | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 2 | 2/2 | 0 | 0 |
 | Supervisionado | integração de página | codex / `gpt-5.6-luna` (medium) | 1 | 0/1¹ | 0 | 0 |
 | Supervisionado | teste (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 2² | 0 |
+| Delegável | teste (arquivo novo, mock de página) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 0 | 0 |
 
 ¹ Reprovou o portão por 2 warnings de `import/order`, resolvidos por `eslint --fix`; nenhuma falha de modelo.
 ² Os 2 ciclos foram indisponibilidade de provedor (`grok-code`) e falha do plano, não do modelo.
+³ A única reprovação foi 1 warning de `import/order` resolvido por `eslint --fix` (registro #018); nenhuma falha de modelo.
 
 **Estado atual (2026-09-08): duas combinações atingiram autoridade estatística.** "Supervisionado / transcrição de migration" com `muse-spark-1.2-contributor-free` e "Delegável / arquivo novo + teste" com `big-pickle` chegaram aos **4 registros** exigidos pela Seção 6 — nessas duas, o histórico agora manda e o benchmark é ignorado. "Supervisionado / edição em arquivo existente" com `gpt-5.6-sol` segue em 3, mas foi **superada na prática**: `gpt-5.6-luna` (effort `medium`) e `muse-spark` gratuito entregaram a mesma forma sem falha de modelo, com fração da queima de janela.
 
 **Executores sem nenhum registro:** `grok-code` (duas tentativas abortadas por erro do provedor, sem chegar a processar — não conta como falha e pode ser estreado de novo).
 
-**Padrão confirmado (N=5):** as cinco falhas registradas até hoje foram **todas do plano**, nenhuma do modelo. O gargalo de qualidade deste fluxo é a especificação, não a capacidade do executor. As três de 2026-09-08 foram do mesmo tipo das anteriores — o planejador descreveu em prosa algo que precisava ser literal (o container do botão, a assertiva de `banned_until`) ou omitiu uma premissa do ambiente (variáveis de ambiente são referenciadas, não lidas em disco).
+**Padrão confirmado (N=8, atualizado em 2026-09-09):** as oito falhas registradas até hoje foram **todas do plano**, nenhuma do modelo. As três de 2026-09-09 repetiram o padrão em sua forma mais pura: uma assertiva que confirmava a si mesma (`toContain('Agendado')` casando com o texto de observações), um caso literal apontando o seletor errado, e uma asserção de ausência sem âncora de presença. Nenhuma delas era detectável por comando de verificação — só por leitura adversarial. O gargalo de qualidade deste fluxo é a especificação, não a capacidade do executor. As três de 2026-09-08 foram do mesmo tipo — o planejador descreveu em prosa algo que precisava ser literal (o container do botão, a assertiva de `banned_until`) ou omitiu uma premissa do ambiente (variáveis de ambiente são referenciadas, não lidas em disco).
 
 **Consequência prática:** vale investir mais em fechar a especificação do que em subir o tier do executor. Um modelo gratuito com spec fechada superou, nesta sessão, o histórico do `gpt-5.6-sol` com spec parcial.

@@ -12,17 +12,20 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  Eye,
 } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 import LastKmLabel from '../components/LastKmLabel';
+import ScheduleDetailModal from '../components/ScheduleDetailModal';
 import ScheduleForm from '../components/ScheduleForm';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { isOperationsManager } from '../lib/rolePermissions';
 import { supabase } from '../lib/supabase';
+import { formatScheduleDate, SCHEDULE_STATUS_LABELS, SCHEDULE_STATUS_BADGE_CLASS } from '../lib/workshopScheduleDisplay';
 import {
   WorkshopScheduleRow,
   scheduleFromRow,
@@ -62,25 +65,7 @@ const ROLES_CAN_DELETE = ['Manager', 'Coordinator', 'Director', 'Admin Master'];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatDate(dateStr: string): string {
-  if (!dateStr) return '-';
-  const [y, m, d] = dateStr.split('-');
-  return `${d}/${m}/${y}`;
-}
-
 type StatusFilter = 'all' | 'scheduled' | 'completed' | 'cancelled';
-
-const STATUS_LABELS: Record<string, string> = {
-  scheduled: 'Agendado',
-  completed: 'Concluído',
-  cancelled: 'Cancelado',
-};
-
-const STATUS_BADGE: Record<string, string> = {
-  scheduled: 'bg-blue-100 text-blue-700',
-  completed: 'bg-green-100 text-green-700',
-  cancelled: 'bg-zinc-100 text-zinc-500',
-};
 
 async function hydrateWorkshopScheduleRows(rows: WorkshopScheduleRow[]): Promise<WorkshopScheduleRow[]> {
   if (rows.length === 0) return rows;
@@ -173,6 +158,7 @@ function DriverView() {
   const { user, currentClient } = useAuth();
   const [showHistory, setShowHistory] = useState(false);
   const [diagnosticError, setDiagnosticError] = useState<string | null>(null);
+  const [detailSchedule, setDetailSchedule] = useState<WorkshopSchedule | null>(null);
 
   // Guard: se não tem currentClient, não pode proceder
   if (!currentClient?.id) {
@@ -304,7 +290,7 @@ function DriverView() {
       ) : (
         <div className="space-y-4">
           {pending.map((s) => (
-            <DriverScheduleCard key={s.id} schedule={s} />
+            <DriverScheduleCard key={s.id} schedule={s} onOpenDetail={() => setDetailSchedule(s)} />
           ))}
         </div>
       )}
@@ -322,17 +308,20 @@ function DriverView() {
           {showHistory && (
             <div className="mt-3 space-y-3 opacity-70">
               {history.map((s) => (
-                <DriverScheduleCard key={s.id} schedule={s} dimmed />
+                <DriverScheduleCard key={s.id} schedule={s} dimmed onOpenDetail={() => setDetailSchedule(s)} />
               ))}
             </div>
           )}
         </div>
       )}
+      {detailSchedule && (
+        <ScheduleDetailModal schedule={detailSchedule} onClose={() => setDetailSchedule(null)} />
+      )}
     </div>
   );
 }
 
-const DriverScheduleCard: React.FC<{ schedule: WorkshopSchedule; dimmed?: boolean }> = ({ schedule, dimmed }) => {
+const DriverScheduleCard: React.FC<{ schedule: WorkshopSchedule; dimmed?: boolean; onOpenDetail: () => void }> = ({ schedule, dimmed, onOpenDetail }) => {
   const address = formatWorkshopAddress(schedule);
   const mapsUrl = buildGoogleMapsUrl(schedule);
   const hasAddress = address.trim().length > 0;
@@ -342,10 +331,10 @@ const DriverScheduleCard: React.FC<{ schedule: WorkshopSchedule; dimmed?: boolea
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[schedule.status]}`}>
-              {STATUS_LABELS[schedule.status]}
+            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${SCHEDULE_STATUS_BADGE_CLASS[schedule.status]}`}>
+              {SCHEDULE_STATUS_LABELS[schedule.status]}
             </span>
-            <span className="text-xs text-zinc-400">{formatDate(schedule.scheduledDate)}</span>
+            <span className="text-xs text-zinc-400">{formatScheduleDate(schedule.scheduledDate)}</span>
           </div>
           <h3 className="mt-2 truncate text-base font-semibold text-zinc-900">{schedule.workshopName ?? 'Oficina'}</h3>
 
@@ -361,17 +350,28 @@ const DriverScheduleCard: React.FC<{ schedule: WorkshopSchedule; dimmed?: boolea
           )}
         </div>
 
-        {hasAddress && !dimmed && (
-          <a
-            href={mapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Abrir no Google Maps"
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 transition-colors hover:bg-blue-100"
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenDetail}
+            title="Ver detalhes"
+            aria-label="Ver detalhes do agendamento"
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-zinc-50 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
           >
-            <MapPin className="h-5 w-5" />
-          </a>
-        )}
+            <Eye className="h-5 w-5" />
+          </button>
+          {hasAddress && !dimmed && (
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Abrir no Google Maps"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 transition-colors hover:bg-blue-100"
+            >
+              <MapPin className="h-5 w-5" />
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -412,6 +412,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
       return saved ? JSON.parse(saved) as WorkshopSchedule : null;
     } catch { return null; }
   });
+  const [detailSchedule, setDetailSchedule] = useState<WorkshopSchedule | null>(null);
 
   const { data: schedules = [], isLoading, error } = useQuery({
     queryKey: ['workshopSchedules', currentClient?.id ?? 'all-clients'],
@@ -636,6 +637,7 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
                     blockWrite={blockWrite}
                     clientName={s.clientId ? (clientNameMap.get(s.clientId) ?? undefined) : undefined}
                     lastKmInfo={s.vehicleId ? lastKmMap.get(s.vehicleId) : undefined}
+                    onViewDetail={() => setDetailSchedule(s)}
                     onEdit={canWriteSchedules ? () => {
                       sessionStorage.setItem('scheduleFormEditing', JSON.stringify(s));
                       sessionStorage.setItem('scheduleFormOpen', 'true');
@@ -669,6 +671,9 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
           onSave={(data) => saveMutation.mutateAsync(data)}
         />
       )}
+      {detailSchedule && (
+        <ScheduleDetailModal schedule={detailSchedule} onClose={() => setDetailSchedule(null)} />
+      )}
     </div>
   );
 }
@@ -682,12 +687,13 @@ const ScheduleRow: React.FC<{
   blockWrite?: boolean;
   clientName?: string;
   lastKmInfo?: VehicleLastKmInfo;
+  onViewDetail: () => void;
   onEdit?: () => void;
   onComplete?: () => void;
   onCancel?: () => void;
   onDelete?: () => void;
   onGenerateMaintenance?: () => void;
-}> = ({ schedule, canDelete, canWriteSchedules, blockWrite, clientName, lastKmInfo, onEdit, onComplete, onCancel, onDelete, onGenerateMaintenance }) => {
+}> = ({ schedule, canDelete, canWriteSchedules, blockWrite, clientName, lastKmInfo, onViewDetail, onEdit, onComplete, onCancel, onDelete, onGenerateMaintenance }) => {
   const isScheduled = schedule.status === 'scheduled';
   const address = formatWorkshopAddress(schedule);
   const mapsUrl = buildGoogleMapsUrl(schedule);
@@ -723,18 +729,27 @@ const ScheduleRow: React.FC<{
           </a>
         )}
       </td>
-      <td className="hidden px-4 py-2 text-zinc-600 sm:table-cell tall:py-3">{formatDate(schedule.scheduledDate)}</td>
+      <td className="hidden px-4 py-2 text-zinc-600 sm:table-cell tall:py-3">{formatScheduleDate(schedule.scheduledDate)}</td>
       <td className="px-4 py-2 tall:py-3">
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[schedule.status]}`}>
-          {STATUS_LABELS[schedule.status]}
+        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${SCHEDULE_STATUS_BADGE_CLASS[schedule.status]}`}>
+          {SCHEDULE_STATUS_LABELS[schedule.status]}
         </span>
         {schedule.completedAt && (
-          <div className="mt-0.5 text-xs text-zinc-400">{formatDate(schedule.completedAt.split('T')[0])}</div>
+          <div className="mt-0.5 text-xs text-zinc-400">{formatScheduleDate(schedule.completedAt.split('T')[0])}</div>
         )}
       </td>
       <td className="hidden px-4 py-2 text-xs text-zinc-500 md:table-cell tall:py-3">{schedule.createdByName ?? '-'}</td>
       <td className="px-4 py-2 tall:py-3">
         <div className="flex items-center justify-end gap-1">
+          <button
+            type="button"
+            onClick={onViewDetail}
+            title="Ver detalhes"
+            aria-label="Ver detalhes do agendamento"
+            className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+          >
+            <Eye className="h-4 w-4" />
+          </button>
           {canWriteSchedules && isScheduled && onEdit && onComplete && onCancel && (
             <>
               <button
