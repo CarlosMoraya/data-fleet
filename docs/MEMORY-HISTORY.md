@@ -24,7 +24,7 @@ Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 3 — alteração em 
 
 **Portão final.** typecheck 0 erros · lint 0 erros / 263 warnings (patamar do baseline preservado) · unitários 2.222/2.222 em 245 arquivos (+27 testes, +4 arquivos) · smoke 7/7. `git status` conferido contra o manifesto: exatamente 6 arquivos novos e 1 modificado.
 
-**Pendente ao fim da sessão:** validação em tela pelo usuário (6 passos) e commit. A limpeza dos endereços colados à mão nas observações ficou registrada como sessão própria — é correção de dado em produção e exige decisão sobre como preservar o texto útil misturado ao endereço.
+**Fechamento.** Validado em tela pelo usuário e promovido para produção no mesmo dia — commit `91de9db` na `main`, build de produção conferido antes do push, deploy pela Vercel. Sem migration e sem Edge Function, a promoção foi só commit + push. A limpeza dos endereços colados à mão nas observações ficou registrada como sessão própria — é correção de dado em produção e exige decisão sobre como preservar o texto útil misturado ao endereço.
 
 ## Sessão — 2026-09-08: Usuários — exclusão restrita ao Admin Master e inativação transacional
 
