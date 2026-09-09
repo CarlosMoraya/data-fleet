@@ -2,16 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CalendarClock,
   MapPin,
-  CheckCircle,
-  XCircle,
-  Pencil,
-  Trash2,
   Plus,
   Search,
   Loader2,
   ChevronDown,
   ChevronUp,
-  ClipboardList,
   Eye,
 } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
@@ -25,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { isOperationsManager } from '../lib/rolePermissions';
 import { supabase } from '../lib/supabase';
+import { buildScheduleConfirmMessage } from '../lib/workshopScheduleActions';
 import { formatScheduleDate, SCHEDULE_STATUS_LABELS, SCHEDULE_STATUS_BADGE_CLASS } from '../lib/workshopScheduleDisplay';
 import {
   WorkshopScheduleRow,
@@ -528,6 +524,38 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
 
   const blockWrite = requiresClientSelection(user?.role, currentClient?.id);
 
+  const handleEditFromDetail = (schedule: WorkshopSchedule) => {
+    setDetailSchedule(null);
+    sessionStorage.setItem('scheduleFormEditing', JSON.stringify(schedule));
+    sessionStorage.setItem('scheduleFormOpen', 'true');
+    sessionStorage.setItem('scheduleFormData', JSON.stringify(schedule));
+    setEditingSchedule(schedule);
+    setIsFormOpen(true);
+  };
+
+  const handleCompleteFromDetail = (schedule: WorkshopSchedule) => {
+    if (!window.confirm(buildScheduleConfirmMessage('complete', schedule))) return;
+    setDetailSchedule(null);
+    updateStatusMutation.mutate({ id: schedule.id, status: 'completed', completedAt: new Date().toISOString() });
+  };
+
+  const handleCancelFromDetail = (schedule: WorkshopSchedule) => {
+    if (!window.confirm(buildScheduleConfirmMessage('cancel', schedule))) return;
+    setDetailSchedule(null);
+    updateStatusMutation.mutate({ id: schedule.id, status: 'cancelled' });
+  };
+
+  const handleDeleteFromDetail = (schedule: WorkshopSchedule) => {
+    if (!window.confirm(buildScheduleConfirmMessage('delete', schedule))) return;
+    setDetailSchedule(null);
+    deleteMutation.mutate(schedule.id);
+  };
+
+  const handleGenerateMaintenanceFromDetail = (schedule: WorkshopSchedule) => {
+    setDetailSchedule(null);
+    handleGenerateMaintenance(schedule);
+  };
+
   return (
     <div className="flex h-full flex-col gap-3 tall:gap-6">
       {blockWrite && <SelectClientNotice />}
@@ -632,23 +660,10 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
                   <ScheduleRow
                     key={s.id}
                     schedule={s}
-                    canDelete={canDelete}
-                    canWriteSchedules={canWriteSchedules}
                     blockWrite={blockWrite}
                     clientName={s.clientId ? (clientNameMap.get(s.clientId) ?? undefined) : undefined}
                     lastKmInfo={s.vehicleId ? lastKmMap.get(s.vehicleId) : undefined}
                     onViewDetail={() => setDetailSchedule(s)}
-                    onEdit={canWriteSchedules ? () => {
-                      sessionStorage.setItem('scheduleFormEditing', JSON.stringify(s));
-                      sessionStorage.setItem('scheduleFormOpen', 'true');
-                      sessionStorage.setItem('scheduleFormData', JSON.stringify(s));
-                      setEditingSchedule(s);
-                      setIsFormOpen(true);
-                    } : undefined}
-                    onComplete={canWriteSchedules ? () => updateStatusMutation.mutate({ id: s.id, status: 'completed', completedAt: new Date().toISOString() }) : undefined}
-                    onCancel={canWriteSchedules ? () => updateStatusMutation.mutate({ id: s.id, status: 'cancelled' }) : undefined}
-                    onDelete={canWriteSchedules && canDelete ? () => deleteMutation.mutate(s.id) : undefined}
-                    onGenerateMaintenance={canWriteSchedules ? () => handleGenerateMaintenance(s) : undefined}
                   />
                 ))}
               </tbody>
@@ -672,7 +687,19 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
         />
       )}
       {detailSchedule && (
-        <ScheduleDetailModal schedule={detailSchedule} onClose={() => setDetailSchedule(null)} />
+        <ScheduleDetailModal
+          schedule={detailSchedule}
+          onClose={() => setDetailSchedule(null)}
+          actions={{
+            canWriteSchedules,
+            canDelete,
+            onEdit: () => handleEditFromDetail(detailSchedule),
+            onComplete: () => handleCompleteFromDetail(detailSchedule),
+            onCancel: () => handleCancelFromDetail(detailSchedule),
+            onDelete: () => handleDeleteFromDetail(detailSchedule),
+            onGenerateMaintenance: () => handleGenerateMaintenanceFromDetail(detailSchedule),
+          }}
+        />
       )}
     </div>
   );
@@ -682,25 +709,13 @@ function AssistantView({ canDelete, isAssistantPlus }: { canDelete: boolean; isA
 
 const ScheduleRow: React.FC<{
   schedule: WorkshopSchedule;
-  canDelete: boolean;
-  canWriteSchedules: boolean;
   blockWrite?: boolean;
   clientName?: string;
   lastKmInfo?: VehicleLastKmInfo;
   onViewDetail: () => void;
-  onEdit?: () => void;
-  onComplete?: () => void;
-  onCancel?: () => void;
-  onDelete?: () => void;
-  onGenerateMaintenance?: () => void;
-}> = ({ schedule, canDelete, canWriteSchedules, blockWrite, clientName, lastKmInfo, onViewDetail, onEdit, onComplete, onCancel, onDelete, onGenerateMaintenance }) => {
-  const isScheduled = schedule.status === 'scheduled';
-  const address = formatWorkshopAddress(schedule);
-  const mapsUrl = buildGoogleMapsUrl(schedule);
-  const hasAddress = address.trim().length > 0;
-
+}> = ({ schedule, blockWrite, clientName, lastKmInfo, onViewDetail }) => {
   return (
-    <tr className="transition-colors hover:bg-zinc-50">
+    <tr className="cursor-pointer transition-colors hover:bg-zinc-50" onClick={onViewDetail}>
       {blockWrite && (
         <td className="px-4 py-2 text-sm text-zinc-600 tall:py-3">
           <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
@@ -711,23 +726,11 @@ const ScheduleRow: React.FC<{
       <td className="px-4 py-2 font-mono text-xs font-medium text-zinc-700 tall:py-3">
         <div>{schedule.vehicleLicensePlate ?? '-'}</div>
         {schedule.vehicleLicensePlate && (
-          <LastKmLabel info={lastKmInfo} className="font-sans text-xs font-normal text-zinc-400" />
+          <LastKmLabel info={lastKmInfo} className="font-sans text-xs font-normal text-zinc-400" hideWhenEmpty />
         )}
       </td>
       <td className="px-4 py-2 tall:py-3">
         <div className="text-sm text-zinc-800">{schedule.workshopName ?? '-'}</div>
-        {hasAddress && (
-          <a
-            href={mapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-0.5 inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700"
-            title="Ver no Google Maps"
-          >
-            <MapPin className="h-3 w-3" />
-            Ver endereço
-          </a>
-        )}
       </td>
       <td className="hidden px-4 py-2 text-zinc-600 sm:table-cell tall:py-3">{formatScheduleDate(schedule.scheduledDate)}</td>
       <td className="px-4 py-2 tall:py-3">
@@ -740,7 +743,7 @@ const ScheduleRow: React.FC<{
       </td>
       <td className="hidden px-4 py-2 text-xs text-zinc-500 md:table-cell tall:py-3">{schedule.createdByName ?? '-'}</td>
       <td className="px-4 py-2 tall:py-3">
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex items-center justify-end">
           <button
             type="button"
             onClick={onViewDetail}
@@ -750,49 +753,6 @@ const ScheduleRow: React.FC<{
           >
             <Eye className="h-4 w-4" />
           </button>
-          {canWriteSchedules && isScheduled && onEdit && onComplete && onCancel && (
-            <>
-              <button
-                onClick={onEdit}
-                title="Editar"
-                className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-              <button
-                onClick={onComplete}
-                title="Concluir manualmente"
-                className="rounded-lg p-1.5 text-green-500 transition-colors hover:bg-green-50 hover:text-green-700"
-              >
-                <CheckCircle className="h-4 w-4" />
-              </button>
-              <button
-                onClick={onCancel}
-                title="Cancelar agendamento"
-                className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-red-500"
-              >
-                <XCircle className="h-4 w-4" />
-              </button>
-            </>
-          )}
-          {canWriteSchedules && schedule.status !== 'cancelled' && onGenerateMaintenance && (
-            <button
-              onClick={onGenerateMaintenance}
-              title="Gerar OS de Manutenção"
-              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
-            >
-              <ClipboardList className="h-4 w-4" />
-            </button>
-          )}
-          {canDelete && canWriteSchedules && !isScheduled && onDelete && (
-            <button
-              onClick={onDelete}
-              title="Excluir"
-              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-500"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          )}
         </div>
       </td>
     </tr>

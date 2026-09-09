@@ -2,6 +2,36 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-09-09: Agendamentos — ações da linha migradas para o modal (Master–Detail)
+
+Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 3 — alteração em funcionalidade existente), em 6 etapas, inteiramente no frontend. Continuação direta da sessão anterior, na mesma tela.
+
+**O pedido e o diagnóstico.** O usuário reportou que `/agendamentos` estava "muito poluída" e sugeriu mover Concluir, Cancelar e Gerar OS para dentro do modal. A leitura do código confirmou o diagnóstico e mostrou que ele era mais grave do que a captura sugeria: a coluna Ações renderizava **até 6 botões condicionais**, e o conjunto **mudava de forma a cada linha** — 5 ícones numa linha "Agendado", 3 numa "Concluída". A instabilidade visual cansava tanto quanto a quantidade.
+
+**O que o planejamento encontrou sem ter sido pedido.** Concluir, Cancelar e Excluir chamavam a mutation **direto no `onClick`, sem nenhuma confirmação**, num alvo de 16px, no meio de 185 linhas — e nenhuma das três é reversível pela interface. O projeto já exigia confirmação para excluir oficina, embarcador, unidade e usuário; Agendamentos era a exceção. A correção entrou no mesmo plano, classificada como PENDENTE→RESOLVIDO no checklist de segurança.
+
+**A decisão de desenho.** Master–Detail: a lista serve para encontrar, o detalhe serve para agir. A alternativa avaliada — um menu "⋯" na linha — pouparia um clique por ação, mas exige um componente de menu acessível (teclado, foco, `aria-haspopup`) que o projeto não tem; `MultiSelectDropdown` é de filtro e não serve. Decidiu-se resolver a poluição com o que já existe e reavaliar o menu se o time reclamar dos cliques. **Não é omissão, é sequenciamento** — está registrado como oportunidade futura.
+
+**A regra virou função pura.** As cinco condições de disponibilidade viviam como expressões booleanas dentro do JSX. Como as ações passariam a viver no modal, a mesma regra precisaria ser reescrita lá — duplicação, e risco real de a cópia divergir e **afrouxar permissão**. Foram transcritas **sem alteração de valor** para `isScheduleActionAvailable`, em `src/lib/workshopScheduleActions.ts`, com uma tabela de fidelidade no próprio plano mapeando cada condição antiga na nova. A fronteira de autorização real continua sendo o RLS `ws_schedules_*`: esconder botão nunca foi controle de segurança, e o plano diz isso explicitamente para ninguém confundir depois.
+
+**O contrato opcional que protegeu o motorista.** `ScheduleDetailModal` é compartilhado com a visão do Motorista. As ações entraram como **uma prop opcional única** (`actions`), não como sete props soltas: quem não a passa continua com o modal de leitura idêntico ao de ontem. A prova de que o contrato antigo sobreviveu é mecânica — `ScheduleDetailModal.test.tsx` (7 testes) e `WorkshopSchedules.detailModal.test.tsx` (3 testes) continuam passando **sem terem sido editados**, e o plano proibia tocá-los.
+
+**Dois controles negativos, executados pelo revisor.** Portão verde não prova que o teste captura o requisito. (1) Um botão de ação foi devolvido à linha: o cenário "a linha não exibe mais nenhum botão além do olho" **falhou**, como devia. (2) A guarda `if (!window.confirm(...)) return;` foi removida do cancelamento: o cenário "cancelar o aviso não altera nada" **falhou**, como devia. Ambos revertidos, com o arquivo voltando byte a byte ao estado aprovado (+50/-90).
+
+**Decisões registradas para não serem "corrigidas" no futuro.**
+- `window.confirm`, **não** `ConfirmDeleteModal`. A confirmação por digitação é reservada a Veículos e Motoristas, registros pesados; agendamento é leve e recorrente, e exigir digitação seria fricção desproporcional.
+- A confirmação vive **na página**, não no modal. O modal recebe callback e o chama; quem confirma, muta e fecha é `AssistantView`, dona das mutations. Isso preserva a testabilidade do modal em isolamento.
+- O `<tr>` clicável **não** tem `role`/`tabIndex`/`onKeyDown`. O caminho acessível por teclado é o botão de olho, que já é focável; duplicar a semântica criaria um segundo alvo anunciado pelo leitor de tela para a mesma ação.
+- `hideWhenEmpty` é prop **aditiva** de `LastKmLabel` com default `false` — o componente é usado por 5 telas, e o default preserva o comportamento nas outras 4.
+
+**O padrão de falha se manteve, e continua sendo do plano.** Quatro correções em 6 etapas, **nenhuma atribuível a modelo**: dois warnings de `import/order`/`classnames-order` resolvidos por `eslint --fix` (um deles em código que o próprio plano ditou), oito warnings de `as any` numa asserção que o plano não tipou, e — a mais séria — **um cenário ausente**: nenhum teste provava que o botão "Excluir" chama `onDelete`, porque ele não existe em status "Agendado" e o único cenário que o mencionava afirmava sua ausência. Um erro de fiação passaria batido. O revisor acrescentou o caso. É o nono registro consecutivo em que o gargalo é a especificação, não a capacidade do executor.
+
+**Validação bloqueada, registrada como tal.** `e2e/pending/tenant-users-assistant-maintenance.spec.ts` foi atualizado (5 substituições: o botão agora é alcançado abrindo o modal), mas vive em `e2e/pending` e exige DEV autenticado com dados operacionais reais. **Não foi executado — `skipped` não é `passed`.** Risco extra introduzido e não verificado empiricamente: antes, `.first()` incidia sobre a lista de *botões* "Gerar OS", pulando naturalmente linhas canceladas; agora incide sobre a lista de *linhas*, e se a primeira linha estiver cancelada o botão não existirá no modal. Na prática o teste 01 da suíte serial cria um agendamento com data futura, que fica no topo da ordenação decrescente — mas isso não foi confirmado em execução.
+
+**Distribuição e custo.** As 6 etapas rodaram em executores de **custo zero absoluto** — `big-pickle` (Etapas 2 e 6) e `muse-spark-1.2-contributor-free` (Etapas 1, 3, 4 e 5) —, sem consumir janela de assinatura nenhuma. A Etapa 4, a integração na página em produção, foi aprovada **sem nenhuma correção** pelo segundo plano consecutivo com o mesmo modelo e o mesmo arquivo, evitando de novo a armadilha do `rules-of-hooks` de `DriverView`. A Etapa 5 (cobertura) foi novamente separada da Etapa 4 (mudança) e dada a outro disparo, para que a asserção não viesse de quem fez a integração. Registros #022 a #027.
+
+**Portão final:** typecheck 0 erros · lint 0 erros / 263 warnings (patamar do baseline preservado) · unitários **2.248/2.248 em 248 arquivos** (+26 testes, +3 arquivos) · smoke 7/7. `WorkshopSchedules.tsx` encolheu 40 linhas.
+
 ## Sessão — 2026-09-09: Agendamentos — visualização somente-leitura para todos os papéis
 
 Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 3 — alteração em funcionalidade existente), em 4 etapas, inteiramente no frontend.

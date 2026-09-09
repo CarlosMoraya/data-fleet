@@ -14,12 +14,15 @@ describe('LastKmLabel', () => {
     }
   });
 
-  function render(info: Parameters<typeof LastKmLabel>[0]['info']) {
+  function render(
+    info: Parameters<typeof LastKmLabel>[0]['info'],
+    hideWhenEmpty?: boolean,
+  ) {
     container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
     act(() => {
-      root.render(<LastKmLabel info={info} />);
+      root.render(<LastKmLabel info={info} hideWhenEmpty={hideWhenEmpty} />);
     });
     return container;
   }
@@ -37,5 +40,16 @@ describe('LastKmLabel', () => {
   it('exibe leitura corrigida com (Editado)', () => {
     const el = render({ value: 38001, isCorrected: true });
     expect(el.textContent).toBe('Último Km: 38.001 km (Editado)');
+  });
+
+  it('com hideWhenEmpty, não renderiza nada quando não há leitura', () => {
+    const el = render(null, true);
+    expect(el.textContent).toBe('');
+    expect(el.querySelector('div')).toBeNull();
+  });
+
+  it('com hideWhenEmpty, continua exibindo a leitura quando ela existe', () => {
+    const el = render({ value: 38001, isCorrected: false }, true);
+    expect(el.textContent).toBe('Último Km: 38.001 km');
   });
 });

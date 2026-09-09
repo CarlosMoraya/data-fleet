@@ -44,14 +44,15 @@ test.describe.serial('Manutenção — Integração Agendamento → OS e Dual OS
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10000 });
   });
 
-  // ─── 02: Botão "Gerar OS" navega para /manutencao e abre form ───────────────
+  // ─── 02: "Gerar OS" no modal de detalhes navega para /manutencao e abre form ──
 
   test('02 — navegação: "Gerar OS" abre form de nova manutenção em /manutencao', async ({ page }) => {
     await page.goto('/agendamentos');
     await expect(page.locator('h1', { hasText: 'Agendamentos' })).toBeVisible({ timeout: 15000 });
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10000 });
 
-    const gerarOsBtn = page.locator('button[title="Gerar OS de Manutenção"]').first();
+    await page.locator('button[aria-label="Ver detalhes do agendamento"]').first().click();
+    const gerarOsBtn = page.getByRole('button', { name: 'Gerar OS', exact: true });
     await expect(gerarOsBtn).toBeVisible({ timeout: 5000 });
     await gerarOsBtn.click();
 
@@ -70,7 +71,8 @@ test.describe.serial('Manutenção — Integração Agendamento → OS e Dual OS
     await expect(page.locator('h1', { hasText: 'Agendamentos' })).toBeVisible({ timeout: 15000 });
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10000 });
 
-    await page.locator('button[title="Gerar OS de Manutenção"]').first().click();
+    await page.locator('button[aria-label="Ver detalhes do agendamento"]').first().click();
+    await page.getByRole('button', { name: 'Gerar OS', exact: true }).click();
     await expect(page).toHaveURL('/manutencao', { timeout: 10000 });
 
     const modal = page.locator('.fixed.inset-0').last();
@@ -107,7 +109,8 @@ test.describe.serial('Manutenção — Integração Agendamento → OS e Dual OS
     await expect(page.locator('h1', { hasText: 'Agendamentos' })).toBeVisible({ timeout: 15000 });
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10000 });
 
-    await page.locator('button[title="Gerar OS de Manutenção"]').first().click();
+    await page.locator('button[aria-label="Ver detalhes do agendamento"]').first().click();
+    await page.getByRole('button', { name: 'Gerar OS', exact: true }).click();
     await expect(page).toHaveURL('/manutencao', { timeout: 10000 });
 
     const modal = page.locator('.fixed.inset-0').last();
@@ -144,7 +147,8 @@ test.describe.serial('Manutenção — Integração Agendamento → OS e Dual OS
 
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10000 });
 
-    await page.locator('button[title="Gerar OS de Manutenção"]').first().click();
+    await page.locator('button[aria-label="Ver detalhes do agendamento"]').first().click();
+    await page.getByRole('button', { name: 'Gerar OS', exact: true }).click();
     await expect(page).toHaveURL('/manutencao', { timeout: 10000 });
 
     const modal = page.locator('.fixed.inset-0').last();

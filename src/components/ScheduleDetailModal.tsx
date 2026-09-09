@@ -1,14 +1,26 @@
 import { X, CalendarClock, MapPin, ExternalLink } from 'lucide-react';
 import React from 'react';
 
+import { isScheduleActionAvailable, type ScheduleActionKey } from '../lib/workshopScheduleActions';
 import { formatScheduleDate, SCHEDULE_STATUS_LABELS, SCHEDULE_STATUS_BADGE_CLASS } from '../lib/workshopScheduleDisplay';
 import { formatWorkshopAddress, buildGoogleMapsUrl } from '../lib/workshopScheduleMappers';
 
 import type { WorkshopSchedule } from '../types';
 
+export interface ScheduleDetailActions {
+  canWriteSchedules: boolean;
+  canDelete: boolean;
+  onEdit: () => void;
+  onComplete: () => void;
+  onCancel: () => void;
+  onDelete: () => void;
+  onGenerateMaintenance: () => void;
+}
+
 interface Props {
   schedule: WorkshopSchedule;
   onClose: () => void;
+  actions?: ScheduleDetailActions;
 }
 
 function DetailField({ label, value }: { label: string; value?: string | null }) {
@@ -28,10 +40,16 @@ function SectionTitle({ title }: { title: string }) {
   );
 }
 
-export default function ScheduleDetailModal({ schedule, onClose }: Props) {
+export default function ScheduleDetailModal({ schedule, onClose, actions }: Props) {
   const address = formatWorkshopAddress(schedule);
   const hasAddress = address.trim().length > 0;
   const mapsUrl = buildGoogleMapsUrl(schedule);
+  const can = (action: ScheduleActionKey): boolean =>
+    actions != null &&
+    isScheduleActionAvailable(action, schedule.status, {
+      canWriteSchedules: actions.canWriteSchedules,
+      canDelete: actions.canDelete,
+    });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
@@ -116,14 +134,63 @@ export default function ScheduleDetailModal({ schedule, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex flex-shrink-0 justify-end border-t border-zinc-200 px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
-          >
-            Fechar
-          </button>
+        <div className="flex flex-shrink-0 flex-col-reverse gap-2 border-t border-zinc-200 px-6 py-3 sm:flex-row sm:items-center sm:justify-between tall:py-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {actions && can('cancel') && (
+              <button
+                type="button"
+                onClick={actions.onCancel}
+                className="rounded-xl px-3 py-2 text-sm font-medium text-zinc-500 transition-colors hover:bg-red-50 hover:text-red-600"
+              >
+                Cancelar agendamento
+              </button>
+            )}
+            {actions && can('delete') && (
+              <button
+                type="button"
+                onClick={actions.onDelete}
+                className="rounded-xl px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+              >
+                Excluir
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+            >
+              Fechar
+            </button>
+            {actions && can('edit') && (
+              <button
+                type="button"
+                onClick={actions.onEdit}
+                className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+              >
+                Editar
+              </button>
+            )}
+            {actions && can('generateMaintenance') && (
+              <button
+                type="button"
+                onClick={actions.onGenerateMaintenance}
+                className="rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-50"
+              >
+                Gerar OS
+              </button>
+            )}
+            {actions && can('complete') && (
+              <button
+                type="button"
+                onClick={actions.onComplete}
+                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+              >
+                Concluir
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

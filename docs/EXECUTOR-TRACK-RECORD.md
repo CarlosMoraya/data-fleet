@@ -634,6 +634,151 @@ Iniciativa correta não pedida: acrescentou `\b` à regex (`/\bUtilizado\b/g`) p
 
 ---
 
+### #022 — 2026-09-09 · Agendamentos: ações no modal — Etapa 2 (módulo puro de disponibilidade)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Forma** | lógica pura + teste, só arquivos novos |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/big-pickle` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | 2 arquivos novos, nenhum existente |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim (7 cenários, 5 ações × 3 status, mais as 3 mensagens completas) · `baseline` sim (245 arq / 2.222 testes / 263 warnings). O plano trazia o módulo inteiro transcrito, mais uma tabela de fidelidade mapeando cada condição do JSX antigo na função nova.
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não · portão_1a **não** (1 warning `import/order`) · ciclos 0 · regressões 0 · lacunas 0.
+
+**Verificação independente:** tsc 0 · lint 0 erros/263 warnings após `eslint --fix` · 246 arq / 2.229 testes (+7). Auditoria adversarial: nenhum mock (função pura), todas as asserções `toBe(true/false)` ou string exata, nenhuma auto-confirmação. Os 7 cenários do plano estão todos presentes com os valores literais.
+
+**Veredito:** aprovado. **Atribuição de falha: nenhuma** — `import/order` é ruído mecânico resolvido por `--fix`, mesmo padrão dos registros #018 e #020.
+
+---
+
+### #023 — 2026-09-09 · Agendamentos: ações no modal — Etapa 1 (`LastKmLabel`, componente compartilhado)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | edição em arquivo existente + teste |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | 2 arquivos existentes, nenhum novo |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim (2 casos com valores exatos) · `baseline` sim. O plano trazia o corpo novo do componente inteiro e o ajuste literal da função `render` do teste.
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente **não** (`+18/-3`; os 3 testes antigos intocados, só a assinatura do helper mudou) · portão_1a **sim** · ciclos 0 · regressões 0 · lacunas 0.
+
+**Risco real desta etapa e como foi coberto:** `LastKmLabel` é renderizado por 5 telas (Veículos, Checklists, Chamados, SOS, Agendamentos). A prop entrou **aditiva com default `false`**, e a suíte inteira (2.231 testes) passou — é a prova de que as outras 4 telas não mudaram.
+
+**Veredito:** aprovado **sem nenhuma correção**. **Atribuição de falha: nenhuma.**
+
+---
+
+### #024 — 2026-09-09 · Agendamentos: ações no modal — Etapa 3 (rodapé de ações do `ScheduleDetailModal`)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | edição em arquivo existente + teste novo |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | 1 arquivo existente + 1 novo |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim (8 cenários com listas de rótulos exatas) · `baseline` sim. O plano numerava **cinco** mudanças e trazia a árvore JSX inteira do rodapé.
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente **não** · portão_1a **não** (1 warning `tailwindcss/classnames-order`) · ciclos 0 · regressões 0 · **lacunas 2, as duas do plano**.
+
+**Verificação independente — duas lacunas, ambas de origem no plano:**
+
+1. O warning de ordem de classes Tailwind estava **no JSX que o próprio plano ditou**, linha por linha. O executor transcreveu fielmente um erro meu. Resolvido por `eslint --fix`. **Atribuição: falha do plano.**
+2. **Nenhum cenário provava que o botão "Excluir" chama `onDelete`.** "Excluir" não existe em status `scheduled`, e o único cenário que o mencionava (`o botão Fechar não dispara nenhuma ação`) afirmava justamente sua **ausência**. Uma fiação trocada — `onDelete` apontando para `onCancel` — passaria por todos os 8 cenários. O revisor acrescentou um nono caso em status `completed`. **Atribuição: falha do plano.**
+
+**Auditoria adversarial dos testes:** `isScheduleActionAvailable` é usada **real**, não mockada — se o executor a tivesse mockado, o teste provaria apenas que o mock funciona. `buttonLabels()` filtra strings vazias, isolando o X do cabeçalho (que não tem texto) das asserções de rótulo. Os dois arquivos de teste protegidos pelo plano continuam intactos e passando.
+
+**Veredito:** aprovado com 2 correções do revisor, **nenhuma atribuível ao modelo**.
+
+---
+
+### #025 — 2026-09-09 · Agendamentos: ações no modal — Etapa 4 (integração de página em produção)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | edição em arquivo existente (integração de página em produção, 785 linhas) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | 1 arquivo existente, nenhum novo |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` **n/a — a etapa PROÍBE escrever teste** (cobertura é a Etapa 5, por outro disparo) · `baseline` sim. O plano listava **nove** mudanças numeradas mais uma lista item a item do que permanece intocado.
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não · portão_1a **sim** · ciclos 0 · regressões 0 · lacunas 0.
+
+**Verificação independente:** diff completo linha a linha, **+50/-90** — a tela encolheu 40 linhas. As nove mudanças aplicadas exatamente como especificadas. Conferido item a item: nenhuma das três `useQuery`, nenhuma das três mutations e `hydrateWorkshopScheduleRows` foram tocadas; `MapPin`, `formatWorkshopAddress` e `buildGoogleMapsUrl` continuam importados porque a `DriverView` os usa (remover teria sido o erro óbvio); o `<tr>` clicável não ganhou `role`/`tabIndex`; a violação pré-existente de `react-hooks/rules-of-hooks` em `DriverView` **não** foi "corrigida"; e o `if (!window.confirm(...)) return;` vem **antes** do `setDetailSchedule(null)` nos três handlers irreversíveis, que é o que mantém o modal aberto quando o usuário recusa.
+
+**Veredito:** aprovado **sem nenhuma correção**. **Atribuição de falha: nenhuma.**
+
+**Conclusão sobre o modelo:** **segundo plano consecutivo** em que este modelo faz a integração de página deste mesmo arquivo sem uma única correção, evitando as duas vezes a armadilha do `rules-of-hooks`. Reforça o achado do #020: o modelo gratuito entrega essa forma quando a spec **enumera** as mudanças em vez de descrevê-las.
+
+---
+
+### #026 — 2026-09-09 · Agendamentos: ações no modal — Etapa 5 (teste de integração de página)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Forma** | teste (arquivo novo, com mock de página) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | 1 arquivo novo, nenhum existente |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim (fixture de 2 linhas com status distintos, 8 cenários, mensagens de confirmação por extenso) · `baseline` sim.
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não · portão_1a **não** (8 warnings) · ciclos 0 · regressões 0 · lacunas 1 (do plano).
+
+**Verificação independente — 8 warnings de `no-explicit-any`/`no-unsafe-member-access`** vindos de `as any` em duas asserções sobre `updateSpy.mock.calls[0][0]`. Causa: o plano especificou o mock como `vi.fn(() => ...)`, **sem tipar o parâmetro**, então o executor não tinha tipo para acessar e recorreu a `any`. O revisor tipou o espião (`vi.fn((_payload: Record<string, unknown>) => ...)`) e removeu os quatro `as any`. **Atribuição: falha do plano.**
+
+**Auditoria adversarial:** só fronteiras externas mockadas (`supabase`, `AuthContext`, `vehicleOdometerService`); `ScheduleDetailModal`, `workshopScheduleActions` e `LastKmLabel` permanecem **reais**. Toda asserção de ausência tem âncora de presença — a lacuna que reprovou o #017 e o #021 **não se repetiu**, porque desta vez o plano especificou as âncoras explicitamente.
+
+**Dois controles negativos executados pelo revisor.** (1) Um botão de ação foi devolvido à linha da tabela: o cenário 1 **falhou**. (2) A guarda `if (!window.confirm(...)) return;` foi removida do cancelamento: o cenário 5 **falhou**. Ambos revertidos, com a suíte voltando a 8/8 e o arquivo de página voltando ao `+50/-90` aprovado. É a evidência de que o teste captura tanto o requisito de UI quanto o requisito de segurança da sessão.
+
+**Veredito:** aprovado com 1 correção do revisor, **não atribuível ao modelo**.
+
+---
+
+### #027 — 2026-09-09 · Agendamentos: ações no modal — Etapa 6 (atualização de E2E)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado / transcrição |
+| **Forma** | edição em arquivo existente (teste E2E) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/big-pickle` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | 1 arquivo existente, nenhum novo |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` n/a (edição de teste existente; o plano trazia o antes e o depois de cada substituição) · `baseline` sim. **Primeira execução registrada da forma "edição de E2E" com qualquer modelo — amostra insuficiente declarada no plano**, mitigada por revisão linha a linha.
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente **sim, por especificação** (é o objeto da etapa) · portão_1a **sim** · ciclos 0 · regressões 0 · lacunas 0.
+
+**Verificação independente:** exatamente as cinco substituições, nada além. Todas as asserções de destino preservadas (`toHaveURL('/manutencao')`, `'Nova Manutenção'`, os `inputValue()` de prefill, `'Preventiva'`, `'Aguardando orçamento'`, `'Será gerada automaticamente'`). `e2e/completed/role-operations-manager.spec.ts:164` — que estava **fora** do manifesto — não foi tocado, e continua correto: o Gestor de Operações não vê o botão nem na linha nem no modal.
+
+**⚠️ Validação de execução BLOQUEADA — não confundir com aprovado.** O arquivo vive em `e2e/pending` e exige DEV autenticado com dados operacionais reais. **Não foi executado.** Risco introduzido e não verificado empiricamente: antes, `.first()` incidia sobre a lista de *botões* "Gerar OS", pulando naturalmente as linhas canceladas; agora incide sobre a lista de *linhas*, e uma primeira linha cancelada faria o botão não existir no modal. Na prática o teste 01 da suíte serial cria um agendamento com data futura, que fica no topo da ordenação decrescente — mas isso é inferência, não medição.
+
+**Veredito:** aprovado na revisão de código; **execução pendente**. **Atribuição de falha: nenhuma.**
+
+---
+
 ## 9. Sumário por combinação
 
 Atualizar a cada registro novo.
@@ -642,25 +787,32 @@ Atualizar a cada registro novo.
 |---|---|---|---|---|---|---|
 | Delegável | lógica pura + UI + teste | codex / `gpt-5.6-sol` (high) | 1 | 1/1 | 0 | 0 |
 | Delegável | componente de UI + teste | opencode / `big-pickle` **(gratuito)** | 2 | 2/2 | 0 | 0 |
-| Delegável | lógica pura + teste, só arquivos novos | opencode / `big-pickle` **(gratuito)** | 2 | 1/2³ | 0 | 0 |
+| Delegável | lógica pura + teste, só arquivos novos | opencode / `big-pickle` **(gratuito)** | 3 | 2/3³ | 0 | 0 |
 | Delegável | arquivo novo, cópia de padrão existente | opencode / `big-pickle` **(gratuito)** | 1 | 1/1 | 0 | 0 |
 | Supervisionado | edição em arquivo existente + integração | codex / `gpt-5.6-sol` (high) | 2 | 1/2 | 0,5 | 0 |
 | Supervisionado | edição em arquivo existente | codex / `gpt-5.6-sol` (high) | 3 | 3/3 | 0 | 0 |
 | Supervisionado / transcrição | migration (SQL literal) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 4 | 4/4 | 0 | 0 |
 | Delegável | arquivo novo + teste | opencode / `big-pickle` **(gratuito)** | 4 | 4/4 | 0 | 0 |
-| Supervisionado | edição em arquivo existente | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 2 | 2/2 | 0 | 0 |
+| Supervisionado | edição em arquivo existente | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | **5** | 4/5⁴ | 0 | 0 |
 | Supervisionado | integração de página | codex / `gpt-5.6-luna` (medium) | 1 | 0/1¹ | 0 | 0 |
 | Supervisionado | teste (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 2² | 0 |
-| Delegável | teste (arquivo novo, mock de página) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 0 | 0 |
+| Delegável | teste (arquivo novo, mock de página) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 2 | 1/2⁵ | 0 | 0 |
+| Supervisionado / transcrição | edição de teste E2E | opencode / `big-pickle` **(gratuito)** | 1 | 1/1 | 0 | 0 |
 
 ¹ Reprovou o portão por 2 warnings de `import/order`, resolvidos por `eslint --fix`; nenhuma falha de modelo.
 ² Os 2 ciclos foram indisponibilidade de provedor (`grok-code`) e falha do plano, não do modelo.
 ³ A única reprovação foi 1 warning de `import/order` resolvido por `eslint --fix` (registro #018); nenhuma falha de modelo.
+⁴ As duas reprovações foram 1 warning de `import/order` e 1 de `classnames-order`, ambos resolvidos por `eslint --fix`; o segundo estava no JSX ditado literalmente pelo plano. Nenhuma falha de modelo.
+⁵ A reprovação foram 8 warnings de `no-explicit-any` decorrentes de o plano não ter tipado o espião do mock (registro #026); nenhuma falha de modelo.
 
-**Estado atual (2026-09-08): duas combinações atingiram autoridade estatística.** "Supervisionado / transcrição de migration" com `muse-spark-1.2-contributor-free` e "Delegável / arquivo novo + teste" com `big-pickle` chegaram aos **4 registros** exigidos pela Seção 6 — nessas duas, o histórico agora manda e o benchmark é ignorado. "Supervisionado / edição em arquivo existente" com `gpt-5.6-sol` segue em 3, mas foi **superada na prática**: `gpt-5.6-luna` (effort `medium`) e `muse-spark` gratuito entregaram a mesma forma sem falha de modelo, com fração da queima de janela.
+**Estado atual (2026-09-09): três combinações atingiram autoridade estatística.** "Supervisionado / edição em arquivo existente" com `muse-spark-1.2-contributor-free` chegou a **5 registros** — nessa combinação o histórico manda e o benchmark é ignorado. Ela inclui duas integrações de página em produção no mesmo arquivo (`WorkshopSchedules.tsx`, registros #020 e #025), ambas **sem uma única correção**.
+
+**Estado anterior (2026-09-08): duas combinações atingiram autoridade estatística.** "Supervisionado / transcrição de migration" com `muse-spark-1.2-contributor-free` e "Delegável / arquivo novo + teste" com `big-pickle` chegaram aos **4 registros** exigidos pela Seção 6 — nessas duas, o histórico agora manda e o benchmark é ignorado. "Supervisionado / edição em arquivo existente" com `gpt-5.6-sol` segue em 3, mas foi **superada na prática**: `gpt-5.6-luna` (effort `medium`) e `muse-spark` gratuito entregaram a mesma forma sem falha de modelo, com fração da queima de janela.
 
 **Executores sem nenhum registro:** `grok-code` (duas tentativas abortadas por erro do provedor, sem chegar a processar — não conta como falha e pode ser estreado de novo).
 
-**Padrão confirmado (N=8, atualizado em 2026-09-09):** as oito falhas registradas até hoje foram **todas do plano**, nenhuma do modelo. As três de 2026-09-09 repetiram o padrão em sua forma mais pura: uma assertiva que confirmava a si mesma (`toContain('Agendado')` casando com o texto de observações), um caso literal apontando o seletor errado, e uma asserção de ausência sem âncora de presença. Nenhuma delas era detectável por comando de verificação — só por leitura adversarial. O gargalo de qualidade deste fluxo é a especificação, não a capacidade do executor. As três de 2026-09-08 foram do mesmo tipo — o planejador descreveu em prosa algo que precisava ser literal (o container do botão, a assertiva de `banned_until`) ou omitiu uma premissa do ambiente (variáveis de ambiente são referenciadas, não lidas em disco).
+**Padrão confirmado (N=12, atualizado em 2026-09-09, segunda sessão do dia):** as doze falhas registradas até hoje foram **todas do plano**, nenhuma do modelo. As quatro mais recentes: um JSX que o plano ditou já com a ordem de classes Tailwind errada (o executor transcreveu fielmente um erro do planejador); um mock especificado sem tipo de parâmetro, que forçou o executor a `as any`; e — a mais séria — **um cenário de teste que o plano simplesmente não previu**: nenhuma asserção provava que o botão "Excluir" chama `onDelete`, porque a ação não existe no status usado pelos demais cenários. Uma fiação trocada teria passado por todos os 8 casos. **Lição nova:** revisar a matriz de cobertura por *ação × estado*, não por contagem de cenários — um plano com oito casos pode deixar uma ação inteira sem prova positiva.
+
+**Padrão anterior (N=8):** as oito falhas registradas até então foram **todas do plano**, nenhuma do modelo. As três de 2026-09-09 repetiram o padrão em sua forma mais pura: uma assertiva que confirmava a si mesma (`toContain('Agendado')` casando com o texto de observações), um caso literal apontando o seletor errado, e uma asserção de ausência sem âncora de presença. Nenhuma delas era detectável por comando de verificação — só por leitura adversarial. O gargalo de qualidade deste fluxo é a especificação, não a capacidade do executor. As três de 2026-09-08 foram do mesmo tipo — o planejador descreveu em prosa algo que precisava ser literal (o container do botão, a assertiva de `banned_until`) ou omitiu uma premissa do ambiente (variáveis de ambiente são referenciadas, não lidas em disco).
 
 **Consequência prática:** vale investir mais em fechar a especificação do que em subir o tier do executor. Um modelo gratuito com spec fechada superou, nesta sessão, o histórico do `gpt-5.6-sol` com spec parcial.
