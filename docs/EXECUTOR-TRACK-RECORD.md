@@ -779,6 +779,74 @@ Iniciativa correta não pedida: acrescentou `\b` à regex (`/\bUtilizado\b/g`) p
 
 ---
 
+### #028 — 2026-09-11 · Financeiro/Pagamentos: rótulo "Lançado no sistema" — Etapa 1 (módulo de labels)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Forma** | arquivo novo (lógica pura) + teste transcrito |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/big-pickle` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | 2 arquivos novos, nenhum existente |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim (2 cenários com `toEqual` sobre o mapa inteiro, entrada/saída literais) · `baseline` sim (248 arq / 2.248 testes / 263 warnings).
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não · portão_1a **sim** · ciclos 0 · regressões 0 · lacunas 0.
+
+**Verificação independente:** os dois arquivos criados são byte a byte idênticos ao conteúdo literal do plano — conferido por leitura direta, sem diff necessário (arquivos novos). `npx vitest run src/lib/paymentStatusDisplay.test.ts` 2/2. `tsc` 0 erros.
+
+**Veredito:** aprovado sem correções. Quinto registro limpo de `big-pickle` na combinação "Delegável / arquivo novo + teste".
+
+---
+
+### #029 — 2026-09-11 · Financeiro/Pagamentos: rótulo "Lançado no sistema" — Etapa 2 (4 componentes de Financeiro)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | edição em arquivo existente |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | 4 arquivos existentes, nenhum novo |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` n/a (edição de componente por trocas literais especificadas antes/depois, sem teste novo nesta etapa — justificado no plano) · `baseline` sim.
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não · portão_1a **sim** · ciclos 0 · regressões 0 · lacunas 0.
+
+**Verificação independente:** diff completo dos 4 arquivos lido linha a linha. Todas as 18 trocas especificadas (imports, remoção das 4 constantes `STATUS_LABELS` duplicadas, 2 arrays `STATUS_OPTIONS` reescritos, 2 badges, botão de ação em massa com template literal, aviso, card "Lançados no sistema", 3 `ReadField` de auditoria) aplicadas exatamente como no plano. `STATUS_BADGE`, `CATEGORY_LABELS`, `CATEGORY_OPTIONS`, `SOURCE_LABELS`, `SOURCE_OPTIONS` e o rótulo "Pagamento" (distinto de "Pago em") permaneceram intocados, como exigido pelas restrições absolutas.
+
+**Veredito:** aprovado sem correções. Quarto registro limpo de `muse-spark-1.2-contributor-free` na combinação "Supervisionado / edição em arquivo existente / frontend" — consolida a preferência sobre `gpt-5.6-luna` para esta forma quando a spec vem fechada.
+
+---
+
+### #030 — 2026-09-11 · Financeiro/Pagamentos: rótulo "Lançado no sistema" — Etapa 3 (E2E pendentes)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado / transcrição |
+| **Forma** | edição em arquivo existente (teste E2E) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`) |
+| **Modelo** | `opencode/big-pickle` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | 2 arquivos existentes, nenhum novo |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` n/a (edição de teste existente; o plano trazia o antes e o depois literal de cada substituição) · `baseline` sim. Segunda execução registrada da forma "edição de E2E" — agora 2 registros (#027, #030), ainda amostra insuficiente formalmente, mas consistente: `big-pickle` limpo nas duas.
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente **sim, por especificação** (é o objeto da etapa) · portão_1a **sim** · ciclos 0 · regressões 0 · lacunas 0.
+
+**Verificação independente:** exatamente as 4 substituições especificadas nos 2 arquivos, nada além — nomes de teste preservados intactos. Confirmado por checagem visual real na tela (Playwright ad-hoc autenticado como Admin Master em `http://localhost:3000/financeiro`): o filtro de status mostra "Lançado no sistema" nas duas abas, Pagamentos e Pagamentos Extras.
+
+**⚠️ Validação de execução das specs BLOQUEADA — não confundir com aprovado.** Os dois arquivos vivem em `e2e/pending` e exigem `TEST_FINANCEIRO_EMAIL`/`PASSWORD` (e `TEST_WORKSHOP_EMAIL`/`PASSWORD` para o cenário 08 da mesma suíte), não confirmados como disponíveis nesta sessão. **Não foram executados via Playwright.** A verificação desta etapa foi estática (grep + diff) mais checagem visual manual da tela real, não a execução das duas specs.
+
+**Veredito:** aprovado na revisão de código; **execução das specs pendente**. **Atribuição de falha: nenhuma.**
+
+---
+
 ## 9. Sumário por combinação
 
 Atualizar a cada registro novo.

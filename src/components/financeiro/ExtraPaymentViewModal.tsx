@@ -2,20 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import React from 'react';
 
+import { EXTRA_PAYMENT_STATUS_LABELS } from '../../lib/paymentStatusDisplay';
 import { getFinancialDocumentSignedUrl } from '../../lib/storageHelpers';
 import { cn } from '../../lib/utils';
 import { listPaymentInstallments } from '../../services/paymentInstallmentService';
 import { getExtraPaymentAuditors } from '../../services/serviceExpenseService';
 
 import type { ExtraPaymentCategory, ExtraPaymentRequest, ExtraPaymentStatus } from '../../types/serviceExpense';
-
-const STATUS_LABELS: Record<ExtraPaymentStatus, string> = {
-  pendente_aprovacao: 'Pendente de aprovação',
-  aprovado: 'Aprovado',
-  reprovado: 'Reprovado',
-  pago: 'Pago',
-  cancelado: 'Cancelado',
-};
 
 const STATUS_BADGE: Record<ExtraPaymentStatus, string> = {
   pendente_aprovacao: 'bg-amber-100 text-amber-700',
@@ -106,7 +99,7 @@ export default function ExtraPaymentViewModal({
             <div>
               <p className="mb-1 text-xs font-medium text-zinc-500">Status</p>
               <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STATUS_BADGE[request.status])}>
-                {STATUS_LABELS[request.status]}
+                {EXTRA_PAYMENT_STATUS_LABELS[request.status]}
               </span>
             </div>
             <ReadField label="Data do serviço" value={formatDate(request.serviceDate)} />
@@ -186,8 +179,8 @@ export default function ExtraPaymentViewModal({
               <ReadField label="Aprovado em" value={formatDateTime(request.approvedAt)} />
               <ReadField label="Reprovado por" value={auditors?.rejectedByName ?? '—'} />
               <ReadField label="Reprovado em" value={formatDateTime(request.rejectedAt)} />
-              <ReadField label="Pago por" value={auditors?.paidByName ?? '—'} />
-              <ReadField label="Pago em" value={formatDateTime(request.paidAt)} />
+              <ReadField label="Lançado por" value={auditors?.paidByName ?? '—'} />
+              <ReadField label="Lançado em" value={formatDateTime(request.paidAt)} />
             </div>
           </section>
         </div>

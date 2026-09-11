@@ -2,18 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import React from 'react';
 
+import { PAYMENT_INSTALLMENT_STATUS_LABELS } from '../../lib/paymentStatusDisplay';
 import { getFinancialDocumentSignedUrl, openPrivateDocument } from '../../lib/storageHelpers';
 import { cn } from '../../lib/utils';
 import { getPaymentInstallmentAuditors } from '../../services/paymentInstallmentService';
 
 import type { PaymentInstallment, PaymentInstallmentStatus } from '../../types/payment';
-
-const STATUS_LABELS: Record<PaymentInstallmentStatus, string> = {
-  pendente_aprovacao: 'Pendente de aprovação',
-  aprovado: 'Aprovado',
-  reprovado: 'Reprovado',
-  pago: 'Pago',
-};
 
 const STATUS_BADGE: Record<PaymentInstallmentStatus, string> = {
   pendente_aprovacao: 'bg-amber-100 text-amber-700',
@@ -104,7 +98,7 @@ export default function PaymentInstallmentViewModal({
             <div>
               <p className="mb-1 text-xs font-medium text-zinc-500">Status</p>
               <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STATUS_BADGE[installment.status])}>
-                {STATUS_LABELS[installment.status]}
+                {PAYMENT_INSTALLMENT_STATUS_LABELS[installment.status]}
               </span>
             </div>
             <ReadField label="Categoria" value={installment.categoria ?? '—'} />
@@ -159,7 +153,7 @@ export default function PaymentInstallmentViewModal({
               <ReadField label="Orçamento aprovado por" value={auditors?.budgetApprovedByName ?? installment.budgetApprovedByName ?? '—'} />
               <ReadField label="Pagamento aprovado por" value={auditors?.paymentApprovedByName ?? '—'} />
               <ReadField label="Aprovação do pagamento" value={formatDate(installment.paymentApprovedAt)} />
-              <ReadField label="Pago por" value={auditors?.paidByName ?? '—'} />
+              <ReadField label="Lançado por" value={auditors?.paidByName ?? '—'} />
               <ReadField label="Pagamento" value={formatDate(installment.paidAt)} />
             </div>
           </section>

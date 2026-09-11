@@ -332,8 +332,8 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
         return;
       }
       await row.locator('input[type="checkbox"]').check();
-      await page.getByRole('button', { name: /Marcar selecionadas como Pago/ }).click();
-      await expect(row.getByText('Pago')).toBeVisible({ timeout: 15000 });
+      await page.getByRole('button', { name: /Marcar selecionadas como Lançado no sistema/ }).click();
+      await expect(row.getByText('Lançado no sistema')).toBeVisible({ timeout: 15000 });
     } finally {
       await page.context().close();
     }

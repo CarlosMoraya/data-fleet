@@ -252,7 +252,7 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
       const row = page.locator('tr', { hasText: osNumber }).first();
       await row.locator('input[type="checkbox"]').check();
 
-      const markPaidButton = page.getByRole('button', { name: /Marcar selecionadas como Pago/ });
+      const markPaidButton = page.getByRole('button', { name: /Marcar selecionadas como Lançado no sistema/ });
       await expect(markPaidButton).toBeEnabled({ timeout: 10000 });
 
       const downloadPromise = page.waitForEvent('download');
@@ -261,7 +261,7 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
       expect(download.suggestedFilename()).toMatch(/^pagamentos_.*\.xlsx$/);
 
       await markPaidButton.click();
-      await expect(row.getByText('Pago')).toBeVisible({ timeout: 15000 });
+      await expect(row.getByText('Lançado no sistema')).toBeVisible({ timeout: 15000 });
     } finally {
       await page.context().close();
     }

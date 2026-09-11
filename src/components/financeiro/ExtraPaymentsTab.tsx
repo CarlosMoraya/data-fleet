@@ -3,6 +3,7 @@ import { Ban, Eye, Plus, Wallet } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
+import { EXTRA_PAYMENT_STATUS_LABELS } from '../../lib/paymentStatusDisplay';
 import { canCreateExtraPayments } from '../../lib/rolePermissions';
 import { computeExtraPaymentCounts, filterExtraPayments, matchesExtraPaymentSearch } from '../../lib/serviceExpenseFilters';
 import { cn } from '../../lib/utils';
@@ -12,14 +13,6 @@ import ExtraPaymentFormModal from './ExtraPaymentFormModal';
 import ExtraPaymentViewModal from './ExtraPaymentViewModal';
 
 import type { ExtraPaymentCategory, ExtraPaymentRequest, ExtraPaymentStatus } from '../../types/serviceExpense';
-
-const STATUS_LABELS: Record<ExtraPaymentStatus, string> = {
-  pendente_aprovacao: 'Pendente de aprovação',
-  aprovado: 'Aprovado',
-  reprovado: 'Reprovado',
-  pago: 'Pago',
-  cancelado: 'Cancelado',
-};
 
 const STATUS_BADGE: Record<ExtraPaymentStatus, string> = {
   pendente_aprovacao: 'bg-amber-100 text-amber-700',
@@ -41,11 +34,11 @@ const CATEGORY_LABELS: Record<ExtraPaymentCategory, string> = {
 
 const STATUS_OPTIONS: { value: '' | ExtraPaymentStatus; label: string }[] = [
   { value: '', label: 'Todos os status' },
-  { value: 'pendente_aprovacao', label: 'Pendente de aprovação' },
-  { value: 'aprovado', label: 'Aprovado' },
-  { value: 'reprovado', label: 'Reprovado' },
-  { value: 'pago', label: 'Pago' },
-  { value: 'cancelado', label: 'Cancelado' },
+  { value: 'pendente_aprovacao', label: EXTRA_PAYMENT_STATUS_LABELS.pendente_aprovacao },
+  { value: 'aprovado', label: EXTRA_PAYMENT_STATUS_LABELS.aprovado },
+  { value: 'reprovado', label: EXTRA_PAYMENT_STATUS_LABELS.reprovado },
+  { value: 'pago', label: EXTRA_PAYMENT_STATUS_LABELS.pago },
+  { value: 'cancelado', label: EXTRA_PAYMENT_STATUS_LABELS.cancelado },
 ];
 
 const CATEGORY_OPTIONS: { value: '' | ExtraPaymentCategory; label: string }[] = [
@@ -167,7 +160,7 @@ export default function ExtraPaymentsTab(): React.ReactElement {
           <p className="text-lg font-semibold text-zinc-900">{counts.reprovado}</p>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3">
-          <p className="text-xs font-medium text-zinc-500">Pagos</p>
+          <p className="text-xs font-medium text-zinc-500">Lançados no sistema</p>
           <p className="text-lg font-semibold text-zinc-900">{counts.pago}</p>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3">
@@ -216,7 +209,7 @@ export default function ExtraPaymentsTab(): React.ReactElement {
                     <td className="px-3 py-2.5 font-medium text-zinc-800">{formatCurrency(r.amount)}</td>
                     <td className="px-3 py-2.5">
                       <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STATUS_BADGE[r.status])}>
-                        {STATUS_LABELS[r.status]}
+                        {EXTRA_PAYMENT_STATUS_LABELS[r.status]}
                       </span>
                     </td>
                     <td className="px-3 py-2.5">

@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
 import { resolveExportSelection } from '../../lib/paymentExportSelection';
+import { PAYMENT_INSTALLMENT_STATUS_LABELS } from '../../lib/paymentStatusDisplay';
 import { resolvePaymentVehiclePlate } from '../../lib/paymentVehiclePlate';
 import { canCreatePayments, canMarkPaid } from '../../lib/rolePermissions';
 import { getFinancialDocumentSignedUrl, openPrivateDocument } from '../../lib/storageHelpers';
@@ -34,13 +35,6 @@ const SOURCE_LABELS: Record<PaymentSourceType, string> = {
   extra_payment: 'Extra',
 };
 
-const STATUS_LABELS: Record<PaymentInstallmentStatus, string> = {
-  pendente_aprovacao: 'Pendente de aprovação',
-  aprovado: 'Aprovado',
-  reprovado: 'Reprovado',
-  pago: 'Pago',
-};
-
 const STATUS_BADGE: Record<PaymentInstallmentStatus, string> = {
   pendente_aprovacao: 'bg-amber-100 text-amber-700',
   aprovado: 'bg-blue-100 text-blue-700',
@@ -50,10 +44,10 @@ const STATUS_BADGE: Record<PaymentInstallmentStatus, string> = {
 
 const STATUS_OPTIONS: { value: '' | PaymentInstallmentStatus; label: string }[] = [
   { value: '', label: 'Todos os status' },
-  { value: 'pendente_aprovacao', label: 'Pendente de aprovação' },
-  { value: 'aprovado', label: 'Aprovado' },
-  { value: 'reprovado', label: 'Reprovado' },
-  { value: 'pago', label: 'Pago' },
+  { value: 'pendente_aprovacao', label: PAYMENT_INSTALLMENT_STATUS_LABELS.pendente_aprovacao },
+  { value: 'aprovado', label: PAYMENT_INSTALLMENT_STATUS_LABELS.aprovado },
+  { value: 'reprovado', label: PAYMENT_INSTALLMENT_STATUS_LABELS.reprovado },
+  { value: 'pago', label: PAYMENT_INSTALLMENT_STATUS_LABELS.pago },
 ];
 
 function formatCurrency(value: number): string {
@@ -169,7 +163,7 @@ export default function PaymentsTab(): React.ReactElement {
       setSelected(new Set());
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : 'Falha ao marcar como pago.';
+      const msg = err instanceof Error ? err.message : 'Falha ao marcar como lançado no sistema.';
       window.alert(msg);
     },
   });
@@ -276,11 +270,11 @@ export default function PaymentsTab(): React.ReactElement {
             )}
             title={allSelectedApproved ? '' : 'Selecione apenas parcelas aprovadas'}
           >
-            {markPaidMutation.isPending ? 'Marcando…' : 'Marcar selecionadas como Pago'}
+            {markPaidMutation.isPending ? 'Marcando…' : `Marcar selecionadas como ${PAYMENT_INSTALLMENT_STATUS_LABELS.pago}`}
           </button>
           {!allSelectedApproved && selected.size > 0 && (
             <span className="text-xs text-amber-700">
-              Só é possível marcar como pago parcelas já aprovadas.
+              Só é possível marcar como lançado no sistema parcelas já aprovadas.
             </span>
           )}
         </div>
@@ -359,7 +353,7 @@ export default function PaymentsTab(): React.ReactElement {
                       </td>
                       <td className="px-3 py-2.5">
                         <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STATUS_BADGE[i.status])}>
-                          {STATUS_LABELS[i.status]}
+                          {PAYMENT_INSTALLMENT_STATUS_LABELS[i.status]}
                         </span>
                       </td>
                       <td className="px-3 py-2.5">
