@@ -913,6 +913,28 @@ Iniciativa correta não pedida: acrescentou `\b` à regex (`/\bUtilizado\b/g`) p
 
 ---
 
+### #034–#041 — 2026-09-11 · Cancelamento de pagamentos aprovados (Etapas 3–9)
+
+Sessão Tipo 4. Etapas 1, 2 e 10 foram escritas pelo agente planejador: migration, diagnósticos e SPEC. Todos os disparos foram feitos via `scripts/plan-runner.mjs run <n>` e todos os executores eram de **custo zero absoluto**. Condições da especificação, em todas as etapas: `manifesto` sim · `testes_literais` sim · `baseline` sim (2.284/251, lint 0/264, smoke 7/7).
+
+| # | Etapa | Classe / forma | Executor | portão 1ª | ciclos | Atribuição |
+|---|---|---|---|---|---|---|
+| #034 | 3 — tipos, mappers, saldo (14 arquivos) | Supervisionado / edição em arquivo existente | `muse-spark-1.2-contributor-free` | **sim** (único "reprovado" do runner foi pelos diagnósticos da Etapa 2, criados pelo planejador depois do snapshot) | 0 | Lacuna real **do plano** detectada e bem resolvida pelo executor: o teste 2 literal esbarrava no excess property check do TS; ele usou variável intermediária, sem `any` |
+| #035 | 4 — `paymentCancellation.ts` + 34 testes | Delegável / lógica pura + teste, só arquivos novos | `big-pickle` | **sim** | 0 | — |
+| #036 | 5 — serviços (4 arquivos) | Supervisionado / edição em arquivo existente | `muse-spark-1.2-contributor-free` | não | 0 do executor; 1 correção do revisor | (a) **falha do plano**: a Etapa 5 mudou a assinatura de `cancelExtraPaymentRequest` e o chamador só era atualizado na Etapa 7, deixando 1 erro de tsc transitório. O executor **parou e reportou** em vez de tocar arquivo fora do manifesto (comportamento correto). (b) 2 warnings de `import/order` nos testes, corrigidos pelo revisor com uma linha em branco |
+| #037 | 6 — `CancelPaymentModal` + 11 testes | Delegável / componente de UI + teste | `big-pickle` | **sim contra o esperado** (só o erro de tsc conhecido do #036) | 0 | Evitou `eslint-disable` usando `?.set?.call`; revisão dirigida sem achado |
+| #038 | 7 — integração Pagamentos Extras | Supervisionado / integração de página + teste (arquivo novo) | `muse-spark-1.2-contributor-free` | **sim** | 0 | Revisor trocou um `eslint-disable` do teste pela forma encadeada do #037. **Controle negativo**: com `approvedBy === userId` → `true`, só o teste 9 falha |
+| #039 | 8 — integração Pagamentos | Supervisionado / integração de página + teste (arquivo novo) | `muse-spark-1.2-contributor-free` | **sim** (números finais exatos, 255/2.384) | 0 | **Incidente de protocolo, sem dano**: rodou `git stash push --keep-index` + `pop` para comparar lint. Nada se perdeu (conferido contra o snapshot), mas é ação proibida a partir de agora nos roteiros. Revisor reformatou 2 blocos JSX em linha única, que vieram literais do plano. **Controle negativo**: sem o filtro de cancelados, os 3 testes de exportação falham |
+| #040 | 9 (1ª) — E2E | Delegável / teste E2E (arquivo novo) | `big-pickle` | não — **timeout de 15 min sem entrega** | — | **Falha do modelo** (não entregou), com contribuição do plano: a lista de leitura era ampla e ele gastou o tempo explorando migration e serviços |
+| #041 | 9 (2ª) — E2E | Delegável / teste E2E (arquivo novo) | `muse-spark-1.2-contributor-free` | **sim** | 1 correção do revisor | O roteiro foi refeito com os fatos do banco e os seletores prontos. Na execução real em DEV, o cenário 01 falhou por strict mode: `div`+`.first()` pegava o contêiner de dois cards, porque o DEV tem outro extra pendente. O revisor trocou por `.last()` nos dois cards. O padrão foi copiado do spec de referência: **falha do plano/ambiente**, não do modelo. Resultado final: 5 aprovados e o 04 pulado (sem `TEST_FINANCEIRO_*`) |
+
+**Lições desta sessão:**
+1. **Mudança de assinatura precisa andar junto com o chamador.** Quando uma etapa muda o contrato de uma função, o plano deve pôr o chamador na mesma etapa ou garantir compatibilidade temporária. Senão, o portão fica vermelho em duas etapas seguidas.
+2. **Roteiro de E2E deve entregar os fatos, não mandar descobrir.** Colunas obrigatórias, seletores e textos da tela resolveram em um ciclo o que a leitura livre não resolveu em 15 minutos.
+3. **Proibir git destrutivo explicitamente.** "Não faça commit" não cobre `stash`/`checkout`/`reset`.
+
+---
+
 ## 9. Sumário por combinação
 
 Atualizar a cada registro novo.
@@ -920,20 +942,22 @@ Atualizar a cada registro novo.
 | Classe | Forma | Ferramenta / Modelo | N | portão 1ª vez | ciclos médios | Falhas do modelo |
 |---|---|---|---|---|---|---|
 | Delegável | lógica pura + UI + teste | codex / `gpt-5.6-sol` (high) | 1 | 1/1 | 0 | 0 |
-| Delegável | componente de UI + teste | opencode / `big-pickle` **(gratuito)** | 2 | 2/2 | 0 | 0 |
-| Delegável | lógica pura + teste, só arquivos novos | opencode / `big-pickle` **(gratuito)** | 3 | 2/3³ | 0 | 0 |
+| Delegável | componente de UI + teste | opencode / `big-pickle` **(gratuito)** | 3 | 3/3⁷ | 0 | 0 |
+| Delegável | lógica pura + teste, só arquivos novos | opencode / `big-pickle` **(gratuito)** | 4 | 3/4³ | 0 | 0 |
 | Delegável | arquivo novo, cópia de padrão existente | opencode / `big-pickle` **(gratuito)** | 1 | 1/1 | 0 | 0 |
 | Supervisionado | edição em arquivo existente + integração | codex / `gpt-5.6-sol` (high) | 2 | 1/2 | 0,5 | 0 |
 | Supervisionado | edição em arquivo existente | codex / `gpt-5.6-sol` (high) | 3 | 3/3 | 0 | 0 |
 | Supervisionado / transcrição | migration (SQL literal) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 4 | 4/4 | 0 | 0 |
 | Delegável | arquivo novo + teste | opencode / `big-pickle` **(gratuito)** | 5 | 5/5 | 0 | 0 |
-| Supervisionado | edição em arquivo existente | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | **7** | 6/7⁴ | 0 | 0 |
+| Supervisionado | edição em arquivo existente | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | **9** | 7/9⁴ ⁸ | 0 | 0 |
 | Supervisionado | integração de página | codex / `gpt-5.6-luna` (medium) | 1 | 0/1¹ | 0 | 0 |
 | Supervisionado | teste (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 2² | 0 |
 | Delegável | teste (arquivo novo, mock de página) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 2 | 1/2⁵ | 0 | 0 |
 | Supervisionado / transcrição | edição de teste E2E | opencode / `big-pickle` **(gratuito)** | 2 | 2/2 | 0 | 0 |
 | Supervisionado | componente de UI + teste | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 0 | 0 |
-| Supervisionado | integração de página + teste (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1⁶ | 0 | 0 |
+| Supervisionado | integração de página + teste (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 3 | 3/3⁶ | 0 | 0 |
+| Delegável | teste E2E (arquivo novo) | opencode / `big-pickle` **(gratuito)** | 1 | 0/1⁹ | — | **1** |
+| Delegável | teste E2E (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 1 | 0 |
 
 ¹ Reprovou o portão por 2 warnings de `import/order`, resolvidos por `eslint --fix`; nenhuma falha de modelo.
 ² Os 2 ciclos foram indisponibilidade de provedor (`grok-code`) e falha do plano, não do modelo.
@@ -941,6 +965,9 @@ Atualizar a cada registro novo.
 ⁴ As duas reprovações foram 1 warning de `import/order` e 1 de `classnames-order`, ambos resolvidos por `eslint --fix`; o segundo estava no JSX ditado literalmente pelo plano. Nenhuma falha de modelo.
 ⁵ A reprovação foram 8 warnings de `no-explicit-any` decorrentes de o plano não ter tipado o espião do mock (registro #026); nenhuma falha de modelo.
 ⁶ O runner marcou reprovação só pelo +1 de lint previsto no plano (registro #033); contra os valores esperados, passou na 1ª vez. A falha do #033 foi do plano (cenário Fail Closed ausente), acrescentado pelo revisor.
+⁷ No #037 o runner marcou reprovação só pelo erro de tsc transitório causado pelo plano no #036; contra o esperado, passou.
+⁸ A reprovação do #036 foi 1 erro de tsc por falha do plano (chamador atualizado só na etapa seguinte) + 2 warnings de `import/order`; nenhuma falha de modelo. O #039 registrou um **incidente de protocolo** (`git stash` + `pop`, sem dano), anotado fora da coluna de falhas.
+⁹ Timeout de 15 min sem entrega (#040). Primeira falha de modelo do `big-pickle` neste projeto, numa forma nova para ele.
 
 **Atualização (2026-09-11):** o sumário passou a incluir #028–#030 (sessão "Pago → Lançado no sistema", que registrou mas não atualizou esta tabela) e #031–#033. "Supervisionado / edição em arquivo existente" com `muse-spark-1.2-contributor-free` chega a **7 registros, 0 falhas de modelo**. Nas três etapas de 2026-09-11 (#031–#033) os controles negativos do revisor confirmaram que os testes escritos pelo executor detectam a remoção do comportamento.
 

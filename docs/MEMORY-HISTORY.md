@@ -2,6 +2,50 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-09-11: Financeiro — cancelamento de pagamentos aprovados pelo próprio aprovador
+
+**Pedido do usuário:** que quem aprovou uma ordem de pagamento possa cancelá-la. Hoje o sistema só deixa visualizar. "Não quero excluir o registro. Ele deve continuar no banco de dados." O escopo foi ampliado pelo usuário para as duas telas: Pagamentos e Pagamentos Extras.
+
+**Decisões do usuário:** o Admin Master também cancela, para não haver beco sem saída se o aprovador sair. Sem notificação. Sem card "Cancelados". "Total do mês" de Extras exclui cancelado e reprovado. Parcelas ganham o status `cancelado`, e o cancelamento do pedido extra propaga para elas. Em Pagamentos o cancelamento é parcela a parcela, só origem OS; parcela extra tem apenas uma dica, e a cancelada devolve o saldo da OS. O XLSX nunca inclui cancelada. O Financeiro vê extras cancelados que foram aprovados. O reparo da PE-2608-0002 fica dentro da migration. Duas funções de gatilho acima de 30 linhas foram mantidas unidas.
+
+**Entregue:**
+- **Migration `20260911000000_payment_cancellation.sql`:**
+  - colunas `cancelled_by/at/cancellation_reason` nas duas tabelas e o status `cancelado` em parcelas;
+  - gatilhos com trava Fail Closed: `auth.uid() IS NULL OR (role ≠ Admin Master AND aprovador ≠ auth.uid())`, evitando a armadilha de comparar com NULL;
+  - `FOR UPDATE` nas parcelas antes de cancelar um extra aprovado, com recusa se alguma estiver `pago`;
+  - propagação do cancelamento para as parcelas, com cópia do motivo;
+  - teto de orçamento liberando as canceladas;
+  - policies de SELECT do Financeiro com `approved_at IS NOT NULL`;
+  - RPCs de auditoria com `cancelled_by_name`, via DROP + CREATE porque o tipo de retorno mudou;
+  - reparo idempotente das parcelas órfãs.
+- **Diagnósticos:** um estrutural, para DEV e PROD, e um comportamental só para DEV. Este simula usuários com `request.jwt.claims` + `SET LOCAL ROLE authenticated` dentro de um `DO` que termina sempre em exceção, então tudo é desfeito.
+- **Frontend:**
+  - `src/lib/paymentCancellation.ts` com as regras de UI;
+  - `CancelPaymentModal`, com a ação no rodapé do detalhe (Master–Detail);
+  - serviços com concorrência otimista: `.eq('status', esperado).select('id')`, e 0 linhas = erro;
+  - `sumNonRejectedValue`/`countNonRejectedInstallments` renomeadas para `sumCommittedValue`/`countCommittedInstallments`;
+  - `resolveExportSelection` sem canceladas e `sumExtraPaymentMonthTotal`.
+- **E2E:** `e2e/pending/payment-cancellation-flow.spec.ts`.
+- **SPEC.md** atualizada.
+
+**Achados durante o planejamento:** (1) o cancelamento de extra pendente não propagava para as parcelas, e isso deixou a PE-2608-0002 da Rio Log com uma parcela de R$ 300,00 pendente sob um cabeçalho cancelado em PROD; (2) o Financeiro deixaria de ver pedidos já aprovados que fossem cancelados; (3) o XLSX exportaria parcelas canceladas; (4) a comparação com NULL desligaria a trava do aprovador em silêncio, sem quebrar nenhum teste.
+
+**Validação antes da aplicação:** antes de o usuário aplicar a migration, o agente fez um ensaio em DEV (migration + 15 casos dentro de um único `DO`, desfeito no fim): 15 PASS. Um controle negativo, com a trava do aprovador desligada, fez B2 e B4 falharem. Depois da aplicação em DEV: estrutural conforme e 15 PASS de novo.
+
+**Execução:** Etapas 3, 5, 7, 8 e 9 por `muse-spark-1.2-contributor-free`; 4 e 6 por `big-pickle`; 1, 2 e 10 pelo agente planejador.
+- **Falha do plano:** a Etapa 5 mudou a assinatura de `cancelExtraPaymentRequest` antes de a Etapa 7 atualizar o chamador, o que deu 1 erro de tsc transitório. O executor parou e reportou.
+- **Incidente sem dano:** o executor da Etapa 8 rodou `git stash` + `pop`. Os roteiros passaram a proibir git destrutivo.
+- **Etapa 9:** o `big-pickle` estourou os 15 minutos sem entregar. O `muse-spark` a refez com roteiro fechado. Na execução real em DEV, o revisor trocou `.first()` por `.last()` nos cards de aprovação.
+- **Controles negativos** do revisor nas Etapas 7 e 8.
+- **Constatação:** `deepseek-v4-flash-free` saiu da lista gratuita do `opencode`, e a sessão rodou sem executor de estreia.
+- Registros #034–#041.
+
+**Portão final:** tsc 0 · lint 0/264 · unitários 2.384/2.384 em 255 arquivos (+100) · smoke 7/7. E2E em DEV: 5 aprovados; o 04 (Financeiro) está **bloqueado por credencial**, não aprovado.
+
+**Publicação:** o usuário aplicou a migration em DEV e em PROD. O diagnóstico em PROD saiu conforme, com órfãs = 0. A PE-2608-0002 da Rio Log foi reparada; a da Deluna é outro pedido (numeração por cliente) e ficou intacta. O usuário **validou os 13 passos em tela em DEV em 2026-09-11**.
+
+**Pendente ao fim da sessão:** commit e push do frontend, feitos pelo usuário. Até o push, o frontend antigo não consegue cancelar extra pendente, porque não envia motivo.
+
 ## Sessão — 2026-09-10/11: Pagamentos a partir da aprovação do orçamento
 
 **Pedido do usuário:** permitir subir a Ordem de Pagamento assim que o orçamento estiver aprovado — as oficinas enviam NF e boleto nesse momento, e o sistema só aceitava depois de `Concluído`/`Veículo retirado`.
