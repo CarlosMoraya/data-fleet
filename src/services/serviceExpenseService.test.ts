@@ -13,8 +13,15 @@ vi.mock('../lib/supabase', () => ({
 }));
 
 import {
+  CANCELLATION_NOT_APPLIED_MESSAGE,
+  CANCELLATION_REASON_INVALID_MESSAGE,
+} from '../lib/paymentCancellation';
+
+import {
   approveExtraPaymentRequestGroup,
+  cancelExtraPaymentRequest,
   createExtraPaymentRequest,
+  getExtraPaymentAuditors,
   getNextExtraPaymentRequestNumber,
   listExtraPaymentDrivers,
   listExtraPaymentVehicles,
@@ -161,5 +168,81 @@ describe('listExtraPaymentDrivers', () => {
       { id: 'd1', name: 'João Motorista', vehicleId: 'v1', vehicleLicensePlate: 'ABC1D23' },
       { id: 'd2', name: 'Maria Motorista', vehicleId: undefined, vehicleLicensePlate: undefined },
     ]);
+  });
+});
+
+describe('cancelExtraPaymentRequest', () => {
+  it('cancela com motivo normalizado e expectedStatus', async () => {
+    const query = {
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue({ data: [{ id: 'epr-1' }], error: null }),
+    };
+    fromMock.mockReturnValue(query);
+
+    await expect(cancelExtraPaymentRequest('epr-1', '  Serviço não realizado ', 'aprovado')).resolves.toBeUndefined();
+
+    expect(fromMock).toHaveBeenCalledWith('extra_payment_requests');
+    expect(query.update).toHaveBeenCalledWith({ status: 'cancelado', cancellation_reason: 'Serviço não realizado' });
+    expect(query.eq).toHaveBeenNthCalledWith(1, 'id', 'epr-1');
+    expect(query.eq).toHaveBeenNthCalledWith(2, 'status', 'aprovado');
+    expect(query.select).toHaveBeenCalledWith('id');
+  });
+
+  it('rejeita com CANCELLATION_NOT_APPLIED_MESSAGE quando nenhuma linha é afetada', async () => {
+    const query = {
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue({ data: [], error: null }),
+    };
+    fromMock.mockReturnValue(query);
+
+    await expect(cancelExtraPaymentRequest('epr-1', 'Serviço não realizado', 'aprovado')).rejects.toThrow(
+      CANCELLATION_NOT_APPLIED_MESSAGE,
+    );
+  });
+
+  it('propaga erro do Supabase com mensagem de permissão', async () => {
+    const query = {
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Permissão negada: apenas quem aprovou o pagamento extra ou o Admin Master pode cancelá-lo.' },
+      }),
+    };
+    fromMock.mockReturnValue(query);
+
+    await expect(cancelExtraPaymentRequest('epr-1', 'Serviço não realizado', 'aprovado')).rejects.toMatchObject({
+      message: 'Permissão negada: apenas quem aprovou o pagamento extra ou o Admin Master pode cancelá-lo.',
+    });
+  });
+
+  it('rejeita motivo inválido sem chamar o Supabase', async () => {
+    await expect(cancelExtraPaymentRequest('epr-1', '   ', 'pendente_aprovacao')).rejects.toThrow(
+      CANCELLATION_REASON_INVALID_MESSAGE,
+    );
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('getExtraPaymentAuditors com cancelado', () => {
+  it('retorna cancelledByName quando a RPC traz cancelled_by_name', async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        {
+          created_by_name: 'Ana',
+          approved_by_name: 'Bruno',
+          rejected_by_name: null,
+          paid_by_name: null,
+          cancelled_by_name: 'Bruno',
+        },
+      ],
+      error: null,
+    });
+
+    const result = await getExtraPaymentAuditors('epr-1');
+
+    expect(result.cancelledByName).toBe('Bruno');
   });
 });

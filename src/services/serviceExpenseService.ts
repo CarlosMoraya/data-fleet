@@ -1,3 +1,8 @@
+import {
+  CANCELLATION_NOT_APPLIED_MESSAGE,
+  CANCELLATION_REASON_INVALID_MESSAGE,
+  normalizeCancellationReason,
+} from '../lib/paymentCancellation';
 import { extraPaymentRequestFromRow, extraPaymentRequestToInsert } from '../lib/serviceExpenseMappers';
 import { supabase } from '../lib/supabase';
 
@@ -16,7 +21,7 @@ const EXTRA_PAYMENT_SELECT = `
   vehicle_id, driver_id, amount, description, justification, notes, receipt_url, invoice_url,
   evidence_urls,
   status, created_by_id, approved_by, approved_at, rejected_by, rejected_at, rejection_reason,
-  paid_by, paid_at, created_at, updated_at,
+  paid_by, paid_at, cancelled_by, cancelled_at, cancellation_reason, created_at, updated_at,
   vehicles(license_plate), drivers(name), approver:profiles!extra_payment_requests_approved_by_fkey(name)
 `;
 
@@ -187,19 +192,30 @@ export async function rejectExtraPaymentRequest(id: string, reason: string): Pro
 }
 
 /**
- * Cancela um Pagamento Extra pendente de aprovação (status → cancelado).
+ * Cancela um Pagamento Extra pendente (pelo criador) ou aprovado (por quem
+ * aprovou ou Admin Master). Quem pode é decidido pelo banco; aqui só se
+ * detecta o UPDATE que não afetou linha nenhuma (RLS ou status alterado).
  */
-export async function cancelExtraPaymentRequest(id: string): Promise<void> {
-  const { error } = await supabase
+export async function cancelExtraPaymentRequest(
+  id: string,
+  reason: string,
+  expectedStatus: 'pendente_aprovacao' | 'aprovado',
+): Promise<void> {
+  const normalizedReason = normalizeCancellationReason(reason);
+  if (!normalizedReason) throw new Error(CANCELLATION_REASON_INVALID_MESSAGE);
+
+  const { data, error } = await supabase
     .from('extra_payment_requests')
-    .update({ status: 'cancelado' })
-    .eq('id', id);
+    .update({ status: 'cancelado', cancellation_reason: normalizedReason })
+    .eq('id', id)
+    .eq('status', expectedStatus)
+    .select('id');
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error(CANCELLATION_NOT_APPLIED_MESSAGE);
 }
 
 /**
- * Resolve os nomes de auditoria (criado por, aprovado por, reprovado por,
- * pago por) de um Pagamento Extra via RPC SECURITY DEFINER.
+ * Resolve os nomes de auditoria (criado por, aprovado por, reprovado por, pago por, cancelado por) de um Pagamento Extra via RPC SECURITY DEFINER.
  */
 export async function getExtraPaymentAuditors(id: string): Promise<ExtraPaymentAuditors> {
   const { data, error } = await supabase.rpc('get_extra_payment_auditors', {
@@ -213,6 +229,7 @@ export async function getExtraPaymentAuditors(id: string): Promise<ExtraPaymentA
         approved_by_name: string | null;
         rejected_by_name: string | null;
         paid_by_name: string | null;
+        cancelled_by_name: string | null;
       }
     | undefined;
 
@@ -221,5 +238,6 @@ export async function getExtraPaymentAuditors(id: string): Promise<ExtraPaymentA
     approvedByName: row?.approved_by_name ?? undefined,
     rejectedByName: row?.rejected_by_name ?? undefined,
     paidByName: row?.paid_by_name ?? undefined,
+    cancelledByName: row?.cancelled_by_name ?? undefined,
   };
 }

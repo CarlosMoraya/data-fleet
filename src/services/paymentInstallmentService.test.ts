@@ -13,7 +13,13 @@ vi.mock('../lib/supabase', () => ({
 }));
 
 import {
+  CANCELLATION_NOT_APPLIED_MESSAGE,
+  CANCELLATION_REASON_INVALID_MESSAGE,
+} from '../lib/paymentCancellation';
+
+import {
   approveMaintenancePaymentGroup,
+  cancelPaymentInstallment,
   createExtraPaymentInstallmentsBatch,
   createPaymentInstallmentsBatch,
   getMaintenanceOrderPaymentExposure,
@@ -432,5 +438,118 @@ describe('getMaintenanceOrderPaymentExposure', () => {
     fromMock.mockReturnValue(query);
 
     await expect(getMaintenanceOrderPaymentExposure('os-1')).rejects.toEqual({ message: 'boom' });
+  });
+});
+
+describe('cancelPaymentInstallment', () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    fromMock.mockReset();
+  });
+
+  it('cancela com motivo normalizado', async () => {
+    const query = {
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue({ data: [{ id: 'i1' }], error: null }),
+    };
+    fromMock.mockReturnValue(query);
+
+    await expect(cancelPaymentInstallment('i1', ' Parcela duplicada ')).resolves.toBeUndefined();
+
+    expect(fromMock).toHaveBeenCalledWith('payment_installments');
+    expect(query.update).toHaveBeenCalledWith({ status: 'cancelado', cancellation_reason: 'Parcela duplicada' });
+    expect(query.eq).toHaveBeenNthCalledWith(1, 'id', 'i1');
+    expect(query.eq).toHaveBeenNthCalledWith(2, 'status', 'aprovado');
+    expect(query.eq).toHaveBeenNthCalledWith(3, 'source_type', 'maintenance_order');
+    expect(query.select).toHaveBeenCalledWith('id');
+  });
+
+  it('rejeita com CANCELLATION_NOT_APPLIED_MESSAGE quando nenhuma linha é afetada', async () => {
+    const query = {
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue({ data: [], error: null }),
+    };
+    fromMock.mockReturnValue(query);
+
+    await expect(cancelPaymentInstallment('i1', 'Parcela duplicada')).rejects.toThrow(
+      CANCELLATION_NOT_APPLIED_MESSAGE,
+    );
+  });
+
+  it('propaga erro do Supabase com mensagem de permissão', async () => {
+    const query = {
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Permissão negada: apenas quem aprovou a parcela ou o Admin Master pode cancelá-la.' },
+      }),
+    };
+    fromMock.mockReturnValue(query);
+
+    await expect(cancelPaymentInstallment('i1', 'Parcela duplicada')).rejects.toMatchObject({
+      message: 'Permissão negada: apenas quem aprovou a parcela ou o Admin Master pode cancelá-la.',
+    });
+  });
+
+  it('rejeita motivo inválido sem chamar o Supabase', async () => {
+    await expect(cancelPaymentInstallment('i1', '')).rejects.toThrow(CANCELLATION_REASON_INVALID_MESSAGE);
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('getPaymentInstallmentAuditors com cancelado', () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    fromMock.mockReset();
+  });
+
+  it('retorna cancelledByName quando a RPC traz cancelled_by_name', async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        {
+          budget_approved_by_name: 'Ana',
+          payment_approved_by_name: 'Bruno',
+          paid_by_name: null,
+          cancelled_by_name: 'Diego Coord',
+        },
+      ],
+      error: null,
+    });
+
+    const result = await getPaymentInstallmentAuditors('i1');
+
+    expect(result.cancelledByName).toBe('Diego Coord');
+  });
+});
+
+describe('INSTALLMENT_SELECT com cancelamento', () => {
+  it('contém cancelled_by, cancelled_at, cancellation_reason', () => {
+    expect(INSTALLMENT_SELECT).toContain('cancelled_by, cancelled_at, cancellation_reason');
+  });
+});
+
+describe('getMaintenanceOrderPaymentExposure com canceladas', () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    fromMock.mockReset();
+  });
+
+  it('exclui parcelas canceladas do count e total', async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValue({
+        data: [
+          { value: 100, status: 'aprovado' },
+          { value: 40, status: 'cancelado' },
+        ],
+        error: null,
+      }),
+    };
+    fromMock.mockReturnValue(query);
+
+    await expect(getMaintenanceOrderPaymentExposure('os-1')).resolves.toEqual({ count: 1, total: 100 });
   });
 });

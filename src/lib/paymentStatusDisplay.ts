@@ -6,6 +6,7 @@ export const PAYMENT_INSTALLMENT_STATUS_LABELS: Record<PaymentInstallmentStatus,
   aprovado: 'Aprovado',
   reprovado: 'Reprovado',
   pago: 'Lançado no sistema',
+  cancelado: 'Cancelado',
 };
 
 export const EXTRA_PAYMENT_STATUS_LABELS: Record<ExtraPaymentStatus, string> = {

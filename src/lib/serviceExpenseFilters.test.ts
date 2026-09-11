@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeExtraPaymentCounts, filterExtraPayments, matchesExtraPaymentSearch } from './serviceExpenseFilters';
+import { computeExtraPaymentCounts, filterExtraPayments, matchesExtraPaymentSearch, sumExtraPaymentMonthTotal } from './serviceExpenseFilters';
 
 import type { ExtraPaymentRequest } from '../types/serviceExpense';
 
@@ -84,5 +84,27 @@ describe('computeExtraPaymentCounts', () => {
       pago: 1,
       cancelado: 1,
     });
+  });
+});
+
+describe('sumExtraPaymentMonthTotal', () => {
+  it('soma do mês excluindo reprovado e cancelado', () => {
+    const items = [
+      { serviceDate: '2026-09-11', amount: 70, status: 'aprovado' as const },
+      { serviceDate: '2026-09-01', amount: 35, status: 'cancelado' as const },
+      { serviceDate: '2026-09-30', amount: 28.94, status: 'reprovado' as const },
+      { serviceDate: '2026-09-05', amount: 10, status: 'pago' as const },
+      { serviceDate: '2026-09-20', amount: 5, status: 'pendente_aprovacao' as const },
+      { serviceDate: '2026-08-31', amount: 100, status: 'aprovado' as const },
+    ];
+    expect(sumExtraPaymentMonthTotal(items, new Date(2026, 8, 15))).toBe(85);
+  });
+
+  it('lista vazia retorna 0', () => {
+    expect(sumExtraPaymentMonthTotal([], new Date(2026, 8, 15))).toBe(0);
+  });
+
+  it('fora do mês retorna 0', () => {
+    expect(sumExtraPaymentMonthTotal([{ serviceDate: '2025-09-10', amount: 50, status: 'aprovado' as const }], new Date(2026, 8, 15))).toBe(0);
   });
 });

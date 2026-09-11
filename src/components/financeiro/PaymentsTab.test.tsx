@@ -15,6 +15,7 @@ vi.mock('../../services/paymentInstallmentService', () => ({
   listPaymentInstallments: listInstallmentsMock,
   listApprovedOrdersForPayment: listApprovedOrdersMock,
   markInstallmentsPaid: vi.fn(),
+  cancelPaymentInstallment: vi.fn(),
 }));
 vi.mock('../../lib/storageHelpers', () => ({
   getFinancialDocumentSignedUrl: vi.fn().mockResolvedValue('https://signed.example/doc.pdf'),

@@ -36,6 +36,9 @@ export function paymentInstallmentFromRow(row: PaymentInstallmentRow): PaymentIn
     paymentApprovedAt: row.payment_approved_at ?? undefined,
     paidBy: row.paid_by ?? undefined,
     paidAt: row.paid_at ?? undefined,
+    cancelledBy: row.cancelled_by ?? undefined,
+    cancelledAt: row.cancelled_at ?? undefined,
+    cancellationReason: row.cancellation_reason ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     workshopName: row.maintenance_orders?.workshops?.name ?? row.extra_payment_requests?.supplier_name ?? undefined,
@@ -53,5 +56,6 @@ export function paymentInstallmentFromRow(row: PaymentInstallmentRow): PaymentIn
     extraPaymentVehiclePlate: row.extra_payment_requests?.vehicles?.license_plate ?? undefined,
     extraPaymentDriverName: row.extra_payment_requests?.drivers?.name ?? undefined,
     extraPaymentApprovedByName: row.extra_payment_requests?.approver?.name ?? undefined,
+    extraPaymentApprovedBy: row.extra_payment_requests?.approved_by ?? undefined,
   };
 }

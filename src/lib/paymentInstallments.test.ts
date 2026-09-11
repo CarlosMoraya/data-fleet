@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canTransitionStatus,
-  countNonRejectedInstallments,
+  countCommittedInstallments,
   exceedsBudget,
   generateInstallmentDrafts,
   remainingBudget,
   splitInstallmentValue,
+  sumCommittedValue,
   sumInstallmentsValue,
-  sumNonRejectedValue,
 } from './paymentInstallments';
 
 describe('splitInstallmentValue', () => {
@@ -171,18 +171,18 @@ describe('exceedsBudget', () => {
   });
 });
 
-describe('sumNonRejectedValue / remainingBudget (reprovadas liberam saldo)', () => {
-  it('sumNonRejectedValue ignora parcelas reprovadas', () => {
+describe('sumCommittedValue / remainingBudget (reprovadas liberam saldo)', () => {
+  it('sumCommittedValue ignora parcelas reprovadas', () => {
     expect(
-      sumNonRejectedValue([
+      sumCommittedValue([
         { value: 400, status: 'reprovado' },
         { value: 600, status: 'pendente_aprovacao' },
       ]),
     ).toBe(600);
   });
 
-  it('sumNonRejectedValue soma drafts sem status', () => {
-    expect(sumNonRejectedValue([{ value: 100 }, { value: 200 }])).toBe(300);
+  it('sumCommittedValue soma drafts sem status', () => {
+    expect(sumCommittedValue([{ value: 100 }, { value: 200 }])).toBe(300);
   });
 
   it('remainingBudget desconsidera reprovadas na soma', () => {
@@ -199,12 +199,69 @@ describe('sumNonRejectedValue / remainingBudget (reprovadas liberam saldo)', () 
   });
 
   it('conta parcelas não reprovadas, inclusive sem status', () => {
-    expect(countNonRejectedInstallments([
+    expect(countCommittedInstallments([
       { status: 'pendente_aprovacao' },
       { status: 'reprovado' },
       { status: 'pago' },
       {},
     ])).toBe(3);
-    expect(countNonRejectedInstallments([])).toBe(0);
+    expect(countCommittedInstallments([])).toBe(0);
+  });
+});
+
+describe('sumCommittedValue exclui canceladas e reprovadas', () => {
+  it('soma apenas aprovada, pago e pendente', () => {
+    expect(
+      sumCommittedValue([
+        { value: 100, status: 'aprovado' },
+        { value: 50, status: 'cancelado' },
+        { value: 30, status: 'reprovado' },
+        { value: 20, status: 'pago' },
+        { value: 10, status: 'pendente_aprovacao' },
+      ]),
+    ).toBe(130);
+  });
+
+  it('countCommittedInstallments exclui canceladas e reprovadas', () => {
+    const list = [
+      { value: 100, status: 'aprovado' as const },
+      { value: 50, status: 'cancelado' as const },
+      { value: 30, status: 'reprovado' as const },
+      { value: 20, status: 'pago' as const },
+      { value: 10, status: 'pendente_aprovacao' as const },
+    ];
+    expect(countCommittedInstallments(list)).toBe(3);
+  });
+
+  it('remainingBudget desconsidera canceladas', () => {
+    expect(
+      remainingBudget(1000, [
+        { value: 400, status: 'aprovado' },
+        { value: 300, status: 'cancelado' },
+      ]),
+    ).toBe(600);
+  });
+
+  it('sumCommittedValue soma drafts sem status', () => {
+    expect(sumCommittedValue([{ value: 100 }, { value: 200 }])).toBe(300);
+  });
+});
+
+describe('canTransitionStatus com cancelado', () => {
+  it('permite aprovado → cancelado', () => {
+    expect(canTransitionStatus('aprovado', 'cancelado')).toBe(true);
+  });
+
+  it('bloqueia pendente_aprovacao → cancelado', () => {
+    expect(canTransitionStatus('pendente_aprovacao', 'cancelado')).toBe(false);
+  });
+
+  it('bloqueia cancelado → aprovado e cancelado → pago', () => {
+    expect(canTransitionStatus('cancelado', 'aprovado')).toBe(false);
+    expect(canTransitionStatus('cancelado', 'pago')).toBe(false);
+  });
+
+  it('bloqueia pago → cancelado', () => {
+    expect(canTransitionStatus('pago', 'cancelado')).toBe(false);
   });
 });

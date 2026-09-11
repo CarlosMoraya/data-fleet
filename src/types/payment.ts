@@ -2,7 +2,7 @@ import type { MaintenanceStatus } from './maintenance';
 
 // ─── Pagamentos (módulo financeiro) ──────────────────────────────────────────
 
-export type PaymentInstallmentStatus = 'pendente_aprovacao' | 'aprovado' | 'reprovado' | 'pago';
+export type PaymentInstallmentStatus = 'pendente_aprovacao' | 'aprovado' | 'reprovado' | 'pago' | 'cancelado';
 
 export type PaymentSourceType = 'maintenance_order' | 'extra_payment';
 
@@ -43,6 +43,9 @@ export interface PaymentInstallment {
   paymentApprovedAt?: string;
   paidBy?: string;
   paidAt?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
   createdAt: string;
   updatedAt: string;
   // Joins (populated via select with relations)
@@ -60,6 +63,7 @@ export interface PaymentInstallment {
   extraPaymentVehiclePlate?: string;
   extraPaymentDriverName?: string;
   extraPaymentApprovedByName?: string;
+  extraPaymentApprovedBy?: string;
 }
 
 export interface PaymentInstallmentRow {
@@ -91,6 +95,9 @@ export interface PaymentInstallmentRow {
   payment_approved_at: string | null;
   paid_by: string | null;
   paid_at: string | null;
+  cancelled_by?: string | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
   created_at: string;
   updated_at: string;
   // Joins
@@ -120,6 +127,7 @@ export interface PaymentInstallmentAuditors {
   budgetApprovedByName?: string;
   paymentApprovedByName?: string;
   paidByName?: string;
+  cancelledByName?: string;
 }
 
 export interface PaymentApprovalSnapshot {

@@ -32,6 +32,7 @@ interface ExtraPaymentViewModalProps {
   open: boolean;
   request: ExtraPaymentRequest;
   onClose: () => void;
+  onRequestCancel?: () => void;
 }
 
 function formatCurrency(value: number): string {
@@ -63,6 +64,7 @@ export default function ExtraPaymentViewModal({
   open,
   request,
   onClose,
+  onRequestCancel,
 }: ExtraPaymentViewModalProps): React.ReactElement | null {
   const { data: auditors } = useQuery({
     queryKey: ['extraPaymentAuditors', request.id],
@@ -113,6 +115,9 @@ export default function ExtraPaymentViewModal({
             <ReadField label="Observações" value={request.notes ?? '—'} wide />
             {request.status === 'reprovado' && (
               <ReadField label="Motivo da reprovação" value={request.rejectionReason ?? '—'} wide />
+            )}
+            {request.status === 'cancelado' && (
+              <ReadField label="Motivo do cancelamento" value={request.cancellationReason ?? '—'} wide />
             )}
           </div>
 
@@ -181,9 +186,18 @@ export default function ExtraPaymentViewModal({
               <ReadField label="Reprovado em" value={formatDateTime(request.rejectedAt)} />
               <ReadField label="Lançado por" value={auditors?.paidByName ?? '—'} />
               <ReadField label="Lançado em" value={formatDateTime(request.paidAt)} />
+              <ReadField label="Cancelado por" value={auditors?.cancelledByName ?? '—'} />
+              <ReadField label="Cancelado em" value={formatDateTime(request.cancelledAt)} />
             </div>
           </section>
         </div>
+        {onRequestCancel && (
+          <div className="flex justify-end border-t px-6 py-4">
+            <button type="button" onClick={onRequestCancel} className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50">
+              Cancelar pagamento
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

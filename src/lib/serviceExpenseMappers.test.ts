@@ -91,6 +91,26 @@ describe('extraPaymentRequestFromRow', () => {
 
     expect(result.evidenceUrls).toBeUndefined();
   });
+
+  it('mapeia cancelled_by, cancelled_at e cancellation_reason quando presentes', () => {
+    const result = extraPaymentRequestFromRow(baseRow({
+      cancelled_by: 'approver-1',
+      cancelled_at: '2026-09-11T12:00:00Z',
+      cancellation_reason: 'Serviço não realizado',
+    }));
+
+    expect(result.cancelledBy).toBe('approver-1');
+    expect(result.cancelledAt).toBe('2026-09-11T12:00:00Z');
+    expect(result.cancellationReason).toBe('Serviço não realizado');
+  });
+
+  it('cancelled_by, cancelled_at e cancellation_reason ausentes viram undefined', () => {
+    const result = extraPaymentRequestFromRow(baseRow());
+
+    expect(result.cancelledBy).toBeUndefined();
+    expect(result.cancelledAt).toBeUndefined();
+    expect(result.cancellationReason).toBeUndefined();
+  });
 });
 
 describe('extraPaymentRequestToInsert', () => {

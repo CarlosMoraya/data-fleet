@@ -200,4 +200,45 @@ describe('paymentInstallmentFromRow', () => {
 
     expect(paymentInstallmentFromRow(baseRow({ maintenance_orders: null })).maintenanceOrderStatus).toBeUndefined();
   });
+
+  it('mapeia cancelled_by, cancelled_at e cancellation_reason quando presentes', () => {
+    const result = paymentInstallmentFromRow(baseRow({
+      cancelled_by: 'approver-1',
+      cancelled_at: '2026-09-11T12:00:00Z',
+      cancellation_reason: 'Parcela duplicada',
+    }));
+
+    expect(result.cancelledBy).toBe('approver-1');
+    expect(result.cancelledAt).toBe('2026-09-11T12:00:00Z');
+    expect(result.cancellationReason).toBe('Parcela duplicada');
+  });
+
+  it('cancelled_by, cancelled_at e cancellation_reason ausentes viram undefined', () => {
+    const result = paymentInstallmentFromRow(baseRow());
+
+    expect(result.cancelledBy).toBeUndefined();
+    expect(result.cancelledAt).toBeUndefined();
+    expect(result.cancellationReason).toBeUndefined();
+  });
+
+  it('mapeia extra_payment_requests.approved_by para extraPaymentApprovedBy', () => {
+    const result = paymentInstallmentFromRow(baseRow({
+      source_type: 'extra_payment',
+      maintenance_order_id: null,
+      extra_payment_request_id: 'epr-1',
+      extra_payment_requests: {
+        request_number: 'PE-2609-0001',
+        category: 'outro',
+        supplier_name: 'Sidnei Paiva da Cruz',
+        supplier_document: null,
+        approved_by: 'approver-1',
+        approved_at: '2026-09-10T10:00:00Z',
+        vehicles: null,
+        drivers: null,
+        approver: { name: 'Bruno Coord' },
+      },
+    }));
+
+    expect(result.extraPaymentApprovedBy).toBe('approver-1');
+  });
 });

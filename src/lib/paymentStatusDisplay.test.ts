@@ -9,6 +9,7 @@ describe('paymentStatusDisplay', () => {
       aprovado: 'Aprovado',
       reprovado: 'Reprovado',
       pago: 'Lançado no sistema',
+      cancelado: 'Cancelado',
     });
   });
 
@@ -20,5 +21,9 @@ describe('paymentStatusDisplay', () => {
       pago: 'Lançado no sistema',
       cancelado: 'Cancelado',
     });
+  });
+
+  it('PAYMENT_INSTALLMENT_STATUS_LABELS traz "Cancelado" para o status cancelado', () => {
+    expect(PAYMENT_INSTALLMENT_STATUS_LABELS.cancelado).toBe('Cancelado');
   });
 });

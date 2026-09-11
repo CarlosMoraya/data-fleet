@@ -8,6 +8,7 @@ vi.mock('../../services/paymentInstallmentService', () => ({
     budgetApprovedByName: 'Ana Gestora',
     paymentApprovedByName: 'Bruno Coord',
     paidByName: 'Carla Financeiro',
+    cancelledByName: 'Diego Coord',
   }),
 }));
 
@@ -180,5 +181,53 @@ describe('PaymentInstallmentViewModal', () => {
 
     expect(container.textContent).toContain('Ordem de Serviço');
     expect(container.textContent).toContain('OS-001');
+  });
+
+  it('exibe botão Cancelar pagamento quando onRequestCancel é fornecido', async () => {
+    const spy = vi.fn();
+    await render(<PaymentInstallmentViewModal open installment={makeInstallment()} onClose={() => {}} onRequestCancel={spy} />);
+
+    const btn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Cancelar pagamento') as HTMLButtonElement | undefined;
+    expect(btn).toBeTruthy();
+    act(() => {
+      btn!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('exibe dica de cancelamento extra sem botão quando só cancelHint é fornecido', async () => {
+    await render(
+      <PaymentInstallmentViewModal
+        open
+        installment={makeInstallment()}
+        onClose={() => {}}
+        cancelHint="Para cancelar esta parcela, cancele o pagamento extra na aba Pagamentos Extras."
+      />,
+    );
+
+    expect(container.textContent).toContain('Para cancelar esta parcela, cancele o pagamento extra na aba Pagamentos Extras.');
+    const btn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Cancelar pagamento');
+    expect(btn).toBeUndefined();
+  });
+
+  it('exibe motivo do cancelamento quando status é cancelado', async () => {
+    await render(
+      <PaymentInstallmentViewModal
+        open
+        installment={makeInstallment({ status: 'cancelado', cancellationReason: 'Parcela duplicada' })}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(container.textContent).toContain('Cancelado');
+    expect(container.textContent).toContain('Motivo do cancelamento');
+    expect(container.textContent).toContain('Parcela duplicada');
+  });
+
+  it('exibe Cancelado por com nome do auditor', async () => {
+    await render(<PaymentInstallmentViewModal open installment={makeInstallment()} onClose={() => {}} />);
+
+    expect(container.textContent).toContain('Cancelado por');
+    expect(container.textContent).toContain('Diego Coord');
   });
 });

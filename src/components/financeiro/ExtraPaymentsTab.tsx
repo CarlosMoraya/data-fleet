@@ -1,14 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Eye, Plus, Wallet } from 'lucide-react';
+import { Eye, Plus, Wallet } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
+import { canCancelExtraPaymentRequest } from '../../lib/paymentCancellation';
 import { EXTRA_PAYMENT_STATUS_LABELS } from '../../lib/paymentStatusDisplay';
 import { canCreateExtraPayments } from '../../lib/rolePermissions';
-import { computeExtraPaymentCounts, filterExtraPayments, matchesExtraPaymentSearch } from '../../lib/serviceExpenseFilters';
+import { computeExtraPaymentCounts, filterExtraPayments, matchesExtraPaymentSearch, sumExtraPaymentMonthTotal } from '../../lib/serviceExpenseFilters';
 import { cn } from '../../lib/utils';
 import { cancelExtraPaymentRequest, listExtraPaymentRequests } from '../../services/serviceExpenseService';
 
+import CancelPaymentModal from './CancelPaymentModal';
 import ExtraPaymentFormModal from './ExtraPaymentFormModal';
 import ExtraPaymentViewModal from './ExtraPaymentViewModal';
 
@@ -57,12 +59,6 @@ function formatDate(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('pt-BR');
 }
 
-function isCurrentMonth(iso: string): boolean {
-  const now = new Date();
-  const d = new Date(`${iso}T00:00:00`);
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-}
-
 export default function ExtraPaymentsTab(): React.ReactElement {
   const { user, currentClient } = useAuth();
   const queryClient = useQueryClient();
@@ -74,6 +70,8 @@ export default function ExtraPaymentsTab(): React.ReactElement {
   const [categoryFilter, setCategoryFilter] = useState<'' | ExtraPaymentCategory>('');
   const [modalOpen, setModalOpen] = useState(false);
   const [viewing, setViewing] = useState<ExtraPaymentRequest | null>(null);
+  const [cancelling, setCancelling] = useState<ExtraPaymentRequest | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ['extraPaymentRequests', currentClient?.id],
@@ -81,21 +79,23 @@ export default function ExtraPaymentsTab(): React.ReactElement {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: (id: string) => cancelExtraPaymentRequest(id),
+    mutationFn: ({ request, reason }: { request: ExtraPaymentRequest; reason: string }) =>
+      cancelExtraPaymentRequest(request.id, reason, request.status === 'aprovado' ? 'aprovado' : 'pendente_aprovacao'),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['extraPaymentRequests'] });
+      await queryClient.invalidateQueries({ queryKey: ['paymentInstallments'] });
+      await queryClient.invalidateQueries({ queryKey: ['extraPaymentAuditors'] });
+      setCancelling(null);
+      setViewing(null);
+      setCancelError(null);
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : 'Falha ao cancelar o pagamento extra.';
-      window.alert(msg);
+      setCancelError(err instanceof Error ? err.message : 'Falha ao cancelar o pagamento extra.');
     },
   });
 
   const counts = useMemo(() => computeExtraPaymentCounts(requests), [requests]);
-  const totalMonth = useMemo(
-    () => requests.filter((r) => isCurrentMonth(r.serviceDate)).reduce((sum, r) => sum + r.amount, 0),
-    [requests],
-  );
+  const totalMonth = useMemo(() => sumExtraPaymentMonthTotal(requests, new Date()), [requests]);
 
   const filtered = useMemo(() => {
     const bySearch = requests.filter((r) => matchesExtraPaymentSearch(r, search));
@@ -222,17 +222,6 @@ export default function ExtraPaymentsTab(): React.ReactElement {
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </button>
-                        {r.status === 'pendente_aprovacao' && canCreate && r.createdById === user?.id && (
-                          <button
-                            type="button"
-                            disabled={cancelMutation.isPending}
-                            onClick={() => cancelMutation.mutate(r.id)}
-                            title="Cancelar"
-                            className="text-zinc-500 hover:text-red-600 disabled:opacity-50"
-                          >
-                            <Ban className="h-3.5 w-3.5" />
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -248,7 +237,24 @@ export default function ExtraPaymentsTab(): React.ReactElement {
       )}
 
       {viewing && (
-        <ExtraPaymentViewModal open request={viewing} onClose={() => setViewing(null)} />
+        <ExtraPaymentViewModal
+          open
+          request={viewing}
+          onClose={() => setViewing(null)}
+          onRequestCancel={canCancelExtraPaymentRequest(viewing, user?.id, role) ? () => { setCancelError(null); setCancelling(viewing); } : undefined}
+        />
+      )}
+      {cancelling && (
+        <CancelPaymentModal
+          open
+          title="Cancelar pagamento extra"
+          entityLabel={`Pedido ${cancelling.requestNumber}`}
+          amount={cancelling.amount}
+          submitting={cancelMutation.isPending}
+          error={cancelError}
+          onConfirm={(reason) => cancelMutation.mutate({ request: cancelling, reason })}
+          onClose={() => { if (!cancelMutation.isPending) { setCancelling(null); setCancelError(null); } }}
+        />
       )}
     </div>
   );

@@ -4,6 +4,11 @@ import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
 import { MAINTENANCE_ORDER_PAYMENT_SIGNAL_BADGE, describeInstallmentOriginSignal } from '../../lib/maintenanceOrderPaymentSignal';
+import {
+  canCancelPaymentInstallment,
+  EXTRA_PAYMENT_INSTALLMENT_CANCEL_HINT,
+  shouldShowExtraCancelHint,
+} from '../../lib/paymentCancellation';
 import { resolveExportSelection } from '../../lib/paymentExportSelection';
 import { PAYMENT_INSTALLMENT_STATUS_LABELS } from '../../lib/paymentStatusDisplay';
 import { resolvePaymentVehiclePlate } from '../../lib/paymentVehiclePlate';
@@ -13,12 +18,14 @@ import { normalizeSearchText } from '../../lib/textSearch';
 import { cn } from '../../lib/utils';
 import { XlsxPaymentProvider } from '../../services/financialExport/xlsxPaymentProvider';
 import {
-  listPaymentInstallments,
+  cancelPaymentInstallment,
   listApprovedOrdersForPayment,
+  listPaymentInstallments,
   markInstallmentsPaid,
   type ApprovedOrderForPayment,
 } from '../../services/paymentInstallmentService';
 
+import CancelPaymentModal from './CancelPaymentModal';
 import PaymentInstallmentEditModal from './PaymentInstallmentEditModal';
 import PaymentInstallmentFormModal from './PaymentInstallmentFormModal';
 import PaymentInstallmentViewModal from './PaymentInstallmentViewModal';
@@ -41,6 +48,7 @@ const STATUS_BADGE: Record<PaymentInstallmentStatus, string> = {
   aprovado: 'bg-blue-100 text-blue-700',
   reprovado: 'bg-red-100 text-red-700',
   pago: 'bg-green-100 text-green-700',
+  cancelado: 'bg-zinc-100 text-zinc-500',
 };
 
 const STATUS_OPTIONS: { value: '' | PaymentInstallmentStatus; label: string }[] = [
@@ -49,6 +57,7 @@ const STATUS_OPTIONS: { value: '' | PaymentInstallmentStatus; label: string }[] 
   { value: 'aprovado', label: PAYMENT_INSTALLMENT_STATUS_LABELS.aprovado },
   { value: 'reprovado', label: PAYMENT_INSTALLMENT_STATUS_LABELS.reprovado },
   { value: 'pago', label: PAYMENT_INSTALLMENT_STATUS_LABELS.pago },
+  { value: 'cancelado', label: PAYMENT_INSTALLMENT_STATUS_LABELS.cancelado },
 ];
 
 function formatCurrency(value: number): string {
@@ -85,6 +94,8 @@ export default function PaymentsTab(): React.ReactElement {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<PaymentInstallment | null>(null);
   const [viewing, setViewing] = useState<PaymentInstallment | null>(null);
+  const [cancelling, setCancelling] = useState<PaymentInstallment | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const activeClientId = currentClient?.id ?? undefined;
 
@@ -166,6 +177,22 @@ export default function PaymentsTab(): React.ReactElement {
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : 'Falha ao marcar como lançado no sistema.';
       window.alert(msg);
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: ({ installment, reason }: { installment: PaymentInstallment; reason: string }) =>
+      cancelPaymentInstallment(installment.id, reason),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['paymentInstallments'] });
+      await queryClient.invalidateQueries({ queryKey: ['approvedOrdersForPayment'] });
+      await queryClient.invalidateQueries({ queryKey: ['paymentInstallmentAuditors'] });
+      setCancelling(null);
+      setViewing(null);
+      setCancelError(null);
+    },
+    onError: (err: unknown) => {
+      setCancelError(err instanceof Error ? err.message : 'Falha ao cancelar a parcela.');
     },
   });
 
@@ -474,6 +501,20 @@ export default function PaymentsTab(): React.ReactElement {
           open
           installment={viewing}
           onClose={() => setViewing(null)}
+          onRequestCancel={canCancelPaymentInstallment(viewing, user?.id, role) ? () => { setCancelError(null); setCancelling(viewing); } : undefined}
+          cancelHint={shouldShowExtraCancelHint(viewing, user?.id, role) ? EXTRA_PAYMENT_INSTALLMENT_CANCEL_HINT : undefined}
+        />
+      )}
+      {cancelling && (
+        <CancelPaymentModal
+          open
+          title="Cancelar parcela"
+          entityLabel={`Parcela ${cancelling.installmentNumber}/${cancelling.installmentsTotal} · ${cancelling.maintenanceOrderOs ?? 'OS'}`}
+          amount={cancelling.value}
+          submitting={cancelMutation.isPending}
+          error={cancelError}
+          onConfirm={(reason) => cancelMutation.mutate({ installment: cancelling, reason })}
+          onClose={() => { if (!cancelMutation.isPending) { setCancelling(null); setCancelError(null); } }}
         />
       )}
     </div>

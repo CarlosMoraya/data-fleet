@@ -2,9 +2,10 @@ import type { InstallmentDraft, InstallmentInterval, PaymentInstallmentStatus } 
 
 const VALID_TRANSITIONS: Record<PaymentInstallmentStatus, PaymentInstallmentStatus[]> = {
   pendente_aprovacao: ['aprovado', 'reprovado'],
-  aprovado: ['pago'],
+  aprovado: ['pago', 'cancelado'],
   reprovado: [],
   pago: [],
+  cancelado: [],
 };
 
 /**
@@ -77,7 +78,7 @@ export function generateInstallmentDrafts(params: {
 
 /**
  * Máquina de estados da parcela. Centraliza as transições válidas:
- * pendente_aprovacao → aprovado | reprovado; aprovado → pago. Nada mais.
+ * pendente_aprovacao → aprovado | reprovado; aprovado → pago | cancelado. Nada mais.
  */
 export function canTransitionStatus(
   from: PaymentInstallmentStatus,
@@ -94,21 +95,25 @@ export function exceedsBudget(sum: number, budget: number): boolean {
   return Math.round(sum * 100) > Math.round(budget * 100);
 }
 
-export function sumNonRejectedValue(
-  list: { value: number; status?: PaymentInstallmentStatus }[],
-): number {
-  return list.reduce((sum, i) => (i.status === 'reprovado' ? sum : sum + i.value), 0);
+const BUDGET_RELEASING_STATUSES: ReadonlySet<PaymentInstallmentStatus> = new Set<PaymentInstallmentStatus>(['reprovado', 'cancelado']);
+
+function isCommitted(status?: PaymentInstallmentStatus): boolean {
+  return status === undefined || !BUDGET_RELEASING_STATUSES.has(status);
 }
 
-export function countNonRejectedInstallments(
-  list: { status?: PaymentInstallmentStatus }[],
-): number {
-  return list.filter((i) => i.status !== 'reprovado').length;
+/** Soma o valor das parcelas que ainda consomem o orçamento (exclui reprovadas e canceladas). */
+export function sumCommittedValue(list: { value: number; status?: PaymentInstallmentStatus }[]): number {
+  return list.reduce((sum, i) => (isCommitted(i.status) ? sum + i.value : sum), 0);
+}
+
+/** Conta as parcelas que ainda consomem o orçamento (exclui reprovadas e canceladas). */
+export function countCommittedInstallments(list: { status?: PaymentInstallmentStatus }[]): number {
+  return list.filter((i) => isCommitted(i.status)).length;
 }
 
 export function remainingBudget(
   approvedCost: number,
   existing: { value: number; status?: PaymentInstallmentStatus }[],
 ): number {
-  return approvedCost - sumNonRejectedValue(existing);
+  return approvedCost - sumCommittedValue(existing);
 }

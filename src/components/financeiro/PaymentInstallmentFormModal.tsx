@@ -12,8 +12,8 @@ import {
   exceedsBudget,
   generateInstallmentDrafts,
   remainingBudget,
+  sumCommittedValue,
   sumInstallmentsValue,
-  sumNonRejectedValue,
 } from '../../lib/paymentInstallments';
 import {
   applySharedBoletoToDrafts,
@@ -131,7 +131,7 @@ export default function PaymentInstallmentFormModal({
   });
 
   const alreadyRegistered = existingInstallments.length;
-  const alreadyRegisteredSum = sumNonRejectedValue(existingInstallments);
+  const alreadyRegisteredSum = sumCommittedValue(existingInstallments);
   const saldo = selectedOrder
     ? remainingBudget(selectedOrder.approvedCost, existingInstallments)
     : 0;

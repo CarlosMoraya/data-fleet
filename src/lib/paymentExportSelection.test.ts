@@ -42,4 +42,25 @@ describe('resolveExportSelection', () => {
 
     expect(resolveExportSelection(filtered, new Set(['missing']))).toEqual([]);
   });
+
+  it('exclui canceladas quando nada está selecionado', () => {
+    const a = { ...makeInstallment('a'), status: 'aprovado' as const };
+    const b = { ...makeInstallment('b'), status: 'cancelado' as const };
+
+    expect(resolveExportSelection([a, b], new Set())).toEqual([a]);
+  });
+
+  it('não retorna cancelada mesmo se selecionada isoladamente', () => {
+    const a = { ...makeInstallment('a'), status: 'aprovado' as const };
+    const b = { ...makeInstallment('b'), status: 'cancelado' as const };
+
+    expect(resolveExportSelection([a, b], new Set(['b']))).toEqual([]);
+  });
+
+  it('retorna só aprovadas quando ambas selecionadas', () => {
+    const a = { ...makeInstallment('a'), status: 'aprovado' as const };
+    const b = { ...makeInstallment('b'), status: 'cancelado' as const };
+
+    expect(resolveExportSelection([a, b], new Set(['a', 'b']))).toEqual([a]);
+  });
 });

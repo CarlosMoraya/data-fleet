@@ -64,3 +64,22 @@ export function computeExtraPaymentCounts(items: ExtraPaymentRequest[]): ExtraPa
 
   return counts;
 }
+
+const MONTH_TOTAL_EXCLUDED_STATUSES: ReadonlySet<ExtraPaymentStatus> = new Set<ExtraPaymentStatus>(['reprovado', 'cancelado']);
+
+/**
+ * Soma dos pedidos com data de serviço no mês de `now`, excluindo reprovados
+ * e cancelados (decisão do usuário, 2026-09-11).
+ */
+export function sumExtraPaymentMonthTotal(
+  items: Pick<ExtraPaymentRequest, 'serviceDate' | 'amount' | 'status'>[],
+  now: Date,
+): number {
+  return items
+    .filter((item) => !MONTH_TOTAL_EXCLUDED_STATUSES.has(item.status))
+    .filter((item) => {
+      const date = new Date(`${item.serviceDate}T00:00:00`);
+      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+    })
+    .reduce((sum, item) => sum + item.amount, 0);
+}

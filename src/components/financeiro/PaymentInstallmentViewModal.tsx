@@ -14,12 +14,15 @@ const STATUS_BADGE: Record<PaymentInstallmentStatus, string> = {
   aprovado: 'bg-blue-100 text-blue-700',
   reprovado: 'bg-red-100 text-red-700',
   pago: 'bg-green-100 text-green-700',
+  cancelado: 'bg-zinc-100 text-zinc-500',
 };
 
 interface PaymentInstallmentViewModalProps {
   open: boolean;
   installment: PaymentInstallment;
   onClose: () => void;
+  onRequestCancel?: () => void;
+  cancelHint?: string;
 }
 
 function formatCurrency(value: number): string {
@@ -46,6 +49,8 @@ export default function PaymentInstallmentViewModal({
   open,
   installment,
   onClose,
+  onRequestCancel,
+  cancelHint,
 }: PaymentInstallmentViewModalProps): React.ReactElement | null {
   const { data: auditors } = useQuery({
     queryKey: ['paymentInstallmentAuditors', installment.id],
@@ -107,6 +112,9 @@ export default function PaymentInstallmentViewModal({
             <ReadField label="Centro de custo" value={installment.centroCusto ?? '—'} />
             <ReadField label="Descrição" value={installment.descricao ?? '—'} wide />
             <ReadField label="Observações" value={installment.notes ?? '—'} wide />
+            {installment.status === 'cancelado' && (
+              <ReadField label="Motivo do cancelamento" value={installment.cancellationReason ?? '—'} wide />
+            )}
           </div>
 
           {installment.paymentMethod === 'pix' && (
@@ -155,9 +163,21 @@ export default function PaymentInstallmentViewModal({
               <ReadField label="Aprovação do pagamento" value={formatDate(installment.paymentApprovedAt)} />
               <ReadField label="Lançado por" value={auditors?.paidByName ?? '—'} />
               <ReadField label="Pagamento" value={formatDate(installment.paidAt)} />
+              <ReadField label="Cancelado por" value={auditors?.cancelledByName ?? '—'} />
+              <ReadField label="Cancelado em" value={formatDate(installment.cancelledAt)} />
             </div>
           </section>
         </div>
+        {(onRequestCancel || cancelHint) && (
+          <div className="flex items-center justify-between gap-3 border-t px-6 py-4">
+            {cancelHint ? <p className="text-xs text-zinc-500">{cancelHint}</p> : <span />}
+            {onRequestCancel && (
+              <button type="button" onClick={onRequestCancel} className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50">
+                Cancelar pagamento
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

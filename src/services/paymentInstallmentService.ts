@@ -1,4 +1,9 @@
-import { countNonRejectedInstallments, remainingBudget, sumNonRejectedValue } from '../lib/paymentInstallments';
+import {
+  CANCELLATION_NOT_APPLIED_MESSAGE,
+  CANCELLATION_REASON_INVALID_MESSAGE,
+  normalizeCancellationReason,
+} from '../lib/paymentCancellation';
+import { countCommittedInstallments, remainingBudget, sumCommittedValue } from '../lib/paymentInstallments';
 import { paymentInstallmentFromRow } from '../lib/paymentMappers';
 import { supabase } from '../lib/supabase';
 
@@ -88,7 +93,7 @@ export const INSTALLMENT_SELECT = `
   value, due_date, competencia_date, status, payment_method, boleto_url,
   nota_fiscal_url, nota_fiscal_url_2, invoice_number, pix_key_type, pix_key, pix_beneficiary_name, categoria,
   centro_custo, descricao, notes, created_by_id, payment_approved_by,
-  payment_approved_at, paid_by, paid_at, created_at, updated_at,
+  payment_approved_at, paid_by, paid_at, cancelled_by, cancelled_at, cancellation_reason, created_at, updated_at,
   maintenance_orders(os_number, status, budget_pdf_url, approved_cost, budget_reviewed_by, workshops(name, cnpj), vehicles(license_plate), budget_reviewer:profiles!maintenance_orders_budget_reviewed_by_fkey(name)),
   extra_payment_requests(request_number, category, supplier_name, supplier_document, approved_by, approved_at, vehicles(license_plate), drivers(name), approver:profiles!extra_payment_requests_approved_by_fkey(name))
 `;
@@ -156,6 +161,7 @@ export async function getPaymentInstallmentAuditors(
         budget_approved_by_name: string | null;
         payment_approved_by_name: string | null;
         paid_by_name: string | null;
+        cancelled_by_name: string | null;
       }
     | undefined;
 
@@ -163,6 +169,7 @@ export async function getPaymentInstallmentAuditors(
     budgetApprovedByName: row?.budget_approved_by_name ?? undefined,
     paymentApprovedByName: row?.payment_approved_by_name ?? undefined,
     paidByName: row?.paid_by_name ?? undefined,
+    cancelledByName: row?.cancelled_by_name ?? undefined,
   };
 }
 
@@ -295,6 +302,25 @@ export async function rejectPaymentInstallment(id: string): Promise<void> {
 }
 
 /**
+ * Cancela uma parcela de manutenção aprovada. O banco exige que o autor seja
+ * quem aprovou a parcela ou o Admin Master e grava autor/data.
+ */
+export async function cancelPaymentInstallment(id: string, reason: string): Promise<void> {
+  const normalizedReason = normalizeCancellationReason(reason);
+  if (!normalizedReason) throw new Error(CANCELLATION_REASON_INVALID_MESSAGE);
+
+  const { data, error } = await supabase
+    .from('payment_installments')
+    .update({ status: 'cancelado', cancellation_reason: normalizedReason })
+    .eq('id', id)
+    .eq('status', 'aprovado')
+    .eq('source_type', 'maintenance_order')
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error(CANCELLATION_NOT_APPLIED_MESSAGE);
+}
+
+/**
  * Aprova atomicamente todas as parcelas pendentes de uma OS via RPC
  * `approve_maintenance_payment_group`. Fail closed: qualquer divergência
  * de tenant/origem/ID/status/versão aborta o grupo inteiro no banco.
@@ -411,7 +437,7 @@ export interface MaintenanceOrderPaymentExposure {
 }
 
 /**
- * Parcelas não reprovadas de uma OS (quantidade e soma). Usado para avisar
+ * Parcelas não reprovadas nem canceladas de uma OS (quantidade e soma). Usado para avisar
  * quem cancela uma OS que já tem pagamento lançado.
  */
 export async function getMaintenanceOrderPaymentExposure(
@@ -430,7 +456,7 @@ export async function getMaintenanceOrderPaymentExposure(
     }));
 
   return {
-    count: countNonRejectedInstallments(installments),
-    total: sumNonRejectedValue(installments),
+    count: countCommittedInstallments(installments),
+    total: sumCommittedValue(installments),
   };
 }

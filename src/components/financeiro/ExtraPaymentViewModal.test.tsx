@@ -70,11 +70,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function render(request: ExtraPaymentRequest) {
+function render(request: ExtraPaymentRequest, props: Partial<{ onRequestCancel: () => void }> = {}) {
   const root = createRoot(container);
   (container as RootedDiv).__reactRoot = root;
   act(() => {
-    root.render(<ExtraPaymentViewModal open request={request} onClose={() => {}} />);
+    root.render(<ExtraPaymentViewModal open request={request} onClose={() => {}} {...props} />);
   });
   return root;
 }
@@ -94,5 +94,37 @@ describe('ExtraPaymentViewModal — evidências', () => {
   it('com evidenceUrls vazio, também exibe a mensagem de vazio', () => {
     render(baseRequest({ evidenceUrls: [] }));
     expect(container.textContent).toContain('Nenhuma evidência anexada.');
+  });
+});
+
+describe('ExtraPaymentViewModal — cancelamento', () => {
+  it('com onRequestCancel exibe botão e chama ao clicar', () => {
+    const spy = vi.fn();
+    render(baseRequest(), { onRequestCancel: spy });
+    const btn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'Cancelar pagamento');
+    expect(btn).toBeTruthy();
+    act(() => {
+      btn!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('sem onRequestCancel não exibe botão', () => {
+    render(baseRequest());
+    const btn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'Cancelar pagamento');
+    expect(btn).toBeFalsy();
+  });
+
+  it('status cancelado exibe motivo do cancelamento', () => {
+    render(baseRequest({ status: 'cancelado', cancellationReason: 'Serviço não realizado' }));
+    expect(container.textContent).toContain('Motivo do cancelamento');
+    expect(container.textContent).toContain('Serviço não realizado');
+  });
+
+  it('exibe Cancelado por com nome do auditor', () => {
+    useQueryMock.mockImplementation((opts: { queryKey: unknown[] }) => (opts.queryKey[0] === 'extraPaymentAuditors' ? { data: { cancelledByName: 'Bruno Coord' } } : { data: [] }));
+    render(baseRequest());
+    expect(container.textContent).toContain('Cancelado por');
+    expect(container.textContent).toContain('Bruno Coord');
   });
 });

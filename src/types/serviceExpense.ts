@@ -37,6 +37,9 @@ export interface ExtraPaymentRequest {
   rejectionReason?: string;
   paidBy?: string;
   paidAt?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
   createdAt: string;
   updatedAt: string;
   // Joins (populated via select with relations)
@@ -71,6 +74,9 @@ export interface ExtraPaymentRequestRow {
   rejection_reason: string | null;
   paid_by: string | null;
   paid_at: string | null;
+  cancelled_by?: string | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
   created_at: string;
   updated_at: string;
   // Joins
@@ -84,6 +90,7 @@ export interface ExtraPaymentAuditors {
   approvedByName?: string;
   rejectedByName?: string;
   paidByName?: string;
+  cancelledByName?: string;
 }
 
 export interface ExtraPaymentFormInput {
