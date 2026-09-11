@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit2, CheckCircle, XCircle, RefreshCw, Trash2, FileStack, Copy } from 'lucide-react';
+import { Plus, Edit2, CheckCircle, XCircle, RefreshCw, Trash2, FileStack, Copy, Eye } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 
+import ChecklistTemplateDetailModal from '../components/ChecklistTemplateDetailModal';
 import ChecklistTemplateForm from '../components/ChecklistTemplateForm';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
@@ -51,6 +52,15 @@ export default function ChecklistTemplates() {
     return saved ? (JSON.parse(saved) as ChecklistTemplate) : null;
   });
   const [duplicatingTemplate, setDuplicatingTemplate] = useState<ChecklistTemplate | null>(null);
+  const [viewingTemplate, setViewingTemplate] = useState<ChecklistTemplate | null>(null);
+
+  const openTemplateDetail = (template: ChecklistTemplate): void => {
+    setViewingTemplate(template);
+  };
+
+  const closeTemplateDetail = (): void => {
+    setViewingTemplate(null);
+  };
 
   // Sincronizar estado do formulário com sessionStorage
   React.useEffect(() => {
@@ -320,6 +330,17 @@ export default function ChecklistTemplates() {
                     <td className="px-4 py-3 text-sm text-zinc-600">v{t.currentVersion}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
+                        {t.status === 'published' && (
+                          <button
+                            type="button"
+                            title="Visualizar"
+                            aria-label="Visualizar template"
+                            onClick={() => openTemplateDetail(t)}
+                            className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        )}
                         {/* Edit (only draft) */}
                         {t.status === 'draft' && isManager && !blockWrite && (
                           <button
@@ -415,6 +436,10 @@ export default function ChecklistTemplates() {
             void queryClient.invalidateQueries({ queryKey: ['checklistTemplates', currentClient?.id] });
           }}
         />
+      )}
+
+      {viewingTemplate && (
+        <ChecklistTemplateDetailModal template={viewingTemplate} onClose={closeTemplateDetail} />
       )}
 
       {/* Confirm Dialog */}

@@ -63,6 +63,23 @@ test.describe.serial('Módulo de Templates de Checklist (Manager)', () => {
     await expect(row.locator('text=Publicado')).toBeVisible({ timeout: 15000 });
   });
 
+  test('deve visualizar a estrutura do template publicado em modal somente leitura', async ({ page }) => {
+    const row = page.locator('tr').filter({ hasText: TPL_LEVE });
+    await expect(row).toBeVisible({ timeout: 10000 });
+    const visualizarBtn = row.locator('button[title="Visualizar"]');
+    await expect(visualizarBtn).toBeVisible({ timeout: 10000 });
+    await visualizarBtn.click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog.getByText('Detalhes do Template')).toBeVisible();
+    await expect(dialog.getByText('Item customizado E2E')).toBeVisible();
+    await expect(dialog.getByText('Publicado')).toBeVisible();
+    await expect(dialog.getByText('Editar')).not.toBeVisible();
+    await expect(dialog.getByText('Salvar alterações')).not.toBeVisible();
+    await dialog.locator('button').filter({ hasText: 'Fechar' }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10000 });
+  });
+
   test('deve criar nova versão do template Leve', async ({ page }) => {
     const row = page.locator('tr').filter({ hasText: TPL_LEVE });
     await row.locator('button[title="Nova versão"]').click();
