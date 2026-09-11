@@ -45,6 +45,7 @@ export function paymentInstallmentFromRow(row: PaymentInstallmentRow): PaymentIn
     maintenanceOrderApprovedCost:
       row.maintenance_orders?.approved_cost != null ? Number(row.maintenance_orders.approved_cost) : undefined,
     maintenanceOrderVehiclePlate: row.maintenance_orders?.vehicles?.license_plate ?? undefined,
+    maintenanceOrderStatus: row.maintenance_orders?.status ?? undefined,
     extraPaymentNumber: row.extra_payment_requests?.request_number ?? undefined,
     extraPaymentCategory: row.extra_payment_requests?.category ?? undefined,
     extraPaymentSupplierName: row.extra_payment_requests?.supplier_name ?? undefined,

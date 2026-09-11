@@ -1,6 +1,9 @@
 import { FileText, ListChecks, ThumbsUp } from 'lucide-react';
 import React from 'react';
 
+import { MAINTENANCE_ORDER_PAYMENT_SIGNAL_BADGE, describeMaintenanceOrderPaymentSignal } from '../../lib/maintenanceOrderPaymentSignal';
+import { cn } from '../../lib/utils';
+
 import type { MaintenancePaymentApprovalGroup } from '../../lib/paymentApprovalGroups';
 
 interface MaintenancePaymentApprovalGroupCardProps {
@@ -22,6 +25,7 @@ export default function MaintenancePaymentApprovalGroupCard({
   onViewBudget,
   onViewInstallments,
 }: MaintenancePaymentApprovalGroupCardProps): React.ReactElement {
+  const originSignal = describeMaintenanceOrderPaymentSignal(group.maintenanceOrderStatus);
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-5 py-4 shadow-sm">
       <div>
@@ -29,8 +33,16 @@ export default function MaintenancePaymentApprovalGroupCard({
           <span className="font-mono text-sm font-semibold text-zinc-800">{group.osNumber}</span>
           <span className="text-sm text-zinc-500">{group.workshopName}</span>
           {group.workshopCnpj && <span className="text-xs text-zinc-400">· {group.workshopCnpj}</span>}
+          {originSignal && (
+            <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', MAINTENANCE_ORDER_PAYMENT_SIGNAL_BADGE[originSignal.tone])}>
+              {originSignal.label}
+            </span>
+          )}
         </div>
         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+          {group.maintenanceOrderStatus && (
+            <span>Status da OS: <strong className="text-zinc-700">{group.maintenanceOrderStatus}</strong></span>
+          )}
           <span>Custo aprovado: <strong className="text-zinc-700">{formatCurrency(group.approvedCost)}</strong></span>
           <span>{group.installmentCount} parcela(s) pendente(s)</span>
           <span>Total pendente: <strong className="text-zinc-700">{formatCurrency(group.totalPending)}</strong></span>

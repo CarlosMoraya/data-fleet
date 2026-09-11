@@ -100,6 +100,12 @@ export function sumNonRejectedValue(
   return list.reduce((sum, i) => (i.status === 'reprovado' ? sum : sum + i.value), 0);
 }
 
+export function countNonRejectedInstallments(
+  list: { status?: PaymentInstallmentStatus }[],
+): number {
+  return list.filter((i) => i.status !== 'reprovado').length;
+}
+
 export function remainingBudget(
   approvedCost: number,
   existing: { value: number; status?: PaymentInstallmentStatus }[],

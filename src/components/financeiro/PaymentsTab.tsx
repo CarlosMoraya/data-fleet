@@ -3,6 +3,7 @@ import { Download, Eye, FileText, KeyRound, Pencil, Plus, ReceiptText } from 'lu
 import React, { useMemo, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
+import { MAINTENANCE_ORDER_PAYMENT_SIGNAL_BADGE, describeInstallmentOriginSignal } from '../../lib/maintenanceOrderPaymentSignal';
 import { resolveExportSelection } from '../../lib/paymentExportSelection';
 import { PAYMENT_INSTALLMENT_STATUS_LABELS } from '../../lib/paymentStatusDisplay';
 import { resolvePaymentVehiclePlate } from '../../lib/paymentVehiclePlate';
@@ -319,6 +320,7 @@ export default function PaymentsTab(): React.ReactElement {
               </thead>
               <tbody className="divide-y divide-zinc-100 bg-white">
                 {filtered.map((i) => {
+                  const originSignal = describeInstallmentOriginSignal(i.sourceType, i.maintenanceOrderStatus);
                   return (
                     <tr key={i.id} className="hover:bg-zinc-50">
                       {canPaid && (
@@ -352,9 +354,16 @@ export default function PaymentsTab(): React.ReactElement {
                         ) : 'Boleto'}
                       </td>
                       <td className="px-3 py-2.5">
-                        <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STATUS_BADGE[i.status])}>
-                          {PAYMENT_INSTALLMENT_STATUS_LABELS[i.status]}
-                        </span>
+                        <div className="flex flex-col items-start gap-1">
+                          <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STATUS_BADGE[i.status])}>
+                            {PAYMENT_INSTALLMENT_STATUS_LABELS[i.status]}
+                          </span>
+                          {originSignal && (
+                            <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', MAINTENANCE_ORDER_PAYMENT_SIGNAL_BADGE[originSignal.tone])}>
+                              {originSignal.label}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-1.5 text-xs">

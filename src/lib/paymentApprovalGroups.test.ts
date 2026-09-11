@@ -97,4 +97,16 @@ describe('groupPendingMaintenancePayments', () => {
 
     expect(groups.map((g) => g.maintenanceOrderId)).toEqual(['os-earlier', 'os-later']);
   });
+
+  it('leva o status operacional da OS para o grupo', () => {
+    const groups = groupPendingMaintenancePayments([
+      installment({
+        maintenanceOrderId: 'os-1',
+        status: 'pendente_aprovacao',
+        maintenanceOrderStatus: 'Serviço em execução',
+      }),
+    ]);
+
+    expect(groups[0].maintenanceOrderStatus).toBe('Serviço em execução');
+  });
 });

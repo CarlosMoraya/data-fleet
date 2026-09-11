@@ -37,10 +37,20 @@ describe('selectSelectableApprovedOrders', () => {
     expect(selectSelectableApprovedOrders([partiallyPaid])).toEqual([partiallyPaid]);
   });
 
-  it('remove uma OS com status não pagável', () => {
+  it('remove uma OS cancelada mesmo com saldo', () => {
     expect(selectSelectableApprovedOrders([
-      order({ remainingBudget: 500, status: 'Serviço em execução' }),
+      order({ remainingBudget: 500, status: 'Cancelado' }),
     ])).toEqual([]);
+  });
+
+  it('mantém uma OS com orçamento recém-aprovado', () => {
+    const justApproved = order({ remainingBudget: 500, status: 'Orçamento aprovado' });
+    expect(selectSelectableApprovedOrders([justApproved])).toEqual([justApproved]);
+  });
+
+  it('mantém uma OS com serviço em execução', () => {
+    const inProgress = order({ remainingBudget: 500, status: 'Serviço em execução' });
+    expect(selectSelectableApprovedOrders([inProgress])).toEqual([inProgress]);
   });
 
   it('devolve lista vazia para entrada vazia', () => {

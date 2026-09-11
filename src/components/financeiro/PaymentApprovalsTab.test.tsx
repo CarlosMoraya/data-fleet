@@ -252,4 +252,40 @@ describe('PaymentApprovalsTab', () => {
     });
     expect(container.textContent).toContain('OS-0001');
   });
+
+  it('mostra status da OS e sinal âmbar quando o serviço não foi concluído, sem bloquear a aprovação', async () => {
+    listMock.mockResolvedValue([installment({ maintenanceOrderStatus: 'Serviço em execução' })]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Status da OS: Serviço em execução');
+    });
+    expect(container.textContent).toContain('Serviço não concluído');
+    const approveAllButton = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('Aprovar todas'));
+    expect(approveAllButton).toBeDefined();
+    expect(approveAllButton?.disabled).toBe(false);
+  });
+
+  it('mostra sinal de OS cancelada', async () => {
+    listMock.mockResolvedValue([installment({ maintenanceOrderStatus: 'Cancelado' })]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Status da OS: Cancelado');
+    });
+    expect(container.textContent).toContain('OS cancelada');
+    const badge = Array.from(container.querySelectorAll('span')).find((el) => el.textContent === 'OS cancelada');
+    expect(badge?.className).toContain('border-red-300');
+  });
+
+  it('não mostra sinal quando o serviço já foi concluído', async () => {
+    listMock.mockResolvedValue([installment({ maintenanceOrderStatus: 'Concluído' })]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Status da OS: Concluído');
+    });
+    expect(container.textContent).not.toContain('Serviço não concluído');
+    expect(container.textContent).not.toContain('OS cancelada');
+  });
 });

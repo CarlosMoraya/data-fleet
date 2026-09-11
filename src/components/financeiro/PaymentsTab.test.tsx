@@ -232,4 +232,68 @@ describe('PaymentsTab', () => {
     }
     expect(container.textContent).not.toMatch(/📄|📃|🔑|🧾/);
   });
+
+  it('sinaliza na coluna Status que a OS de origem foi cancelada', async () => {
+    listInstallmentsMock.mockResolvedValue([installment({ status: 'aprovado', maintenanceOrderStatus: 'Cancelado' })]);
+    listApprovedOrdersMock.mockResolvedValue([]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      const row = container.querySelector('tbody tr');
+      expect(row?.textContent).toContain('Aprovado');
+      expect(row?.textContent).toContain('OS cancelada');
+      const badge = Array.from(container.querySelectorAll('span')).find((el) => el.textContent === 'OS cancelada');
+      expect(badge?.className).toContain('border-red-300');
+    });
+  });
+
+  it('sinaliza serviço não concluído quando a OS ainda está em execução', async () => {
+    listInstallmentsMock.mockResolvedValue([
+      installment({ status: 'pendente_aprovacao', maintenanceOrderStatus: 'Orçamento aprovado' }),
+    ]);
+    listApprovedOrdersMock.mockResolvedValue([]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      const row = container.querySelector('tbody tr');
+      expect(row?.textContent).toContain('Pendente de aprovação');
+      expect(row?.textContent).toContain('Serviço não concluído');
+      const badge = Array.from(container.querySelectorAll('span')).find(
+        (el) => el.textContent === 'Serviço não concluído',
+      );
+      expect(badge?.className).toContain('border-amber-300');
+    });
+  });
+
+  it('não sinaliza OS concluída', async () => {
+    listInstallmentsMock.mockResolvedValue([installment({ status: 'aprovado', maintenanceOrderStatus: 'Veículo retirado' })]);
+    listApprovedOrdersMock.mockResolvedValue([]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      const row = container.querySelector('tbody tr');
+      expect(row?.textContent).toContain('Aprovado');
+      expect(row?.textContent).not.toContain('OS cancelada');
+      expect(row?.textContent).not.toContain('Serviço não concluído');
+    });
+  });
+
+  it('não sinaliza parcela de Pagamento Extra', async () => {
+    listInstallmentsMock.mockResolvedValue([
+      installment({
+        sourceType: 'extra_payment',
+        maintenanceOrderId: undefined,
+        status: 'aprovado',
+        maintenanceOrderStatus: 'Cancelado',
+      }),
+    ]);
+    listApprovedOrdersMock.mockResolvedValue([]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      const row = container.querySelector('tbody tr');
+      expect(row?.textContent).toContain('Extra');
+      expect(row?.textContent).not.toContain('OS cancelada');
+    });
+  });
 });

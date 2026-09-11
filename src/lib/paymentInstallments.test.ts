@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canTransitionStatus,
+  countNonRejectedInstallments,
   exceedsBudget,
   generateInstallmentDrafts,
   remainingBudget,
@@ -195,5 +196,15 @@ describe('sumNonRejectedValue / remainingBudget (reprovadas liberam saldo)', () 
 
   it('remainingBudget com lista vazia devolve o total aprovado', () => {
     expect(remainingBudget(1000, [])).toBe(1000);
+  });
+
+  it('conta parcelas não reprovadas, inclusive sem status', () => {
+    expect(countNonRejectedInstallments([
+      { status: 'pendente_aprovacao' },
+      { status: 'reprovado' },
+      { status: 'pago' },
+      {},
+    ])).toBe(3);
+    expect(countNonRejectedInstallments([])).toBe(0);
   });
 });

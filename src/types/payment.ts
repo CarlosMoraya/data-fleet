@@ -1,3 +1,5 @@
+import type { MaintenanceStatus } from './maintenance';
+
 // ─── Pagamentos (módulo financeiro) ──────────────────────────────────────────
 
 export type PaymentInstallmentStatus = 'pendente_aprovacao' | 'aprovado' | 'reprovado' | 'pago';
@@ -49,6 +51,7 @@ export interface PaymentInstallment {
   maintenanceOrderOs?: string;
   maintenanceOrderApprovedCost?: number;
   maintenanceOrderVehiclePlate?: string;
+  maintenanceOrderStatus?: MaintenanceStatus;
   // Campos derivados de origem extra (Pagamentos Extras / Serviços Avulsos)
   extraPaymentNumber?: string;
   extraPaymentCategory?: string;
@@ -93,6 +96,7 @@ export interface PaymentInstallmentRow {
   // Joins
   maintenance_orders?: {
     os_number: string;
+    status?: MaintenanceStatus | null;
     budget_pdf_url: string | null;
     approved_cost: number | null;
     workshops: { name: string; cnpj: string | null } | null;

@@ -19,6 +19,7 @@ import { type BudgetLockKind } from '../lib/maintenanceBudgetLock';
 import { canReopenBudget } from '../lib/maintenanceBudgetReopen';
 import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, matchesMaintenanceCard, countVehiclesNotWithdrawn, BUDGET_STATUS_FILTER_OPTIONS, daysInWorkshop } from '../lib/maintenanceFilters';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
+import { describeCancelPaymentExposure } from '../lib/maintenanceOrderPaymentSignal';
 import { canAdvanceMaintenanceStatus, describeStatusBlockReason } from '../lib/maintenanceStatusCoherence';
 import { canWorkshopFillOrder, canWorkshopStartService } from '../lib/maintenanceWorkshop';
 import { isOperationsManager, canExportMaintenanceSpreadsheet } from '../lib/rolePermissions';
@@ -36,6 +37,7 @@ import {
   cancelMaintenanceOrder,
   startWorkshopService,
 } from '../services/maintenanceService';
+import { getMaintenanceOrderPaymentExposure } from '../services/paymentInstallmentService';
 import { normalizeFleetPlate } from '../services/vehicleLastRouteService';
 
 import type { MaintenanceExportRow } from '../lib/maintenanceExportRows';
@@ -209,6 +211,16 @@ export default function Maintenance() {
     () => (operationsManager ? undefined : (location.state as { prefillMaintenance?: Partial<MaintenanceOrder> } | null)?.prefillMaintenance ?? undefined)
   );
   const [orderToCancel, setOrderToCancel] = React.useState<MaintenanceOrder | null>(null);
+  const cancelExposureQuery = useQuery({
+    queryKey: ['maintenanceOrderPaymentExposure', orderToCancel?.id],
+    enabled: !!orderToCancel,
+    staleTime: 0,
+    queryFn: () => getMaintenanceOrderPaymentExposure(orderToCancel?.id ?? ''),
+  });
+  const cancelPaymentWarning = describeCancelPaymentExposure(
+    cancelExposureQuery.data,
+    cancelExposureQuery.isError,
+  );
   const [orderToReopen, setOrderToReopen] = React.useState<MaintenanceOrder | null>(null);
   const [reopenReason, setReopenReason] = React.useState('');
   const [mobileFiltersOpen, setMobileFiltersOpen] = React.useState(false);
@@ -973,6 +985,11 @@ export default function Maintenance() {
               <div><span className="font-medium text-zinc-700">Placa:</span> {orderToCancel.licensePlate}</div>
               <div><span className="font-medium text-zinc-700">Status atual:</span> {orderToCancel.status}</div>
             </div>
+            {cancelPaymentWarning && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+                {cancelPaymentWarning}
+              </div>
+            )}
             <p className="text-sm text-zinc-600">
               A OS será marcada como <strong>Cancelado</strong> e não contará mais para cálculos de custo.
               Caso seja necessário, você poderá reabrir uma nova OS a partir deste registro.
@@ -987,11 +1004,11 @@ export default function Maintenance() {
               </button>
               <button
                 onClick={() => cancelMutation.mutate(orderToCancel)}
-                disabled={cancelMutation.isPending}
+                disabled={cancelMutation.isPending || cancelExposureQuery.isLoading}
                 className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
               >
                 {cancelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Confirmar Cancelamento
+                {cancelPaymentWarning ? 'Cancelar mesmo assim' : 'Confirmar Cancelamento'}
               </button>
             </div>
           </div>

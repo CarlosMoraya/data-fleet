@@ -2,6 +2,24 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-09-10/11: Pagamentos a partir da aprovação do orçamento
+
+**Pedido do usuário:** permitir subir a Ordem de Pagamento assim que o orçamento estiver aprovado — as oficinas enviam NF e boleto nesse momento, e o sistema só aceitava depois de `Concluído`/`Veículo retirado`.
+
+**Diagnóstico:** a regra vivia em duas camadas — `PAYABLE_MAINTENANCE_STATUSES` (frontend) e o gatilho `trg_enforce_payment_installment_source_payable` (migration `20260827000000`). Era uma decisão deliberada de 2026-08-26 (commit `b1e74a0`), documentada na `SPEC.md`, nascida da desconfiança após o episódio Deluna de 21/08. O usuário decidiu desfazê-la conscientemente, repondo a proteção em forma de informação.
+
+**Decisões do usuário:** A2 — janela contínua (`Orçamento aprovado` e `Serviço em execução` juntos; só o primeiro criaria buraco ao iniciar o serviço). B1 — cancelar OS com parcelas avisa, não bloqueia, e o ledger sinaliza "OS cancelada". C1 — status da OS visível para quem aprova. Os dois sinais no ledger (cancelada e não concluída).
+
+**Entregue:** migration `20260910000000_widen_payment_installment_payable_window.sql` (só recria a função; guarda explícita de `source_status IS NULL`, porque `NULL NOT IN (...)` não dispara a exceção); diagnóstico estrutural `supabase/diagnostics/check-payment-installment-payable-window.sql`; `maintenance_orders.status` no `INSTALLMENT_SELECT` (agora exportado e protegido por teste, já que o `select` é string e o TypeScript não o enxerga); `getMaintenanceOrderPaymentExposure` + `countNonRejectedInstallments`; módulo puro `src/lib/maintenanceOrderPaymentSignal.ts`; sinal no card de aprovação, na coluna Status de `PaymentsTab` e aviso no modal de cancelamento de `Maintenance.tsx`; E2E pendente atualizado para o combobox; `SPEC.md` reescrita.
+
+**Achados durante o planejamento:** (1) o SQL Editor não testa o gatilho — o escape hatch `auth.uid() IS NULL` libera tudo, então o diagnóstico é só estrutural e o comportamento exige validação em tela; (2) a policy de INSERT aceita `Workshop` na própria OS (risco aceito); (3) **o `status` não é validado no INSERT de parcelas** — qualquer porta de INSERT cria parcela já aprovada ou paga (pendência de prioridade alta, pré-existente); (4) a opção `Cancelar` do select "Ações" de `Maintenance.tsx` envia um status inválido; (5) o vermelho sólido que seria usado para "OS cancelada" é idêntico ao badge "Reprovado" na mesma coluna — daí as pílulas contornadas.
+
+**Execução:** uma sessão paralela ("Pago → Lançado no sistema", commit `891afdd`) terminou dois minutos antes do início e alterou `PaymentsTab.tsx`; o plano foi rebaseado (Etapa 7) e o baseline remedido (249/2.250) antes de qualquer disparo. Etapas 1–5 e 9 escritas pelo agente planejador (teste de economia spec ≈ artefato); 6, 7 e 8 por `muse-spark-1.2-contributor-free`, todas na primeira execução, com controle negativo em cada uma. Na revisão da Etapa 8 foi acrescentado um cenário que o plano não previa (botão bloqueado enquanto verifica — Fail Closed), registrado como falha do plano. Registros #031–#033.
+
+**Portão final:** tsc 0 · lint 0/264 (desvio aceito: +1 `rules-of-hooks` em `Maintenance.tsx`, defeito pré-existente de `return` antes dos hooks) · unitários 2.284/2.284 em 251 arquivos · smoke 7/7.
+
+**Pendente ao fim da sessão:** aplicação da migration em DEV e PROD pelo usuário, diagnóstico nos dois bancos, validação em tela (9 passos) e execução do E2E pendente.
+
 ## Sessão — 2026-09-09: Agendamentos — ações da linha migradas para o modal (Master–Detail)
 
 Implementado o escopo fechado de `IMPLEMENTATION.md` (Tipo 3 — alteração em funcionalidade existente), em 6 etapas, inteiramente no frontend. Continuação direta da sessão anterior, na mesma tela.

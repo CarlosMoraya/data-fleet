@@ -53,6 +53,19 @@ async function login(page: Page, email: string, password: string) {
   await expect(page).toHaveURL('/', { timeout: 15000 });
 }
 
+async function expectPaymentOption(page: Page, osNumber: string, visible: boolean) {
+  await page.goto('/financeiro?tab=payments');
+  await page.getByRole('button', { name: /Cadastrar Pagamento/i }).click();
+  const combobox = page.getByRole('combobox', { name: 'Ordem de Serviço (orçamento aprovado)' });
+  await expect(combobox).toBeVisible({ timeout: 10000 });
+  await combobox.fill(osNumber);
+  if (visible) {
+    await expect(page.getByRole('option', { name: new RegExp(osNumber) })).toHaveCount(1, { timeout: 10000 });
+  } else {
+    await expect(page.getByText('Nenhuma OS encontrada')).toBeVisible({ timeout: 10000 });
+  }
+}
+
 test.describe.serial('Coerência entre status operacional e orçamento da OS', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -148,7 +161,7 @@ test.describe.serial('Coerência entre status operacional e orçamento da OS', (
     await supabase.from('vehicles').delete().eq('id', vehicleId);
   });
 
-  test('mantém a OS fora das transições bloqueadas, aprova o orçamento e só libera pagamento após retirada', async ({ page }) => {
+  test('mantém a OS fora das transições bloqueadas, aprova o orçamento e libera pagamento a partir da aprovação', async ({ page }) => {
     if (blockedReason) {
       test.skip(true, blockedReason);
       return;
@@ -173,6 +186,7 @@ test.describe.serial('Coerência entre status operacional e orçamento da OS', (
     await expect(blockedCompleteOption).toHaveAttribute('title', /aguardando aprovação/);
     await page.getByRole('button', { name: 'Cancelar', exact: true }).last().click();
 
+    await expectPaymentOption(page, osNumber, false);
     await page.goto('/financeiro?tab=budget&segment=pending');
     const pendingRow = page.locator('tbody tr', { hasText: osNumber });
     await expect(pendingRow).toBeVisible({ timeout: 15000 });
@@ -180,10 +194,7 @@ test.describe.serial('Coerência entre status operacional e orçamento da OS', (
     await pendingRow.getByRole('button', { name: /Aprovar/ }).click();
     await expect(page.locator('tbody tr', { hasText: osNumber })).toHaveCount(0, { timeout: 15000 });
 
-    await page.goto('/financeiro?tab=payments');
-    await page.getByRole('button', { name: /Cadastrar Pagamento/i }).click();
-    await expect(page.getByText('Ordem de Serviço (orçamento aprovado)')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('select').last().locator(`option[value="${osId}"]`)).toHaveCount(0);
+    await expectPaymentOption(page, osNumber, true);
 
     await page.goto('/manutencao');
     await page.locator('input[placeholder*="Buscar"]').first().fill(plate);
@@ -194,15 +205,16 @@ test.describe.serial('Coerência entre status operacional e orçamento da OS', (
     await page.getByRole('button', { name: 'Salvar Edição', exact: true }).click();
     await expect(page.locator('tr', { hasText: plate }).first()).toContainText('Serviço em execução', { timeout: 15000 });
 
+    await expectPaymentOption(page, osNumber, true);
+    await page.goto('/manutencao');
+    await page.locator('input[placeholder*="Buscar"]').first().fill(plate);
+
     const executingRow = page.locator('tr', { hasText: plate }).first();
     await executingRow.locator('select[title="Ações"]').selectOption('Concluído');
     await expect(page.locator('tr', { hasText: plate }).first()).toContainText('Concluído', { timeout: 15000 });
     await page.locator('tr', { hasText: plate }).first().locator('button[title="Retirar Veículo"]').click();
     await expect(page.locator('tr', { hasText: plate }).first()).toContainText('Veículo retirado', { timeout: 15000 });
 
-    await page.goto('/financeiro?tab=payments');
-    await page.getByRole('button', { name: /Cadastrar Pagamento/i }).click();
-    await expect(page.getByText('Ordem de Serviço (orçamento aprovado)')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('select').last().locator(`option[value="${osId}"]`)).toHaveCount(1);
+    await expectPaymentOption(page, osNumber, true);
   });
 });

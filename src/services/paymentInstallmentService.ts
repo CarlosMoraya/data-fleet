@@ -1,4 +1,4 @@
-import { remainingBudget } from '../lib/paymentInstallments';
+import { countNonRejectedInstallments, remainingBudget, sumNonRejectedValue } from '../lib/paymentInstallments';
 import { paymentInstallmentFromRow } from '../lib/paymentMappers';
 import { supabase } from '../lib/supabase';
 
@@ -83,13 +83,13 @@ export interface ApprovedOrderForPayment {
   clientId: string;
 }
 
-const INSTALLMENT_SELECT = `
+export const INSTALLMENT_SELECT = `
   id, maintenance_order_id, source_type, extra_payment_request_id, client_id, installment_number, installments_total,
   value, due_date, competencia_date, status, payment_method, boleto_url,
   nota_fiscal_url, nota_fiscal_url_2, invoice_number, pix_key_type, pix_key, pix_beneficiary_name, categoria,
   centro_custo, descricao, notes, created_by_id, payment_approved_by,
   payment_approved_at, paid_by, paid_at, created_at, updated_at,
-  maintenance_orders(os_number, budget_pdf_url, approved_cost, budget_reviewed_by, workshops(name, cnpj), vehicles(license_plate), budget_reviewer:profiles!maintenance_orders_budget_reviewed_by_fkey(name)),
+  maintenance_orders(os_number, status, budget_pdf_url, approved_cost, budget_reviewed_by, workshops(name, cnpj), vehicles(license_plate), budget_reviewer:profiles!maintenance_orders_budget_reviewed_by_fkey(name)),
   extra_payment_requests(request_number, category, supplier_name, supplier_document, approved_by, approved_at, vehicles(license_plate), drivers(name), approver:profiles!extra_payment_requests_approved_by_fkey(name))
 `;
 
@@ -403,4 +403,34 @@ export async function listApprovedOrdersForPayment(
       clientId: row.client_id,
     };
   });
+}
+
+export interface MaintenanceOrderPaymentExposure {
+  count: number;
+  total: number;
+}
+
+/**
+ * Parcelas não reprovadas de uma OS (quantidade e soma). Usado para avisar
+ * quem cancela uma OS que já tem pagamento lançado.
+ */
+export async function getMaintenanceOrderPaymentExposure(
+  maintenanceOrderId: string,
+): Promise<MaintenanceOrderPaymentExposure> {
+  const { data, error } = await supabase
+    .from('payment_installments')
+    .select('value, status')
+    .eq('maintenance_order_id', maintenanceOrderId);
+  if (error) throw error;
+
+  const installments = ((data ?? []) as { value: number | string | null; status: PaymentInstallmentStatus }[])
+    .map((row) => ({
+      value: row.value != null ? Number(row.value) : 0,
+      status: row.status,
+    }));
+
+  return {
+    count: countNonRejectedInstallments(installments),
+    total: sumNonRejectedValue(installments),
+  };
 }

@@ -171,4 +171,33 @@ describe('paymentInstallmentFromRow', () => {
     expect(result.workshopName).toBe('Guincho Rápido LTDA');
     expect(result.workshopCnpj).toBe('12.345.678/0001-90');
   });
+
+  it('mapeia maintenance_orders.status para maintenanceOrderStatus', () => {
+    const cancelled = paymentInstallmentFromRow(baseRow({
+      maintenance_orders: {
+        os_number: 'OS-9',
+        status: 'Cancelado',
+        budget_pdf_url: null,
+        approved_cost: 500,
+        workshops: null,
+        vehicles: null,
+        budget_reviewer: null,
+      },
+    }));
+    expect(cancelled.maintenanceOrderStatus).toBe('Cancelado');
+
+    const withoutStatus = paymentInstallmentFromRow(baseRow({
+      maintenance_orders: {
+        os_number: 'OS-9',
+        budget_pdf_url: null,
+        approved_cost: 500,
+        workshops: null,
+        vehicles: null,
+        budget_reviewer: null,
+      },
+    }));
+    expect(withoutStatus.maintenanceOrderStatus).toBeUndefined();
+
+    expect(paymentInstallmentFromRow(baseRow({ maintenance_orders: null })).maintenanceOrderStatus).toBeUndefined();
+  });
 });

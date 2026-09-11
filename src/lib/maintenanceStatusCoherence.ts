@@ -2,7 +2,12 @@ import type { BudgetStatus, MaintenanceStatus } from '../types/maintenance';
 
 export const BUDGET_AWAITING_DECISION_STATUSES: BudgetStatus[] = ['pendente', 'reaberto'];
 
-export const PAYABLE_MAINTENANCE_STATUSES: MaintenanceStatus[] = ['Concluído', 'Veículo retirado'];
+export const PAYABLE_MAINTENANCE_STATUSES: MaintenanceStatus[] = [
+  'Orçamento aprovado',
+  'Serviço em execução',
+  'Concluído',
+  'Veículo retirado',
+];
 
 export const BUDGET_GATED_STATUSES: MaintenanceStatus[] = [
   'Serviço em execução',

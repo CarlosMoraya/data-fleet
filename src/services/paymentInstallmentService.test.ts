@@ -16,7 +16,9 @@ import {
   approveMaintenancePaymentGroup,
   createExtraPaymentInstallmentsBatch,
   createPaymentInstallmentsBatch,
+  getMaintenanceOrderPaymentExposure,
   getPaymentInstallmentAuditors,
+  INSTALLMENT_SELECT,
   listApprovedOrdersForPayment,
   listPaymentInstallments,
 } from './paymentInstallmentService';
@@ -386,5 +388,49 @@ describe('listPaymentInstallments com filtro sourceType', () => {
     await listPaymentInstallments({ sourceType: 'extra_payment' });
 
     expect(query.eq).toHaveBeenCalledWith('source_type', 'extra_payment');
+  });
+});
+
+describe('INSTALLMENT_SELECT', () => {
+  it('traz o status operacional da OS no join de maintenance_orders', () => {
+    expect(INSTALLMENT_SELECT).toContain('maintenance_orders(os_number, status, budget_pdf_url');
+  });
+});
+
+describe('getMaintenanceOrderPaymentExposure', () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    fromMock.mockReset();
+  });
+
+  it('soma e conta só as parcelas não reprovadas da OS', async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValue({
+        data: [
+          { value: '400.00', status: 'pendente_aprovacao' },
+          { value: 600, status: 'aprovado' },
+          { value: 250, status: 'reprovado' },
+          { value: null, status: 'pago' },
+        ],
+        error: null,
+      }),
+    };
+    fromMock.mockReturnValue(query);
+
+    await expect(getMaintenanceOrderPaymentExposure('os-1')).resolves.toEqual({ count: 3, total: 1000 });
+    expect(fromMock).toHaveBeenCalledWith('payment_installments');
+    expect(query.select).toHaveBeenCalledWith('value, status');
+    expect(query.eq).toHaveBeenCalledWith('maintenance_order_id', 'os-1');
+  });
+
+  it('propaga o erro do Supabase', async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValue({ data: null, error: { message: 'boom' } }),
+    };
+    fromMock.mockReturnValue(query);
+
+    await expect(getMaintenanceOrderPaymentExposure('os-1')).rejects.toEqual({ message: 'boom' });
   });
 });

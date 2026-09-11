@@ -847,6 +847,72 @@ Iniciativa correta não pedida: acrescentou `\b` à regex (`/\bUtilizado\b/g`) p
 
 ---
 
+### #031 — 2026-09-11 · Pagamentos a partir da aprovação do orçamento — Etapa 6 (card de aprovação)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | componente de UI + teste |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`, via `scripts/plan-runner.mjs run 6`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | `MaintenancePaymentApprovalGroupCard.tsx` + `PaymentApprovalsTab.test.tsx` (existentes) |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim (3 cenários com entrada e saída literais) · `baseline` sim. JSX e imports ditados literalmente; o executor produziu o scaffolding dos 3 testes.
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não (só acrescentou) · portão_1a **sim** · ciclos 0 · regressões 0 · lacunas 0.
+
+**Verificação independente:** diff lido linha a linha, idêntico ao plano. Revisão adversarial dos testes: nenhuma asserção autoconfirmada ("Status da OS: Cancelado" não contém "OS cancelada"), ausências ancoradas em presença. **Controle negativo** executado pelo revisor: com `describeMaintenanceOrderPaymentSignal(undefined)` forçado no componente, 2 dos 3 testes novos falham; arquivo restaurado.
+
+**Veredito:** aprovado sem correções.
+
+---
+
+### #032 — 2026-09-11 · Pagamentos a partir da aprovação do orçamento — Etapa 7 (coluna Status do ledger)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | edição em arquivo existente + teste |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`, via `scripts/plan-runner.mjs run 7`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | `PaymentsTab.tsx` + `PaymentsTab.test.tsx` (existentes) |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim (4 cenários) · `baseline` sim. O plano foi rebaseado antes do disparo: o commit paralelo `891afdd` havia movido `STATUS_LABELS` para `paymentStatusDisplay.ts`, e o trecho literal da célula foi corrigido no `IMPLEMENTATION.md` com "Nota de rebase". Sem o rebase, o trecho ditado não casaria com o arquivo — teria sido **falha do plano**.
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não · portão_1a **sim** · ciclos 0 · regressões 0 · lacunas 0.
+
+**Verificação independente:** diff idêntico ao plano, inclusive a posição alfabética do import. **Controle negativo** no ramo mais sutil: forçando `sourceType = 'maintenance_order'`, o cenário "não sinaliza parcela de Pagamento Extra" (fixture com `Cancelado` numa parcela Extra) falha; arquivo restaurado.
+
+**Veredito:** aprovado sem correções.
+
+---
+
+### #033 — 2026-09-11 · Pagamentos a partir da aprovação do orçamento — Etapa 8 (aviso no cancelamento de OS)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | integração de página + teste (arquivo novo) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`, via `scripts/plan-runner.mjs run 8`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | `src/pages/Maintenance.tsx` (existente, ~1.000 linhas, em produção) + `Maintenance.cancelPaymentWarning.test.tsx` (novo) |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim (5 cenários) · `baseline` sim, com o desvio de lint +1 previsto e justificado no plano. Mocks tipados ditados pelo plano (lição do #026).
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não · portão_1a **sim contra os valores esperados** — o runner marcou "REPROVADA" só pelo lint 264, que é o desvio previsto; o revisor confirmou que o warning extra é exatamente o `rules-of-hooks` do `useQuery` novo (24 no arquivo, nenhum outro) · ciclos 0 · regressões 0 · lacunas 0.
+
+**Verificação independente:** diff de `Maintenance.tsx` idêntico ao plano byte a byte; os 4 testes antigos de `Maintenance.*` seguem verdes. **Falha do plano encontrada na revisão:** a garantia Fail Closed (botão desabilitado enquanto a verificação carrega) não tinha cenário de teste — exatamente a lacuna ação × estado registrada no #024. O revisor acrescentou o 6º cenário ("bloqueia a confirmação enquanto verifica as parcelas") e rodou o **controle negativo**: removendo `|| cancelExposureQuery.isLoading`, só o cenário novo falha; arquivo restaurado.
+
+**Veredito:** aprovado. Atribuição: **falha do plano** (cenário ausente), não do modelo.
+
+---
+
 ## 9. Sumário por combinação
 
 Atualizar a cada registro novo.
@@ -860,18 +926,23 @@ Atualizar a cada registro novo.
 | Supervisionado | edição em arquivo existente + integração | codex / `gpt-5.6-sol` (high) | 2 | 1/2 | 0,5 | 0 |
 | Supervisionado | edição em arquivo existente | codex / `gpt-5.6-sol` (high) | 3 | 3/3 | 0 | 0 |
 | Supervisionado / transcrição | migration (SQL literal) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 4 | 4/4 | 0 | 0 |
-| Delegável | arquivo novo + teste | opencode / `big-pickle` **(gratuito)** | 4 | 4/4 | 0 | 0 |
-| Supervisionado | edição em arquivo existente | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | **5** | 4/5⁴ | 0 | 0 |
+| Delegável | arquivo novo + teste | opencode / `big-pickle` **(gratuito)** | 5 | 5/5 | 0 | 0 |
+| Supervisionado | edição em arquivo existente | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | **7** | 6/7⁴ | 0 | 0 |
 | Supervisionado | integração de página | codex / `gpt-5.6-luna` (medium) | 1 | 0/1¹ | 0 | 0 |
 | Supervisionado | teste (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 2² | 0 |
 | Delegável | teste (arquivo novo, mock de página) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 2 | 1/2⁵ | 0 | 0 |
-| Supervisionado / transcrição | edição de teste E2E | opencode / `big-pickle` **(gratuito)** | 1 | 1/1 | 0 | 0 |
+| Supervisionado / transcrição | edição de teste E2E | opencode / `big-pickle` **(gratuito)** | 2 | 2/2 | 0 | 0 |
+| Supervisionado | componente de UI + teste | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 0 | 0 |
+| Supervisionado | integração de página + teste (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1⁶ | 0 | 0 |
 
 ¹ Reprovou o portão por 2 warnings de `import/order`, resolvidos por `eslint --fix`; nenhuma falha de modelo.
 ² Os 2 ciclos foram indisponibilidade de provedor (`grok-code`) e falha do plano, não do modelo.
 ³ A única reprovação foi 1 warning de `import/order` resolvido por `eslint --fix` (registro #018); nenhuma falha de modelo.
 ⁴ As duas reprovações foram 1 warning de `import/order` e 1 de `classnames-order`, ambos resolvidos por `eslint --fix`; o segundo estava no JSX ditado literalmente pelo plano. Nenhuma falha de modelo.
 ⁵ A reprovação foram 8 warnings de `no-explicit-any` decorrentes de o plano não ter tipado o espião do mock (registro #026); nenhuma falha de modelo.
+⁶ O runner marcou reprovação só pelo +1 de lint previsto no plano (registro #033); contra os valores esperados, passou na 1ª vez. A falha do #033 foi do plano (cenário Fail Closed ausente), acrescentado pelo revisor.
+
+**Atualização (2026-09-11):** o sumário passou a incluir #028–#030 (sessão "Pago → Lançado no sistema", que registrou mas não atualizou esta tabela) e #031–#033. "Supervisionado / edição em arquivo existente" com `muse-spark-1.2-contributor-free` chega a **7 registros, 0 falhas de modelo**. Nas três etapas de 2026-09-11 (#031–#033) os controles negativos do revisor confirmaram que os testes escritos pelo executor detectam a remoção do comportamento.
 
 **Estado atual (2026-09-09): três combinações atingiram autoridade estatística.** "Supervisionado / edição em arquivo existente" com `muse-spark-1.2-contributor-free` chegou a **5 registros** — nessa combinação o histórico manda e o benchmark é ignorado. Ela inclui duas integrações de página em produção no mesmo arquivo (`WorkshopSchedules.tsx`, registros #020 e #025), ambas **sem uma única correção**.
 

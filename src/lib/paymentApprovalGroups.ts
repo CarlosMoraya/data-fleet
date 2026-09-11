@@ -1,3 +1,4 @@
+import type { MaintenanceStatus } from '../types/maintenance';
 import type { PaymentInstallment } from '../types/payment';
 
 export interface MaintenancePaymentApprovalGroup {
@@ -8,6 +9,7 @@ export interface MaintenancePaymentApprovalGroup {
   workshopCnpj?: string;
   budgetPdfUrl?: string;
   approvedCost: number;
+  maintenanceOrderStatus?: MaintenanceStatus;
   totalPending: number;
   installmentCount: number;
   installments: PaymentInstallment[];
@@ -44,6 +46,7 @@ function buildMaintenancePaymentGroup(
     workshopCnpj: first.workshopCnpj,
     budgetPdfUrl: first.budgetPdfUrl,
     approvedCost: first.maintenanceOrderApprovedCost ?? 0,
+    maintenanceOrderStatus: first.maintenanceOrderStatus,
     totalPending: totalPendingCents / 100,
     installmentCount: sorted.length,
     installments: sorted,

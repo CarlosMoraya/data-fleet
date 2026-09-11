@@ -5,6 +5,7 @@ import {
   canAdvanceMaintenanceStatus,
   describeStatusBlockReason,
   isOrderPayable,
+  PAYABLE_MAINTENANCE_STATUSES,
 } from './maintenanceStatusCoherence';
 
 describe('canAdvanceMaintenanceStatus', () => {
@@ -43,12 +44,26 @@ describe('canAdvanceMaintenanceStatus', () => {
 });
 
 describe('isOrderPayable', () => {
-  it('só considera pagáveis Concluído e Veículo retirado com orçamento aprovado', () => {
+  it('considera pagáveis os quatro status a partir da aprovação do orçamento', () => {
+    expect(isOrderPayable('Orçamento aprovado', 'aprovado')).toBe(true);
+    expect(isOrderPayable('Serviço em execução', 'aprovado')).toBe(true);
     expect(isOrderPayable('Concluído', 'aprovado')).toBe(true);
     expect(isOrderPayable('Veículo retirado', 'aprovado')).toBe(true);
+  });
+
+  it('recusa Cancelado e os status anteriores à aprovação mesmo com orçamento aprovado', () => {
     expect(isOrderPayable('Cancelado', 'aprovado')).toBe(false);
-    expect(isOrderPayable('Serviço em execução', 'aprovado')).toBe(false);
-    expect(isOrderPayable('Orçamento aprovado', 'aprovado')).toBe(false);
+    expect(isOrderPayable('Aguardando orçamento', 'aprovado')).toBe(false);
+    expect(isOrderPayable('Aguardando aprovação', 'aprovado')).toBe(false);
+  });
+
+  it('fixa a lista de status pagáveis na ordem do fluxo', () => {
+    expect(PAYABLE_MAINTENANCE_STATUSES).toEqual([
+      'Orçamento aprovado',
+      'Serviço em execução',
+      'Concluído',
+      'Veículo retirado',
+    ]);
   });
 
   it('recusa qualquer status quando o orçamento não está aprovado', () => {
@@ -65,6 +80,7 @@ describe('isOrderPayable', () => {
       expect(isOrderPayable(status, 'pendente')).toBe(false);
       expect(isOrderPayable(status, 'reprovado')).toBe(false);
       expect(isOrderPayable(status, 'sem_orcamento')).toBe(false);
+      expect(isOrderPayable(status, 'reaberto')).toBe(false);
     }
   });
 });
