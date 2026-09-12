@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import ChecklistDetailModal from '../components/ChecklistDetailModal';
 import ChecklistMapLink from '../components/ChecklistMapLink';
 import ChecklistAdherencePanel from '../components/checklists/ChecklistAdherencePanel';
+import SearchableSelect from '../components/common/SearchableSelect';
 import CreateActionPlanModal from '../components/CreateActionPlanModal';
 import DriverLoanNotifications from '../components/DriverLoanNotifications';
 import LastKmLabel from '../components/LastKmLabel';
@@ -40,6 +41,7 @@ import {
 } from '../lib/checklistAdherence';
 import { requiresHandoverEvidence, filterTemplatesByContext, filterAuditorVehiclesForContext, shouldCreateLoanOnHandover, getAvailableContextsForDriver, getFreeVehicleChoiceContexts } from '../lib/checklistContextRules';
 import { checklistFromRow, type ChecklistRow } from '../lib/checklistMappers';
+import { filterChecklistsByHistorySearch, filterVehiclesByPlate } from '../lib/checklistSearch';
 import { getChecklistStartBlockMessage, getTireInspectionStartBlockMessage } from '../lib/checklistStartGuard';
 import { templateFromRow, type ChecklistTemplateRow } from '../lib/checklistTemplateMappers';
 import {
@@ -351,7 +353,7 @@ export default function Checklists() {
   }, [isDriver, publishedTemplates, driverActiveLoan, selectedDriverVehicle]);
 
   // ── Queries for Auditor ───────────────────────────────────────────────────
-  const { data: auditorVehicles = [] } = useQuery({
+  const { data: auditorVehicles = [], isLoading: loadingAuditorVehicles } = useQuery({
     queryKey: ['auditorVehicles', currentClient?.id],
     queryFn: async () => {
       const { data } = await supabase
@@ -392,11 +394,29 @@ export default function Checklists() {
   const [selectedContext, setSelectedContext] = useSessionUiState<ChecklistContext | ''>(
     'checklists', 'selection', 'auditor-context', '',
   );
+  const [auditorVehicleSearch, setAuditorVehicleSearch] = useState('');
 
   const filteredAuditorVehicles = useMemo(
     () => filterAuditorVehiclesForContext({ vehicles: auditorVehicles, context: selectedContext || undefined, activeLoanVehicleIds }),
     [auditorVehicles, selectedContext, activeLoanVehicleIds],
   );
+
+  const searchableAuditorVehicles = useMemo(
+    () => filterVehiclesByPlate(filteredAuditorVehicles, auditorVehicleSearch),
+    [filteredAuditorVehicles, auditorVehicleSearch],
+  );
+
+  useEffect(() => {
+    if (!isFreeChoiceExecutor) return;
+    setAuditorVehicleSearch('');
+  }, [isFreeChoiceExecutor, selectedContext]);
+
+  useEffect(() => {
+    if (!isFreeChoiceExecutor || loadingAuditorVehicles) return;
+    if (selectedVehicleId && !filteredAuditorVehicles.some((vehicle) => vehicle.id === selectedVehicleId)) {
+      setSelectedVehicleId('');
+    }
+  }, [filteredAuditorVehicles, isFreeChoiceExecutor, loadingAuditorVehicles, selectedVehicleId, setSelectedVehicleId]);
 
   const selectedAuditorVehicle = useMemo(() =>
     auditorVehicles.find(v => v.id === selectedVehicleId),
@@ -1098,15 +1118,9 @@ export default function Checklists() {
     new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
   const filteredHistory = useMemo(() => {
-    return checklists.filter(c => {
-      if (historyStatusFilter !== 'all' && c.status !== historyStatusFilter) return false;
-      if (historySearch.trim()) {
-        const q = historySearch.toLowerCase();
-        if (!(c.templateName ?? '').toLowerCase().includes(q) && !(c.templateContext ?? '').toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
-  }, [checklists, historyStatusFilter, historySearch]);
+    const statusFiltered = checklists.filter(c => historyStatusFilter === 'all' || c.status === historyStatusFilter);
+    return filterChecklistsByHistorySearch(statusFiltered, historySearch, isFreeChoiceExecutor);
+  }, [checklists, historyStatusFilter, historySearch, isFreeChoiceExecutor]);
 
   const visibleChecklists = useMemo(
     () => checklists
@@ -1310,6 +1324,7 @@ export default function Checklists() {
             onView={setViewChecklist}
             formatDate={formatDate}
             loanDeliveryChecklistIds={loanDeliveryChecklistIds}
+            allowPlateSearch={false}
           />
 
           {isDriver && user?.id && <DriverLoanNotifications profileId={user.id} />}
@@ -1371,16 +1386,19 @@ export default function Checklists() {
 
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-500">Selecionar veículo</label>
-              <select
+              <SearchableSelect
+                ariaLabel="Veículo para vistoria"
+                placeholder="Digite a placa..."
+                emptyLabel="Nenhum veículo encontrado para esta busca."
                 value={selectedVehicleId}
-                onChange={e => setSelectedVehicleId(e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
-              >
-                <option value="">— Selecione um veículo —</option>
-                {filteredAuditorVehicles.map(v => (
-                  <option key={v.id} value={v.id}>{v.plate}{v.category ? ` (${v.category})` : ''}</option>
-                ))}
-              </select>
+                onChange={setSelectedVehicleId}
+                query={auditorVehicleSearch}
+                onQueryChange={setAuditorVehicleSearch}
+                options={searchableAuditorVehicles.map(v => ({
+                  value: v.id,
+                  label: `${v.plate ?? ''}${v.category ? ` (${v.category})` : ''}`,
+                }))}
+              />
             </div>
 
             {isAuditor && selectedAuditorVehicle && (
@@ -1503,6 +1521,7 @@ export default function Checklists() {
             onView={setViewChecklist}
             formatDate={formatDate}
             loanDeliveryChecklistIds={loanDeliveryChecklistIds}
+            allowPlateSearch={true}
           />
         </div>
       )}
@@ -2006,9 +2025,10 @@ interface HistoryCardProps {
   onView: (c: Checklist) => void;
   formatDate: (iso: string) => string;
   loanDeliveryChecklistIds: Set<string>;
+  allowPlateSearch: boolean;
 }
 
-function HistoryCard({ checklists, historySearch, setHistorySearch, historyStatusFilter, setHistoryStatusFilter, onView, formatDate, loanDeliveryChecklistIds }: HistoryCardProps) {
+function HistoryCard({ checklists, historySearch, setHistorySearch, historyStatusFilter, setHistoryStatusFilter, onView, formatDate, loanDeliveryChecklistIds, allowPlateSearch }: HistoryCardProps) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-5">
       <h2 className="mb-3 text-sm font-semibold text-zinc-700">Histórico</h2>
@@ -2020,7 +2040,8 @@ function HistoryCard({ checklists, historySearch, setHistorySearch, historyStatu
             type="text"
             value={historySearch}
             onChange={e => setHistorySearch(e.target.value)}
-            placeholder="Buscar por template ou contexto..."
+            aria-label="Buscar no histórico"
+            placeholder={allowPlateSearch ? 'Buscar por placa, template ou contexto...' : 'Buscar por template ou contexto...'}
             className="w-full rounded-lg border border-zinc-200 py-1.5 pr-3 pl-8 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
           />
         </div>

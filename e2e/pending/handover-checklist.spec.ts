@@ -35,7 +35,7 @@ test.describe('Checklists — contextos Entrega e Devolução (Yard Auditor)', (
   test('3. O dropdown de motoristas lista apenas motoristas sem veículo vinculado', async ({ page }) => {
     await page.goto('/checklists');
     await page.locator('select').first().selectOption({ label: 'Entrega' });
-    const driverSelect = page.locator('select').nth(2);
+    const driverSelect = page.locator('select').nth(1);
     await expect(driverSelect).toBeVisible({ timeout: 15000 });
   });
 

@@ -22,25 +22,25 @@ test.describe.serial('Inspeção de Pneus — Auditor (Carlos)', () => {
     await page.goto('/checklists');
     await page.waitForLoadState('networkidle');
 
-    // Auditor vê select de veículo (auditorVehicles)
-    const vehicleSelect = page.locator('select').first();
-    await expect(vehicleSelect).toBeVisible({ timeout: 15000 });
+    const vehicleCombobox = page.getByRole('combobox', { name: 'Veículo para vistoria' });
+    await expect(vehicleCombobox).toBeVisible({ timeout: 15000 });
   });
 
   test('A.3 Botão "Inspeção de Pneus" aparece após selecionar veículo', async ({ page }) => {
     await page.goto('/checklists');
     await page.waitForLoadState('networkidle');
 
-    const vehicleSelect = page.locator('select').first();
-    const optionCount = await vehicleSelect.locator('option').count();
+    const vehicleCombobox = page.getByRole('combobox', { name: 'Veículo para vistoria' });
+    await vehicleCombobox.click();
+    const vehicleOptions = page.getByRole('listbox', { name: 'Veículo para vistoria' }).getByRole('option');
+    const optionCount = await vehicleOptions.count();
 
-    if (optionCount < 2) {
+    if (optionCount < 1) {
       test.skip(true, 'Nenhum veículo disponível para Carlos — execute o seed primeiro');
       return;
     }
 
-    // Selecionar primeiro veículo disponível
-    await vehicleSelect.selectOption({ index: 1 });
+    await vehicleOptions.first().click();
     await page.waitForTimeout(500);
 
     // Botão de inspeção deve aparecer
@@ -54,15 +54,17 @@ test.describe.serial('Inspeção de Pneus — Auditor (Carlos)', () => {
     await page.goto('/checklists');
     await page.waitForLoadState('networkidle');
 
-    const vehicleSelect = page.locator('select').first();
-    const optionCount = await vehicleSelect.locator('option').count();
+    const vehicleCombobox = page.getByRole('combobox', { name: 'Veículo para vistoria' });
+    await vehicleCombobox.click();
+    const vehicleOptions = page.getByRole('listbox', { name: 'Veículo para vistoria' }).getByRole('option');
+    const optionCount = await vehicleOptions.count();
 
-    if (optionCount < 2) {
+    if (optionCount < 1) {
       test.skip(true, 'Nenhum veículo disponível para Carlos');
       return;
     }
 
-    await vehicleSelect.selectOption({ index: 1 });
+    await vehicleOptions.first().click();
     await page.waitForTimeout(500);
 
     const tireBtn = page.locator('button', { hasText: /Inspeção de Pneus/i }).first();
@@ -89,16 +91,18 @@ test.describe.serial('Inspeção de Pneus — Auditor (Carlos)', () => {
     await page.goto('/checklists');
     await page.waitForLoadState('networkidle');
 
-    const vehicleSelect = page.locator('select').first();
-    const optionCount = await vehicleSelect.locator('option').count();
+    const vehicleCombobox = page.getByRole('combobox', { name: 'Veículo para vistoria' });
+    await vehicleCombobox.click();
+    const vehicleOptions = page.getByRole('listbox', { name: 'Veículo para vistoria' }).getByRole('option');
+    const optionCount = await vehicleOptions.count();
 
-    if (optionCount < 2) {
+    if (optionCount < 1) {
       test.skip(true, 'Nenhum veículo disponível para Carlos');
       return;
     }
 
     // Obter texto da opção selecionada para comparar depois
-    await vehicleSelect.selectOption({ index: 1 });
+    await vehicleOptions.first().click();
     await page.waitForTimeout(500);
 
     const tireBtn = page.locator('button', { hasText: /Inspeção de Pneus/i }).first();
@@ -130,15 +134,17 @@ test.describe.serial('Inspeção de Pneus — Auditor (Carlos)', () => {
     await page.goto('/checklists');
     await page.waitForLoadState('networkidle');
 
-    const vehicleSelect = page.locator('select').first();
-    const optionCount = await vehicleSelect.locator('option').count();
+    const vehicleCombobox = page.getByRole('combobox', { name: 'Veículo para vistoria' });
+    await vehicleCombobox.click();
+    const vehicleOptions = page.getByRole('listbox', { name: 'Veículo para vistoria' }).getByRole('option');
+    const optionCount = await vehicleOptions.count();
 
-    if (optionCount < 2) {
+    if (optionCount < 1) {
       test.skip(true, 'Nenhum veículo disponível para Carlos');
       return;
     }
 
-    await vehicleSelect.selectOption({ index: 1 });
+    await vehicleOptions.first().click();
     await page.waitForTimeout(500);
 
     const tireBtn = page.locator('button', { hasText: /Inspeção de Pneus/i }).first();
@@ -171,15 +177,17 @@ test.describe.serial('Inspeção de Pneus — Auditor (Carlos)', () => {
     await page.goto('/checklists');
     await page.waitForLoadState('networkidle');
 
-    const vehicleSelect = page.locator('select').first();
-    const optionCount = await vehicleSelect.locator('option').count();
+    const vehicleCombobox = page.getByRole('combobox', { name: 'Veículo para vistoria' });
+    await vehicleCombobox.click();
+    const vehicleOptions = page.getByRole('listbox', { name: 'Veículo para vistoria' }).getByRole('option');
+    const optionCount = await vehicleOptions.count();
 
-    if (optionCount < 2) {
+    if (optionCount < 1) {
       test.skip(true, 'Nenhum veículo disponível para Carlos');
       return;
     }
 
-    await vehicleSelect.selectOption({ index: 1 });
+    await vehicleOptions.first().click();
     await page.waitForTimeout(500);
 
     const tireBtn = page.locator('button', { hasText: /Inspeção de Pneus/i }).first();
@@ -217,12 +225,12 @@ test.describe.serial('Inspeção de Pneus — Auditor (Carlos)', () => {
     await page.goto('/checklists');
     await page.waitForLoadState('networkidle');
 
-    const vehicleSelect = page.locator('select').first();
-    await expect(vehicleSelect).toBeVisible({ timeout: 15000 });
-
-    const optionCount = await vehicleSelect.locator('option').count();
+    const vehicleCombobox = page.getByRole('combobox', { name: 'Veículo para vistoria' });
+    await expect(vehicleCombobox).toBeVisible({ timeout: 15000 });
+    await vehicleCombobox.click();
+    const optionCount = await page.getByRole('listbox', { name: 'Veículo para vistoria' }).getByRole('option').count();
     // Auditor deve poder ver mais de 1 opção (ou zero se sem dados)
-    // Apenas verificar que o select está presente e acessível
+    // Apenas verificar que o combobox está presente e acessível
     expect(optionCount).toBeGreaterThanOrEqual(1);
   });
 

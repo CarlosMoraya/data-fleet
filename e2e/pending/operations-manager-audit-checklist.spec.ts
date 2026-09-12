@@ -35,7 +35,9 @@ test.describe.serial('Operations Manager — checklist de Auditoria por escopo',
     await page.goto('/checklists');
     await page.locator('select').first().selectOption({ label: 'Auditoria' });
 
-    const vehicleOptions = page.locator('select').nth(1).locator('option:not([value=""])');
+    const vehicleCombobox = page.getByRole('combobox', { name: 'Veículo para vistoria' });
+    await vehicleCombobox.click();
+    const vehicleOptions = page.getByRole('listbox', { name: 'Veículo para vistoria' }).getByRole('option');
     await expect.poll(() => vehicleOptions.count(), { timeout: 15000 }).toBeGreaterThan(0);
     const listedPlates = (await vehicleOptions.allTextContents())
       .map((label) => label.split(' (')[0].trim())
@@ -43,23 +45,29 @@ test.describe.serial('Operations Manager — checklist de Auditoria por escopo',
 
     expect(listedPlates.length).toBeGreaterThan(1);
     expect(listedPlates).toEqual(expectedPlates);
+
+    const expectedPlate = expectedPlates[0];
+    await vehicleCombobox.pressSequentially(expectedPlate);
+    await expect(vehicleOptions).toHaveCount(1);
+    await expect(vehicleOptions.first()).toContainText(expectedPlate);
   });
 
   test('inicia um template de Auditoria e navega para o preenchimento', async ({ page }) => {
     await page.goto('/checklists');
     await page.locator('select').first().selectOption({ label: 'Auditoria' });
 
-    const vehicleSelect = page.locator('select').nth(1);
-    await expect.poll(
-      () => vehicleSelect.locator('option:not([value=""])').count(),
-      { timeout: 15000 },
-    ).toBeGreaterThan(0);
-
     const startButton = page.getByRole('button', { name: 'Iniciar' }).first();
-    const vehicleOptionCount = await vehicleSelect.locator('option').count();
+    const vehicleCombobox = page.getByRole('combobox', { name: 'Veículo para vistoria' });
+    await vehicleCombobox.click();
+    const vehicleOptions = page.getByRole('listbox', { name: 'Veículo para vistoria' }).getByRole('option');
+    await expect.poll(() => vehicleOptions.count(), { timeout: 15000 }).toBeGreaterThan(0);
+    const vehicleOptionLabels = await vehicleOptions.allTextContents();
     let foundVehicleWithTemplate = false;
-    for (let index = 1; index < vehicleOptionCount; index += 1) {
-      await vehicleSelect.selectOption({ index });
+    for (const vehicleOptionLabel of vehicleOptionLabels) {
+      await vehicleCombobox.click();
+      await page.getByRole('listbox', { name: 'Veículo para vistoria' })
+        .getByRole('option', { name: vehicleOptionLabel, exact: true })
+        .click();
       try {
         await expect.poll(() => startButton.count(), { timeout: 3000 }).toBeGreaterThan(0);
         foundVehicleWithTemplate = true;
@@ -84,6 +92,9 @@ test.describe.serial('Operations Manager — checklist de Auditoria por escopo',
     const completedEntry = historyCard.locator('span').filter({ hasText: /^Concluído$/ }).first().locator('..');
 
     await expect(completedEntry.getByText(/Auditoria/).first()).toBeVisible({ timeout: 15000 });
+    const completedPlate = (await completedEntry.locator('p').nth(1).innerText()).split(' · ')[0].trim();
+    await page.getByRole('textbox', { name: 'Buscar no histórico' }).fill(completedPlate);
+    await expect(completedEntry).toBeVisible({ timeout: 15000 });
     await completedEntry.locator('button').click();
 
     const filledByField = page.getByText('Preenchido por', { exact: true }).first().locator('..');

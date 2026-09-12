@@ -195,11 +195,17 @@ test.describe.serial('Auditor checklist visibility', () => {
     await login(page, seed.auditorEmail, seed.auditorPassword);
     await expect(page).toHaveURL(/\/checklists/, { timeout: 15000 });
 
-    // 2. Selecionar veículo (categoria Leve) no dropdown "Iniciar Auditoria"
-    const vehicleSelect = page.locator('select', { has: page.getByText('— Selecione um veículo —') });
-    await vehicleSelect.waitFor({ state: 'visible', timeout: 10000 });
+    // 2. Selecionar veículo (categoria Leve) no combobox "Iniciar Auditoria"
+    await page.locator('select').first().selectOption({ label: 'Auditoria' });
+    const vehicleCombobox = page.getByRole('combobox', { name: 'Veículo para vistoria' });
+    await expect(vehicleCombobox).toBeVisible({ timeout: 10000 });
     const optionLabel = `${seed.vehiclePlate} (${AUDITOR_CATEGORY})`;
-    await vehicleSelect.selectOption({ label: optionLabel });
+    await vehicleCombobox.click();
+    await expect(page.getByRole('listbox', { name: 'Veículo para vistoria' })).toBeVisible();
+    await vehicleCombobox.pressSequentially(seed.vehiclePlate);
+    await page.getByRole('listbox', { name: 'Veículo para vistoria' })
+      .getByRole('option', { name: optionLabel, exact: true })
+      .click();
 
     // 3. Verifica que o template com contexto "Auditoria" aparece (RLS SELECT funcionando)
     await expect(page.getByText(seed.templateName, { exact: true })).toBeVisible({ timeout: 15000 });
@@ -216,7 +222,13 @@ test.describe.serial('Auditor checklist visibility', () => {
     await page.goto('/checklists');
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(/\/checklists/, { timeout: 15000 });
-    // Banner de checklist em andamento ou linha do histórico exibem o template
-    await expect(page.getByText(seed.templateName, { exact: true })).toBeVisible({ timeout: 15000 });
+    const historyCard = page.getByRole('heading', { name: 'Histórico' }).locator('..');
+    const historySearch = page.getByRole('textbox', { name: 'Buscar no histórico' });
+    await historySearch.fill(seed.vehiclePlate);
+    await expect(historyCard.getByText(seed.templateName, { exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(historyCard.getByText(seed.vehiclePlate, { exact: false })).toBeVisible();
+
+    await historySearch.fill('ZZZ000');
+    await expect(historyCard.getByText(seed.templateName, { exact: true })).not.toBeVisible();
   });
 });
