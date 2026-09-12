@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ROLES_CAN_CREATE_PAYMENTS,
   ROLE_RANK,
   canAccessRoute,
   canApproveExtraPayments,
   canApprovePayments,
   canCorrectOdometer,
   canCreateExtraPayments,
+  canCreatePayments,
   canDeleteUsers,
   canExportMaintenanceSpreadsheet,
   canFillCoupling,
@@ -15,6 +17,7 @@ import {
   canMarkPaid,
   canViewBudgetTab,
   canViewExtraPayments,
+  canViewPayments,
   getCreatableRoles,
   getDefaultRouteForRole,
   hasRoleAccess,
@@ -214,5 +217,44 @@ describe('canInactivateUsers', () => {
     expect(canInactivateUsers('Fleet Analyst')).toBe(false);
     expect(canInactivateUsers('Fleet Assistant')).toBe(false);
     expect(canInactivateUsers(undefined)).toBe(false);
+  });
+});
+
+describe('permissões do módulo de Pagamentos', () => {
+  // Decisão de 2026-09-12: a oficina cria parcela na própria OS. Ver
+  // docs/MEMORY.md, "Decisões Vigentes". NÃO remover 'Workshop' desta lista.
+  it('canCreatePayments inclui Workshop por decisão de 2026-09-12', () => {
+    expect(canCreatePayments('Workshop')).toBe(true);
+  });
+
+  it('canCreatePayments cobre exatamente os oito papéis previstos', () => {
+    expect(ROLES_CAN_CREATE_PAYMENTS).toEqual([
+      'Fleet Assistant',
+      'Fleet Analyst',
+      'Supervisor',
+      'Coordinator',
+      'Manager',
+      'Director',
+      'Admin Master',
+      'Workshop',
+    ]);
+  });
+
+  it('canCreatePayments exclui quem não lança pagamento', () => {
+    expect(canCreatePayments('Financeiro')).toBe(false);
+    expect(canCreatePayments('Driver')).toBe(false);
+    expect(canCreatePayments('Yard Auditor')).toBe(false);
+    expect(canCreatePayments('Operations Manager')).toBe(false);
+    expect(canCreatePayments('Coupling Agent')).toBe(false);
+    expect(canCreatePayments(undefined)).toBe(false);
+  });
+
+  it('canViewPayments inclui Workshop e Financeiro e exclui os papéis operacionais', () => {
+    expect(canViewPayments('Workshop')).toBe(true);
+    expect(canViewPayments('Financeiro')).toBe(true);
+    expect(canViewPayments('Driver')).toBe(false);
+    expect(canViewPayments('Yard Auditor')).toBe(false);
+    expect(canViewPayments('Coupling Agent')).toBe(false);
+    expect(canViewPayments(undefined)).toBe(false);
   });
 });

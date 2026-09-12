@@ -2,6 +2,30 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-09-12 (2ª): Pendências da sessão anterior — porta da oficina, diagnóstico das 4 políticas, redação do EXECUTORS.md
+
+**Pedido:** fechar as três pendências que a sessão de 2026-09-12 deixou registradas. Nenhuma delas era correção de bug.
+
+**O achado que mudou a decisão.** O registro de RISCO ACEITO sobre a porta de INSERT do papel `Workshop` justificava a aceitação com uma afirmação **falsa**: que a interface não oferecia criação de parcela à oficina, porque `ROLES_CAN_CREATE_PAYMENTS` não incluiria o papel. Ele inclui (`src/lib/rolePermissions.ts:122-131`), e o caminho está inteiro aberto na tela — menu → `/financeiro` → aba Pagamentos → botão "Cadastrar Pagamento", mais o botão de editar parcela pendente. Medido em PROD: **33 contas de oficina ativas** e **1 parcela de 150** criada por conta de oficina (R$ 346,00, "Oficina do Moraya", OS-2606-1298, 2026-08-05, pendente até hoje). Descoberto também que fechar só o INSERT seria fechar um quarto da porta: a oficina tem `UPDATE` e `DELETE` sobre parcela pendente das OS dela, inclusive parcela criada pela equipe do cliente.
+
+**Decisão do usuário: a porta é funcionalidade e fica aberta.** Apresentados ganhos, perdas e riscos, o usuário escolheu não fechar — a oficina informa o parcelamento da própria OS e o Coordenador aprova. Nenhuma migration nesta sessão. O registro do `MEMORY.md` deixou de ser RISCO ACEITO e virou decisão vigente, agora com os fatos medidos no lugar da afirmação errada, e a `SPEC.md` passou a documentar que a assimetria com `extra_payment_requests_insert` (que exclui `Workshop`) é intencional — com a instrução explícita de que um agente futuro **não deve uniformizar as duas**.
+
+**O diagnóstico ganhou uma segunda camada.** `check-payment-installment-insert-status.sql` foi substituído por `check-payment-installment-policies.sql`, que cobre as quatro políticas em 10 seções. Além das sondas de cláusula — que dizem *o que* sumiu —, entrou a **impressão digital**: o `md5` das oito expressões (`USING` e `WITH CHECK` de cada policy), medidos em 2026-09-12 e **byte a byte idênticos em DEV e PROD**. A razão é uma limitação real do método anterior: substring presente na expressão não prova cláusula no ramo certo. Duas invariantes novas passaram a ser verificadas: que `USING` e `WITH CHECK` do UPDATE são idênticos (um `WITH CHECK` mais frouxo permitiria mover parcela para outro `client_id`) e que a cláusula `status = 'pendente_aprovacao'` continua no ramo `Workshop` do DELETE (sem ela a oficina apaga parcela aprovada ou paga, e nenhum teste acusa).
+
+**O controle negativo é o critério de aceitação, não a suíte verde.** A seção 10 roda as mesmas sondas contra `extra_payment_requests` e exige `3 · f · f · t`. Passou nos dois bancos — as sondas sabem devolver `false`. Sem isso o arquivo seria inválido, por relatar conformidade que não verificou.
+
+**`docs/EXECUTORS.md` não tinha erro factual.** A apuração desmentiu a premissa do pedido: a palavra "indisponível" estava em coluna cujo cabeçalho é **AAII** e falava da nota ausente do índice, não do modelo ausente do parque — `opencode models` lista o `muse-spark-1.2-contributor-free` normalmente (reconfirmado em 2026-09-12). O defeito era **ambiguidade de redação**, que já havia produzido uma leitura errada registrada no #047. Corrigidas as duas tabelas, acrescentada a nota canônica "ausente do índice ≠ ausente do parque", e corrigida a observação do #047. `docs/model-cache.md` **não foi tocado** — a recoleta vence em 2026-10-11.
+
+**Cobertura nova.** `canCreatePayments` e `canViewPayments` não tinham um único teste. Entraram 4 testes unitários que travam a lista de oito papéis por igualdade de array — pega acréscimo e remoção —, com comentário apontando para a decisão. Era o que faltava para a decisão de hoje não se desfazer em silêncio.
+
+**Validações:** diagnóstico 10/10 seções conformes em **DEV e PROD**, controle negativo `3 · f · f · t` nos dois; portão tsc 0, lint 0 erros/264 warnings, unitários 2.413/2.413 em 258 arquivos (+4), smoke 7/7. Escopo conferido contra snapshot de 118 caminhos sujos: 8 arquivos alterados, todos dentro do manifesto.
+
+**Execução:** Etapas 2, 3 e 4 pelo agente planejador; Etapa 1 (diagnóstico) delegada ao Tier C — registro #048, 2 correções do revisor, **ambas atribuídas ao plano**, zero falhas de modelo.
+
+**Ficou fora, deliberadamente:** a parcela de R$ 346,00 pendente desde 2026-08-05 continua sem decisão (aprovar, reprovar ou cancelar) — é decisão do usuário. E `SELECT`/`UPDATE`/`DELETE` seguem sem verificação de **comportamento**: o E2E existente cobre só o INSERT, autenticando como Fleet Assistant.
+
+---
+
 ## Sessão — 2026-09-12: Pagamentos — fechar a escalação de `status` no INSERT de parcelas
 
 **Pedido:** corrigir o débito técnico de PRIORIDADE ALTA registrado em `docs/MEMORY.md` — `status` não era validado na criação de `payment_installments`.
@@ -14,7 +38,7 @@ Este documento preserva o histórico de evolução do projeto **βetaFleet** e a
 
 **A brecha foi reproduzida ao vivo.** O E2E foi escrito e executado **antes** da migration: o caso 01 falhou porque `res.error` veio `null` — o Fleet Assistant conseguiu criar, pela API, uma parcela já `aprovado` em DEV. Depois da migration, os 4 casos passam. É a evidência antes/depois que o diagnóstico estrutural sozinho não consegue dar, porque pelo SQL Editor o `service_role` ignora RLS.
 
-**Validações:** diagnóstico estrutural (`supabase/diagnostics/check-payment-installment-insert-status.sql`) com 15/15 cláusulas em `t`, 3 gatilhos e 0 parcelas históricas fora do pendente, **em DEV e em PROD**; E2E `4/4` em DEV; portão tsc 0, lint 0 erros/264 warnings, unitários 2.409/2.409 em 258 arquivos, smoke 7/7. O diagnóstico foi validado contra a tabela irmã antes de ser usado — detecta `true` onde a cláusula existe e `false` onde não existe.
+**Validações:** diagnóstico estrutural (`supabase/diagnostics/check-payment-installment-policies.sql`) com 15/15 cláusulas em `t`, 3 gatilhos e 0 parcelas históricas fora do pendente, **em DEV e em PROD**; E2E `4/4` em DEV; portão tsc 0, lint 0 erros/264 warnings, unitários 2.409/2.409 em 258 arquivos, smoke 7/7. O diagnóstico foi validado contra a tabela irmã antes de ser usado — detecta `true` onde a cláusula existe e `false` onde não existe.
 
 **Execução:** etapas 1, 2, 4 e 5 pelo agente planejador; etapa 3 (E2E) delegada ao `muse-spark-1.3-contributor-free` em estreia disciplinada — registro #047, com 2 correções do revisor, uma atribuída ao plano e outra ao modelo.
 

@@ -260,12 +260,14 @@ Apresente a classificação antes de qualquer proposta:
 
 Correção de bug **não** tem o mesmo perfil de uma evolução. Enquanto uma evolução costuma criar arquivos novos, uma correção é quase sempre **edição cirúrgica dentro de arquivo existente**, sujeita à Regra 5 (preservar comportamento adjacente). Isso muda o default.
 
-| Tipo do bug | Classe padrão | Executor |
-|---|---|---|
-| **Tipo A** — isolado | Supervisionado | Tier B |
-| **Tipo B** — com dependências | Supervisionado | Tier A ou B |
-| **Tipo C** — sistêmico | Não delegável | Você escreve |
-| **Tipo D** — regressão | Não delegável | Você escreve |
+| Tipo do bug | Classe padrão | Grau | AAII mínimo | Executor |
+|---|---|---|---|---|
+| **Tipo A** — isolado | Supervisionado | S1 ou S2 | **35** / **38** | Tier B |
+| **Tipo B** — com dependências | Supervisionado | S2 ou S3 | **38** / **45** | Tier A ou B |
+| **Tipo C** — sistêmico | Não delegável | N | sem piso | Você escreve |
+| **Tipo D** — regressão | Não delegável | N | sem piso | Você escreve |
+
+> **Piso mínimo de qualquer passo delegado de correção: 35 (S1).** Correção de bug tem `Supervisionado` como default, então os graus D1 e D2 só aparecem em passo que **cria arquivo novo** (um teste de regressão, por exemplo) — nunca no passo que contém a correção em si.
 
 **`Delegável` é exceção, não regra.** Uma correção só pode ser marcada `Delegável` quando as três condições valerem ao mesmo tempo:
 
@@ -274,6 +276,22 @@ Correção de bug **não** tem o mesmo perfil de uma evolução. Enquanto uma ev
 3. Nenhum outro módulo depende do comportamento alterado — comprovado no mapeamento de dependências
 
 Faltando qualquer uma, é `Supervisionado`. Na dúvida entre duas classes, **suba** para a mais restritiva.
+
+### A máxima: qualidade com o melhor custo-benefício
+
+*(regra do usuário, 2026-09-08 — detalhamento em `docs/MODEL_SELECTION.md`, Passos 4.1 e 4.2)*
+
+**`Não delegável` protege a decisão, não a digitação.** Vale também em correção de bug: se o `IMPLEMENTATION_FIXBUG.md` já traz o trecho corrigido **literal e completo**, o executor não precisa abrir outro arquivo, e existe verificação mecânica do resultado, rebaixe para `Supervisionado / transcrição` com revisão linha a linha.
+
+**Mas o default restritivo desta sessão continua valendo, e vence em caso de conflito.** Correção de bug tem duas particularidades que quase sempre impedem o rebaixamento: a correção costuma ser **inserção em código existente** (merge, não cópia), e o passo carrega a verificação anti-alteração de teste, que é julgamento e não mecânica. Na prática, o rebaixamento só cabe quando o passo cria arquivo novo — um teste de regressão isolado, por exemplo.
+
+**Nunca rebaixe** bug com implicação de segurança, RLS, autenticação ou dado sensível: é `Não delegável` de forma inegociável, independentemente de o código estar literal no documento.
+
+**Estreia de executor sem histórico** segue as regras do Passo 4.2 do `MODEL_SELECTION.md` — que a permitem **apenas em grau D1 ou D2**. Em correção de bug isso restringe a estreia a passos que **criam arquivo novo** (tipicamente o teste de regressão). Nunca estreie executor no passo que contém a correção em si.
+
+### A execução é verificada por script
+
+`scripts/plan-runner.mjs` faz a parte mecânica: dispara o executor, destila o log, compara `git status` com o manifesto e roda o portão contra o baseline. Rode `snapshot` uma vez antes do primeiro passo. Em correção de bug, o alerta mais importante que ele dá é o de **arquivo fora do manifesto** — é o sinal de que o executor tocou um teste pré-existente, o que esta sessão proíbe.
 
 ### Armadilha específica de correção de bug
 
@@ -446,8 +464,8 @@ Antes de implementar, leia:
 
 [Tabela produzida pelo protocolo de `docs/MODEL_SELECTION.md`. Lembre-se: em correção de bug o default é `Supervisionado`.]
 
-| Passo | Classe | Forma | Tier | Executor | Revisão | Quem dispara |
-|---|---|---|---|---|---|---|
+| Passo | Classe | Grau | Forma | AAII mín. | Tier | Executor | Revisão | Quem dispara |
+|---|---|---|---|---|---|---|---|---|
 
 ## O que NÃO fazer — restrições absolutas
 - Não modificar [arquivo X] — [razão]
@@ -571,8 +589,15 @@ Arquivos que serão modificados: [lista]
 Arquivos que NÃO serão tocados: [lista dos adjacentes mapeados]
 Garantia de não-regressão: [como a correção preserva os comportamentos adjacentes]
 
-Para implementar, abra uma nova sessão com o agente de código da sua escolha e diga:
-'Leia agent/AGENT.md e IMPLEMENTATION_FIXBUG.md. Implemente a correção especificada — não tome nenhuma decisão além do que está documentado.'"
+Você não executa nada. Eu sou o planejador, o orquestrador e o revisor: eu disparo todos os agentes, leio os logs, reexecuto as verificações contra o baseline e confiro o git status contra o manifesto.
+
+Ordem de disparo que eu vou seguir, por importância e dependência:
+1. [passo] → [executor] — [por quê nesta posição]
+2. [passo] → [executor] — [...]
+
+Me dê o comando para começar e eu executo a sequência inteira, parando apenas se um critério de conclusão falhar ou se algo não previsto no plano aparecer."
+
+**Modelo de execução — regra fixa desta sessão e das seguintes:** o usuário **não roda comandos, não dispara agentes e não executa código**. Nunca ofereça a ele o comando "para rodar no terminal", nunca sugira abrir sessão com outro agente, e nunca atribua execução a ele na coluna "Quem dispara". A regra canônica está em `agent/AGENT.md` §4 e prevalece sobre qualquer texto em contrário.
 
 ---
 
@@ -617,10 +642,10 @@ Após criar o IMPLEMENTATION_FIXBUG.md, execute integralmente o protocolo de `do
 
 Siga a Seção 3 (Como usar) do `docs/MODEL_SELECTION.md`, nesta ordem:
 
-1. **Ordem de consulta.** Primeiro `EXECUTOR-TRACK-RECORD.md` (desempenho real nesta combinação), depois `EXECUTORS.md` (o que existe e com qual comando), e só então `model-cache.md` (benchmark, **apenas para aptidão**). Nunca acesse a web se os três locais bastarem.
+1. **Ordem de consulta — duas camadas.** Camada 1: `EXECUTOR-TRACK-RECORD.md` (desempenho real nesta combinação), preferindo **modelo gratuito** e, na falta dele, o **mais barato entre os já assinados**. Camada 2, só quando o histórico não resolver: `model-cache.md` (**AAII**, a única métrica de benchmark do projeto). O `EXECUTORS.md` **não é camada de decisão** — é o tradutor de tier → ferramenta + comando. Nunca acesse a web se os arquivos locais bastarem.
 2. **Classifique cada passo da correção** com o default restritivo desta sessão: Tipo A e B nascem `Supervisionado`; Tipo C e D nascem `Não delegável`. `Delegável` é exceção e exige as três condições da seção "Delegação da execução".
 3. **Verifique as condições da spec** — manifesto, teste de regressão com assertiva literal, baseline. Faltando qualquer um, rebaixe o passo.
-4. **Selecione por custo real**, na ordem: custo zero absoluto → custo marginal zero → custo por token. Aplique a regra anti-overkill e a regra do teto de saída.
+4. **Selecione por custo real**, na ordem: **gratuito** (custo zero absoluto) → **mais barato entre os já assinados** → custo por token. Só entram modelos que **alcançam o piso de AAII do grau**. Aplique a regra anti-overkill e a regra do teto de saída.
 5. **Defina a profundidade de revisão** pela tabela do Passo 5. Em correção de bug, some sempre a verificação anti-alteração de teste — ela é obrigatória em qualquer tier.
 6. **Produza a saída EXATAMENTE no formato do Passo 6** do `docs/MODEL_SELECTION.md`.
 
@@ -629,8 +654,9 @@ Regras de redação:
 - Inclua o **comando pronto** de cada passo, copiado literalmente do `docs/EXECUTORS.md`.
 - A justificativa deve citar o **tipo específico do bug** (visual, API, regra de negócio, query, race condition, segurança) e a camada afetada.
 - A justificativa deve citar a evidência usada: registro do track record, benchmark específico do cache, ou **declaração explícita de amostra insuficiente**.
-- Preço `$/M` **não é critério** neste projeto. O usuário não paga por token em nenhuma ferramenta.
-- Se um modelo não tiver benchmark público (caso da maioria dos gratuitos), diga isso. **Nunca invente métrica.**
+- Preço `$/M` **não é orçamento** — mas é **desempate legítimo**: entre modelos que alcançam o piso, prefira o gratuito; na falta dele, o mais barato entre os já assinados.
+- Se um modelo não tiver AAII, **diga isso explicitamente** e sustente a escolha no histórico. Nunca invente métrica nem herde nota de versão vizinha.
+- A justificativa deve **declarar o piso de AAII do grau**, mesmo quando a escolha vier do histórico.
 - Bug com implicação de segurança, RLS, autenticação ou dado sensível é **sempre** `Não delegável`, independentemente do Tipo A-D.
 
 Responda sempre em português do Brasil.

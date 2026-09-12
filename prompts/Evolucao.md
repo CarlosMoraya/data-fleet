@@ -25,7 +25,7 @@ docs/
   MEMORY.md              → estado atual — máximo uma página
   MEMORY-HISTORY.md      → histórico completo de sessões
   MODEL_SELECTION.md     → protocolo de escolha de executor por etapa
-  model-cache.md         → cache de benchmarks públicos
+  model-cache.md         → snapshot do Artificial Analysis (AAII) + pisos por grau
   EXECUTORS.md           → parque de agentes de código e comandos de invocação
   EXECUTOR-TRACK-RECORD.md → histórico empírico de desempenho dos executores
 
@@ -387,6 +387,26 @@ Para cada etapa do plano, atribua uma classe:
 
 Na dúvida entre duas classes, **suba** para a mais restritiva.
 
+### A máxima: qualidade com o melhor custo-benefício
+
+*(regra do usuário, 2026-09-08 — detalhamento completo em `docs/MODEL_SELECTION.md`, Passos 4.1 e 4.2)*
+
+**`Não delegável` protege a decisão, não a digitação.** Depois de escrever as etapas, percorra cada `Não delegável` e pergunte: *o executor precisaria decidir algo, ou só copiar do que já está neste documento?*
+
+Se o artefato está **literal e completo** no plano, o executor não precisa abrir outro arquivo, e existe verificação mecânica do resultado (consulta SQL estrutural, contagem de policies, teste com assertiva literal), então **rebaixe para `Supervisionado / transcrição`** com revisão linha a linha. Manter em `Não delegável` por hábito queima o recurso mais caro do fluxo à toa.
+
+**Mantenha em `Não delegável`** só quando o artefato precisar ser **fundido** com código existente — ler arquivo, inserir em posição específica, preservar o resto —, quando houver **armadilha de falha silenciosa** (erro que não quebra teste nenhum e desliga uma garantia de segurança), ou quando for correção de dado em produção.
+
+**Estrear executor sem histórico é comportamento desejado, não risco.** Benchmark é indício; o `EXECUTOR-TRACK-RECORD.md` só sai do zero se alguém rodar os modelos. Prefira quem **atende ao piso de AAII do grau da etapa** (tabela em `docs/MODEL_SELECTION.md`, Passo 4, e em `docs/model-cache.md`). **Estreia só é permitida em grau D1 ou D2** — nunca em S1, S2, S3 ou N, e nunca em fronteira de tenant/auth/RLS ou migration com dado real. Uma estreia por plano, para que a falha seja atribuível. Registro no track record é obrigatório: sem ele, o risco foi corrido e o aprendizado perdido.
+
+> **Revisto em 2026-09-11:** a regra anterior admitia "um pouco abaixo da barra ... com revisão linha a linha". Saiu. Era um atalho para usar modelo abaixo do piso, e com o parque atual é desnecessário — há gratuito que alcança todos os graus. **Modelo abaixo do piso do grau não entra.**
+
+### A execução é verificada por script, não por leitura de log
+
+`scripts/plan-runner.mjs` faz a parte mecânica sem gastar tokens: dispara o executor, destila o log, compara `git status` com o manifesto da etapa, roda o portão e compara com o baseline. Rode `snapshot` uma vez antes da primeira etapa — sem ele a checagem de escopo é ruído, porque o repositório carrega mais de 100 arquivos sujos sem relação com o plano.
+
+O `IMPLEMENTATION.md` DEVE trazer o manifesto e o baseline em formato que permita gerar `scripts/plan-runner.config.json`. Portão verde **não é aprovação** — é permissão para começar a revisão de verdade.
+
 ### Pré-requisito: uma etapa só é Delegável se a especificação permitir
 
 Uma etapa **não pode** ser marcada `Delegável` — por mais simples que pareça — se faltar qualquer um destes três:
@@ -596,8 +616,8 @@ test:smoke   : [N]/[N]
 
 [Tabela produzida pelo protocolo de `docs/MODEL_SELECTION.md`. Ver seção "Sugestão de executor" ao final deste prompt.]
 
-| Etapa | Classe | Forma | Tier | Executor | Revisão | Quem dispara |
-|---|---|---|---|---|---|---|
+| Etapa | Classe | Grau | Forma | AAII mín. | Tier | Executor | Revisão | Quem dispara |
+|---|---|---|---|---|---|---|---|---|
 
 ## Restrições absolutas — o que NÃO fazer
 [Lista explícita e sem ambiguidade:]
@@ -611,6 +631,8 @@ test:smoke   : [N]/[N]
 ### Etapa 1 — [nome descritivo]
 
 **Classe:** [Delegável / Supervisionado / Não delegável]
+**Grau:** [D1 · D2 · S1 · S2 · S3 · N]
+**AAII mínimo:** [piso do grau, ou "sem piso" para N]
 **Forma:** [lógica pura · componente de UI · edição em arquivo existente · migration · integração externa · teste · configuração]
 **Camada:** [frontend · backend · database · infra]
 
@@ -716,12 +738,20 @@ Após gerar o arquivo, apresente um resumo:
 
 Distribuição de execução: [resumo em uma linha — quais etapas vão para modelo gratuito, quais exigem supervisão, quais eu escrevo].
 
-Para as etapas Delegáveis, o comando está pronto no documento — você pode rodar direto no terminal e me chamar só na revisão. Para as Supervisionadas, eu disparo e leio o diff. Para as Não delegáveis, eu escrevo.
+Você não executa nada. Eu sou o planejador, o orquestrador e o revisor: eu disparo todos os agentes, leio os logs, reexecuto as verificações contra o baseline e confiro o git status contra o manifesto.
 
-Se preferir executar tudo manualmente, abra uma nova sessão com o agente de código da sua escolha e diga:
-'Leia agent/AGENT.md e IMPLEMENTATION.md. Implemente exatamente o que está especificado — não tome decisões além do que está documentado.'
+Ordem de disparo que eu vou seguir, por importância e dependência:
+1. [etapa] → [executor] — [por quê nesta posição]
+2. [etapa] → [executor] — [...]
+[...]
+
+Suas três decisões continuam sendo só estas: aplicar migration em DEV e PROD, publicar Edge Function, e commitar.
+
+Me dê o comando para começar e eu executo a sequência inteira, parando apenas se um critério de conclusão falhar ou se algo não previsto no plano aparecer.
 
 Este arquivo substitui o IMPLEMENTATION.md anterior. O histórico será registrado no MEMORY-HISTORY.md após a implementação."
+
+**Modelo de execução — regra fixa desta sessão e das seguintes:** o usuário **não roda comandos, não dispara agentes e não executa código**. Nunca ofereça a ele o comando "para rodar no terminal", nunca sugira abrir sessão com outro agente, e nunca atribua execução a ele na coluna "Quem dispara". A regra canônica está em `agent/AGENT.md` §4 e prevalece sobre qualquer texto em contrário.
 
 ---
 
@@ -742,6 +772,7 @@ Este arquivo substitui o IMPLEMENTATION.md anterior. O histórico será registra
 13. Nunca aceite o relatório do executor como evidência — sempre reexecute a verificação e compare com o baseline
 14. Nunca deixe de registrar a execução em `docs/EXECUTOR-TRACK-RECORD.md`, com atribuição explícita de falha (`falha do modelo` / `falha do plano` / `ambiguidade genuína`)
 15. Nunca cite nome de modelo dentro do IMPLEMENTATION.md — cite **tier**; o mapeamento vive em `docs/EXECUTORS.md`
+16. Nunca omita o **piso de AAII** de uma etapa. Ele é a exigência da tarefa e é declarado **mesmo quando a escolha do executor veio do histórico** — inclusive, e principalmente, quando o executor não tem nota pública. Piso é número, não nome: convive com a regra 15
 
 ---
 
@@ -771,20 +802,21 @@ Após criar o IMPLEMENTATION.md, execute integralmente o protocolo de `docs/MODE
 
 Siga a Seção 3 (Como usar) do `docs/MODEL_SELECTION.md`, nesta ordem:
 
-1. **Ordem de consulta.** Primeiro `EXECUTOR-TRACK-RECORD.md` (desempenho real nesta combinação), depois `EXECUTORS.md` (o que existe e com qual comando), e só então `model-cache.md` (benchmark, **apenas para aptidão**). Nunca acesse a web se os três locais bastarem.
+1. **Ordem de consulta — duas camadas.** Camada 1: `EXECUTOR-TRACK-RECORD.md` (desempenho real nesta combinação), preferindo **modelo gratuito** e, na falta dele, o **mais barato entre os já assinados**. Camada 2, só quando o histórico não resolver: `model-cache.md` (**AAII**, a única métrica de benchmark do projeto). O `EXECUTORS.md` **não é camada de decisão** — é o tradutor de tier → ferramenta + comando. Nunca acesse a web se os arquivos locais bastarem.
 2. **Classifique cada etapa** em Delegável / Supervisionado / Não delegável, com forma e camada.
 3. **Verifique as condições da spec** — manifesto, casos literais, baseline. Faltando qualquer um, rebaixe a etapa.
-4. **Selecione por custo real**, na ordem: custo zero absoluto → custo marginal zero → custo por token. Aplique a regra anti-overkill e a regra do teto de saída.
+4. **Selecione por custo real**, na ordem: **gratuito** (custo zero absoluto) → **mais barato entre os já assinados** (custo marginal zero) → custo por token. Dentro disso, só entram modelos que **alcançam o piso de AAII do grau**. Aplique a regra anti-overkill e a regra do teto de saída — esta última tem precedência sobre o piso e sobre o histórico.
 5. **Defina a profundidade de revisão** pela tabela do Passo 5 (Portão / Revisão dirigida / Linha a linha).
 6. **Produza a saída EXATAMENTE no formato do Passo 6** do `docs/MODEL_SELECTION.md`.
 
 Regras de redação:
 - A saída é **uma tabela por etapa**, não uma lista de modelos para o plano inteiro.
 - Inclua o **comando pronto** de cada etapa, copiado literalmente do `docs/EXECUTORS.md`.
-- A justificativa deve citar a evidência usada: registro do track record, benchmark específico do cache, ou **declaração explícita de amostra insuficiente**.
+- A justificativa deve citar a evidência usada: registro do track record, **AAII específico do cache (com a data da coleta)**, ou **declaração explícita de amostra insuficiente**.
+- A justificativa deve **declarar o piso de AAII do grau**. Quando a escolha vier do histórico, o piso aparece como referência da exigência e a justificativa se sustenta nos registros, citando quais.
 - A justificativa deve citar o domínio concreto da etapa — nunca termos genéricos como "boa performance em coding".
-- Preço `$/M` **não é critério** neste projeto. O usuário não paga por token em nenhuma ferramenta.
-- Se um modelo não tiver benchmark público (caso da maioria dos gratuitos), diga isso. **Nunca invente métrica.**
+- Preço `$/M` **não é orçamento** — o usuário não paga por token em ferramenta nenhuma. Mas é **desempate legítimo**: entre modelos que alcançam o piso, prefira o gratuito; na falta dele, o mais barato entre os já assinados. Serve também como proxy de velocidade de queima da janela de 5h.
+- Se um modelo não tiver AAII (caso de boa parte dos gratuitos), **diga isso explicitamente** e sustente a escolha no histórico. Nunca invente métrica, nunca estime por proximidade de nome e nunca herde nota de versão vizinha.
 - Se o cache não puder ser lido nem atualizado, registre explicitamente e sinalize o que ficou sem dado.
 
 Responda sempre em português do Brasil.

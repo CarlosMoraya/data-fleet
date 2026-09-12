@@ -1209,9 +1209,76 @@ O executor entregou o script, passou o self-test 8/8 e então **reprovou os docu
 **Observações**
 
 - Teto de saída de 131k não foi limitante: o arquivo saiu com ~222 linhas.
-- `docs/EXECUTORS.md` marca `muse-spark-1.2-contributor-free` como "indisponível desde 11/09", mas `opencode models` o listou em 2026-09-12. A linha precisa ser corrigida na próxima sessão que tocar esse arquivo.
+- ~~`docs/EXECUTORS.md` marca `muse-spark-1.2-contributor-free` como "indisponível desde 11/09", mas `opencode models` o listou em 2026-09-12. A linha precisa ser corrigida na próxima sessão que tocar esse arquivo.~~ **Corrigido em 2026-09-12 — e a observação original estava errada.** Apurado na sessão seguinte: a palavra "indisponível" estava numa coluna cujo cabeçalho é **AAII** e falava da **nota ausente do índice do Artificial Analysis**, não do modelo ausente do parque. `docs/EXECUTORS.md` nunca afirmou que o modelo não existia, e `docs/model-cache.md` já dizia o mesmo sem ambiguidade em três lugares. **Não havia erro factual, e sim ambiguidade de redação** — que esta observação propagou. A disponibilidade do modelo no parque foi reconfirmada por `opencode models` em 2026-09-12 (os 7 gratuitos, com o `1.2` entre eles) e nunca esteve em questão. A ambiguidade foi desfeita nas duas tabelas de `docs/EXECUTORS.md`, com uma nota canônica distinguindo "ausente do índice" de "ausente do parque".
 - `e2e/` está fora do escopo do eslint, então specs novas não movem a contagem de warnings.
 
 **Veredito:** aprovado após duas correções do revisor — uma falha do plano, uma falha do modelo. **Estreia bem-sucedida:** o `muse-spark-1.3-contributor-free` entrega estrutura correta e infere schema com precisão, mas exigiu conferência de completude contra a especificação. Uma segunda execução limpa nesta forma permite baixar a revisão para o mínimo da matriz.
 
 **Revisão aplicada:** **linha a linha** (matriz daria "revisão dirigida" para Delegável + Tier C; elevada um nível por ser estreia, conforme Passo 4.2) — portão reexecutado, leitura integral do arquivo, conferência de cada coluna e cada valor contra o schema real, e controle negativo pré-migration.
+
+---
+
+### #048 — 2026-09-12 · Pagamentos: diagnóstico estrutural das quatro políticas — Etapa 1
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Grau** | D2 |
+| **AAII mínimo do grau** | 30 |
+| **Forma** | diagnóstico SQL (arquivo novo) |
+| **Camada** | database (somente leitura) |
+| **Ferramenta** | opencode (`opencode run`, modo automático) |
+| **Modelo** | `opencode/muse-spark-1.3-contributor-free` |
+| `aaii` | **48** (`docs/model-cache.md`, coleta de 2026-09-11) — alcança o piso 30 com folga |
+| **Custo marginal** | **zero absoluto** — não consome janela de assinatura |
+| **Escopo** | 1 arquivo novo; a exclusão do arquivo antigo ficou deliberadamente com o revisor |
+| **Natureza** | **Segunda execução** deste modelo no projeto (a 1ª foi o #047). Primeira na forma "diagnóstico SQL" |
+
+**Por que este modelo.** A combinação "Delegável / diagnóstico SQL (arquivo novo)" tinha **zero registros** — amostra insuficiente declarada, decisão pela camada 2 (AAII). O `muse-spark-1.2-contributor-free` não era elegível aqui: **não tem nota pública** e, sem histórico nesta forma, não tinha por onde entrar. Teto de saída de 131k, folgado para as ~226 linhas entregues.
+
+**Condições da especificação**
+
+| | |
+|---|---|
+| `manifesto` | **sim** — arquivo único, com proibição nominal de apagar arquivo, criar migration, ler arquivo de ambiente e rodar `git stash`/`checkout`/`reset` |
+| `testes_literais` | **sim** — as 10 seções com o resultado esperado literal de cada uma, incluindo os 8 md5 de referência |
+| `baseline` | **sim** — gravado no plano e reconferido pelo revisor |
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — só `supabase/diagnostics/check-payment-installment-policies.sql`, conferido contra o snapshot de 118 caminhos sujos |
+| `portao_1a` | **não** — ver lacuna 1 |
+| `ciclos` | **0** — sem reexecução do executor; as duas correções eram de poucas linhas conhecidas |
+| `regressoes` | **0** |
+| `lacunas` | **2** — nenhuma auto-reportada |
+
+**Números verificados independentemente pelo revisor**
+
+| | Baseline | Depois |
+|---|---|---|
+| `tsc --noEmit` | 0 erros | 0 erros |
+| `lint` | 0 erros / 264 warnings | 0 erros / 264 warnings |
+| `test:unit` | 258 arq / 2.409 testes | 258 arq / 2.413 testes |
+| `test:smoke` | 7/7 | 7/7 |
+| Diagnóstico da etapa | — | 10/10 seções conformes em **DEV e PROD** |
+
+**Lacunas e atribuição**
+
+1. **Seção 7 escrita com `JOIN` em vez de `LEFT JOIN` a partir da tabela de referência.** Consequência: se uma policy fosse **apagada**, a linha dela sumiria da saída e as três restantes viriam todas em `confere = t` — a seção que existe para detectar policy sumindo em silêncio falharia exatamente nesse caso. **Atribuição: `falha do plano`.** A Etapa 1 especificou as colunas, os md5 e o resultado esperado, mas **não especificou o sentido do JOIN**, e "4 linhas, todas com confere = t" é satisfeito por 3 linhas verdes para quem não conta as linhas. Corrigido pelo revisor: `LEFT JOIN` a partir da referência, mais a coluna `policy_ausente` e um comentário explicando por que o sentido importa.
+2. **`CASE pol.polcmd` sem `ELSE` na seção 2.** Uma policy `FOR ALL` — que vale para os quatro comandos e substitui as regras específicas — apareceria como `NULL` em vez de achado nomeado. **Atribuição: `falha do plano`** — o plano listou a tradução de `r`/`a`/`w`/`d` e não previu o caso `*`. Corrigido pelo revisor com rótulo explícito e nota de "PARAR".
+
+**Acertos que merecem registro.** As **15 sondas da política de INSERT foram transcritas byte a byte** do arquivo anterior — conferido por `diff`, saída vazia —, que era a exigência mais mecânica do roteiro e a que o #047 falhou em respeitar (omissão de assertiva literal). O executor também respeitou integralmente as proibições de escopo: não apagou o arquivo antigo, não criou migration, não leu arquivo de ambiente, não executou SQL. Nenhuma cláusula DDL entrou no arquivo (`grep` de verificação, só um falso positivo em comentário).
+
+**Controle negativo executado pelo revisor:** a seção 10 foi rodada nos dois bancos contra a tabela irmã `extra_payment_requests` e devolveu `3 · f · f · t` — as sondas **sabem devolver `false`**. Sem isso o arquivo inteiro seria inválido, por relatar conformidade que não verificou.
+
+**Observações**
+
+- Teto de saída não foi limitante: 226 linhas entregues.
+- O log saiu com 34 linhas e nenhuma linha suspeita — execução limpa do ponto de vista da ferramenta.
+- As duas lacunas foram **do plano**, não do modelo. É a segunda sessão seguida em que a especificação de uma verificação estrutural subespecificou um detalhe que só aparece no caso de falha — vale escrever roteiro de diagnóstico já declarando *o que deve acontecer quando o objeto verificado não existe*.
+
+**Veredito:** aprovado após duas correções do revisor, **ambas atribuídas ao plano**. Segunda execução do `muse-spark-1.3-contributor-free`, **zero falhas de modelo** — pela regra do Passo 4.2 (duas execuções limpas), a revisão desta forma pode cair para o mínimo da matriz na próxima vez. Combinação "Delegável / diagnóstico SQL" passa a ter 1 registro.
+
+**Revisão aplicada:** **linha a linha** (matriz daria "revisão dirigida"; elevada um nível por armadilha de falha silenciosa — diagnóstico de segurança mal escrito relata verde estando cego) — portão reexecutado, leitura integral do arquivo, `diff` das sondas transcritas contra o original, execução das 10 seções em DEV e PROD, e controle negativo contra a tabela irmã.

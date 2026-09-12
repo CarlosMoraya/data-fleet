@@ -28,7 +28,7 @@
 --   RLS não se aplica a service_role. É o mesmo efeito prático do
 --   escape hatch auth.uid() IS NULL dos gatilhos do módulo.
 -- ⚠️ EXECUTAR NO SUPABASE DASHBOARD → SQL Editor (DEV antes de PROD)
--- ⚠️ Depois: supabase/diagnostics/check-payment-installment-insert-status.sql
+-- ⚠️ Depois: supabase/diagnostics/check-payment-installment-policies.sql
 -- ============================================================
 
 BEGIN;
