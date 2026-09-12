@@ -29,6 +29,19 @@ import {
   listPaymentInstallments,
 } from './paymentInstallmentService';
 
+// Campos preenchidos exclusivamente pelos gatilhos do banco. A policy
+// payment_installments_insert (migration 20260912000000) recusa o INSERT se
+// qualquer um deles vier preenchido — o cliente nunca deve enviá-los.
+const AUDIT_KEYS = [
+  'payment_approved_by',
+  'payment_approved_at',
+  'paid_by',
+  'paid_at',
+  'cancelled_by',
+  'cancelled_at',
+  'cancellation_reason',
+] as const;
+
 describe('getPaymentInstallmentAuditors', () => {
   beforeEach(() => {
     rpcMock.mockReset();
@@ -274,6 +287,32 @@ describe('createPaymentInstallmentsBatch', () => {
       expect.objectContaining({ notes: null }),
     ]);
   });
+
+  it('sempre envia status pendente_aprovacao e nenhum campo de auditoria', async () => {
+    const insertMock = vi.fn().mockResolvedValue({ error: null });
+    fromMock.mockReturnValue({ insert: insertMock });
+
+    await createPaymentInstallmentsBatch({
+      maintenanceOrderId: 'mo-1',
+      clientId: 'client-1',
+      createdById: 'user-1',
+      installmentsTotal: 1,
+      drafts: [
+        { installmentNumber: 1, value: 100, dueDate: '2026-08-01', paymentMethod: 'boleto' },
+      ],
+    });
+
+    expect(insertMock).toHaveBeenCalledWith([
+      expect.objectContaining({ status: 'pendente_aprovacao' }),
+    ]);
+
+    const [sentRows] = insertMock.mock.calls[0] as [Array<Record<string, unknown>>];
+    const sentKeys = Object.keys(sentRows[0]);
+    expect(sentKeys).toContain('status');
+    for (const auditKey of AUDIT_KEYS) {
+      expect(sentKeys).not.toContain(auditKey);
+    }
+  });
 });
 
 describe('createExtraPaymentInstallmentsBatch', () => {
@@ -305,6 +344,40 @@ describe('createExtraPaymentInstallmentsBatch', () => {
         status: 'pendente_aprovacao',
       }),
     ]);
+  });
+
+  it('sempre envia status pendente_aprovacao e nenhum campo de auditoria', async () => {
+    const insertMock = vi.fn().mockResolvedValue({ error: null });
+    fromMock.mockReturnValue({ insert: insertMock });
+
+    await createExtraPaymentInstallmentsBatch({
+      extraPaymentRequestId: 'epr-1',
+      clientId: 'client-1',
+      createdById: 'user-1',
+      installmentsTotal: 1,
+      drafts: [
+        {
+          installmentNumber: 1,
+          value: 100,
+          dueDate: '2026-08-01',
+          paymentMethod: 'pix',
+          pixKeyType: 'cpf',
+          pixKey: '12345678901',
+          pixBeneficiaryName: 'Fulano',
+        },
+      ],
+    });
+
+    expect(insertMock).toHaveBeenCalledWith([
+      expect.objectContaining({ status: 'pendente_aprovacao' }),
+    ]);
+
+    const [sentRows] = insertMock.mock.calls[0] as [Array<Record<string, unknown>>];
+    const sentKeys = Object.keys(sentRows[0]);
+    expect(sentKeys).toContain('status');
+    for (const auditKey of AUDIT_KEYS) {
+      expect(sentKeys).not.toContain(auditKey);
+    }
   });
 });
 

@@ -10,7 +10,19 @@
 
 SWE-Bench mede issues genéricos de GitHub. Este arquivo mede o que realmente importa para a decisão: **este código, este stack, este formato de guardrail**.
 
-E resolve um problema que o benchmark não resolve: modelos sem catalogação pública. `opencode/big-pickle` não aparece na Artificial Analysis nem na Vellum, mas pode acumular histórico real aqui.
+E resolve um problema que o benchmark não resolve: modelos sem catalogação pública. `opencode/big-pickle` não aparece em leaderboard nenhum, mas pode acumular histórico real aqui.
+
+---
+
+### ⚠️ Nota de corte — 2026-09-11
+
+**Este arquivo é a camada 1 da fonte da verdade** para escolha de executor. Dentro dele, a preferência é: modelo **gratuito** que já executou bem a mesma combinação; na falta dele, o **mais barato** entre os disponíveis nas ferramentas já assinadas. Só quando o histórico não resolver é que se recorre à camada 2, o **AAII** de `docs/model-cache.md`.
+
+A partir desta data, o **Artificial Analysis Intelligence Index é o único benchmark de contraste**. SWE-Bench, GPQA, HLE, Vellum e LMSYS saíram do protocolo.
+
+**Os registros anteriores a 2026-09-11 não devem ser reinterpretados nem corrigidos.** As notas de benchmark citadas neles — inclusive valores de AA que hoje não existem mais, porque o índice foi reescalado em 11/09 com quedas de 12 a 17 pontos sem preservar ordem relativa — são **fato histórico do que se sabia na época**. Converter esses números para a escala nova corromperia o registro. Este arquivo é append-only: corrigir é acrescentar linha, nunca reescrever.
+
+**Consequência prática ao comparar registros:** um AA citado em registro de agosto e um AAII citado em registro de setembro **não são comparáveis**. Compare desempenho (`portao_1a`, `ciclos`, `escopo_ok`), que é o que este arquivo mede de verdade.
 
 ---
 
@@ -43,6 +55,7 @@ Nada de "% de efetividade" estimado. Só o que é auditável:
 | `regressoes` | testes que passavam antes e falharam depois |
 | `lacunas` | quantas dependências ou ambiguidades o executor **auto-reportou** |
 | `tokens` | consumo declarado pela ferramenta, quando disponível |
+| `aaii` | nota do executor na coleta vigente de `docs/model-cache.md`, **com a data da coleta**, ou `—` quando o modelo não é catalogado. Nunca estimar |
 
 ---
 
@@ -79,9 +92,11 @@ Comparar dois modelos sob condições de spec diferentes é comparação inváli
 3. **Se houver 4 ou mais registros:** o histórico manda. Sugerir o executor de menor custo marginal com melhor desempenho na combinação.
 4. **Se houver menos de 4:** amostra insuficiente. Declarar isso explicitamente e decidir por benchmark (`model-cache.md`), citando os registros existentes como indício, não como prova.
 
+5. **Declarar o piso de AAII do grau no plano, sempre** — inclusive quando a escolha vier daqui. O piso é a exigência da etapa; o histórico é a justificativa da escolha. São coisas diferentes e as duas aparecem no documento. Isto vale principalmente quando o executor **não tem nota pública**: o plano declara o piso, diz que o modelo não é catalogado, e sustenta a escolha nos registros.
+
 Formato da recomendação apoiada em histórico:
 
-> Etapa 6 é `Delegável` / `componente de UI`. Nessa combinação há N registros: `<modelo>` passou o portão de primeira em X de N, com Y ciclos de correção no restante. Custo marginal zero. Sugiro `<modelo>`.
+> Etapa 6 é `Delegável` / `componente de UI`, grau **D2**, piso **AAII ≥ 30**. Nessa combinação há N registros: `<modelo>` passou o portão de primeira em X de N, com Y ciclos de correção no restante. Custo zero absoluto. O modelo **não tem nota pública** — o piso fica declarado como referência da exigência e a escolha se sustenta no histórico. Sugiro `<modelo>`.
 
 ---
 
@@ -935,6 +950,78 @@ Sessão Tipo 4. Etapas 1, 2 e 10 foram escritas pelo agente planejador: migratio
 
 ---
 
+### #042 — 2026-09-11 · Templates de Checklist: visualização da estrutura publicada — Etapa 1 (modal e testes)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Forma** | componente de UI + teste, somente arquivos novos |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --format json`, via `scripts/plan-runner.mjs run 1`) |
+| **Modelo** | `opencode/big-pickle` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | `ChecklistTemplateDetailModal.tsx` + `ChecklistTemplateDetailModal.test.tsx`, ambos novos |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim (10 casos) · `baseline` sim (2.298 testes, 251 arquivos, 264 warnings).
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente não · portão_1a **sim** · ciclos 0 · regressões 0 · lacunas 1 atribuída ao plano.
+
+**Verificação independente:** os 10 testes direcionados passaram; o componente consulta exatamente `checklist_items` pela combinação `template_id` + `current_version`, trata loading/vazio/erro, mantém a lista ordenada, exibe somente flags verdadeiras e fecha por botão/Escape. O revisor acrescentou asserções explícitas para garantir que a mensagem de erro não renderiza `Error:` nem stack trace — a tabela do plano exigia a proteção, mas não a tornou literal no caso de teste.
+
+**Portão da etapa:** tsc 0 erros; lint 0 erros e 264 warnings; unitários 256 arquivos/2.394 testes; smoke 7/7. Nenhum arquivo fora do manifesto foi alterado pela etapa.
+
+**Veredito:** aprovado após uma correção de cobertura atribuída a lacuna do plano; nenhuma falha de modelo.
+
+---
+
+### #043 — 2026-09-11 · Templates de Checklist: visualização da estrutura publicada — Etapa 2 (integração e E2E)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Forma** | edição em arquivo existente + integração de página + teste E2E |
+| **Camada** | frontend / E2E |
+| **Ferramenta** | opencode (`opencode run --format json`, via `scripts/plan-runner.mjs run 2`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| **Custo** | **zero absoluto** |
+| **Escopo** | `src/pages/ChecklistTemplates.tsx` (existente), teste de integração novo e spec E2E pendente existente |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim (4 casos de integração + 1 caso E2E) · `baseline` sim (2.394 testes após a Etapa 1, 256 arquivos, 264 warnings).
+
+**Resultado:** escopo_ok sim · alterou_teste_preexistente **sim, por especificação** (a spec pendente era o objeto da etapa) · portão_1a **sim** · ciclos 0 · regressões 0 · lacunas 1 atribuída ao plano.
+
+**Verificação independente:** o olho aparece somente em linhas `published`, antes das ações existentes, sem guard de permissão ou cliente; o teste de integração cobre Fleet Analyst, Manager, fechamento e Admin Master agregado. A correção do revisor tornou específico o seletor de fechamento do E2E, pois o modal possui dois elementos com o nome acessível `Fechar`; o seletor inicialmente ditado pelo plano era ambíguo. A correção do comando para `--project=manager` também foi registrada no plano, porque `chromium` ignora essa spec.
+
+**Portão da etapa:** tsc 0 erros; lint 0 erros e 264 warnings; unitários 257 arquivos/2.398 testes; smoke 7/7. O escopo permaneceu limitado aos três arquivos esperados.
+
+**Validação E2E:** a execução real com `PLAYWRIGHT_INCLUDE_PENDING=1` parou no terceiro cenário preexistente da suíte serial, antes do novo cenário, porque a expectativa `Item obrigatório do sistema` não encontra elemento na fixture/formulário atual. As referências históricas a `Livre` também foram mantidas fora do escopo. O E2E permanece pendente; o bloqueio é de fixture/suíte preexistente, não uma aprovação.
+
+**Veredito:** código aprovado após uma correção de seletor atribuída a lacuna do plano; E2E pendente documentado; nenhuma falha de modelo.
+
+---
+
+### #044–#046 — 2026-09-11 · Checklists — busca por placa e seleção pesquisável
+
+Sessão executada em três etapas. O executor Tier C inicialmente planejado (`opencode`) ficou indisponível por rate limit/saldo do provedor, sem produzir alterações; isso foi tratado como falha de provedor, não como falha de modelo. As três etapas foram então disparadas pelo planejador com `codex exec -s workspace-write`, em modo automático não interativo (YOLO MODE), preservando o manifesto de cada etapa.
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim (9 casos unitários e assertivas E2E do plano) · `baseline` sim (2.398 testes/257 arquivos, 264 warnings, smoke 7/7).
+
+| # | Etapa | Classe / forma | Executor | portão 1ª | ciclos | Atribuição |
+|---|---|---|---|---|---|---|
+| #044 | 1 — filtros puros e testes | Delegável / lógica pura + teste, somente arquivos novos | `codex / gpt-5.6-luna (medium)` | **sim** | 0 | — |
+| #045 | 2 — integração de `Checklists.tsx` | Supervisionado / edição em arquivo existente + integração de página | `codex / gpt-5.6-luna (medium)` | **sim** | 1 correção do revisor | A revisão corrigiu a invalidação prematura de uma seleção persistida enquanto a query de veículos ainda carregava; sem falha de modelo |
+| #046 | 3 — cobertura E2E | Supervisionado / edição de testes E2E existentes | `codex / gpt-5.6-luna (medium)` | não | 2 correções do revisor | Uma asserção de placa foi ajustada para o texto composto do card e os skips do combobox foram adaptados para a ausência de placeholder; sem falha de modelo |
+
+**Custo:** não mensurado nesta execução; o fallback foi escolhido por disponibilidade e executado em modo automático com escrita restrita ao workspace.
+
+**Escopo final:** `src/lib/checklistSearch.ts`, `src/lib/checklistSearch.test.ts`, `src/pages/Checklists.tsx` e os quatro specs E2E previstos. Nenhuma migration, RLS, RPC, componente `SearchableSelect`, permissão ou consulta Supabase foi alterada.
+
+**Verificação independente:** 9/9 testes novos; 27/27 testes focados; tsc 0; lint 0 erros/264 warnings; unitários 2.407/2.407 em 258 arquivos; smoke 7/7; E2E concluído do Auditor 2/2; validação DEV do Gestor confirmou 7 opções autorizadas reduzidas a 1 pela placa digitada. Os quatro specs foram reconhecidos com `--list` (o do Gestor exigiu `PLAYWRIGHT_INCLUDE_PENDING=1`). A execução completa do Gestor ficou parcialmente bloqueada por checklist em andamento preexistente na conta (`DEV1A23`); o spec de pneus encontrou sessão de Carlos expirada e o Handover não possui as fixtures `yard-auditor.json`/`driver.json`. Esses bloqueios permanecem ambientais e não foram mascarados alterando skips ou contrato.
+
+**Veredito:** implementação aprovada; E2E principal do Auditor verde e pendências ambientais documentadas; nenhuma falha de modelo. O arquivamento da memória foi deliberadamente deixado para outra sessão.
+
+---
+
 ## 9. Sumário por combinação
 
 Atualizar a cada registro novo.
@@ -942,7 +1029,7 @@ Atualizar a cada registro novo.
 | Classe | Forma | Ferramenta / Modelo | N | portão 1ª vez | ciclos médios | Falhas do modelo |
 |---|---|---|---|---|---|---|
 | Delegável | lógica pura + UI + teste | codex / `gpt-5.6-sol` (high) | 1 | 1/1 | 0 | 0 |
-| Delegável | componente de UI + teste | opencode / `big-pickle` **(gratuito)** | 3 | 3/3⁷ | 0 | 0 |
+| Delegável | componente de UI + teste | opencode / `big-pickle` **(gratuito)** | 4 | 4/4⁷ ¹⁰ | 0 | 0 |
 | Delegável | lógica pura + teste, só arquivos novos | opencode / `big-pickle` **(gratuito)** | 4 | 3/4³ | 0 | 0 |
 | Delegável | arquivo novo, cópia de padrão existente | opencode / `big-pickle` **(gratuito)** | 1 | 1/1 | 0 | 0 |
 | Supervisionado | edição em arquivo existente + integração | codex / `gpt-5.6-sol` (high) | 2 | 1/2 | 0,5 | 0 |
@@ -958,6 +1045,11 @@ Atualizar a cada registro novo.
 | Supervisionado | integração de página + teste (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 3 | 3/3⁶ | 0 | 0 |
 | Delegável | teste E2E (arquivo novo) | opencode / `big-pickle` **(gratuito)** | 1 | 0/1⁹ | — | **1** |
 | Delegável | teste E2E (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 1 | 0 |
+| Delegável | teste E2E (arquivo novo) | opencode / `muse-spark-1.3-contributor-free` **(gratuito)** | 1 | 0/1¹² | 2 | 0 |
+| Supervisionado | edição em arquivo existente + integração de página + teste E2E | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 0 | 0 |
+| Delegável | lógica pura + teste, somente arquivos novos | codex / `gpt-5.6-luna` (medium) | 1 | 1/1 | 0 | 0 |
+| Supervisionado | edição em arquivo existente + integração de página | codex / `gpt-5.6-luna` (medium) | 1 | 1/1 | 1 | 0 |
+| Supervisionado | edição de testes E2E existentes | codex / `gpt-5.6-luna` (medium) | 1 | 0/1 | 2 | 0 |
 
 ¹ Reprovou o portão por 2 warnings de `import/order`, resolvidos por `eslint --fix`; nenhuma falha de modelo.
 ² Os 2 ciclos foram indisponibilidade de provedor (`grok-code`) e falha do plano, não do modelo.
@@ -968,10 +1060,16 @@ Atualizar a cada registro novo.
 ⁷ No #037 o runner marcou reprovação só pelo erro de tsc transitório causado pelo plano no #036; contra o esperado, passou.
 ⁸ A reprovação do #036 foi 1 erro de tsc por falha do plano (chamador atualizado só na etapa seguinte) + 2 warnings de `import/order`; nenhuma falha de modelo. O #039 registrou um **incidente de protocolo** (`git stash` + `pop`, sem dano), anotado fora da coluna de falhas.
 ⁹ Timeout de 15 min sem entrega (#040). Primeira falha de modelo do `big-pickle` neste projeto, numa forma nova para ele.
+¹⁰ No #042 o revisor acrescentou asserções explícitas contra `Error:` e stack trace no estado de erro; requisito presente no plano, mas não literalizado na tabela de casos. Falha atribuída ao plano, não ao modelo.
+¹² Estreia do `muse-spark-1.3-contributor-free` (#047). `portao_1a` = não porque faltou a coluna `acquisition`, obrigatória em `vehicles`, o que derrubaria o `beforeAll` inteiro — mas essa lacuna é **falha do plano**, não do modelo. A única falha atribuída ao modelo foi a omissão de uma assertiva literal do roteiro. Nenhuma falha de modelo que justifique queima; combinação segue com amostra insuficiente (1 registro).
 
-**Atualização (2026-09-11):** o sumário passou a incluir #028–#030 (sessão "Pago → Lançado no sistema", que registrou mas não atualizou esta tabela) e #031–#033. "Supervisionado / edição em arquivo existente" com `muse-spark-1.2-contributor-free` chega a **7 registros, 0 falhas de modelo**. Nas três etapas de 2026-09-11 (#031–#033) os controles negativos do revisor confirmaram que os testes escritos pelo executor detectam a remoção do comportamento.
+¹¹ No #043 o seletor de fechamento do E2E foi especificado de forma ambígua pelo plano porque havia dois elementos com o nome acessível `Fechar`; a correção foi feita pelo revisor. O E2E também ficou bloqueado antes do novo caso por uma expectativa preexistente da fixture.
 
-**Estado atual (2026-09-09): três combinações atingiram autoridade estatística.** "Supervisionado / edição em arquivo existente" com `muse-spark-1.2-contributor-free` chegou a **5 registros** — nessa combinação o histórico manda e o benchmark é ignorado. Ela inclui duas integrações de página em produção no mesmo arquivo (`WorkshopSchedules.tsx`, registros #020 e #025), ambas **sem uma única correção**.
+**Atualização (2026-09-11):** o sumário inclui #028–#030, #031–#033 e agora #042–#043. "Supervisionado / edição em arquivo existente" com `muse-spark-1.2-contributor-free` permanece com **7 registros e 0 falhas de modelo**; #043 foi mantido em uma linha própria por combinar edição de página, integração e ajuste de E2E. Nas etapas desta sessão, as correções foram lacunas do plano: asserções de não vazamento no #042 e seletor acessível ambíguo no #043.
+
+**Atualização (2026-09-11):** #044–#046 registram a entrega de busca por placa em Checklists. O `opencode` planejado foi substituído por indisponibilidade do provedor; o fallback `codex / gpt-5.6-luna (medium)` entregou as três etapas em modo automático, com uma correção de estado na integração e duas correções de robustez E2E pelo revisor. Nenhuma falha de modelo foi registrada.
+
+**Estado atual (2026-09-11): três combinações atingiram autoridade estatística.** "Supervisionado / edição em arquivo existente" com `muse-spark-1.2-contributor-free` chegou a **5 registros** — nessa combinação o histórico manda e o benchmark é ignorado. Ela inclui duas integrações de página em produção no mesmo arquivo (`WorkshopSchedules.tsx`, registros #020 e #025), ambas **sem uma única correção**. A nova combinação composta de #043 ainda tem amostra insuficiente.
 
 **Estado anterior (2026-09-08): duas combinações atingiram autoridade estatística.** "Supervisionado / transcrição de migration" com `muse-spark-1.2-contributor-free` e "Delegável / arquivo novo + teste" com `big-pickle` chegaram aos **4 registros** exigidos pela Seção 6 — nessas duas, o histórico agora manda e o benchmark é ignorado. "Supervisionado / edição em arquivo existente" com `gpt-5.6-sol` segue em 3, mas foi **superada na prática**: `gpt-5.6-luna` (effort `medium`) e `muse-spark` gratuito entregaram a mesma forma sem falha de modelo, com fração da queima de janela.
 
@@ -982,3 +1080,138 @@ Atualizar a cada registro novo.
 **Padrão anterior (N=8):** as oito falhas registradas até então foram **todas do plano**, nenhuma do modelo. As três de 2026-09-09 repetiram o padrão em sua forma mais pura: uma assertiva que confirmava a si mesma (`toContain('Agendado')` casando com o texto de observações), um caso literal apontando o seletor errado, e uma asserção de ausência sem âncora de presença. Nenhuma delas era detectável por comando de verificação — só por leitura adversarial. O gargalo de qualidade deste fluxo é a especificação, não a capacidade do executor. As três de 2026-09-08 foram do mesmo tipo — o planejador descreveu em prosa algo que precisava ser literal (o container do botão, a assertiva de `banned_until`) ou omitiu uma premissa do ambiente (variáveis de ambiente são referenciadas, não lidas em disco).
 
 **Consequência prática:** vale investir mais em fechar a especificação do que em subir o tier do executor. Um modelo gratuito com spec fechada superou, nesta sessão, o histórico do `gpt-5.6-sol` com spec parcial.
+
+---
+
+### #045 — 2026-09-11 · Protocolo AAII, Etapa 7 (`scripts/check-executor-docs.mjs`)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Grau** | D2 |
+| **AAII mínimo do grau** | 30 |
+| **Forma** | lógica pura (arquivo novo) |
+| **Camada** | infra |
+| **Ferramenta** | opencode (`opencode run`, modo automático) |
+| **Modelo** | `opencode/big-pickle` |
+| `aaii` | **—** — sem nota pública em fonte alguma. Escolha pela **camada 1** (histórico), com o piso declarado como referência da exigência |
+| **Custo marginal** | **zero absoluto** — não consome janela de assinatura |
+| **Escopo** | 1 arquivo novo, nenhum existente autorizado |
+
+**Condições da especificação**
+
+| | |
+|---|---|
+| `manifesto` | **sim** — arquivo único, explícito, com proibição nominal de tocar em qualquer outro |
+| `testes_literais` | **sim** — 8 casos `entrada → saída` com objetos `Finding` completos |
+| `baseline` | **sim** — gravado no plano e reconferido pelo revisor |
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — só `scripts/check-executor-docs.mjs`; nenhum documento alterado |
+| `portao_1a` | **sim** — self-test 8/8 na primeira execução |
+| `ciclos` | **0** — nenhuma reexecução do executor |
+| `regressoes` | **0** |
+| `lacunas` | **2** — ambas auto-reportadas |
+
+**Números verificados independentemente pelo revisor**
+
+| | Baseline | Depois |
+|---|---|---|
+| `tsc --noEmit` | 0 erros | 0 erros |
+| `lint` | 0 erros / 264 warnings | 0 erros / 264 warnings |
+| `test:unit` | 258 arq / 2.407 testes | 258 arq / 2.407 testes |
+| `test:smoke` | 7/7 | 7/7 |
+
+**Lacunas auto-reportadas e atribuição**
+
+O executor entregou o script, passou o self-test 8/8 e então **reprovou os documentos do projeto com 11 erros** — e **não alterou nenhum documento para fazer o verificador passar**, dizendo explicitamente: *"Ambos são veredictos determinísticos do contrato; não alterei os documentos para fazê-los passar."*
+
+**Atribuição: `falha do plano`, nas duas lacunas.**
+
+1. O regex de piso ditado pelo plano — `/AAII\s*(?:mín\.?|mínimo)?\s*(?:≥|>=|:)?\s*(\d{2})/gi` — tornava **ambos** os indicadores opcionais, de modo que casava `AAII 47`, que é a **nota** de um modelo, e não um piso. Dez ocorrências legítimas foram acusadas.
+2. O plano exigia a string literal `Fonte única de benchmark: Artificial Analysis`, mas o cabeçalho do cache a escreve com **negrito markdown**.
+
+**Comportamento exemplar, não falha.** Um executor que "consertasse" os documentos para o próprio teste passar teria produzido portão verde com o protocolo quebrado — exatamente o risco que a exigência de assertiva literal existe para evitar. A recusa é o resultado desejado.
+
+**Correção aplicada pelo revisor** (não pelo executor, e sem segundo disparo, porque a mudança era de duas linhas conhecidas — teste de economia): regex passou a exigir indicador explícito de piso; `checkCacheHeader` passou a ignorar ênfase markdown; e **dois casos de self-test novos** foram acrescentados cobrindo precisamente as duas armadilhas (`nota de modelo não é piso` e `ênfase markdown no cabeçalho`). Self-test final: **10/10**.
+
+**Controle negativo executado pelo revisor:** com `SWE-Bench` e `AAII mínimo: 52` injetados em `prompts/Fixbugs.md`, o verificador acusou as duas regras e saiu com `exit 2`; após reverter, `exit 0` e o arquivo conferido byte a byte contra a cópia de segurança.
+
+**Observações**
+
+- Teto de saída de 32k do `big-pickle` foi suficiente: o arquivo saiu com ~280 linhas.
+- Nenhuma estreia de executor nesta sessão, por decisão do plano: com um único disparo externo, uma falha não seria atribuível.
+
+**Veredito:** aprovado, com correção de duas lacunas do plano pelo revisor.
+
+**Revisão aplicada:** revisão dirigida (conforme matriz: Delegável + Tier C) — portão reexecutado, leitura integral do arquivo criado e dos 8 casos de teste com olhar adversarial, mais controle negativo.
+
+---
+
+### #047 — 2026-09-12 · Pagamentos: E2E da trava de status no INSERT — Etapa 3
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Grau** | D2 |
+| **AAII mínimo do grau** | 30 |
+| **Forma** | teste E2E (arquivo novo) |
+| **Camada** | E2E |
+| **Ferramenta** | opencode (`opencode run`, modo automático) |
+| **Modelo** | `opencode/muse-spark-1.3-contributor-free` |
+| `aaii` | **48** (`docs/model-cache.md`, coleta de 2026-09-11) — alcança o piso 30 com folga |
+| **Custo marginal** | **zero absoluto** — não consome janela de assinatura |
+| **Escopo** | 1 arquivo novo, nenhum existente autorizado |
+| **Natureza** | **ESTREIA DISCIPLINADA** — primeira execução deste modelo no projeto. Permitida por ser grau D2, uma por plano, com revisão elevada um nível |
+
+**Por que estreia, e não o modelo com histórico.** A combinação "Delegável / teste E2E (arquivo novo)" tinha **1 registro** com `muse-spark-1.2-contributor-free` (#041, aprovado) e **1 falha** com `big-pickle` (#040, timeout sem entrega) — amostra insuficiente para autoridade estatística nos dois casos. Somado a isso, o `1.2` estava marcado como indisponível desde 2026-09-11 em `docs/EXECUTORS.md` (embora `opencode models` o listasse de novo na data desta sessão, ver Observações). Aplicou-se o Passo 4.2: havendo gratuito que alcança o piso do grau, estreia-se com ele.
+
+**Condições da especificação**
+
+| | |
+|---|---|
+| `manifesto` | **sim** — arquivo único, com proibição nominal de tocar em qualquer outro e de rodar `git stash`/`checkout`/`reset` |
+| `testes_literais` | **sim** — 4 casos com payload literal e assertivas concretas (`error.code === '42501'`), incluindo controle negativo obrigatório |
+| `baseline` | **sim** — gravado no plano e reconferido pelo revisor |
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — só `e2e/pending/payment-installment-insert-status.spec.ts`; conferido por diff contra o snapshot de 121 caminhos sujos |
+| `portao_1a` | **não** — o `beforeAll` quebraria antes de qualquer teste rodar |
+| `ciclos` | **0** — sem reexecução do executor; as duas correções eram de poucas linhas conhecidas (teste de economia) |
+| `regressoes` | **0** |
+| `lacunas` | **2** — nenhuma auto-reportada |
+
+**Números verificados independentemente pelo revisor**
+
+| | Baseline | Depois |
+|---|---|---|
+| `tsc --noEmit` | 0 erros | 0 erros |
+| `lint` | 0 erros / 264 warnings | 0 erros / 264 warnings |
+| `test:unit` | 258 arq / 2.407 testes | 258 arq / 2.409 testes |
+| `test:smoke` | 7/7 | 7/7 |
+| E2E da etapa | — | 4/4 em DEV |
+
+**Lacunas e atribuição**
+
+1. **`acquisition` ausente no INSERT de `vehicles` da massa.** A coluna é `NOT NULL` sem default; o `beforeAll` lançaria e os quatro testes morreriam juntos. **Atribuição: `falha do plano`.** O roteiro listou as colunas obrigatórias de `payment_installments` e as de `maintenance_orders`, mas não as de `vehicles` — mandou o executor montar o veículo copiando o spec de referência, que também não tem a coluna. Corrigido pelo revisor com `acquisition: 'Owned'` (valor conferido contra `vehicles_acquisition_check`).
+2. **Assertiva complementar do caso 01 omitida.** O plano pedia, literalmente, conferir por `service_role` que a recusa não deixou linha para trás. O executor escreveu as duas assertivas de erro e parou. **Atribuição: `falha do modelo`** — estava explícita no roteiro. Corrigida pelo revisor.
+
+**Acertos que merecem registro.** O executor **inferiu corretamente** cinco colunas de `maintenance_orders` que o plano não ditou (`os_number`, `entry_date`, `type`, `estimated_cost`, `created_by_id`), cobrindo todas as `NOT NULL` sem default, e acertou os valores contra os CHECKs (`'Corretiva'`, `'Concluído'`, `'aprovado'`) — verificado pelo revisor contra `information_schema` e `pg_constraint`. Também respeitou `test.describe.serial`, a limpeza em ordem inversa e o uso de `adminClient` restrito à massa, nunca nos casos de teste.
+
+**Controle negativo executado pelo revisor:** o E2E foi rodado **antes** de a migration ser aplicada em DEV. O caso 01 falhou com `Received: null` — o INSERT escalado passou, provando que a spec testa a trava real e não uma tautologia. Após a migration, 4/4. Resíduo em DEV conferido depois de cada execução: 0 veículos, 0 OS, 0 parcelas.
+
+**Observações**
+
+- Teto de saída de 131k não foi limitante: o arquivo saiu com ~222 linhas.
+- `docs/EXECUTORS.md` marca `muse-spark-1.2-contributor-free` como "indisponível desde 11/09", mas `opencode models` o listou em 2026-09-12. A linha precisa ser corrigida na próxima sessão que tocar esse arquivo.
+- `e2e/` está fora do escopo do eslint, então specs novas não movem a contagem de warnings.
+
+**Veredito:** aprovado após duas correções do revisor — uma falha do plano, uma falha do modelo. **Estreia bem-sucedida:** o `muse-spark-1.3-contributor-free` entrega estrutura correta e infere schema com precisão, mas exigiu conferência de completude contra a especificação. Uma segunda execução limpa nesta forma permite baixar a revisão para o mínimo da matriz.
+
+**Revisão aplicada:** **linha a linha** (matriz daria "revisão dirigida" para Delegável + Tier C; elevada um nível por ser estreia, conforme Passo 4.2) — portão reexecutado, leitura integral do arquivo, conferência de cada coluna e cada valor contra o schema real, e controle negativo pré-migration.
