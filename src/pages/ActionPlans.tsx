@@ -6,11 +6,13 @@ import ActionPlanModal from '../components/ActionPlanModal';
 import LastKmLabel from '../components/LastKmLabel';
 import SelectClientNotice from '../components/SelectClientNotice';
 import { useAuth } from '../context/AuthContext';
+import { mergeActionPlanLabels } from '../lib/actionPlanLabels';
 import { actionPlanFromRow, actionStatusLabel, actionStatusColor, type ActionPlanRow } from '../lib/actionPlanMappers';
 import { actionPlanOriginOf, actionPlanOriginLabel, actionPlanOriginColor } from '../lib/actionPlanOrigin';
 import { requiresClientSelection, showsAggregatedData } from '../lib/clientScope';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
+import { getYardAuditorActionPlanLabels } from '../services/actionPlanLabelsService';
 import { getVehicleLastKmMap, type VehicleLastKmInfo } from '../services/vehicleOdometerService';
 
 import type { ActionPlan, ActionPlanStatus } from '../types';
@@ -85,7 +87,7 @@ export default function ActionPlans() {
         (profiles ?? []).forEach((p: { id: string; name: string }) => { profileMap[p.id] = p.name; });
       }
 
-      return typedData.map((r) => {
+      const mappedPlans = typedData.map((r) => {
         const row: APQueryRow = { ...r };
         if (row.claimed_by && !row.claimed_by_profile && profileMap[row.claimed_by]) {
           row.claimed_by_profile = { name: profileMap[row.claimed_by] };
@@ -95,6 +97,16 @@ export default function ActionPlans() {
         }
         return actionPlanFromRow(row as unknown as ActionPlanRow);
       });
+
+      if (user?.role !== 'Yard Auditor' || mappedPlans.length === 0) return mappedPlans;
+
+      try {
+        const labels = await getYardAuditorActionPlanLabels(mappedPlans.map((plan) => plan.id));
+        return mergeActionPlanLabels(mappedPlans, labels);
+      } catch (labelsError) {
+        console.error('getYardAuditorActionPlanLabels failed', labelsError);
+        return mappedPlans;
+      }
     },
     enabled: showsAggregatedData(user?.role, currentClient?.id)
   });

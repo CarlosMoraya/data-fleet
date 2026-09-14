@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { actionPlanToRow } from '../lib/actionPlanMappers';
+import { ACTION_PLAN_RESPONSIBLE_EXCLUDED_ROLES_FILTER } from '../lib/actionPlanPermissions';
 import { fleetTicketCriticalityLabel } from '../lib/fleetTicketRules';
 import { supabase } from '../lib/supabase';
 
@@ -79,7 +80,7 @@ export default function CreateActionPlanModal({ origin, onClose, onCreated }: Pr
           .from('profiles')
           .select('id, name, role')
           .eq('client_id', currentClient.id)
-          .not('role', 'in', '("Driver","Yard Auditor")')
+          .not('role', 'in', ACTION_PLAN_RESPONSIBLE_EXCLUDED_ROLES_FILTER)
           .order('name'),
       ]);
 

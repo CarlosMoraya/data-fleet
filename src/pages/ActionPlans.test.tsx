@@ -18,9 +18,11 @@ vi.mock('../lib/supabase', () => ({
   },
 }));
 
+let authRole = 'Coordinator';
+
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
-    user: { id: 'user-1', role: 'Coordinator' },
+    user: { id: 'user-1', role: authRole },
     currentClient: { id: 'client-1' },
     clients: [{ id: 'client-1', name: 'Cliente 1' }],
   }),
@@ -123,6 +125,7 @@ afterEach(() => {
   queryClient.clear();
   document.body.removeChild(container);
   vi.clearAllMocks();
+  authRole = 'Coordinator';
 });
 
 async function waitForAssertion(assertion: () => void) {
@@ -230,5 +233,93 @@ describe('ActionPlans — Último Km abaixo da placa', () => {
     await waitForAssertion(() => {
       expect(container.textContent).toContain('Último Km: 12.345 km (Editado)');
     });
+  });
+});
+
+describe('ActionPlans — Yard Auditor', () => {
+  it('chama get_yard_auditor_action_plan_labels e exibe o nome do responsável para Yard Auditor', async () => {
+    authRole = 'Yard Auditor';
+    rpcMock.mockImplementation((name: string) => {
+      if (name === 'get_vehicle_odometer_readings_batch') {
+        return Promise.resolve({ data: [{ vehicle_id: 'vehicle-1', effective_km: 12345, is_corrected: false }], error: null });
+      }
+      if (name === 'get_yard_auditor_action_plan_labels') {
+        return Promise.resolve({
+          data: [
+            {
+              action_plan_id: 'plan-1',
+              reported_by_name: null,
+              assigned_by_name: null,
+              claimed_by_name: null,
+              completed_by_name: null,
+              responsible_name: 'Carlos Auditor',
+              template_name: null,
+              item_title: null,
+            },
+          ],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const root = createRoot(container);
+    container.__reactRoot = root;
+
+    act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ActionPlans />
+        </QueryClientProvider>,
+      );
+    });
+
+    await waitForAssertion(() => {
+      expect(rpcMock).toHaveBeenCalledWith('get_yard_auditor_action_plan_labels', { p_action_plan_ids: ['plan-1', 'plan-2'] });
+      expect(container.textContent).toContain('Carlos Auditor');
+      expect(container.textContent).toContain('Plano A');
+    });
+  });
+
+  it('não chama get_yard_auditor_action_plan_labels para Coordinator', async () => {
+    rpcMock.mockImplementation((name: string) => {
+      if (name === 'get_vehicle_odometer_readings_batch') {
+        return Promise.resolve({ data: [{ vehicle_id: 'vehicle-1', effective_km: 12345, is_corrected: false }], error: null });
+      }
+      if (name === 'get_yard_auditor_action_plan_labels') {
+        return Promise.resolve({
+          data: [
+            {
+              action_plan_id: 'plan-1',
+              reported_by_name: null,
+              assigned_by_name: null,
+              claimed_by_name: null,
+              completed_by_name: null,
+              responsible_name: 'Carlos Auditor',
+              template_name: null,
+              item_title: null,
+            },
+          ],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const root = createRoot(container);
+    container.__reactRoot = root;
+
+    act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ActionPlans />
+        </QueryClientProvider>,
+      );
+    });
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Plano A');
+    });
+    expect(rpcMock).not.toHaveBeenCalledWith('get_yard_auditor_action_plan_labels', expect.anything());
   });
 });

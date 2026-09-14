@@ -366,4 +366,43 @@ describe('Sidebar', () => {
 
     expect(container.textContent).not.toContain('Utilização MELI');
   });
+
+  it('papel Yard Auditor vê o item "Plano de Ação"', () => {
+    authState = {
+      user: {
+        id: 'u-aud',
+        name: 'Carlos Auditor',
+        email: 'auditor@example.com',
+        role: 'Yard Auditor',
+        clientId: 'c1',
+        budgetApprovalLimit: 0,
+      },
+      currentClient: null,
+      logout: async () => {},
+    };
+
+    renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
+
+    expect(container.textContent).toContain('Plano de Ação');
+  });
+
+  it('papel Driver não vê o item "Plano de Ação"', () => {
+    authState = {
+      user: {
+        id: 'u-driver',
+        name: 'Motorista',
+        email: 'driver@example.com',
+        role: 'Driver',
+        clientId: 'c1',
+        budgetApprovalLimit: 0,
+      },
+      currentClient: null,
+      logout: async () => {},
+    };
+
+    renderWithAct(<Sidebar isOpen={false} onClose={() => {}} />);
+
+    expect(container.textContent).not.toContain('Plano de Ação');
+    expect(container.textContent).toContain('Checklists');
+  });
 });

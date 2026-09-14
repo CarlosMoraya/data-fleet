@@ -1030,22 +1030,22 @@ Atualizar a cada registro novo.
 |---|---|---|---|---|---|---|
 | Delegável | lógica pura + UI + teste | codex / `gpt-5.6-sol` (high) | 1 | 1/1 | 0 | 0 |
 | Delegável | componente de UI + teste | opencode / `big-pickle` **(gratuito)** | 4 | 4/4⁷ ¹⁰ | 0 | 0 |
-| Delegável | lógica pura + teste, só arquivos novos | opencode / `big-pickle` **(gratuito)** | 4 | 3/4³ | 0 | 0 |
+| Delegável | lógica pura + teste, só arquivos novos | opencode / `big-pickle` **(gratuito)** | 5 | 4/5³ | 0 | 0 |
 | Delegável | arquivo novo, cópia de padrão existente | opencode / `big-pickle` **(gratuito)** | 1 | 1/1 | 0 | 0 |
 | Supervisionado | edição em arquivo existente + integração | codex / `gpt-5.6-sol` (high) | 2 | 1/2 | 0,5 | 0 |
 | Supervisionado | edição em arquivo existente | codex / `gpt-5.6-sol` (high) | 3 | 3/3 | 0 | 0 |
 | Supervisionado / transcrição | migration (SQL literal) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 4 | 4/4 | 0 | 0 |
 | Delegável | arquivo novo + teste | opencode / `big-pickle` **(gratuito)** | 5 | 5/5 | 0 | 0 |
-| Supervisionado | edição em arquivo existente | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | **9** | 7/9⁴ ⁸ | 0 | 0 |
+| Supervisionado | edição em arquivo existente | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | **10** | 8/10⁴ ⁸ | 0 | 0 |
 | Supervisionado | integração de página | codex / `gpt-5.6-luna` (medium) | 1 | 0/1¹ | 0 | 0 |
 | Supervisionado | teste (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 2² | 0 |
 | Delegável | teste (arquivo novo, mock de página) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 2 | 1/2⁵ | 0 | 0 |
 | Supervisionado / transcrição | edição de teste E2E | opencode / `big-pickle` **(gratuito)** | 2 | 2/2 | 0 | 0 |
 | Supervisionado | componente de UI + teste | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 0 | 0 |
-| Supervisionado | integração de página + teste (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 3 | 3/3⁶ | 0 | 0 |
+| Supervisionado | integração de página + teste (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 4 | 3/4⁶ ¹⁴ | 0 | 0 |
 | Supervisionado | teste (edição de arquivo de teste existente) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 0/1¹³ | 0 | 0 |
 | Delegável | teste E2E (arquivo novo) | opencode / `big-pickle` **(gratuito)** | 1 | 0/1⁹ | — | **1** |
-| Delegável | teste E2E (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 1 | 0 |
+| Delegável | teste E2E (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 2 | 2/2 | 0,5 | 0 |
 | Delegável | teste E2E (arquivo novo) | opencode / `muse-spark-1.3-contributor-free` **(gratuito)** | 1 | 0/1¹² | 2 | 0 |
 | Supervisionado | edição em arquivo existente + integração de página + teste E2E | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 0 | 0 |
 | Delegável | lógica pura + teste, somente arquivos novos | codex / `gpt-5.6-luna` (medium) | 1 | 1/1 | 0 | 0 |
@@ -1067,6 +1067,10 @@ Atualizar a cada registro novo.
 ¹¹ No #043 o seletor de fechamento do E2E foi especificado de forma ambígua pelo plano porque havia dois elementos com o nome acessível `Fechar`; a correção foi feita pelo revisor. O E2E também ficou bloqueado antes do novo caso por uma expectativa preexistente da fixture.
 
 ¹³ #049: o runner reprovou só por +1 warning `unbound-method`, vindo do padrão do setter nativo que o plano mandou copiar do teste existente (o mesmo warning já existia na linha 244). Falha do plano, corrigida pelo revisor com tipagem local. Houve também um **incidente de protocolo** sem dano (sobrescrita temporária do arquivo com `git show HEAD:…`), anotado fora da coluna de falhas.
+
+¹⁴ #052: o portão reprovou só por +1 warning `no-unsafe-assignment`, gerado pelo bloco de serviço que o plano ditou literalmente (desestruturar `data` de `supabase.rpc` sem tipo gerado); o recuo do trecho inserido em `ActionPlans.tsx` também veio errado do plano. Ambos falha do plano, corrigidos pelo revisor seguindo `vehicleOdometerService.ts`. Incidente de protocolo sem dano: 2 arquivos temporários em `/tmp`, apagados pelo próprio executor.
+
+**Atualização (2026-09-14, Plano de Ação — Auditor responsável):** #050–#053, quatro etapas delegadas ao Tier C gratuito, todas no 1º degrau da cadeia, sem travamento de provedor e com **zero falhas de modelo**. `muse-spark-1.2-contributor-free` chega a 10 registros em "Supervisionado / edição em arquivo existente".
 
 **Atualização (2026-09-11):** o sumário inclui #028–#030, #031–#033 e agora #042–#043. "Supervisionado / edição em arquivo existente" com `muse-spark-1.2-contributor-free` permanece com **7 registros e 0 falhas de modelo**; #043 foi mantido em uma linha própria por combinar edição de página, integração e ajuste de E2E. Nas etapas desta sessão, as correções foram lacunas do plano: asserções de não vazamento no #042 e seletor acessível ambíguo no #043.
 
@@ -1344,3 +1348,177 @@ O executor entregou o script, passou o self-test 8/8 e então **reprovou os docu
 **Veredito:** aprovado após uma correção do revisor, **atribuída ao plano**, e um incidente de protocolo sem dano. Zero falhas de modelo. Primeiro registro da combinação "Supervisionado / teste (edição de arquivo de teste existente)".
 
 **Revisão aplicada:** **linha a linha** (Supervisionado + Tier C) — portão reexecutado duas vezes, leitura integral do bloco novo e do diff completo, conferência do log do executor e os 3 controles negativos.
+
+---
+
+### #050 — 2026-09-14 · Plano de Ação: Auditor responsável — Etapa 2 (regras puras: disponibilidade de ações e junção de nomes)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Grau** | D2 |
+| **AAII mínimo do grau** | 30 |
+| **Forma** | lógica pura + teste, só arquivos novos (4 arquivos) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --auto`, formato padrão, `timeout 1200`) |
+| **Modelo** | `opencode/big-pickle` |
+| `aaii` | escolha pela camada 1 (histórico): 4 registros na combinação, 0 falhas de modelo; ≤ 5 arquivos, teto de 32k suficiente |
+| **Custo marginal** | **zero absoluto** |
+| **Degraus da cadeia de fallback** | só o 1º — entregou em ~3 min, sem travamento |
+
+**Condições da especificação**
+
+| | |
+|---|---|
+| `manifesto` | **sim** |
+| `testes_literais` | **sim** |
+| `baseline` | **sim** |
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — só os 4 arquivos novos |
+| `portao_1a` | **sim** |
+| `ciclos` | **0** |
+| `regressoes` | **0** |
+| `lacunas` | **0** — só faltou a quebra de linha final em `actionPlanPermissions.ts` (acrescentada pelo revisor; transcrição idêntica ao plano no restante, conferida byte a byte) |
+
+**Números verificados independentemente pelo revisor:** tsc 0 · lint 0/264 · test:unit 258→260 arquivos, 2.423→2.448 testes (+25, exatamente o previsto)
+
+**Controles negativos executados pelo revisor** (arquivo restaurado e conferido por md5): `role === 'Yard Auditorx'` → 3 testes falham (os 2 previstos + o 6, cobertura mais forte que a prevista); `canApproveOrReject` com rank de Fleet Assistant → teste 19 falha.
+
+**Veredito:** aprovado sem correção de mérito. Zero falhas de modelo.
+
+**Revisão aplicada:** **revisão dirigida** (Delegável + Tier C) — leitura integral dos 2 arquivos criados e dos 25 testes contra as tabelas do plano, portão e 2 controles negativos.
+
+---
+
+### #051 — 2026-09-14 · Plano de Ação: Auditor responsável — Etapa 3 (modal do plano, modal de criação e menu)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Grau** | S2 |
+| **AAII mínimo do grau** | 38 |
+| **Forma** | edição em arquivo existente (3 componentes + 3 testes) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --auto`, formato padrão, `timeout 1200`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| `aaii` | escolha pela camada 1 (histórico): 9 registros na combinação, 0 falhas de modelo |
+| **Custo marginal** | **zero absoluto** |
+| **Degraus da cadeia de fallback** | só o 1º — entregou em ~2,5 min, sem travamento |
+
+**Condições da especificação**
+
+| | |
+|---|---|
+| `manifesto` | **sim** |
+| `testes_literais` | **sim** |
+| `baseline` | **sim** |
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — só os 6 arquivos do manifesto; testes só por acréscimo |
+| `portao_1a` | **sim** |
+| `ciclos` | **0** |
+| `regressoes` | **0** |
+| `lacunas` | **0** |
+
+**Números verificados independentemente pelo revisor:** tsc 0 · lint 0/264 · test:unit 260 arquivos, 2.448→2.456 (+8) · `grep "Yard Auditor"` nos 2 modais: nenhuma ocorrência
+
+**Controles negativos executados pelo revisor** (arquivo restaurado e conferido por md5): `getActionPlanActionAvailability(user?.role, undefined, plan)` → exatamente os testes 1 e 3 do Auditor falham.
+
+**Veredito:** aprovado sem correção. Zero falhas de modelo. O prompt antecipou o warning `require-await` do padrão `await act(async …)` sem `await` existente no arquivo — lição do #049 aplicada.
+
+**Revisão aplicada:** **linha a linha** (Supervisionado + Tier C) — diff completo dos 6 arquivos, conferência dos comandos do log (nenhum proibido), portão e controle negativo.
+
+---
+
+### #052 — 2026-09-14 · Plano de Ação: Auditor responsável — Etapa 4 (nomes para o Auditor na lista de planos)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Grau** | S2 |
+| **AAII mínimo do grau** | 38 |
+| **Forma** | integração de página + teste (arquivo novo de serviço) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --auto`, formato padrão, `timeout 1200`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| `aaii` | escolha pela camada 1 (histórico): 3 registros na combinação, 0 falhas de modelo |
+| **Custo marginal** | **zero absoluto** |
+| **Degraus da cadeia de fallback** | só o 1º — entregou em ~6,5 min, sem travamento |
+
+**Condições da especificação**
+
+| | |
+|---|---|
+| `manifesto` | **sim** |
+| `testes_literais` | **sim** |
+| `baseline` | **sim** |
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — só os 4 arquivos do manifesto |
+| `portao_1a` | **não** — lint 265 (+1)¹⁴ |
+| `ciclos` | **0** — 2 correções pelo revisor |
+| `regressoes` | **0** |
+| `lacunas` | **2**, ambas auto-reportadas ou visíveis no diff, ambas **falha do plano**: (1) `no-unsafe-assignment` no bloco literal do serviço — o executor reportou e sugeriu a correção certa, sem desviar do literal; (2) recuo de 10 espaços no trecho inserido em `ActionPlans.tsx`, copiado do plano |
+
+**Números verificados independentemente pelo revisor:** tsc 0 · lint 0/264 (após correção) · test:unit 261 arquivos, 2.461 (+5) · smoke 7/7
+
+**Incidente de protocolo (fora da coluna de falhas).** O executor criou `/tmp/test_rpc.ts` e `/tmp/lint_check.sh` para investigar o warning e os apagou ao final. Escrita fora do repositório estava proibida nominalmente no prompt. Sem dano. É a terceira ocorrência de desvio de protocolo deste modelo (#039, #049), sempre em investigação de lint — próximos prompts devem dar ao executor o comando exato de diagnóstico para que ele não improvise.
+
+**Controles negativos executados pelo revisor** (arquivo restaurado e conferido por md5): `user?.role !== 'Yard Auditorx'` → teste 1 do Auditor falha.
+
+**Veredito:** aprovado após 2 correções do revisor atribuídas ao plano. Zero falhas de modelo.
+
+**Revisão aplicada:** **linha a linha** (Supervisionado + Tier C) — diff completo, leitura dos 2 arquivos novos, conferência dos comandos do log, portão completo com smoke e controle negativo.
+
+---
+
+### #053 — 2026-09-14 · Plano de Ação: Auditor responsável — Etapa 5 (E2E real do Auditor: API autenticada + navegador)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Grau** | D2 |
+| **AAII mínimo do grau** | 30 |
+| **Forma** | teste E2E (arquivo novo) |
+| **Camada** | E2E |
+| **Ferramenta** | opencode (`opencode run --auto`, formato padrão, `timeout 1200`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| `aaii` | escolha pela camada 1 (histórico): 1 registro aprovado na combinação, contra 1 falha de modelo do `big-pickle` (#040) e estreia do `1.3` com lacuna (#047) |
+| **Custo marginal** | **zero absoluto** |
+| **Degraus da cadeia de fallback** | só o 1º — entregou em ~2 min, sem travamento |
+
+**Condições da especificação**
+
+| | |
+|---|---|
+| `manifesto` | **sim** |
+| `testes_literais` | **sim** |
+| `baseline` | **sim** |
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — só o arquivo novo; não executou o Playwright (proibido no prompt), só `--list` |
+| `portao_1a` | **sim** |
+| `ciclos` | **0** |
+| `regressoes` | **0** |
+| `lacunas` | **0** — os 11 cenários com todas as assertivas literais; helpers idênticos aos da spec de origem (diff vazio) |
+
+**Números verificados independentemente pelo revisor:** `PLAYWRIGHT_INCLUDE_PENDING=1 npx playwright test e2e/pending/action-plan-auditor-flow.spec.ts --project=auditor` em DEV → **11 passed, 0 skipped** na 1ª execução; SQL pós-execução: 0 planos `E2E Auditor %` residuais e 0 evidências recentes no Storage
+
+**Controles negativos executados pelo revisor** (arquivo restaurado e conferido por md5): o próprio roteiro traz o controle do banco — cenário 08 (gestor continua podendo) contra 03, 04 e 09 (Auditor recusado com a mensagem exata do gatilho).
+
+**Veredito:** aprovado sem correção. Zero falhas de modelo.
+
+**Revisão aplicada:** **revisão dirigida + execução real em DEV** (Delegável + Tier C).

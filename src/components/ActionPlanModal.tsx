@@ -5,11 +5,12 @@ import { useAuth } from '../context/AuthContext';
 import { useStorageFileUrl } from '../hooks/useStorageFileUrl';
 import { actionPlanToRow, actionStatusLabel, actionStatusColor } from '../lib/actionPlanMappers';
 import { actionPlanOriginOf } from '../lib/actionPlanOrigin';
+import { ACTION_PLAN_RESPONSIBLE_EXCLUDED_ROLES_FILTER, getActionPlanActionAvailability } from '../lib/actionPlanPermissions';
 import { getFleetTicketAttachmentSignedUrl, uploadActionPlanEvidence } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 
-import type { ActionPlan, ActionPlanStatus } from '../types';
+import type { ActionPlan } from '../types';
 
 
 interface Props {
@@ -24,26 +25,10 @@ interface ResponsibleOption {
   name: string;
 }
 
-const REASSIGNABLE_STATUSES: ActionPlanStatus[] = ['pending', 'in_progress', 'awaiting_conclusion'];
-
-const ROLE_RANK: Record<string, number> = {
-  'Driver': 1,
-  'Yard Auditor': 2,
-  'Fleet Assistant': 3,
-  'Fleet Analyst': 4,
-  'Supervisor': 5,
-  'Coordinator': 6,
-  'Manager': 7,
-  'Director': 8,
-  'Admin Master': 9,
-};
-
 export default function ActionPlanModal({ plan, onClose, onSaved, onReassigned }: Props) {
   const { user, currentClient } = useAuth();
-  const rank = ROLE_RANK[user?.role ?? ''] ?? 0;
-  const isAnalystPlus = rank >= 4;
-  const isAssistantPlus = rank >= 3;
-  const isCoordinatorPlus = rank >= ROLE_RANK['Coordinator'];
+  const { canClaim, canConclude, canApproveOrReject, canReassignResponsible } =
+    getActionPlanActionAvailability(user?.role, user?.id, plan);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
@@ -72,8 +57,6 @@ export default function ActionPlanModal({ plan, onClose, onSaved, onReassigned }
     'vehicle-documents',
   );
 
-  const canReassignResponsible = isCoordinatorPlus && REASSIGNABLE_STATUSES.includes(plan.status);
-
   useEffect(() => {
     setPhotoLoadError(false);
     if (actionPlanOriginOf(plan) !== 'fleet_ticket' || !plan.photoUrl) {
@@ -95,7 +78,7 @@ export default function ActionPlanModal({ plan, onClose, onSaved, onReassigned }
         .from('profiles')
         .select('id, name')
         .eq('client_id', currentClient.id)
-        .not('role', 'in', '("Driver","Yard Auditor")')
+        .not('role', 'in', ACTION_PLAN_RESPONSIBLE_EXCLUDED_ROLES_FILTER)
         .order('name');
       setResponsibleOptions((data ?? []) as ResponsibleOption[]);
     })();
@@ -196,12 +179,6 @@ export default function ActionPlanModal({ plan, onClose, onSaved, onReassigned }
 
   const fmtDate = (iso?: string) =>
     iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : undefined;
-
-  const canClaim = plan.status === 'pending' && isAssistantPlus;
-  const canConclude =
-    plan.status === 'in_progress' &&
-    (plan.claimedBy === user?.id || isAnalystPlus);
-  const canApproveOrReject = plan.status === 'awaiting_conclusion' && isAnalystPlus;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4">

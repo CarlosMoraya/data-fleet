@@ -247,4 +247,64 @@ describe('ActionPlanModal — reatribuição de responsável', () => {
     });
     expect(onReassigned).toHaveBeenCalled();
   });
+
+  it('filtra responsáveis por ("Driver") ao abrir a reatribuição', async () => {
+    authRole = 'Coordinator';
+    renderWithAct(
+      <ActionPlanModal plan={basePlan()} onClose={() => {}} onSaved={() => {}} />,
+    );
+
+    const openButton = Array.from(container.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Alterar responsável',
+    )!;
+    await act(async () => {
+      openButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(notMock).toHaveBeenCalledWith('role', 'in', '("Driver")');
+  });
+});
+
+describe('ActionPlanModal — Yard Auditor responsável', () => {
+  it('exibe Assumir esta ação quando pending e responsável é o próprio Auditor', () => {
+    authRole = 'Yard Auditor';
+    renderWithAct(
+      <ActionPlanModal plan={basePlan({ status: 'pending', responsibleId: 'user-1' })} onClose={() => {}} onSaved={() => {}} />,
+    );
+
+    expect(container.textContent).toContain('Assumir esta ação');
+    expect(container.textContent).not.toContain('Alterar responsável');
+  });
+
+  it('não exibe Assumir esta ação quando pending mas responsável é outro', () => {
+    authRole = 'Yard Auditor';
+    renderWithAct(
+      <ActionPlanModal plan={basePlan({ status: 'pending', responsibleId: 'resp-1' })} onClose={() => {}} onSaved={() => {}} />,
+    );
+
+    expect(container.textContent).not.toContain('Assumir esta ação');
+    expect(container.textContent).toContain('Ação sugerida');
+  });
+
+  it('exibe Enviar para aprovação quando in_progress e responsável é o próprio Auditor', () => {
+    authRole = 'Yard Auditor';
+    renderWithAct(
+      <ActionPlanModal plan={basePlan({ status: 'in_progress', responsibleId: 'user-1', claimedBy: 'other-9' })} onClose={() => {}} onSaved={() => {}} />,
+    );
+
+    expect(container.textContent).toContain('Enviar para aprovação');
+  });
+
+  it('exibe Conclusão enviada — aguardando aprovação e não exibe Aprovar/Rejeitar quando awaiting_conclusion', () => {
+    authRole = 'Yard Auditor';
+    renderWithAct(
+      <ActionPlanModal plan={basePlan({ status: 'awaiting_conclusion', responsibleId: 'user-1' })} onClose={() => {}} onSaved={() => {}} />,
+    );
+
+    expect(container.textContent).toContain('Conclusão enviada — aguardando aprovação');
+    expect(container.textContent).not.toContain('Aprovar conclusão');
+    expect(container.textContent).not.toContain('Rejeitar / Reabrir');
+  });
 });

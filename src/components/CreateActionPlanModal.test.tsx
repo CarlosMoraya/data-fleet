@@ -258,6 +258,23 @@ describe('CreateActionPlanModal — origem chamado', () => {
     const payload = insertMock.mock.calls[0][0] as Record<string, unknown>;
     expect(payload.observed_issue).toBeNull();
   });
+
+  it('filtra responsáveis por ("Driver") e lista Yard Auditor como opção', async () => {
+    const profilesQueryInstance = profilesQuery([{ id: 'aud-1', name: 'Carlos Auditor', role: 'Yard Auditor' }]);
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'checklist_responses') return checklistResponsesQuery([]);
+      if (table === 'profiles') return profilesQueryInstance;
+      if (table === 'action_plans') return { insert: insertMock };
+      throw new Error(`unexpected table ${table}`);
+    });
+    renderWithAct(
+      <CreateActionPlanModal origin={{ kind: 'fleetTicket', ticket: baseTicket() }} onClose={() => {}} onCreated={() => {}} />,
+    );
+    await flush();
+
+    expect(profilesQueryInstance.not).toHaveBeenCalledWith('role', 'in', '("Driver")');
+    expect(container.textContent).toContain('Carlos Auditor (Yard Auditor)');
+  });
 });
 
 describe('CreateActionPlanModal — origem checklist (regressão)', () => {

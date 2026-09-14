@@ -2,6 +2,24 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-09-14: Plano de Ação — Auditor responsável
+
+**Pedido:** permitir que gestores escolham o `Yard Auditor` como responsável por um plano de ação, e que o Auditor veja, assuma e envie para aprovação os planos sob sua responsabilidade.
+
+**Decisões do usuário.** O Auditor envia para aprovação, não conclui direto; vê só os planos em que é o responsável; nomes chegam por função restrita, não por policy nova em `profiles`/`checklists`; notas e evidência reaproveitam `completion_notes` + um arquivo (histórico com múltiplos anexos descartado). Arquivamento do `MEMORY.md` e limpeza do `AGENT-FRONTEND.md` ficaram para sessão própria.
+
+**Fatos medidos antes (DEV e PROD).** 4 policies em `action_plans` com impressões digitais idênticas nos dois ambientes; 0 planos com Auditor responsável (117 planos em PROD); 6 Auditores em DEV e 20 em PROD. Para o Auditor, `profiles` só devolve o próprio perfil e `checklists`/`checklist_responses` só os que ele preencheu — por isso os joins de nome voltariam vazios. Storage `vehicle-documents` já aceitava o upload de evidência. Plano de Ação não tem notificação — nada a estender.
+
+**Implementação.** Migration `20260914100000_yard_auditor_action_plan_responsible.sql`: 2 policies permissivas aditivas (SELECT e UPDATE recortadas por `responsible_id = auth.uid()` + tenant + papel), gatilho `fn_enforce_yard_auditor_action_plan_update` (`SECURITY INVOKER`, allowlist por `to_jsonb(NEW) - chaves`, só `pending → in_progress` com `claimed_by = auth.uid()` e `in_progress → awaiting_conclusion` com caminho de evidência travado, recusa por padrão) e RPC `get_yard_auditor_action_plan_labels` (`SECURITY DEFINER`, só nomes). Rollback e diagnóstico estrutural versionados. Frontend: `src/lib/actionPlanPermissions.ts` (disponibilidade de ações, tabela de rank local transcrita literalmente), `src/lib/actionPlanLabels.ts`, `src/services/actionPlanLabelsService.ts`; `ActionPlanModal`, `CreateActionPlanModal` (filtro de responsável só `Driver`), `Sidebar` (item "Plano de Ação" para o Auditor) e `ActionPlans` (junção de nomes só quando o papel é Auditor, com falha silenciosa para lista sem nomes).
+
+**Validações.** Migration aplicada em DEV pelo agente com autorização do usuário e em PROD pelo usuário (SQL Editor); diagnóstico conforme em PROD nas 7 seções, com as 4 impressões digitais originais iguais e md5 dos corpos das funções idêntico ao de DEV. Em DEV: diagnóstico conforme nas 7 seções e corpo das funções no banco idêntico ao arquivo (md5). E2E `action-plan-auditor-flow.spec.ts` com 11 passed em DEV (API autenticada real + navegador; massa e evidência limpas depois). Controles negativos: Auditor fora do ramo → 3 testes falham; aprovar com rank de Assistant → 1; modal sem `user.id` → 2; página sem a junção → 1. Validação manual de 8 passos confirmada pelo usuário. Portão final: tsc 0, lint 0 erros/264 warnings, unitários 2.461 em 261 arquivos (+38), smoke 7/7.
+
+**Execução.** Etapas 1 e 6 pelo agente planejador; Etapas 2–5 delegadas ao Tier C gratuito (registros #050–#053): `big-pickle` na 2, `muse-spark-1.2-contributor-free` nas 3, 4 e 5. Duas correções do revisor na Etapa 4, ambas falha do plano (bloco literal com `no-unsafe-assignment` e recuo). Um incidente de protocolo sem dano (arquivos temporários em `/tmp` na Etapa 4).
+
+**Ficou fora, deliberadamente (observações para sessões futuras):** Storage `vehicle-documents` legível por qualquer papel na pasta do tenant; `reassign_action_plan_responsible` aceita `Driver` via API direta; `canAccessRoute` não restringe rotas do Auditor; `canConclude` de papéis não Auditor dá `true` com `claimedBy` e `userId` ambos ausentes (transcrito sem alteração); listas de responsável incluem `Workshop`, `Financeiro`, `Coupling Agent` e `Operations Manager`; mensagens `YARD_AUDITOR_*` aparecem cruas se provocadas fora da UI; `queryKey` de `ActionPlans` não inclui o papel (mitigado por `queryClient.clear()` no logout).
+
+---
+
 ## Sessão — 2026-09-14: Financeiro — OS cancelada na aprovação de orçamentos e ordem das abas
 
 **Pedido:** impedir que o aprovador aprove orçamento de OS já cancelada — em PROD havia 5 orçamentos pendentes, 2 deles de OS `Cancelado` — e trocar de posição as abas "Aprovações" e "Pagamentos".
