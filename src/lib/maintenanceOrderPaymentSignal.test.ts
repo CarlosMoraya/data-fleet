@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CANCELLED_ORDER_APPROVE_BLOCKED_TOOLTIP,
+  CANCELLED_ORDER_APPROVE_REJECTED_MESSAGE,
+  CANCELLED_ORDER_BUDGET_BADGE_LABEL,
   describeCancelPaymentExposure,
   describeInstallmentOriginSignal,
   describeMaintenanceOrderPaymentSignal,
+  isMaintenanceOrderCancelled,
   MAINTENANCE_ORDER_PAYMENT_SIGNAL_BADGE,
 } from './maintenanceOrderPaymentSignal';
 
@@ -84,5 +88,37 @@ describe('MAINTENANCE_ORDER_PAYMENT_SIGNAL_BADGE', () => {
       danger: 'border border-red-300 bg-white text-red-700',
       warning: 'border border-amber-300 bg-white text-amber-800',
     });
+  });
+});
+
+describe('isMaintenanceOrderCancelled', () => {
+  it('reconhece OS cancelada', () => {
+    expect(isMaintenanceOrderCancelled('Cancelado')).toBe(true);
+  });
+
+  it('não considera cancelada nenhuma OS em outro status', () => {
+    for (const status of [
+      'Aguardando orçamento',
+      'Aguardando aprovação',
+      'Orçamento aprovado',
+      'Serviço em execução',
+      'Concluído',
+      'Veículo retirado',
+    ] as const) {
+      expect(isMaintenanceOrderCancelled(status)).toBe(false);
+    }
+  });
+
+  it('não considera cancelada OS sem status', () => {
+    expect(isMaintenanceOrderCancelled(undefined)).toBe(false);
+    expect(isMaintenanceOrderCancelled(null)).toBe(false);
+  });
+});
+
+describe('textos da sinalização de OS cancelada na aprovação de orçamentos', () => {
+  it('mantém os textos exibidos ao aprovador', () => {
+    expect(CANCELLED_ORDER_BUDGET_BADGE_LABEL).toBe('OS CANCELADA');
+    expect(CANCELLED_ORDER_APPROVE_BLOCKED_TOOLTIP).toBe('OS cancelada — não é possível aprovar');
+    expect(CANCELLED_ORDER_APPROVE_REJECTED_MESSAGE).toBe('Não é possível aprovar: esta OS foi cancelada.');
   });
 });

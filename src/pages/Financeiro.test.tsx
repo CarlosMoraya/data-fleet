@@ -101,7 +101,7 @@ describe('Financeiro — shell de quatro abas', () => {
 
     await waitForAssertion(() => {
       const tabs = Array.from(container.querySelectorAll('[role="tab"]')).map((el) => el.textContent);
-      expect(tabs).toEqual(['Aprovação de Orçamentos', 'Pagamentos', 'Aprovações', 'Pagamentos Extras']);
+      expect(tabs).toEqual(['Aprovação de Orçamentos', 'Aprovações', 'Pagamentos', 'Pagamentos Extras']);
     });
   });
 
@@ -141,7 +141,7 @@ describe('Financeiro — shell de quatro abas', () => {
 
     await waitForAssertion(() => {
       const tabs = Array.from(container.querySelectorAll('[role="tab"]')).map((el) => el.textContent);
-      expect(tabs).toEqual(['Aprovação de Orçamentos', 'Pagamentos', 'Aprovações', 'Pagamentos Extras']);
+      expect(tabs).toEqual(['Aprovação de Orçamentos', 'Aprovações', 'Pagamentos', 'Pagamentos Extras']);
     });
   });
 

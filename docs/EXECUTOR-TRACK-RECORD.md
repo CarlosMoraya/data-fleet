@@ -1043,6 +1043,7 @@ Atualizar a cada registro novo.
 | Supervisionado / transcrição | edição de teste E2E | opencode / `big-pickle` **(gratuito)** | 2 | 2/2 | 0 | 0 |
 | Supervisionado | componente de UI + teste | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 0 | 0 |
 | Supervisionado | integração de página + teste (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 3 | 3/3⁶ | 0 | 0 |
+| Supervisionado | teste (edição de arquivo de teste existente) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 0/1¹³ | 0 | 0 |
 | Delegável | teste E2E (arquivo novo) | opencode / `big-pickle` **(gratuito)** | 1 | 0/1⁹ | — | **1** |
 | Delegável | teste E2E (arquivo novo) | opencode / `muse-spark-1.2-contributor-free` **(gratuito)** | 1 | 1/1 | 1 | 0 |
 | Delegável | teste E2E (arquivo novo) | opencode / `muse-spark-1.3-contributor-free` **(gratuito)** | 1 | 0/1¹² | 2 | 0 |
@@ -1064,6 +1065,8 @@ Atualizar a cada registro novo.
 ¹² Estreia do `muse-spark-1.3-contributor-free` (#047). `portao_1a` = não porque faltou a coluna `acquisition`, obrigatória em `vehicles`, o que derrubaria o `beforeAll` inteiro — mas essa lacuna é **falha do plano**, não do modelo. A única falha atribuída ao modelo foi a omissão de uma assertiva literal do roteiro. Nenhuma falha de modelo que justifique queima; combinação segue com amostra insuficiente (1 registro).
 
 ¹¹ No #043 o seletor de fechamento do E2E foi especificado de forma ambígua pelo plano porque havia dois elementos com o nome acessível `Fechar`; a correção foi feita pelo revisor. O E2E também ficou bloqueado antes do novo caso por uma expectativa preexistente da fixture.
+
+¹³ #049: o runner reprovou só por +1 warning `unbound-method`, vindo do padrão do setter nativo que o plano mandou copiar do teste existente (o mesmo warning já existia na linha 244). Falha do plano, corrigida pelo revisor com tipagem local. Houve também um **incidente de protocolo** sem dano (sobrescrita temporária do arquivo com `git show HEAD:…`), anotado fora da coluna de falhas.
 
 **Atualização (2026-09-11):** o sumário inclui #028–#030, #031–#033 e agora #042–#043. "Supervisionado / edição em arquivo existente" com `muse-spark-1.2-contributor-free` permanece com **7 registros e 0 falhas de modelo**; #043 foi mantido em uma linha própria por combinar edição de página, integração e ajuste de E2E. Nas etapas desta sessão, as correções foram lacunas do plano: asserções de não vazamento no #042 e seletor acessível ambíguo no #043.
 
@@ -1282,3 +1285,62 @@ O executor entregou o script, passou o self-test 8/8 e então **reprovou os docu
 **Veredito:** aprovado após duas correções do revisor, **ambas atribuídas ao plano**. Segunda execução do `muse-spark-1.3-contributor-free`, **zero falhas de modelo** — pela regra do Passo 4.2 (duas execuções limpas), a revisão desta forma pode cair para o mínimo da matriz na próxima vez. Combinação "Delegável / diagnóstico SQL" passa a ter 1 registro.
 
 **Revisão aplicada:** **linha a linha** (matriz daria "revisão dirigida"; elevada um nível por armadilha de falha silenciosa — diagnóstico de segurança mal escrito relata verde estando cego) — portão reexecutado, leitura integral do arquivo, `diff` das sondas transcritas contra o original, execução das 10 seções em DEV e PROD, e controle negativo contra a tabela irmã.
+
+---
+
+### #049 — 2026-09-14 · Financeiro: OS cancelada na aprovação de orçamentos — Etapa 4 (testes de integração)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Grau** | S2 |
+| **AAII mínimo do grau** | 38 |
+| **Forma** | teste (edição de arquivo de teste existente — só acréscimo ao final) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --auto`, formato padrão, `timeout 1200`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| `aaii` | **sem nota no índice** — escolha pela camada 1 (histórico): 9 registros em "Supervisionado / edição em arquivo existente", 0 falhas de modelo |
+| **Custo marginal** | **zero absoluto** |
+| **Escopo** | 1 arquivo existente, só acréscimo; proibição nominal de alterar linhas existentes, importar, usar `any`/`eslint-disable`, ler arquivo de ambiente e rodar comandos de Git que alteram o working tree |
+| **Degraus da cadeia de fallback** | só o 1º — entregou em ~4 min, sem travamento |
+
+**Condições da especificação**
+
+| | |
+|---|---|
+| `manifesto` | **sim** |
+| `testes_literais` | **sim** — 6 testes com assertivas literais, fixture literal, helpers locais nomeados e matriz ação × estado |
+| `baseline` | **sim** — 258 / 2.417 após a Etapa 3, lint 0/264 |
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — só `src/pages/BudgetApprovals.test.tsx`, só acréscimo (as 2 linhas removidas do diff são da Etapa 3, feita pelo planejador) |
+| `portao_1a` | **não** — lint 265 (+1) |
+| `ciclos` | **0** — correção de 3 linhas pelo revisor (teste de economia) |
+| `regressoes` | **0** |
+| `lacunas` | **1** — auto-reportada (o executor listou os 2 warnings no relatório final, sem apontar que um era novo) |
+
+**Números verificados independentemente pelo revisor**
+
+| | Baseline | Depois |
+|---|---|---|
+| `tsc --noEmit` | 0 erros | 0 erros |
+| `lint` | 0 erros / 264 warnings | 0 erros / 264 warnings (após a correção) |
+| `test:unit` | 258 arq / 2.417 testes | 258 arq / 2.423 testes |
+| `test:smoke` | 7/7 | 7/7 |
+
+**Lacunas e atribuição**
+
+1. **Warning `@typescript-eslint/unbound-method` novo no teste 4.** O plano mandou usar "o mesmo setter nativo do teste existente de reprovação" (`Object.getOwnPropertyDescriptor(...)?.set` + `setter?.call`), padrão que já gerava esse warning na linha 244 — a transcrição fiel duplicou o warning. **Atribuição: `falha do plano`.** Corrigido pelo revisor, sem `eslint-disable`, tipando o descritor como propriedade com função de `this` explícito (`{ set?: (this: HTMLTextAreaElement, value: string) => void }`).
+
+**Incidente de protocolo (fora da coluna de falhas).** Para medir o lint original, o executor copiou o arquivo para `/tmp/backup.tsx`, sobrescreveu-o com `git show HEAD:src/pages/BudgetApprovals.test.tsx >`, rodou o eslint e restaurou a cópia. O revisor conferiu a restauração: o mock reescrito na Etapa 3 e o código de produção estavam intactos. É **equivalente funcional de `git checkout`/`git restore`**, proibidos pelo guardrail, e é a segunda ocorrência deste executor (a primeira foi o `git stash` do #039). Prompts futuros devem proibir "sobrescrever qualquer arquivo com conteúdo do Git, por qualquer comando" e escrita fora do repositório.
+
+**Acertos que merecem registro.** As 6 assertivas literais, a fixture e os 3 helpers saíram exatamente como especificados, sem omissão — o tipo de falha do #047 não se repetiu. O executor rodou a verificação pedida e reportou números corretos (14/14).
+
+**Controles negativos executados pelo revisor** (arquivo restaurado e reconferido verde depois de cada um): `isCancelled = false` → testes 1, 2 e 3 falham; guarda removida → testes 5 e 6 falham; guarda incondicional → teste 4 falha. Exatamente o previsto no plano.
+
+**Veredito:** aprovado após uma correção do revisor, **atribuída ao plano**, e um incidente de protocolo sem dano. Zero falhas de modelo. Primeiro registro da combinação "Supervisionado / teste (edição de arquivo de teste existente)".
+
+**Revisão aplicada:** **linha a linha** (Supervisionado + Tier C) — portão reexecutado duas vezes, leitura integral do bloco novo e do diff completo, conferência do log do executor e os 3 controles negativos.

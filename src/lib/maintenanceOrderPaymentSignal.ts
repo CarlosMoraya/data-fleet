@@ -17,11 +17,19 @@ export const MAINTENANCE_ORDER_PAYMENT_SIGNAL_BADGE: Record<MaintenanceOrderPaym
 
 const SERVICE_FINISHED_STATUSES: MaintenanceStatus[] = ['Concluído', 'Veículo retirado'];
 
+export const CANCELLED_ORDER_BUDGET_BADGE_LABEL = 'OS CANCELADA';
+export const CANCELLED_ORDER_APPROVE_BLOCKED_TOOLTIP = 'OS cancelada — não é possível aprovar';
+export const CANCELLED_ORDER_APPROVE_REJECTED_MESSAGE = 'Não é possível aprovar: esta OS foi cancelada.';
+
+export function isMaintenanceOrderCancelled(status: MaintenanceStatus | undefined | null): boolean {
+  return status === 'Cancelado';
+}
+
 export function describeMaintenanceOrderPaymentSignal(
   status: MaintenanceStatus | undefined | null,
 ): MaintenanceOrderPaymentSignal | undefined {
   if (!status) return undefined;
-  if (status === 'Cancelado') return { label: 'OS cancelada', tone: 'danger' };
+  if (isMaintenanceOrderCancelled(status)) return { label: 'OS cancelada', tone: 'danger' };
   if (SERVICE_FINISHED_STATUSES.includes(status)) return undefined;
   return { label: 'Serviço não concluído', tone: 'warning' };
 }

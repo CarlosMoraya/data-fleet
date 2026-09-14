@@ -49,19 +49,6 @@ const TAB_DEFS: TabDef[] = [
     ),
   },
   {
-    id: 'payments',
-    label: 'Pagamentos',
-    title: 'Pagamentos',
-    description: 'Cadastre, consulte, exporte e marque parcelas como pagas',
-    icon: Wallet,
-    canAccess: canViewPayments,
-    render: () => (
-      <Suspense fallback={<RouteFallback />}>
-        <PaymentsTab />
-      </Suspense>
-    ),
-  },
-  {
     id: 'approvals',
     label: 'Aprovações',
     title: 'Aprovações',
@@ -71,6 +58,19 @@ const TAB_DEFS: TabDef[] = [
     render: (legacySegment) => (
       <Suspense fallback={<RouteFallback />}>
         <ApprovalsTab initialSegment={legacySegment} />
+      </Suspense>
+    ),
+  },
+  {
+    id: 'payments',
+    label: 'Pagamentos',
+    title: 'Pagamentos',
+    description: 'Cadastre, consulte, exporte e marque parcelas como pagas',
+    icon: Wallet,
+    canAccess: canViewPayments,
+    render: () => (
+      <Suspense fallback={<RouteFallback />}>
+        <PaymentsTab />
       </Suspense>
     ),
   },
@@ -153,7 +153,7 @@ export default function Financeiro() {
         <div>
           <h1 className="text-xl font-bold text-zinc-900">Financeiro</h1>
           <p className="text-sm text-zinc-500">
-            Orçamentos, pagamentos, aprovações e despesas extras
+            Orçamentos, aprovações, pagamentos e despesas extras
           </p>
         </div>
       </div>

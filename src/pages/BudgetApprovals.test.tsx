@@ -65,7 +65,9 @@ const orderRows = [
   },
 ];
 
-const updateMock = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+const updateSelectMock = vi.fn();
+const updateNeqMock = vi.fn();
+const updateMock = vi.fn();
 // Livro-razão de decisões de orçamento: toda aprovação/reprovação grava uma linha.
 const reviewInsertMock = vi.fn().mockResolvedValue({ error: null });
 
@@ -76,7 +78,11 @@ beforeEach(() => {
 
   fromMock.mockReset();
   rpcMock.mockReset();
-  updateMock.mockReset().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+  updateSelectMock.mockReset().mockResolvedValue({ data: [{ id: 'order-1' }], error: null });
+  updateNeqMock.mockReset().mockReturnValue({ select: updateSelectMock });
+  updateMock.mockReset().mockReturnValue({
+    eq: vi.fn().mockReturnValue({ neq: updateNeqMock, select: updateSelectMock }),
+  });
   reviewInsertMock.mockReset().mockResolvedValue({ error: null });
 
   fromMock.mockImplementation((table: string) => {
@@ -398,5 +404,155 @@ describe('BudgetApprovals — desconto e total líquido', () => {
         approved_cost: 10000,
       }),
     );
+  });
+});
+
+describe('BudgetApprovals — OS cancelada', () => {
+  const cancelledScenarioRows = [
+    { ...orderRows[0], status: 'Aguardando aprovação', budget_status: 'pendente' },
+    { ...orderRows[1], status: 'Cancelado', budget_status: 'pendente' },
+  ];
+
+  beforeEach(() => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'maintenance_orders') {
+        return {
+          select: () => ({
+            eq: () => ({
+              order: () => ({
+                eq: () => Promise.resolve({ data: cancelledScenarioRows, error: null }),
+              }),
+            }),
+          }),
+          update: updateMock,
+        };
+      }
+      if (table === 'maintenance_budget_items') {
+        return {
+          select: () => ({
+            eq: () => ({
+              order: () => Promise.resolve({ data: [], error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === 'maintenance_budget_reviews') {
+        return { insert: reviewInsertMock };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+  });
+
+  async function renderList() {
+    const root = createRoot(container);
+    container.__reactRoot = root;
+    act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <BudgetApprovals embedded />
+        </QueryClientProvider>,
+      );
+    });
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('OS-002');
+    });
+  }
+
+  function rowOf(os: string): HTMLTableRowElement {
+    return Array.from(container.querySelectorAll('tbody tr')).find((tr) => tr.textContent?.includes(os)) as HTMLTableRowElement;
+  }
+
+  function buttonIn(row: HTMLElement, label: string): HTMLButtonElement {
+    return Array.from(row.querySelectorAll('button')).find((b) => b.textContent?.includes(label)) as HTMLButtonElement;
+  }
+
+  it('destaca somente a linha da OS cancelada com o selo OS CANCELADA', async () => {
+    await renderList();
+    expect(rowOf('OS-002').textContent).toContain('OS CANCELADA');
+    expect(rowOf('OS-002').className).toContain('bg-red-50');
+    expect(rowOf('OS-001').textContent).toContain('OS-001');
+    expect(rowOf('OS-001').textContent).not.toContain('OS CANCELADA');
+    expect(rowOf('OS-001').className).not.toContain('bg-red-50');
+  });
+
+  it('desabilita Aprovar da OS cancelada com a dica e mantém Reprovar disponível', async () => {
+    await renderList();
+    expect(buttonIn(rowOf('OS-002'), 'Aprovar').disabled).toBe(true);
+    expect(buttonIn(rowOf('OS-002'), 'Aprovar').getAttribute('title')).toBe('OS cancelada — não é possível aprovar');
+    expect(buttonIn(rowOf('OS-002'), 'Reprovar').disabled).toBe(false);
+    expect(buttonIn(rowOf('OS-001'), 'Aprovar').disabled).toBe(false);
+    expect(buttonIn(rowOf('OS-001'), 'Aprovar').getAttribute('title')).toBe(null);
+  });
+
+  it('clicar em Aprovar da OS cancelada não grava nada', async () => {
+    await renderList();
+    await act(async () => {
+      buttonIn(rowOf('OS-002'), 'Aprovar').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(reviewInsertMock).not.toHaveBeenCalled();
+  });
+
+  it('reprovar a OS cancelada grava a reprovação sem a guarda de cancelamento', async () => {
+    await renderList();
+    act(() => {
+      buttonIn(rowOf('OS-002'), 'Reprovar').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    const textarea = container.querySelector('textarea') as HTMLTextAreaElement;
+    const descriptor: { set?: (this: HTMLTextAreaElement, value: string) => void } | undefined =
+      Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+    act(() => {
+      descriptor?.set?.call(textarea, 'OS cancelada');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const confirmButton = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('Confirmar reprovação')) as HTMLButtonElement;
+    await act(async () => {
+      confirmButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitForAssertion(() => {
+      expect(reviewInsertMock).toHaveBeenCalledWith(expect.objectContaining({ decision: 'reprovado', reason: 'OS cancelada', decided_by: 'user-1' }));
+    });
+    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ budget_status: 'reprovado', budget_rejection_reason: 'OS cancelada' }));
+    expect(updateNeqMock).not.toHaveBeenCalled();
+  });
+
+  it('aprovar OS ativa aplica a guarda de cancelamento e registra a decisão', async () => {
+    await renderList();
+    await act(async () => {
+      buttonIn(rowOf('OS-001'), 'Aprovar').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitForAssertion(() => {
+      expect(reviewInsertMock).toHaveBeenCalledWith(expect.objectContaining({ decision: 'aprovado', decided_by: 'user-1' }));
+    });
+    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ budget_status: 'aprovado' }));
+    expect(updateNeqMock).toHaveBeenCalledWith('status', 'Cancelado');
+    expect(updateSelectMock).toHaveBeenCalledWith('id');
+  });
+
+  it('recusa a aprovação quando a OS foi cancelada depois de a lista carregar', async () => {
+    updateSelectMock.mockResolvedValue({ data: [], error: null });
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    await renderList();
+    expect(buttonIn(rowOf('OS-001'), 'Aprovar').disabled).toBe(false);
+    await act(async () => {
+      buttonIn(rowOf('OS-001'), 'Aprovar').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitForAssertion(() => {
+      expect(alertSpy).toHaveBeenCalledWith('Não é possível aprovar: esta OS foi cancelada.');
+    });
+    expect(updateNeqMock).toHaveBeenCalledWith('status', 'Cancelado');
+    expect(reviewInsertMock).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
   });
 });

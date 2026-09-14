@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   BadgeCheck,
   CheckCircle2,
   ChevronDown,
@@ -21,6 +22,12 @@ import {
   type BudgetItem,
   type MaintenanceBudgetItemRow,
 } from '../lib/maintenanceMappers';
+import {
+  CANCELLED_ORDER_APPROVE_BLOCKED_TOOLTIP,
+  CANCELLED_ORDER_APPROVE_REJECTED_MESSAGE,
+  CANCELLED_ORDER_BUDGET_BADGE_LABEL,
+  isMaintenanceOrderCancelled,
+} from '../lib/maintenanceOrderPaymentSignal';
 import { openPrivateDocument } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
@@ -109,21 +116,28 @@ function OrderRow({ order, user, onApprove, onReject, approving, lastKmInfo }: O
     hasItems: items.length > 0,
   });
   const isAlwaysApprover = ALWAYS_APPROVE_ROLES.includes(user.role);
+  const isCancelled = isMaintenanceOrderCancelled(order.status);
+  const canClickApprove = !isCancelled && (withinLimit || isAlwaysApprover);
 
-  const limitTooltip = isAlwaysApprover
-    ? undefined
-    : loadingItems
-      ? 'Aguardando carregamento dos itens do orçamento...'
-      : items.length === 0
-        ? 'Orçamento sem itens cadastrados — não é possível validar contra sua alçada de aprovação.'
-        : !withinLimit
-          ? `Valor acima do seu limite de aprovação (${formatCurrency(user.budgetApprovalLimit)})`
-          : undefined;
+  const limitTooltip = isCancelled
+    ? CANCELLED_ORDER_APPROVE_BLOCKED_TOOLTIP
+    : isAlwaysApprover
+      ? undefined
+      : loadingItems
+        ? 'Aguardando carregamento dos itens do orçamento...'
+        : items.length === 0
+          ? 'Orçamento sem itens cadastrados — não é possível validar contra sua alçada de aprovação.'
+          : !withinLimit
+            ? `Valor acima do seu limite de aprovação (${formatCurrency(user.budgetApprovalLimit)})`
+            : undefined;
 
   return (
     <>
       <tr
-        className="cursor-pointer border-b border-zinc-100 transition-colors hover:bg-zinc-50"
+        className={cn(
+          'cursor-pointer border-b border-zinc-100 transition-colors',
+          isCancelled ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-zinc-50',
+        )}
         onClick={() => setExpanded(v => !v)}
       >
         <td className="w-6 px-4 py-3 text-zinc-400">
@@ -135,6 +149,12 @@ function OrderRow({ order, user, onApprove, onReject, approving, lastKmInfo }: O
           <span className="font-mono text-sm font-semibold text-zinc-800">{order.os}</span>
           {order.workshopOs && (
             <span className="ml-2 text-xs text-zinc-400">OS Of.: {order.workshopOs}</span>
+          )}
+          {isCancelled && (
+            <span className="mt-1 flex w-fit items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+              <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+              {CANCELLED_ORDER_BUDGET_BADGE_LABEL}
+            </span>
           )}
         </td>
         <td className="px-4 py-3 text-sm text-zinc-700">
@@ -172,12 +192,12 @@ function OrderRow({ order, user, onApprove, onReject, approving, lastKmInfo }: O
         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-2">
             <button
-              disabled={approving || !withinLimit && !isAlwaysApprover}
+              disabled={approving || !canClickApprove}
               onClick={() => onApprove(order.id)}
               title={limitTooltip}
               className={cn(
                 'flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-                withinLimit || isAlwaysApprover
+                canClickApprove
                   ? 'bg-green-100 text-green-700 hover:bg-green-200'
                   : 'cursor-not-allowed bg-zinc-100 text-zinc-400'
               )}
@@ -333,7 +353,7 @@ export default function BudgetApprovals({ embedded = false }: BudgetApprovalsPro
       }
 
       const currentOrder = orders.find(o => o.id === id);
-      const { error } = await supabase
+      const reviewUpdate = supabase
         .from('maintenance_orders')
         .update({
           budget_status: approve ? 'aprovado' : 'reprovado',
@@ -346,7 +366,13 @@ export default function BudgetApprovals({ embedded = false }: BudgetApprovalsPro
           ...(approve ? { approved_cost: total } : {}),
         })
         .eq('id', id);
+      // The list may be stale: the order can be cancelled between loading the queue and clicking approve.
+      const guardedUpdate = approve ? reviewUpdate.neq('status', 'Cancelado') : reviewUpdate;
+      const { data: updatedRows, error } = await guardedUpdate.select('id');
       if (error) throw error;
+      if (approve && (!updatedRows || updatedRows.length === 0)) {
+        throw new Error(CANCELLED_ORDER_APPROVE_REJECTED_MESSAGE);
+      }
 
       // Livro-razão de decisões: aprovação e reprovação passam a ficar
       // registradas com autor, motivo e valor.
@@ -367,6 +393,7 @@ export default function BudgetApprovals({ embedded = false }: BudgetApprovalsPro
       if (!variables.approve) setRejectingId(null);
     },
     onError: (err: unknown) => {
+      void queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
       const msg = err instanceof Error ? err.message : 'Falha ao processar aprovação.';
       window.alert(msg);
     },

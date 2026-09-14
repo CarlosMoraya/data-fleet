@@ -2,6 +2,24 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-09-14: Financeiro — OS cancelada na aprovação de orçamentos e ordem das abas
+
+**Pedido:** impedir que o aprovador aprove orçamento de OS já cancelada — em PROD havia 5 orçamentos pendentes, 2 deles de OS `Cancelado` — e trocar de posição as abas "Aprovações" e "Pagamentos".
+
+**Decisões do usuário.** Trava na aplicação (opção B), não no banco (opção C descartada). A essa opção foi acrescentada, com aprovação, uma **guarda na gravação**: sem ela a trava visual falharia com a lista desatualizada (`staleTime` de 3 min). Reprovar orçamento de OS cancelada continua livre, porque é a saída da fila; OS canceladas não são escondidas. O selo é sólido na fila de orçamentos e a pílula contornada da aba Aprovações fica como está — a diferença é intencional.
+
+**Implementação.** `isMaintenanceOrderCancelled` + 3 constantes de texto em `src/lib/maintenanceOrderPaymentSignal.ts` (a pílula existente passou a usar a função). Em `BudgetApprovals.tsx`: fundo `bg-red-50`, selo "OS CANCELADA" com `AlertTriangle`, "Aprovar" desabilitado com dica; aprovação como `UPDATE … .neq('status','Cancelado').select('id')` — 0 linhas lança a mensagem de recusa antes de `recordBudgetReview`, e `onError` recarrega a fila. Em `Financeiro.tsx`, o objeto `approvals` subiu uma posição em `TAB_DEFS` e o subtítulo acompanhou a ordem.
+
+**Validação real em DEV.** Com a fila aberta no navegador, a `OS-2609-2003` foi cancelada por SQL. O clique em "Aprovar" na página desatualizada produziu a recusa; SQL confirmou nada gravado (`Cancelado | pendente`, `approved_cost` nulo, 0 decisões no livro-razão); a lista se recarregou sozinha com selo, fundo e trava. A OS ficou cancelada com orçamento pendente em DEV, como fixture visual.
+
+**Validações:** portão tsc 0, lint 0 erros/264 warnings, unitários 2.423/2.423 em 258 arquivos (+10), smoke 7/7. Três controles negativos na Etapa 4 falharam como previsto (detecção removida → 3 testes; guarda removida → 2; guarda incondicional → 1). Escopo conferido contra snapshot de 113 caminhos sujos: somente os 10 arquivos do manifesto.
+
+**Execução:** Etapas 1, 2, 3, 5 e 6 pelo agente planejador; Etapa 4 (6 testes de integração) delegada ao Tier C — registro #049, `muse-spark-1.2-contributor-free`. Uma correção do revisor (1 warning `unbound-method` herdado do padrão que o plano mandou copiar — falha do plano) e um incidente de protocolo sem dano (sobrescrita temporária do arquivo com `git show HEAD:…`).
+
+**Ficou fora, deliberadamente:** reprovar os 2 orçamentos de OS canceladas em PROD (ação do aprovador); conferência de linhas afetadas na reprovação; aviso de orçamento pendente ao cancelar OS; `ROLE_RANK` duplicado.
+
+---
+
 ## Sessão — 2026-09-12 (2ª): Pendências da sessão anterior — porta da oficina, diagnóstico das 4 políticas, redação do EXECUTORS.md
 
 **Pedido:** fechar as três pendências que a sessão de 2026-09-12 deixou registradas. Nenhuma delas era correção de bug.
