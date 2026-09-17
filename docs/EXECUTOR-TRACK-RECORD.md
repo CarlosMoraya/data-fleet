@@ -1522,3 +1522,107 @@ O executor entregou o script, passou o self-test 8/8 e então **reprovou os docu
 **Veredito:** aprovado sem correção. Zero falhas de modelo.
 
 **Revisão aplicada:** **revisão dirigida + execução real em DEV** (Delegável + Tier C).
+
+---
+
+### #054 — 2026-09-16 · Pagamentos: NF truncada, Competência e ordenação — Etapa 1 (ordenação pura)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Grau** | D2 |
+| **AAII mínimo do grau** | 30 |
+| **Forma** | lógica pura + teste, só arquivos novos (2 arquivos) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --auto`, formato padrão, `timeout 1200`, via `scripts/plan-runner.mjs run 1`) |
+| **Modelo** | `opencode/big-pickle` |
+| `aaii` | `—` (não catalogado); escolha pela camada 1 — registros #005, #014, #018, #022, #028, #050 na combinação |
+| **Custo marginal** | **zero absoluto** |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim · `baseline` sim
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — só os 2 arquivos novos |
+| `portao_1a` | **sim** (na execução efetiva; a 1ª tentativa saiu com exit 127 porque `opencode` não estava no PATH do shell — **falha de ambiente/orquestração, não do modelo**; o executor não chegou a rodar) |
+| `ciclos` | **0** |
+| `regressoes` | **0** |
+| `lacunas` | **0** — só faltou a quebra de linha final nos 2 arquivos (acrescentada pelo revisor) |
+
+**Números verificados independentemente pelo revisor:** tsc 0 · lint 0/264 · test:unit 261→262 arquivos, 2.461→2.469 testes (+8, exatamente o previsto) · smoke 7/7
+
+**Controle negativo:** inverter também a posição dos ausentes em `desc` → casos 5 e 6 falham; arquivo restaurado e conferido por `diff`.
+
+**Veredito:** aprovado sem correção de mérito. Zero falhas de modelo. **Revisão aplicada:** revisão dirigida.
+
+---
+
+### #055 — 2026-09-16 · Pagamentos: NF truncada, Competência e ordenação — Etapa 2 (`TruncatedText` e `SortableHeader`)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Grau** | D2 |
+| **AAII mínimo do grau** | 30 |
+| **Forma** | componente de UI + teste, só arquivos novos (4 arquivos) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --auto`, formato padrão, `timeout 1200`, via `scripts/plan-runner.mjs run 2`) |
+| **Modelo** | `opencode/big-pickle` |
+| `aaii` | `—` (não catalogado); escolha pela camada 1 — registros #003, #019, #042 na forma componente de UI; 4 arquivos, dentro do teto de 32k |
+| **Custo marginal** | **zero absoluto** |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim · `baseline` sim
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — o runner acusou "fora do manifesto" os arquivos da Etapa 1, porque a checagem compara contra o snapshot e não é cumulativa; conferido por `diff`/mtime que o executor não os tocou (**falso positivo da ferramenta**) |
+| `portao_1a` | **sim** |
+| `ciclos` | **0** |
+| `regressoes` | **0** |
+| `lacunas` | **0** — o executor rodou `eslint --fix` nos 4 arquivos (autorizado pelo prompt) e acrescentou `import React` necessário ao tipo de retorno; faltou a quebra de linha final (acrescentada pelo revisor) |
+
+**Números verificados independentemente pelo revisor:** tsc 0 · lint 0/264 · test:unit 262→264 arquivos, 2.469→2.479 testes (+10) · smoke 7/7
+
+**Controles negativos:** remover o "…" → casos 2 e 4 de `TruncatedText` falham; remover `onClick={onSort}` → caso 4 de `SortableHeader` falha. Arquivos restaurados.
+
+**Veredito:** aprovado sem correção de mérito. Zero falhas de modelo. **Revisão aplicada:** revisão dirigida.
+
+---
+
+### #056 — 2026-09-16 · Pagamentos: NF truncada, Competência e ordenação — Etapa 3 (integração em `PaymentsTab`)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Grau** | S2 |
+| **AAII mínimo do grau** | 38 |
+| **Forma** | edição em arquivo existente (integração de página em produção, 522 linhas) + teste |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --auto`, formato padrão, `timeout 1200`, via `scripts/plan-runner.mjs run 3`) |
+| **Modelo** | `opencode/muse-spark-1.2-contributor-free` |
+| `aaii` | `—` (ausente do índice na coleta de 2026-09-11); escolha pela camada 1 — registros #020, #025, #032, #052 |
+| **Custo marginal** | **zero absoluto** |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim · `baseline` sim
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — só `PaymentsTab.tsx` e `PaymentsTab.test.tsx`; demais acusações do runner eram arquivos das Etapas 1–2 (hashes idênticos aos aprovados) e o `DESIGN.md` escrito pelo revisor |
+| `portao_1a` | **sim** |
+| `ciclos` | **0** (1 iteração interna do próprio executor antes de entregar) |
+| `regressoes` | **0** |
+| `lacunas` | **1, do plano** — o caso 6 não previa esperar o carregamento da lista antes do primeiro clique (o caso 5 previa); o executor detectou a falha ("Cabeçalho Competência não encontrado"), acrescentou `waitForAssertion` de sincronização e reportou. **Atribuição: falha do plano** |
+
+**Números verificados independentemente pelo revisor:** tsc 0 · lint 0/264 · test:unit 264 arquivos, 2.479→2.485 testes (+6) · smoke 7/7. O plano previa 265 arquivos — erro de conta do plano (`PaymentsTab.test.tsx` já existia).
+
+**Revisão linha a linha:** diff de `PaymentsTab.tsx` (+34/−3) bate com as 7 alterações; `filtered` preservado em seleção, `toggleAll`, XLSX e estado vazio. Log sem `git stash/checkout/reset/restore` nem leitura de `.env`.
+
+**Controle negativo:** `sorted.map` → `filtered.map` no `tbody` → casos 5 e 6 falham. Arquivo restaurado.
+
+**Veredito:** aprovado sem correção. Zero falhas de modelo. **Revisão aplicada:** linha a linha (Supervisionado + Tier C).

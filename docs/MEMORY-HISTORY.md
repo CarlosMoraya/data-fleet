@@ -2,6 +2,16 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-09-16: Financeiro → Pagamentos — NF truncada, Competência e ordenação
+
+- **Pedido do usuário**: NF/Fatura com só 10 caracteres e número completo em tooltip; nova coluna Competência; ordenar por Competência e Vencimento.
+- **Descobertas do planejamento**: `competencia_date` já existia (data completa, opcional), já vinha em `INSTALLMENT_SELECT` e já era exibida no detalhe da parcela em `dd/mm/aaaa` — nenhuma mudança de banco. A lista não é paginada (carregada inteira e filtrada no cliente), então a ordenação é client-side sobre `filtered`. O projeto não tinha cabeçalho ordenável nem componente de tooltip (só `title` nativo).
+- **Decisões do usuário**: Competência em `dd/mm/aaaa` (não `mm/aaaa`); parcelas sem Competência sempre no fim; no celular, toque expande a célula em vez de tooltip customizado; XLSX segue na ordem original.
+- **Execução**: Etapa 1 (`paymentInstallmentSort.ts`, 8 testes) e Etapa 2 (`TruncatedText`/`SortableHeader`, 10 testes) por `big-pickle`; Etapa 3 (integração em `PaymentsTab.tsx`, 6 testes de integração) por `muse-spark-1.2-contributor-free`; Etapa 4 (`docs/DESIGN.md`) pelo agente planejador. Primeira tentativa da Etapa 1 falhou com exit 127: `opencode` não estava no PATH do shell não interativo — corrigido prefixando `~/.npm-global/bin` no `command` da config.
+- **Revisão**: controles negativos nas três etapas delegadas (vazios invertidos em `desc` → 2 falhas; sem "…" e sem `onClick` → 3 falhas; `filtered.map` no `tbody` → 2 falhas). Revisor acrescentou a quebra de linha final em 6 arquivos novos. Falha do plano: o caso 6 da Etapa 3 não previa esperar o carregamento antes do primeiro clique (o executor acrescentou a espera) e a previsão de 265 arquivos de teste estava errada (são 264 — `PaymentsTab.test.tsx` já existia).
+- **Validação visual** (Playwright ad-hoc, Admin Master, DEV): colunas, ordem e `aria-sort` corretos em 63 parcelas; truncamento/expansão validados com NF longa injetada por interceptação de rede (sem tocar no banco), no desktop e com toque em 390px de largura. Achado anterior à sessão: em celular com altura normal a tabela de Pagamentos fica sem altura útil (registrado em Observações do MEMORY).
+- **Portão final**: tsc 0 · lint 0/264 · unitários 2.485 em 264 arquivos · smoke 7/7.
+
 ## Sessão — 2026-09-14: Plano de Ação — Auditor responsável
 
 **Pedido:** permitir que gestores escolham o `Yard Auditor` como responsável por um plano de ação, e que o Auditor veja, assuma e envie para aprovação os planos sob sua responsabilidade.

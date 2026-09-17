@@ -100,6 +100,19 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+function headerTexts(): string[] {
+  return Array.from(container.querySelectorAll('thead th')).map((th) => th.textContent ?? '');
+}
+function columnTexts(header: string): string[] {
+  const index = headerTexts().indexOf(header);
+  return Array.from(container.querySelectorAll('tbody tr')).map((tr) => tr.children[index]?.textContent ?? '');
+}
+function clickHeader(label: string): void {
+  const button = Array.from(container.querySelectorAll('thead th button')).find((b) => b.textContent === label);
+  if (!(button instanceof HTMLButtonElement)) throw new Error(`Cabeçalho ${label} não encontrado`);
+  act(() => { button.click(); });
+}
+
 describe('PaymentsTab', () => {
   it('oferece apenas exportação XLSX (CSV removido)', async () => {
     listInstallmentsMock.mockResolvedValue([installment()]);
@@ -295,6 +308,108 @@ describe('PaymentsTab', () => {
       const row = container.querySelector('tbody tr');
       expect(row?.textContent).toContain('Extra');
       expect(row?.textContent).not.toContain('OS cancelada');
+    });
+  });
+
+  it('exibe a coluna Competência imediatamente antes de Vencimento', async () => {
+    listInstallmentsMock.mockResolvedValue([installment({ competenciaDate: '2026-08-15', dueDate: '2026-09-10' })]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      expect(headerTexts().indexOf('Competência')).toBe(headerTexts().indexOf('Vencimento') - 1);
+      expect(headerTexts().indexOf('Competência')).toBeGreaterThan(-1);
+      expect(columnTexts('Competência')).toEqual(['15/08/2026']);
+      expect(columnTexts('Vencimento')).toEqual(['10/09/2026']);
+    });
+  });
+
+  it('mostra travessão na Competência quando a parcela não tem a data', async () => {
+    listInstallmentsMock.mockResolvedValue([installment({ competenciaDate: undefined })]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      expect(columnTexts('Competência')).toEqual(['—']);
+    });
+  });
+
+  it('exibe só os 10 primeiros caracteres da NF longa, com o número completo na dica', async () => {
+    listInstallmentsMock.mockResolvedValue([installment({ invoiceNumber: 'NF123456789012' })]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      expect(columnTexts('NF / Fatura')).toEqual(['NF12345678…']);
+      expect(container.querySelector('tbody button[title="NF123456789012"]')).not.toBeNull();
+    });
+  });
+
+  it('mantém a NF curta inteira e sem botão de expansão', async () => {
+    listInstallmentsMock.mockResolvedValue([installment({ invoiceNumber: 'NF-1' })]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      expect(columnTexts('NF / Fatura')).toEqual(['NF-1']);
+      expect(container.querySelector('tbody button[title="NF-1"]')).toBeNull();
+    });
+  });
+
+  it('ordena por Vencimento ao clicar no cabeçalho, alternando a direção', async () => {
+    listInstallmentsMock.mockResolvedValue([
+      installment({ id: 'i1', invoiceNumber: 'NF-A', dueDate: '2026-09-10' }),
+      installment({ id: 'i2', invoiceNumber: 'NF-B', dueDate: '2026-08-05' }),
+      installment({ id: 'i3', invoiceNumber: 'NF-C', dueDate: '2026-10-01' }),
+    ]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      expect(columnTexts('NF / Fatura')).toEqual(['NF-A', 'NF-B', 'NF-C']);
+    });
+
+    clickHeader('Vencimento');
+
+    await waitForAssertion(() => {
+      expect(columnTexts('NF / Fatura')).toEqual(['NF-B', 'NF-A', 'NF-C']);
+      const th = Array.from(container.querySelectorAll('thead th')).find((el) => el.textContent === 'Vencimento');
+      expect(th?.getAttribute('aria-sort')).toBe('ascending');
+    });
+
+    clickHeader('Vencimento');
+
+    await waitForAssertion(() => {
+      expect(columnTexts('NF / Fatura')).toEqual(['NF-C', 'NF-A', 'NF-B']);
+      const th = Array.from(container.querySelectorAll('thead th')).find((el) => el.textContent === 'Vencimento');
+      expect(th?.getAttribute('aria-sort')).toBe('descending');
+    });
+  });
+
+  it('ordena por Competência deixando parcelas sem Competência no fim', async () => {
+    listInstallmentsMock.mockResolvedValue([
+      installment({ id: 'i1', invoiceNumber: 'NF-A', competenciaDate: undefined }),
+      installment({ id: 'i2', invoiceNumber: 'NF-B', competenciaDate: '2026-08-01' }),
+      installment({ id: 'i3', invoiceNumber: 'NF-C', competenciaDate: '2026-07-01' }),
+    ]);
+    renderTab();
+
+    await waitForAssertion(() => {
+      expect(headerTexts()).toContain('Competência');
+    });
+
+    clickHeader('Competência');
+
+    await waitForAssertion(() => {
+      expect(columnTexts('NF / Fatura')).toEqual(['NF-C', 'NF-B', 'NF-A']);
+    });
+
+    clickHeader('Competência');
+
+    await waitForAssertion(() => {
+      expect(columnTexts('NF / Fatura')).toEqual(['NF-B', 'NF-C', 'NF-A']);
+    });
+
+    clickHeader('Vencimento');
+
+    await waitForAssertion(() => {
+      const th = Array.from(container.querySelectorAll('thead th')).find((el) => el.textContent === 'Competência');
+      expect(th?.getAttribute('aria-sort')).toBe('none');
     });
   });
 });

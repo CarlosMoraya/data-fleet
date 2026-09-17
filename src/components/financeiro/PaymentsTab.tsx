@@ -10,6 +10,12 @@ import {
   shouldShowExtraCancelHint,
 } from '../../lib/paymentCancellation';
 import { resolveExportSelection } from '../../lib/paymentExportSelection';
+import {
+  getNextPaymentInstallmentSort,
+  sortPaymentInstallments,
+  type PaymentInstallmentSort,
+  type PaymentInstallmentSortKey,
+} from '../../lib/paymentInstallmentSort';
 import { PAYMENT_INSTALLMENT_STATUS_LABELS } from '../../lib/paymentStatusDisplay';
 import { resolvePaymentVehiclePlate } from '../../lib/paymentVehiclePlate';
 import { canCreatePayments, canMarkPaid } from '../../lib/rolePermissions';
@@ -24,6 +30,8 @@ import {
   markInstallmentsPaid,
   type ApprovedOrderForPayment,
 } from '../../services/paymentInstallmentService';
+import SortableHeader from '../common/SortableHeader';
+import TruncatedText from '../common/TruncatedText';
 
 import CancelPaymentModal from './CancelPaymentModal';
 import PaymentInstallmentEditModal from './PaymentInstallmentEditModal';
@@ -59,6 +67,8 @@ const STATUS_OPTIONS: { value: '' | PaymentInstallmentStatus; label: string }[] 
   { value: 'pago', label: PAYMENT_INSTALLMENT_STATUS_LABELS.pago },
   { value: 'cancelado', label: PAYMENT_INSTALLMENT_STATUS_LABELS.cancelado },
 ];
+
+const INVOICE_NUMBER_VISIBLE_CHARS = 10;
 
 function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -96,6 +106,7 @@ export default function PaymentsTab(): React.ReactElement {
   const [viewing, setViewing] = useState<PaymentInstallment | null>(null);
   const [cancelling, setCancelling] = useState<PaymentInstallment | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [sort, setSort] = useState<PaymentInstallmentSort | null>(null);
 
   const activeClientId = currentClient?.id ?? undefined;
 
@@ -143,6 +154,14 @@ export default function PaymentsTab(): React.ReactElement {
       return true;
     });
   }, [installments, filterInvoice, filterPlate, filterStatus, filterSource]);
+
+  const sorted = useMemo(() => sortPaymentInstallments(filtered, sort), [filtered, sort]);
+
+  const handleSort = (key: PaymentInstallmentSortKey) => {
+    setSort((current) => getNextPaymentInstallmentSort(current, key));
+  };
+
+  const directionFor = (key: PaymentInstallmentSortKey) => (sort?.key === key ? sort.direction : null);
 
   const selectedInstallments = useMemo(
     () => filtered.filter((i) => selected.has(i.id)),
@@ -339,14 +358,25 @@ export default function PaymentsTab(): React.ReactElement {
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Origem</th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Parc.</th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Valor</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Vencimento</th>
+                  <SortableHeader
+                    label="Competência"
+                    direction={directionFor('competenciaDate')}
+                    onSort={() => handleSort('competenciaDate')}
+                    className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase"
+                  />
+                  <SortableHeader
+                    label="Vencimento"
+                    direction={directionFor('dueDate')}
+                    onSort={() => handleSort('dueDate')}
+                    className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase"
+                  />
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Forma</th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Status</th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Docs</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 bg-white">
-                {filtered.map((i) => {
+                {sorted.map((i) => {
                   const originSignal = describeInstallmentOriginSignal(i.sourceType, i.maintenanceOrderStatus);
                   return (
                     <tr key={i.id} className="hover:bg-zinc-50">
@@ -360,7 +390,7 @@ export default function PaymentsTab(): React.ReactElement {
                           />
                         </td>
                       )}
-                      <td className="px-3 py-2.5 font-mono text-xs font-semibold text-zinc-700">{i.invoiceNumber ?? '—'}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs font-semibold text-zinc-700">{i.invoiceNumber ? <TruncatedText text={i.invoiceNumber} maxLength={INVOICE_NUMBER_VISIBLE_CHARS} /> : '—'}</td>
                       <td className="px-3 py-2.5 font-mono text-xs text-zinc-600">{resolvePaymentVehiclePlate(i) ?? '—'}</td>
                       <td className="px-3 py-2.5">
                         <span className={cn(
@@ -372,6 +402,7 @@ export default function PaymentsTab(): React.ReactElement {
                       </td>
                       <td className="px-3 py-2.5 text-zinc-500">{i.installmentNumber}/{i.installmentsTotal}</td>
                       <td className="px-3 py-2.5 font-medium text-zinc-800">{formatCurrency(i.value)}</td>
+                      <td className="px-3 py-2.5 text-zinc-600">{i.competenciaDate ? formatDate(i.competenciaDate) : '—'}</td>
                       <td className="px-3 py-2.5 text-zinc-600">{formatDate(i.dueDate)}</td>
                       <td className="px-3 py-2.5 text-zinc-600">
                         {i.paymentMethod === 'pix' ? (
