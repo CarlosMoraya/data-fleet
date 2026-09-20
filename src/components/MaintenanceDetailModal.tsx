@@ -1,10 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import { X, Wrench, Building2, Calendar, User, FileText, DollarSign, Clock, ExternalLink, BadgeCheck, Ban, Image } from 'lucide-react';
+import { X, Wrench, Building2, Calendar, User, FileText, DollarSign, Clock, ExternalLink, BadgeCheck, Ban, Image, AlertTriangle } from 'lucide-react';
 import React from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { useStorageFileUrl } from '../hooks/useStorageFileUrl';
 import { formatDate } from '../lib/dateUtils';
+import {
+  formatBudgetOverrideAuthor,
+  formatBudgetOverrideReason,
+} from '../lib/maintenanceBudgetOverride';
 import {
   formatMaintenanceCancellationAuthor,
   formatMaintenanceCancellationReason,
@@ -160,6 +164,24 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
                 <Field
                   label="Motivo do cancelamento"
                   value={formatMaintenanceCancellationReason(order.cancellationReason)}
+                  className="col-span-2"
+                />
+              </div>
+            </section>
+          )}
+
+          {typeof order.budgetOverrideReason === 'string' && order.budgetOverrideReason.length > 0 && (
+            <section data-testid="budget-override-block">
+              <div className="mb-3 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <h3 className="text-sm font-semibold tracking-wide text-amber-600 uppercase">Exceção de orçamento</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <Field label="Autorizada por" value={formatBudgetOverrideAuthor(order.budgetOverrideByName)} />
+                <Field label="Data da exceção" value={formatDate(order.budgetOverrideAt)} />
+                <Field
+                  label="Motivo da exceção"
+                  value={formatBudgetOverrideReason(order.budgetOverrideReason)}
                   className="col-span-2"
                 />
               </div>

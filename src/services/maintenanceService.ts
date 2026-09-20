@@ -1,16 +1,24 @@
 import { normalizeBudgetSystem } from '../lib/budgetSystems';
 import { type BudgetLockKind } from '../lib/maintenanceBudgetLock';
+import {
+  BUDGET_OVERRIDE_REASON_INVALID_MESSAGE,
+  normalizeBudgetOverrideReason,
+} from '../lib/maintenanceBudgetOverride';
 import { shouldResubmitReopenedBudget } from '../lib/maintenanceBudgetReopen';
 import {
   MAINTENANCE_CANCELLATION_REASON_INVALID_MESSAGE,
   normalizeMaintenanceCancellationReason,
 } from '../lib/maintenanceCancellation';
 import { budgetItemFromRow } from '../lib/maintenanceMappers';
-import { canAdvanceMaintenanceStatus, describeStatusBlockReason } from '../lib/maintenanceStatusCoherence';
+import {
+  canAdvanceMaintenanceStatus,
+  describeStatusBlockReason,
+  requiresBudgetOverrideReason,
+} from '../lib/maintenanceStatusCoherence';
 import { uploadMaintenanceBudget } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 
-import type { MaintenanceOrder, BudgetItem, BudgetStatus, MaintenanceBudgetItemRow } from '../types/maintenance';
+import type { MaintenanceOrder, BudgetItem, BudgetStatus, MaintenanceBudgetItemRow, MaintenanceStatus } from '../types/maintenance';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -28,6 +36,10 @@ export interface SaveMaintenancePayload {
   budgetLock?: BudgetLockKind;
   /** Estado do orçamento ANTES deste salvamento — usado para o reenvio de OS reaberta. */
   currentBudgetStatus?: BudgetStatus;
+  /** Status da OS ANTES deste salvamento; `undefined` em criação. */
+  currentStatus?: MaintenanceStatus;
+  /** Motivo da exceção de orçamento, quando a transição exigir (Regra C). */
+  budgetOverrideReason?: string;
 }
 
 export interface MaintenanceBudgetApprovalDetails {
@@ -60,7 +72,10 @@ export function generateOSNumber(): string {
 export async function saveMaintenanceOrder(
   payload: SaveMaintenancePayload,
 ): Promise<string> {
-  const { data, budgetItems, budgetFile, profileId, currentClientId, budgetLock, currentBudgetStatus } = payload;
+  const {
+    data, budgetItems, budgetFile, profileId, currentClientId, budgetLock,
+    currentBudgetStatus, currentStatus, budgetOverrideReason,
+  } = payload;
 
   // Orçamento aprovado: a oficina só registra a execução do serviço. Nenhuma
   // coluna de orçamento é enviada e os itens não são tocados.
@@ -77,6 +92,19 @@ export async function saveMaintenanceOrder(
       .eq('id', data.id);
     if (error) throw error;
     return data.id;
+  }
+
+  // Regra A — 'Orçamento aprovado' só é gravável com o orçamento aprovado.
+  // Só revalida quando o status realmente muda, para não travar a edição de
+  // campos operacionais de uma OS já incoerente.
+  const statusChanged = data.status != null && data.status !== currentStatus;
+  if (statusChanged) {
+    if (!canAdvanceMaintenanceStatus(data.status!, currentBudgetStatus)) {
+      throw new Error(
+        describeStatusBlockReason(data.status!, currentBudgetStatus)
+        ?? 'Não foi possível atualizar o status da OS.',
+      );
+    }
   }
 
   // Em edição (Workshop ou Assistant), o client_id da própria OS prevalece;
@@ -107,6 +135,13 @@ export async function saveMaintenanceOrder(
         budget_discount: 0,
       }),
   };
+
+  // Regra C — entrar na faixa operacional sem orçamento aprovado exige motivo.
+  if (statusChanged && requiresBudgetOverrideReason(currentStatus, data.status!, currentBudgetStatus)) {
+    const normalized = normalizeBudgetOverrideReason(budgetOverrideReason ?? '');
+    if (normalized === null) throw new Error(BUDGET_OVERRIDE_REASON_INVALID_MESSAGE);
+    commonFields.budget_override_reason = normalized;
+  }
 
   let orderId: string;
 

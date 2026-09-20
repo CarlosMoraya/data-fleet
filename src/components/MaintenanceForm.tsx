@@ -5,10 +5,20 @@ import { useAuth } from '../context/AuthContext';
 import { extractBudgetData } from '../lib/budgetOcr';
 import { isKnownBudgetSystem } from '../lib/budgetSystems';
 import { isApprovedBudgetLocked, type BudgetLockKind } from '../lib/maintenanceBudgetLock';
+import {
+  BUDGET_OVERRIDE_REASON_INVALID_MESSAGE,
+  BUDGET_OVERRIDE_REASON_MAX_LENGTH,
+  describeBudgetOverrideWarning,
+  normalizeBudgetOverrideReason,
+} from '../lib/maintenanceBudgetOverride';
 import { canReopenBudget, isBudgetDiscountLocked, isBudgetUnderRevision } from '../lib/maintenanceBudgetReopen';
 import { validateMaintenanceCurrentKm } from '../lib/maintenanceKmValidation';
 import { budgetItemFromRow, calcBudgetSubtotal, type MaintenanceBudgetItemRow, BudgetItem } from '../lib/maintenanceMappers';
-import { canAdvanceMaintenanceStatus, describeStatusBlockReason } from '../lib/maintenanceStatusCoherence';
+import {
+  canAdvanceMaintenanceStatus,
+  describeStatusBlockReason,
+  requiresBudgetOverrideReason,
+} from '../lib/maintenanceStatusCoherence';
 import { openPrivateDocument, validateFile } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
 import { buildUiStateKey, readUiState, writeUiState, removeUiState, sanitizeDraft } from '../lib/uiStateStorage';
@@ -328,6 +338,11 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
         return;
       }
     }
+    if (requiresBudgetOverrideReason(order?.status, formData.status as MaintenanceStatus, order?.budgetStatus)
+        && normalizeBudgetOverrideReason(formData.budgetOverrideReason ?? '') === null) {
+      setError(BUDGET_OVERRIDE_REASON_INVALID_MESSAGE);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -606,7 +621,36 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
                           );
                         })}
                       </select>
+                      {order?.budgetStatus !== 'aprovado' && (
+                        <p className="mt-1 text-xs text-zinc-500" data-testid="budget-approved-hint">
+                          &quot;Orçamento aprovado&quot; é definido automaticamente quando o orçamento é aprovado em Financeiro → Aprovação de Orçamentos.
+                        </p>
+                      )}
                     </div>
+
+                    {requiresBudgetOverrideReason(order?.status, formData.status as MaintenanceStatus, order?.budgetStatus) && (
+                      <div className="sm:col-span-2" data-testid="budget-override-block">
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+                          {describeBudgetOverrideWarning(formData.status as MaintenanceStatus, order?.budgetStatus)}
+                        </div>
+                        <div className="mt-2">
+                          <Label htmlFor="budget-override-reason" required>Motivo da exceção</Label>
+                          <textarea
+                            id="budget-override-reason"
+                            name="budgetOverrideReason"
+                            data-testid="budget-override-reason"
+                            rows={3}
+                            maxLength={BUDGET_OVERRIDE_REASON_MAX_LENGTH}
+                            value={formData.budgetOverrideReason ?? ''}
+                            onChange={handleChange}
+                            className={inputClass}
+                          />
+                          <p className="mt-1 text-right text-xs text-zinc-500">
+                            {(formData.budgetOverrideReason ?? '').length}/{BUDGET_OVERRIDE_REASON_MAX_LENGTH}
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Linha 3 */}
                     <div>

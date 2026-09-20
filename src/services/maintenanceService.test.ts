@@ -198,6 +198,8 @@ describe('saveMaintenanceOrder — orçamento aprovado', () => {
       budgetItems: [item],
       budgetFile: null,
       profileId: 'p1',
+      currentBudgetStatus: 'aprovado',
+      currentStatus: 'Serviço em execução',
     });
 
     expect(fromMock).toHaveBeenCalledWith('maintenance_budget_items');
@@ -220,6 +222,8 @@ describe('saveMaintenanceOrder — orçamento aprovado', () => {
       budgetFile: null,
       profileId: 'p1',
       budgetLock: 'client',
+      currentBudgetStatus: 'aprovado',
+      currentStatus: 'Serviço em execução',
     });
 
     expect(orderId).toBe('os-1');
@@ -253,6 +257,8 @@ describe('saveMaintenanceOrder — orçamento aprovado', () => {
       budgetFile: new File(['x'], 'novo-orcamento.pdf', { type: 'application/pdf' }),
       profileId: 'p1',
       budgetLock: 'client',
+      currentBudgetStatus: 'aprovado',
+      currentStatus: 'Serviço em execução',
     });
 
     // Uma única escrita, sem o update que devolveria a OS para 'Aguardando aprovação'
@@ -422,5 +428,211 @@ describe('updateMaintenanceStatus', () => {
     await updateMaintenanceStatus('os-1', 'Serviço em execução', 'sem_orcamento');
 
     expect(update).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('saveMaintenanceOrder — trava de orçamento', () => {
+  function mockSupabase() {
+    const orderUpdate = vi.fn((_payload: Record<string, unknown>) => ({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }));
+    const orderInsert = vi.fn((_rows: Record<string, unknown>[]) => ({
+      select: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: { id: 'os-novo' }, error: null }),
+    }));
+    const itemsDelete = vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }));
+    const itemsInsert = vi.fn((_rows: Record<string, unknown>[]) => Promise.resolve({ error: null }));
+
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'maintenance_orders') return { update: orderUpdate, insert: orderInsert };
+      if (table === 'maintenance_budget_items') return { delete: itemsDelete, insert: itemsInsert };
+      throw new Error(`Tabela inesperada: ${table}`);
+    });
+
+    return { orderUpdate, orderInsert, itemsDelete, itemsInsert };
+  }
+
+  const base = {
+    clientId: 'c1',
+    vehicleId: 'v1',
+    workshopId: 'w1',
+    entryDate: '2026-09-20',
+    type: 'Corretiva' as const,
+    estimatedCost: 0,
+  };
+
+  beforeEach(() => {
+    fromMock.mockReset();
+  });
+
+  it('Regra A — recusa "Orçamento aprovado" sem aprovação do orçamento', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    await expect(saveMaintenanceOrder({
+      data: { ...base, id: 'os-1', status: 'Orçamento aprovado' },
+      budgetItems: [],
+      budgetFile: null,
+      profileId: 'p1',
+      currentStatus: 'Aguardando aprovação',
+      currentBudgetStatus: 'pendente',
+    })).rejects.toThrow(
+      'Não é possível mudar para "Orçamento aprovado": este status é definido automaticamente quando o orçamento é aprovado em Financeiro → Aprovação de Orçamentos.',
+    );
+
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it('Regra A — libera "Orçamento aprovado" quando o orçamento está aprovado', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    const orderId = await saveMaintenanceOrder({
+      data: { ...base, id: 'os-1', status: 'Orçamento aprovado' },
+      budgetItems: [],
+      budgetFile: null,
+      profileId: 'p1',
+      currentStatus: 'Aguardando aprovação',
+      currentBudgetStatus: 'aprovado',
+    });
+
+    expect(orderId).toBe('os-1');
+    expect(orderUpdate.mock.calls[0][0].status).toBe('Orçamento aprovado');
+  });
+
+  it('Regra A — status inalterado não é revalidado', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    const orderId = await saveMaintenanceOrder({
+      data: { ...base, id: 'os-1', status: 'Orçamento aprovado', currentKm: 99000 },
+      budgetItems: [],
+      budgetFile: null,
+      profileId: 'p1',
+      currentStatus: 'Orçamento aprovado',
+      currentBudgetStatus: 'reprovado',
+    });
+
+    expect(orderId).toBe('os-1');
+    expect(orderUpdate.mock.calls[0][0].current_km).toBe(99000);
+  });
+
+  it('Regra C — recusa a entrada na faixa sem motivo', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    await expect(saveMaintenanceOrder({
+      data: { ...base, id: 'os-1', status: 'Serviço em execução' },
+      budgetItems: [],
+      budgetFile: null,
+      profileId: 'p1',
+      currentStatus: 'Aguardando orçamento',
+      currentBudgetStatus: 'sem_orcamento',
+    })).rejects.toThrow('Informe o motivo da exceção (até 500 caracteres).');
+
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it('Regra C — motivo em branco não vale', async () => {
+    mockSupabase();
+
+    await expect(saveMaintenanceOrder({
+      data: { ...base, id: 'os-1', status: 'Serviço em execução' },
+      budgetItems: [],
+      budgetFile: null,
+      profileId: 'p1',
+      currentStatus: 'Aguardando orçamento',
+      currentBudgetStatus: 'sem_orcamento',
+      budgetOverrideReason: '    ',
+    })).rejects.toThrow('Informe o motivo da exceção (até 500 caracteres).');
+  });
+
+  it('Regra C — motivo válido é aparado e enviado', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    await saveMaintenanceOrder({
+      data: { ...base, id: 'os-1', status: 'Serviço em execução' },
+      budgetItems: [],
+      budgetFile: null,
+      profileId: 'p1',
+      currentStatus: 'Aguardando orçamento',
+      currentBudgetStatus: 'sem_orcamento',
+      budgetOverrideReason: '  motor fundido  ',
+    });
+
+    expect(orderUpdate.mock.calls[0][0].budget_override_reason).toBe('motor fundido');
+  });
+
+  it('Regra C — motivo acima do teto é recusado', async () => {
+    mockSupabase();
+
+    await expect(saveMaintenanceOrder({
+      data: { ...base, id: 'os-1', status: 'Serviço em execução' },
+      budgetItems: [],
+      budgetFile: null,
+      profileId: 'p1',
+      currentStatus: 'Aguardando orçamento',
+      currentBudgetStatus: 'sem_orcamento',
+      budgetOverrideReason: 'a'.repeat(501),
+    })).rejects.toThrow('Informe o motivo da exceção (até 500 caracteres).');
+  });
+
+  it('Regra C — dentro da faixa não exige motivo nem envia a coluna', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    await saveMaintenanceOrder({
+      data: { ...base, id: 'os-1', status: 'Concluído' },
+      budgetItems: [],
+      budgetFile: null,
+      profileId: 'p1',
+      currentStatus: 'Serviço em execução',
+      currentBudgetStatus: 'sem_orcamento',
+    });
+
+    expect(Object.keys(orderUpdate.mock.calls[0][0])).not.toContain('budget_override_reason');
+  });
+
+  it('Regra C — orçamento aprovado não exige motivo nem envia a coluna', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    await saveMaintenanceOrder({
+      data: { ...base, id: 'os-1', status: 'Serviço em execução' },
+      budgetItems: [],
+      budgetFile: null,
+      profileId: 'p1',
+      currentStatus: 'Orçamento aprovado',
+      currentBudgetStatus: 'aprovado',
+    });
+
+    expect(Object.keys(orderUpdate.mock.calls[0][0])).not.toContain('budget_override_reason');
+  });
+
+  it('Regra C — criação direta em "Veículo retirado" exige motivo', async () => {
+    const { orderInsert } = mockSupabase();
+
+    await expect(saveMaintenanceOrder({
+      data: { ...base, id: undefined, status: 'Veículo retirado' },
+      budgetItems: [],
+      budgetFile: null,
+      profileId: 'p1',
+      currentStatus: undefined,
+      currentBudgetStatus: undefined,
+    })).rejects.toThrow('Informe o motivo da exceção (até 500 caracteres).');
+
+    expect(orderInsert).not.toHaveBeenCalled();
+  });
+
+  it('Regra B — o bloqueio duro tem precedência sobre a exceção', async () => {
+    const { orderUpdate } = mockSupabase();
+
+    await expect(saveMaintenanceOrder({
+      data: { ...base, id: 'os-1', status: 'Concluído' },
+      budgetItems: [],
+      budgetFile: null,
+      profileId: 'p1',
+      currentStatus: 'Aguardando aprovação',
+      currentBudgetStatus: 'pendente',
+      budgetOverrideReason: 'qualquer motivo',
+    })).rejects.toThrow('Não é possível mudar para "Concluído": o orçamento ainda está aguardando aprovação.');
+
+    expect(orderUpdate).not.toHaveBeenCalled();
   });
 });

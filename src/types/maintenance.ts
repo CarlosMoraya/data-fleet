@@ -35,6 +35,10 @@ export interface MaintenanceOrder {
   cancelledById?: string;
   cancellationReason?: string;
   cancelledByName?: string;
+  budgetOverrideReason?: string;
+  budgetOverrideById?: string;
+  budgetOverrideAt?: string;
+  budgetOverrideByName?: string;
   clientName?: string; // Populado quando Workshop vê múltiplas transportadoras
   clientId?: string;   // client_id da OS; necessário para Workshop no modo "Todos os Clientes"
   shipperName?: string;
@@ -98,6 +102,9 @@ export interface MaintenanceOrderRow {
   cancelled_at: string | null;
   cancelled_by_id: string | null;
   cancellation_reason: string | null;
+  budget_override_reason: string | null;
+  budget_override_by_id: string | null;
+  budget_override_at: string | null;
   warranty_revision_event_id: string | null;
   created_at: string;
   updated_at: string;
@@ -108,6 +115,7 @@ export interface MaintenanceOrderRow {
   profiles?: { name: string };
   budget_reviewer?: { name: string };
   cancelled_by?: { name: string } | null;
+  budget_override_by?: { name: string } | null;
   clients?: { name: string };
 }
 

@@ -263,6 +263,7 @@ export default function Maintenance() {
           profiles!created_by_id (name),
           budget_reviewer:profiles!budget_reviewed_by (name),
           cancelled_by:profiles!maintenance_orders_cancelled_by_id_fkey (name),
+          budget_override_by:profiles!maintenance_orders_budget_override_by_id_fkey (name),
           clients (name)
         `)
         .order('created_at', { ascending: false });
@@ -364,6 +365,7 @@ export default function Maintenance() {
       pendingPartPhotos,
       budgetLock,
       currentBudgetStatus,
+      currentStatus,
     }: {
       data: Partial<MaintenanceOrder>;
       budgetItems: BudgetItem[];
@@ -371,6 +373,7 @@ export default function Maintenance() {
       pendingPartPhotos: PartPhotoDraft[];
       budgetLock: BudgetLockKind | null;
       currentBudgetStatus?: BudgetStatus;
+      currentStatus?: MaintenanceStatus;
     }) => {
       if (!profile) throw new Error('Sessão inválida');
       const orderId = await saveMaintenanceOrder({
@@ -381,6 +384,8 @@ export default function Maintenance() {
         currentClientId: currentClient?.id,
         budgetLock: budgetLock ?? undefined,
         currentBudgetStatus,
+        currentStatus,
+        budgetOverrideReason: data.budgetOverrideReason,
       });
       if (pendingPartPhotos.length > 0) {
         const clientId = data.clientId ?? currentClient?.id;
@@ -928,6 +933,7 @@ export default function Maintenance() {
               pendingPartPhotos,
               budgetLock,
               currentBudgetStatus: orderToEdit?.budgetStatus,
+              currentStatus: orderToEdit?.status,
             });
           }}
           onRequestReopen={() => {

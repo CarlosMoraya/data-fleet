@@ -6,6 +6,7 @@ import {
   describeStatusBlockReason,
   isOrderPayable,
   PAYABLE_MAINTENANCE_STATUSES,
+  requiresBudgetOverrideReason,
 } from './maintenanceStatusCoherence';
 
 describe('canAdvanceMaintenanceStatus', () => {
@@ -98,5 +99,62 @@ describe('describeStatusBlockReason', () => {
   it('retorna undefined quando não há bloqueio', () => {
     expect(describeStatusBlockReason('Concluído', 'aprovado')).toBeUndefined();
     expect(describeStatusBlockReason('Cancelado', 'pendente')).toBeUndefined();
+  });
+});
+
+describe('canAdvanceMaintenanceStatus — Regra A', () => {
+  it('só libera "Orçamento aprovado" quando o orçamento está aprovado', () => {
+    expect(canAdvanceMaintenanceStatus('Orçamento aprovado', 'aprovado')).toBe(true);
+    expect(canAdvanceMaintenanceStatus('Orçamento aprovado', 'sem_orcamento')).toBe(false);
+    expect(canAdvanceMaintenanceStatus('Orçamento aprovado', 'pendente')).toBe(false);
+    expect(canAdvanceMaintenanceStatus('Orçamento aprovado', 'reprovado')).toBe(false);
+    expect(canAdvanceMaintenanceStatus('Orçamento aprovado', 'reaberto')).toBe(false);
+    expect(canAdvanceMaintenanceStatus('Orçamento aprovado', undefined)).toBe(false);
+    expect(canAdvanceMaintenanceStatus('Orçamento aprovado', null)).toBe(false);
+  });
+});
+
+describe('describeStatusBlockReason — Regra A', () => {
+  it('explica que o status vem da aprovação no Financeiro', () => {
+    expect(describeStatusBlockReason('Orçamento aprovado', 'sem_orcamento')).toBe(
+      'Não é possível mudar para "Orçamento aprovado": este status é definido automaticamente quando o orçamento é aprovado em Financeiro → Aprovação de Orçamentos.',
+    );
+  });
+
+  it('não bloqueia quando o orçamento está aprovado', () => {
+    expect(describeStatusBlockReason('Orçamento aprovado', 'aprovado')).toBeUndefined();
+  });
+});
+
+describe('requiresBudgetOverrideReason — Regra C', () => {
+  it('exige motivo ao entrar na faixa operacional sem orçamento aprovado', () => {
+    expect(requiresBudgetOverrideReason('Aguardando orçamento', 'Serviço em execução', 'sem_orcamento')).toBe(true);
+    expect(requiresBudgetOverrideReason('Aguardando orçamento', 'Serviço em execução', 'reprovado')).toBe(true);
+    expect(requiresBudgetOverrideReason('Aguardando aprovação', 'Concluído', 'sem_orcamento')).toBe(true);
+    expect(requiresBudgetOverrideReason('Orçamento aprovado', 'Serviço em execução', 'reprovado')).toBe(true);
+    expect(requiresBudgetOverrideReason(undefined, 'Veículo retirado', 'sem_orcamento')).toBe(true);
+    expect(requiresBudgetOverrideReason(null, 'Serviço em execução', 'sem_orcamento')).toBe(true);
+  });
+
+  it('não exige motivo em transições dentro da faixa operacional', () => {
+    expect(requiresBudgetOverrideReason('Serviço em execução', 'Concluído', 'sem_orcamento')).toBe(false);
+    expect(requiresBudgetOverrideReason('Concluído', 'Veículo retirado', 'sem_orcamento')).toBe(false);
+    expect(requiresBudgetOverrideReason('Concluído', 'Veículo retirado', 'reprovado')).toBe(false);
+    expect(requiresBudgetOverrideReason('Serviço em execução', 'Serviço em execução', 'sem_orcamento')).toBe(false);
+  });
+
+  it('não exige motivo quando o orçamento está aprovado', () => {
+    expect(requiresBudgetOverrideReason('Aguardando orçamento', 'Serviço em execução', 'aprovado')).toBe(false);
+  });
+
+  it('cede ao bloqueio duro de pendente e reaberto', () => {
+    expect(requiresBudgetOverrideReason('Aguardando orçamento', 'Serviço em execução', 'pendente')).toBe(false);
+    expect(requiresBudgetOverrideReason('Aguardando orçamento', 'Serviço em execução', 'reaberto')).toBe(false);
+  });
+
+  it('não exige motivo para alvos fora da faixa operacional', () => {
+    expect(requiresBudgetOverrideReason('Aguardando orçamento', 'Cancelado', 'sem_orcamento')).toBe(false);
+    expect(requiresBudgetOverrideReason('Aguardando orçamento', 'Aguardando aprovação', 'sem_orcamento')).toBe(false);
+    expect(requiresBudgetOverrideReason(undefined, 'Aguardando orçamento', 'sem_orcamento')).toBe(false);
   });
 });
