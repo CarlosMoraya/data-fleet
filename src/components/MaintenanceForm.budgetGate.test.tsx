@@ -156,6 +156,22 @@ describe('MaintenanceForm — trava de orçamento', () => {
     expect(container.querySelector('[data-testid="budget-approved-hint"]')).toBeNull();
   });
 
+  it('3b. desabilita "Aguardando aprovação" quando o orçamento já foi aprovado', async () => {
+    await renderForm(baseOrder({ status: 'Orçamento aprovado', budgetStatus: 'aprovado' }));
+
+    const option = optionByText('Aguardando aprovação');
+    expect(option.disabled).toBe(true);
+    expect(option.title).toBe(
+      'Este orçamento já foi aprovado no Financeiro, então a OS não volta para "Aguardando aprovação". Para revisá-lo, use "Reabrir orçamento".',
+    );
+  });
+
+  it('3c. mantém "Aguardando aprovação" habilitada sem orçamento aprovado', async () => {
+    await renderForm(baseOrder({ status: 'Aguardando orçamento', budgetStatus: 'sem_orcamento' }));
+
+    expect(optionByText('Aguardando aprovação').disabled).toBe(false);
+  });
+
   it('4. mostra o bloco de exceção ao escolher um status da faixa operacional', async () => {
     await renderForm(baseOrder({ status: 'Aguardando orçamento', budgetStatus: 'sem_orcamento' }));
 

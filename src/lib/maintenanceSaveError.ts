@@ -13,6 +13,10 @@
  */
 
 import { BUDGET_OVERRIDE_REASON_INVALID_MESSAGE } from './maintenanceBudgetOverride';
+import {
+  APPROVED_BUDGET_DOES_NOT_RETURN_MESSAGE,
+  BUDGET_APPROVED_STATUS_IS_AUTOMATIC_MESSAGE,
+} from './maintenanceStatusCoherence';
 
 export const MAINTENANCE_SAVE_FALLBACK_MESSAGE = 'Erro ao salvar. Tente novamente.';
 
@@ -33,13 +37,13 @@ export function describeMaintenanceSaveError(err: unknown): string {
   }
 
   if (message.includes('Orcamento ja aprovado')) {
-    return 'Este orçamento já foi aprovado no Financeiro, então a OS não volta para "Aguardando aprovação". Para revisá-lo, use "Reabrir orçamento".';
+    return APPROVED_BUDGET_DOES_NOT_RETURN_MESSAGE;
   }
   if (message.includes('Orcamento aguardando decisao')) {
     return 'O orçamento ainda está aguardando decisão no Financeiro. Aprove ou reprove o orçamento antes de avançar o status da OS.';
   }
   if (message.includes('Status Orcamento aprovado exige aprovacao')) {
-    return 'Não é possível mudar para "Orçamento aprovado": este status é definido automaticamente quando o orçamento é aprovado em Financeiro → Aprovação de Orçamentos.';
+    return BUDGET_APPROVED_STATUS_IS_AUTOMATIC_MESSAGE;
   }
   if (message.includes('Motivo obrigatorio') || message.includes('Motivo da excecao de orcamento excede')) {
     return BUDGET_OVERRIDE_REASON_INVALID_MESSAGE;

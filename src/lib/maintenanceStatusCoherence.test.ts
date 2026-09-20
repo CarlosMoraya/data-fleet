@@ -36,10 +36,13 @@ describe('canAdvanceMaintenanceStatus', () => {
   });
 
   it('não bloqueia estados que não exigem decisão de orçamento', () => {
-    for (const target of ['Aguardando orçamento', 'Aguardando aprovação'] as const) {
-      for (const budgetStatus of ['sem_orcamento', 'pendente', 'aprovado', 'reprovado', 'reaberto'] as const) {
-        expect(canAdvanceMaintenanceStatus(target, budgetStatus)).toBe(true);
-      }
+    for (const budgetStatus of ['sem_orcamento', 'pendente', 'aprovado', 'reprovado', 'reaberto'] as const) {
+      expect(canAdvanceMaintenanceStatus('Aguardando orçamento', budgetStatus)).toBe(true);
+    }
+    // 'Aguardando aprovação' com orçamento 'aprovado' deixou de ser livre em
+    // 2026-09-20 — ver o describe dedicado à volta para "Aguardando aprovação".
+    for (const budgetStatus of ['sem_orcamento', 'pendente', 'reprovado', 'reaberto'] as const) {
+      expect(canAdvanceMaintenanceStatus('Aguardando aprovação', budgetStatus)).toBe(true);
     }
   });
 });
@@ -156,5 +159,41 @@ describe('requiresBudgetOverrideReason — Regra C', () => {
     expect(requiresBudgetOverrideReason('Aguardando orçamento', 'Cancelado', 'sem_orcamento')).toBe(false);
     expect(requiresBudgetOverrideReason('Aguardando orçamento', 'Aguardando aprovação', 'sem_orcamento')).toBe(false);
     expect(requiresBudgetOverrideReason(undefined, 'Aguardando orçamento', 'sem_orcamento')).toBe(false);
+  });
+});
+
+describe('canAdvanceMaintenanceStatus — volta para "Aguardando aprovação"', () => {
+  it('bloqueia a volta quando o orçamento já foi aprovado', () => {
+    expect(canAdvanceMaintenanceStatus('Aguardando aprovação', 'aprovado')).toBe(false);
+  });
+
+  it('libera a volta em todos os demais estados do orçamento', () => {
+    expect(canAdvanceMaintenanceStatus('Aguardando aprovação', 'pendente')).toBe(true);
+    expect(canAdvanceMaintenanceStatus('Aguardando aprovação', 'reaberto')).toBe(true);
+    expect(canAdvanceMaintenanceStatus('Aguardando aprovação', 'reprovado')).toBe(true);
+    expect(canAdvanceMaintenanceStatus('Aguardando aprovação', 'sem_orcamento')).toBe(true);
+    expect(canAdvanceMaintenanceStatus('Aguardando aprovação', undefined)).toBe(true);
+    expect(canAdvanceMaintenanceStatus('Aguardando aprovação', null)).toBe(true);
+  });
+
+  it('não interfere nos demais alvos com orçamento aprovado', () => {
+    expect(canAdvanceMaintenanceStatus('Serviço em execução', 'aprovado')).toBe(true);
+    expect(canAdvanceMaintenanceStatus('Concluído', 'aprovado')).toBe(true);
+    expect(canAdvanceMaintenanceStatus('Veículo retirado', 'aprovado')).toBe(true);
+    expect(canAdvanceMaintenanceStatus('Aguardando orçamento', 'aprovado')).toBe(true);
+    expect(canAdvanceMaintenanceStatus('Cancelado', 'aprovado')).toBe(true);
+  });
+});
+
+describe('describeStatusBlockReason — volta para "Aguardando aprovação"', () => {
+  it('aponta "Reabrir orçamento" como caminho correto', () => {
+    expect(describeStatusBlockReason('Aguardando aprovação', 'aprovado')).toBe(
+      'Este orçamento já foi aprovado no Financeiro, então a OS não volta para "Aguardando aprovação". Para revisá-lo, use "Reabrir orçamento".',
+    );
+  });
+
+  it('não descreve bloqueio quando o orçamento não está aprovado', () => {
+    expect(describeStatusBlockReason('Aguardando aprovação', 'pendente')).toBeUndefined();
+    expect(describeStatusBlockReason('Aguardando aprovação', 'reaberto')).toBeUndefined();
   });
 });
