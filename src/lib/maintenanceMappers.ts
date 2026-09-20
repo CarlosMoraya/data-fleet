@@ -137,6 +137,8 @@ export function maintenanceFromRow(row: MaintenanceOrderRow): MaintenanceOrder {
     budgetRejectionReason: row.budget_rejection_reason || undefined,
     cancelledAt: row.cancelled_at || undefined,
     cancelledById: row.cancelled_by_id || undefined,
+    cancellationReason: row.cancellation_reason || undefined,
+    cancelledByName: row.cancelled_by?.name || undefined,
     clientName: row.clients?.name || undefined,
     clientId: row.client_id,
     shipperName: row.vehicles?.shippers?.name || undefined,

@@ -179,6 +179,37 @@ A 1ª etapa criada pela tela espelha `vehicles.first_revision_max_km` (só preen
 
 ---
 
+## 🔧 Módulo Manutenção — cancelamento de Ordem de Serviço
+
+### Motivo obrigatório (migration `20260919000000_maintenance_cancellation_reason.sql`)
+
+`maintenance_orders.cancellation_reason` (`TEXT`, nullable, **sem backfill**) guarda a justificativa do cancelamento. As colunas de auditoria `cancelled_at` e `cancelled_by_id` já existiam desde `add_cancelled_status_maintenance.sql`; o motivo se soma a elas.
+
+A obrigatoriedade é **de banco, não de interface**. `fn_enforce_maintenance_cancellation_reason` (`BEFORE UPDATE`, `SECURITY DEFINER`, `search_path=public`):
+
+- na transição `status <> 'Cancelado' → 'Cancelado'`, exige `btrim(cancellation_reason) <> ''` (`Motivo do cancelamento e obrigatorio`) e `char_length <= 500` (`Motivo do cancelamento excede 500 caracteres`);
+- normaliza o motivo com `btrim` e **carimba** `cancelled_by_id := auth.uid()` e `cancelled_at := now()`, ignorando o que o cliente enviou — a autoria não é forjável;
+- fora dessa transição, qualquer alteração de `cancellation_reason` é recusada (`Motivo do cancelamento so pode ser gravado no cancelamento da OS`): o motivo é imutável depois de gravado;
+- **escape hatch**: com `auth.uid() IS NULL` (SQL Editor / `service_role`) o gatilho devolve `NEW` sem validar, liberando reparo manual — mesmo padrão de `fn_lock_approved_budget_order_columns`.
+
+`enforce_workshop_maintenance_columns` ganhou `cancellation_reason` na lista de colunas protegidas contra o papel `Workshop`, ao lado de `cancelled_at` e `cancelled_by_id`. O `Workshop` não cancela OS de qualquer forma (`canWriteMaintenance` o exclui), mas a coluna de auditoria nova segue o mesmo regime das outras.
+
+**Ordem de gatilhos:** `trg_enforce_maintenance_cancellation_reason` dispara **antes** de `trg_enforce_workshop_maintenance_columns` (ordem alfabética de nome). Consequência intencional: uma tentativa de cancelamento por conta de oficina é barrada de todo modo — pelo motivo ausente, se não houver motivo, ou pela trava de papel, se houver.
+
+**Dado legado:** as 22 OS já canceladas em PROD em 2026-09-19 permanecem com `cancellation_reason` nulo (todas já tinham autor e data). A interface exibe `Não informado` nesses casos.
+
+### Contrato de aplicação
+
+- `normalizeMaintenanceCancellationReason` / `formatMaintenanceCancellationReason` / `formatMaintenanceCancellationAuthor` (`src/lib/maintenanceCancellation.ts`) são a fonte única da regra de formato no frontend: `trim` **antes** da checagem de comprimento, teto de 500, rótulos `Não informado` e `Não identificado`. Mesmo contrato de `src/lib/paymentCancellation.ts` — não-vazio, máximo 500, **sem mínimo de caracteres**.
+- `cancelMaintenanceOrder(id, cancelledById, reason)` (`src/services/maintenanceService.ts`) valida o motivo antes de tocar a rede e é o **único** ponto do código que escreve `status: 'Cancelado'`.
+- A query de `/manutencao` traz o nome do autor pelo embed `cancelled_by:profiles!maintenance_orders_cancelled_by_id_fkey (name)`, mapeado para `cancelledByName`. **Limitação conhecida:** o papel `Workshop` (rank 2) não satisfaz as policies de `profiles` (exigem rank ≥ 3 no mesmo tenant), então o embed devolve `null` e a oficina vê `Não identificado` — mesma degradação que já ocorre no campo "Criado por" da mesma tela.
+
+### Caminho único de cancelamento
+
+Em `src/pages/Maintenance.tsx`, tanto o botão ⊘ (`title="Cancelar OS"`) quanto a opção **Cancelar** do `<select title="Ações">` abrem o **mesmo** modal de confirmação. Antes de 2026-09-19 a opção do menu enviava o literal `'Cancelar'` a `updateMaintenanceStatus` como se fosse um `MaintenanceStatus`, sem confirmação e sem efeito útil — defeito registrado em `MEMORY.md` em 2026-09-10 e corrigido aqui. O aviso de parcelas lançadas (`describeCancelPaymentExposure`) e o rótulo condicional `Cancelar mesmo assim` permanecem inalterados.
+
+---
+
 ## 💸 Módulo Financeiro
 
 ### Shell e abas

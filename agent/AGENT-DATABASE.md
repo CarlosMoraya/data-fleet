@@ -52,14 +52,15 @@ Existem tabelas dedicadas para permitir que cada cliente (`client_id`) configure
 
 ## 📜 Histórico Recente de Migrações (Destaques)
 
-1.  **`20260914100000_yard_auditor_action_plan_responsible.sql`**: o `Yard Auditor` vê e altera **só** os planos de ação em que é o responsável — 2 policies aditivas em `action_plans` (as 4 originais intactas), gatilho `fn_enforce_yard_auditor_action_plan_update` com allowlist de colunas e 2 transições (`pending → in_progress`, `in_progress → awaiting_conclusion`), e RPC `SECURITY DEFINER` `get_yard_auditor_action_plan_labels` que devolve só nomes. Rollback em `migrations/rollback/`; diagnóstico `diagnostics/check-yard-auditor-action-plan.sql`.
-2.  **`20260912000000_harden_payment_installment_insert.sql`**: a policy `payment_installments_insert` passa a exigir `status = 'pendente_aprovacao'` e os sete campos de auditoria vazios na criação. Fecha escalação de status por chamada direta à API. Correção por policy, **não** por gatilho — mesmo padrão de `extra_payment_requests_insert`.
-3.  **`20260819000000_add_auditoria_day_interval.sql`**: Adiciona `auditoria_day_interval` a `checklist_day_intervals` (aditiva, `NULL` por padrão). Alimenta a sub-aba "Aderência" da página Checklists.
-4.  **`20260818000000_allow_operations_manager_audit_checklist.sql`**: Libera execução e consulta de checklists de Auditoria para o Operations Manager, restritas aos veículos do escopo atribuído ao perfil.
-5.  **`20260405000000_fix_workshop_partnership_rls.sql`**: Correção de recursão infinita (42P17) entre policies de oficinas.
-6.  **`20260326000000_fix_supervisor_coordinator_rls.sql`**: Atualização da hierarquia de roles e permissões de visibilidade.
-7.  **`20260324000000_create_tire_management.sql`**: Implementação completa do módulo de pneus.
-8.  **`20260319000000_add_budget_to_maintenance.sql`**: Campos de orçamento e auditoria em ordens de serviço.
+1.  **`20260919000000_maintenance_cancellation_reason.sql`**: motivo obrigatório no cancelamento de OS. Coluna aditiva `maintenance_orders.cancellation_reason` (nullable, sem backfill — as 22 OS canceladas em PROD ficam com `NULL`), gatilho `fn_enforce_maintenance_cancellation_reason` (`BEFORE UPDATE`, exige motivo não-vazio de até 500 caracteres na transição para `Cancelado`, carimba `cancelled_by_id`/`cancelled_at` a partir de `auth.uid()`, torna o motivo imutável depois de gravado, escape hatch com `auth.uid() IS NULL`) e `cancellation_reason` acrescentado à lista de colunas protegidas de `enforce_workshop_maintenance_columns`. Rollback em `migrations/rollback/`; diagnóstico `diagnostics/check-maintenance-cancellation-reason.sql` (5 seções, roda em DEV e PROD).
+2.  **`20260914100000_yard_auditor_action_plan_responsible.sql`**: o `Yard Auditor` vê e altera **só** os planos de ação em que é o responsável — 2 policies aditivas em `action_plans` (as 4 originais intactas), gatilho `fn_enforce_yard_auditor_action_plan_update` com allowlist de colunas e 2 transições (`pending → in_progress`, `in_progress → awaiting_conclusion`), e RPC `SECURITY DEFINER` `get_yard_auditor_action_plan_labels` que devolve só nomes. Rollback em `migrations/rollback/`; diagnóstico `diagnostics/check-yard-auditor-action-plan.sql`.
+3.  **`20260912000000_harden_payment_installment_insert.sql`**: a policy `payment_installments_insert` passa a exigir `status = 'pendente_aprovacao'` e os sete campos de auditoria vazios na criação. Fecha escalação de status por chamada direta à API. Correção por policy, **não** por gatilho — mesmo padrão de `extra_payment_requests_insert`.
+4.  **`20260819000000_add_auditoria_day_interval.sql`**: Adiciona `auditoria_day_interval` a `checklist_day_intervals` (aditiva, `NULL` por padrão). Alimenta a sub-aba "Aderência" da página Checklists.
+5.  **`20260818000000_allow_operations_manager_audit_checklist.sql`**: Libera execução e consulta de checklists de Auditoria para o Operations Manager, restritas aos veículos do escopo atribuído ao perfil.
+6.  **`20260405000000_fix_workshop_partnership_rls.sql`**: Correção de recursão infinita (42P17) entre policies de oficinas.
+7.  **`20260326000000_fix_supervisor_coordinator_rls.sql`**: Atualização da hierarquia de roles e permissões de visibilidade.
+8.  **`20260324000000_create_tire_management.sql`**: Implementação completa do módulo de pneus.
+9.  **`20260319000000_add_budget_to_maintenance.sql`**: Campos de orçamento e auditoria em ordens de serviço.
 
 > [!IMPORTANT]
 > Migrações são executadas manualmente no SQL Editor do Supabase. O projeto não utiliza sistema de migração por linha de comando no momento.

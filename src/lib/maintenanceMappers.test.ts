@@ -80,6 +80,7 @@ function makeMaintenanceRow(overrides: Partial<MaintenanceOrderRow> = {}): Maint
     budget_rejection_reason: null,
     cancelled_at: null,
     cancelled_by_id: null,
+    cancellation_reason: null,
     warranty_revision_event_id: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -99,6 +100,25 @@ describe('maintenanceFromRow — budgetRejectionReason', () => {
   it('maps null to undefined', () => {
     const row = makeMaintenanceRow({ budget_rejection_reason: null });
     expect(maintenanceFromRow(row).budgetRejectionReason).toBeUndefined();
+  });
+});
+
+describe('maintenanceFromRow — cancelamento', () => {
+  it('mapeia motivo e nome de quem cancelou', () => {
+    const row = makeMaintenanceRow({
+      cancellation_reason: 'Veículo vendido',
+      cancelled_by: { name: 'Ana Souza' },
+    });
+    const order = maintenanceFromRow(row);
+    expect(order.cancellationReason).toBe('Veículo vendido');
+    expect(order.cancelledByName).toBe('Ana Souza');
+  });
+
+  it('mapeia ausência de motivo e de autor para undefined', () => {
+    const row = makeMaintenanceRow({ cancellation_reason: null, cancelled_by: null });
+    const order = maintenanceFromRow(row);
+    expect(order.cancellationReason).toBeUndefined();
+    expect(order.cancelledByName).toBeUndefined();
   });
 });
 

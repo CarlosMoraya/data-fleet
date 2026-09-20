@@ -1,6 +1,10 @@
 import { normalizeBudgetSystem } from '../lib/budgetSystems';
 import { type BudgetLockKind } from '../lib/maintenanceBudgetLock';
 import { shouldResubmitReopenedBudget } from '../lib/maintenanceBudgetReopen';
+import {
+  MAINTENANCE_CANCELLATION_REASON_INVALID_MESSAGE,
+  normalizeMaintenanceCancellationReason,
+} from '../lib/maintenanceCancellation';
 import { budgetItemFromRow } from '../lib/maintenanceMappers';
 import { canAdvanceMaintenanceStatus, describeStatusBlockReason } from '../lib/maintenanceStatusCoherence';
 import { uploadMaintenanceBudget } from '../lib/storageHelpers';
@@ -272,18 +276,26 @@ export async function updateMaintenanceStatus(
 }
 
 /**
- * Cancela uma ordem de serviço.
+ * Cancela uma ordem de serviço. O motivo é obrigatório: além da trava de
+ * interface, o gatilho `fn_enforce_maintenance_cancellation_reason` recusa
+ * a transição sem motivo.
  */
 export async function cancelMaintenanceOrder(
   id: string,
   cancelledById: string | null,
+  reason: string,
 ): Promise<void> {
+  const normalized = normalizeMaintenanceCancellationReason(reason);
+  if (normalized === null) {
+    throw new Error(MAINTENANCE_CANCELLATION_REASON_INVALID_MESSAGE);
+  }
   const { error } = await supabase
     .from('maintenance_orders')
     .update({
       status: 'Cancelado',
       cancelled_at: new Date().toISOString(),
       cancelled_by_id: cancelledById,
+      cancellation_reason: normalized,
     })
     .eq('id', id);
   if (error) throw error;

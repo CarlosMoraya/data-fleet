@@ -1,10 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import { X, Wrench, Building2, Calendar, User, FileText, DollarSign, Clock, ExternalLink, BadgeCheck, Image } from 'lucide-react';
+import { X, Wrench, Building2, Calendar, User, FileText, DollarSign, Clock, ExternalLink, BadgeCheck, Ban, Image } from 'lucide-react';
 import React from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { useStorageFileUrl } from '../hooks/useStorageFileUrl';
 import { formatDate } from '../lib/dateUtils';
+import {
+  formatMaintenanceCancellationAuthor,
+  formatMaintenanceCancellationReason,
+} from '../lib/maintenanceCancellation';
 import { daysInWorkshop } from '../lib/maintenanceFilters';
 import { budgetItemFromRow, type MaintenanceBudgetItemRow } from '../lib/maintenanceMappers';
 import { canManagePartPhotos, canViewPartPhotos } from '../lib/rolePermissions';
@@ -144,6 +148,23 @@ export default function MaintenanceDetailModal({ order, onClose }: Props) {
 
         {/* Body */}
         <div className="space-y-6 overflow-y-auto p-6">
+          {order.status === 'Cancelado' && (
+            <section data-testid="maintenance-cancellation-block">
+              <div className="mb-3 flex items-center gap-2">
+                <Ban className="h-4 w-4 text-red-500" />
+                <h3 className="text-sm font-semibold tracking-wide text-red-600 uppercase">Cancelamento</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-4 rounded-xl border border-red-200 bg-red-50 p-4">
+                <Field label="Cancelada por" value={formatMaintenanceCancellationAuthor(order.cancelledByName)} />
+                <Field label="Data do cancelamento" value={formatDate(order.cancelledAt)} />
+                <Field
+                  label="Motivo do cancelamento"
+                  value={formatMaintenanceCancellationReason(order.cancellationReason)}
+                  className="col-span-2"
+                />
+              </div>
+            </section>
+          )}
 
           {/* Seção 1 — Identificação */}
           <section>

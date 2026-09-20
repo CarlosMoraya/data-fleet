@@ -66,6 +66,17 @@ O dashboard utiliza o princípio de "Progressive Disclosure", mostrando KPIs ger
 - Todos os modais financeiros usam `role="dialog"`, `aria-modal="true"` e título associado via `aria-labelledby`; fecham por botão e por Escape (Escape é ignorado enquanto uma submissão está em andamento).
 - **Pagamentos — NF/Fatura, Competência e ordenação** (2026-09-16): a coluna "NF / Fatura" mostra os 10 primeiros caracteres seguidos de "…" quando o número é maior; o número completo aparece na dica nativa (`title`) ao passar o mouse e, ao tocar/clicar, a célula se expande no lugar (novo toque recolhe) — componente `TruncatedText`. A coluna "Competência" (`dd/mm/aaaa`, "—" quando vazia) fica imediatamente antes de "Vencimento". Os cabeçalhos dessas duas colunas são ordenáveis (`SortableHeader`, `aria-sort`): 1º clique crescente, 2º decrescente; trocar de coluna reinicia em crescente; parcelas sem data ficam sempre no fim; sem clique, a ordem original é mantida. A ordenação não é persistida e **não** afeta a ordem do XLSX nem a seleção em lote.
 
+### Manutenção — cancelamento de OS (2026-09-19)
+
+- **Caminho único.** O botão ⊘ da linha e a opção **Cancelar** do menu "Ações" abrem o **mesmo** modal de confirmação. Não existe segundo modal, e não se usa `window.confirm` aqui — confirmação por diálogo próprio é o padrão de ação destrutiva com motivo, como no Financeiro.
+- **Modal de cancelamento.** Largura `max-w-md` (subiu de `max-w-sm` para acomodar o campo), a mesma do modal de reabertura de orçamento. Mantém o cabeçalho com ícone `Ban` em círculo `bg-red-100`, o bloco de contexto (OS, placa, status atual) e o aviso âmbar de parcelas lançadas.
+- **Campo de motivo.** `<textarea id="cancel-reason" rows={3} maxLength={500}>` com `<label>` "Motivo do cancelamento" seguido de asterisco `text-red-500`, e contador `n/500` alinhado à direita em `text-xs text-zinc-400`. O botão de confirmação fica **desabilitado** enquanto o motivo estiver vazio ou só com espaços — mesma mecânica do "Confirmar reabertura".
+- **Sem mínimo de caracteres.** O contrato é o mesmo dos outros quatro campos de motivo do produto: não-vazio após `trim`, máximo 500. Não introduzir piso de caracteres aqui.
+- **Erro dentro do modal.** Falha de gravação aparece em faixa `rounded-lg border border-red-200 bg-red-50 text-red-700` logo acima do rodapé, com o modal aberto e o texto digitado preservado. Nunca `window.alert`.
+- **Rótulo condicional preservado.** O botão continua alternando entre "Confirmar Cancelamento" e "Cancelar mesmo assim" conforme exista aviso de parcelas.
+- **Bloco "Cancelamento" no modal de visualização.** Em OS com status `Cancelado`, o `MaintenanceDetailModal` abre o corpo com uma `<section>` de cabeçalho `Ban` + título `text-red-600 uppercase`, e um cartão `rounded-xl border border-red-200 bg-red-50` em grade de 2 colunas: "Cancelada por", "Data do cancelamento" e, ocupando as duas colunas, "Motivo do cancelamento". Em OS não cancelada o bloco não é renderizado.
+- **Rótulos de ausência.** Motivo inexistente (OS canceladas antes desta mudança) exibe **"Não informado"**; autor não resolvível exibe **"Não identificado"**. Nunca campo em branco, nunca travessão nesses dois campos.
+
 ### Cadastros — filtros de listagem em multisseleção
 
 - Os filtros de lista de Veículos e Motoristas (Embarcador, Unidade Operacional, Pendência/Situação, Disponibilidade e Última rota) usam um dropdown de multisseleção em checkbox visual.

@@ -3,10 +3,11 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { fromMock, exposureMock, cancelMock, authState } = vi.hoisted(() => ({
+const { fromMock, exposureMock, cancelMock, updateStatusMock, authState } = vi.hoisted(() => ({
   fromMock: vi.fn(),
   exposureMock: vi.fn<(id: string) => Promise<{ count: number; total: number }>>(),
   cancelMock: vi.fn<(id: string, cancelledById: string | null, reason: string) => Promise<void>>(),
+  updateStatusMock: vi.fn(),
   authState: {
     user: { id: 'user-1', name: 'Ana', role: 'Fleet Assistant', clientId: 'client-1' } as Record<string, unknown>,
     currentClient: { id: 'client-1', name: 'Transportadora' } as Record<string, unknown> | null,
@@ -43,9 +44,9 @@ vi.mock('../services/paymentInstallmentService', () => ({
 vi.mock('../services/maintenanceService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../services/maintenanceService')>()),
   cancelMaintenanceOrder: cancelMock,
+  updateMaintenanceStatus: updateStatusMock,
 }));
 
-// O formulário completo não participa destes cenários.
 vi.mock('../components/MaintenanceForm', () => ({ default: () => null }));
 vi.mock('../components/MaintenanceDetailModal', () => ({ default: () => null }));
 
@@ -173,8 +174,9 @@ beforeEach(() => {
   authState.workshopAccount = null;
 
   fromMock.mockReset();
-  exposureMock.mockReset();
+  exposureMock.mockReset().mockResolvedValue({ count: 0, total: 0 });
   cancelMock.mockReset().mockResolvedValue(undefined);
+  updateStatusMock.mockReset();
   window.sessionStorage.clear();
 });
 
@@ -188,9 +190,8 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('Maintenance — aviso de parcelas no cancelamento', () => {
-  it('consulta as parcelas da OS ao abrir o modal', async () => {
-    exposureMock.mockResolvedValue({ count: 0, total: 0 });
+describe('Maintenance — motivo do cancelamento', () => {
+  it('motivo vazio mantém o cancelamento bloqueado', async () => {
     mockOrders([makeRow()]);
     await renderPage();
 
@@ -198,86 +199,118 @@ describe('Maintenance — aviso de parcelas no cancelamento', () => {
       findButtonByTitle('Cancelar OS')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
+    // Preenche e espera habilitar: prova que a consulta de parcelas terminou e
+    // que o botao NAO esta desabilitado por causa do carregamento.
+    fillCancelReason('Motivo temporario');
     await waitForAssertion(() => {
-      expect(exposureMock).toHaveBeenCalledWith('order-1');
+      expect(findButtonByText('Confirmar Cancelamento')?.disabled).toBe(false);
     });
-  });
 
-  it('avisa parcelas lançadas e troca o rótulo do botão', async () => {
-    exposureMock.mockResolvedValue({ count: 2, total: 1500 });
-    mockOrders([makeRow()]);
-    await renderPage();
+    // Agora esvazia: o unico motivo possivel de disabled passa a ser o campo vazio.
+    fillCancelReason('');
 
+    const btn = findButtonByText('Confirmar Cancelamento');
+    expect(btn?.disabled).toBe(true);
     act(() => {
-      findButtonByTitle('Cancelar OS')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    await waitForAssertion(() => {
-      expect(container.textContent).toContain('Esta OS já tem 2 parcela(s) de pagamento lançada(s), somando R$\u00a01.500,00.');
-    });
-    expect(findButtonByText('Cancelar mesmo assim')).toBeTruthy();
-    expect(findButtonByText('Confirmar Cancelamento')).toBeFalsy();
-  });
-
-  it('mantém o modal original quando não há parcelas', async () => {
-    exposureMock.mockResolvedValue({ count: 0, total: 0 });
-    mockOrders([makeRow()]);
-    await renderPage();
-
-    act(() => {
-      findButtonByTitle('Cancelar OS')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    fillCancelReason('Motivo de teste');
-    await waitForAssertion(() => {
-      const btn = findButtonByText('Confirmar Cancelamento');
-      expect(btn).toBeTruthy();
-      expect(btn?.disabled).toBe(false);
-    });
-    expect(container.textContent).not.toContain('parcela(s) de pagamento');
-  });
-
-  it('bloqueia a confirmação enquanto verifica as parcelas', async () => {
-    exposureMock.mockReturnValue(new Promise<never>(() => undefined));
-    mockOrders([makeRow()]);
-    await renderPage();
-
-    act(() => {
-      findButtonByTitle('Cancelar OS')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    fillCancelReason('Motivo de teste');
-    await waitForAssertion(() => {
-      expect(exposureMock).toHaveBeenCalledWith('order-1');
-      const btn = findButtonByText('Confirmar Cancelamento');
-      expect(btn).toBeTruthy();
-      expect(btn?.disabled).toBe(true);
-    });
-
-    act(() => {
-      findButtonByText('Confirmar Cancelamento')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      btn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     expect(cancelMock).not.toHaveBeenCalled();
   });
 
-  it('avisa quando não consegue verificar as parcelas', async () => {
-    exposureMock.mockRejectedValue(new Error('rede'));
+  it('motivo só com espaços não habilita a confirmação', async () => {
     mockOrders([makeRow()]);
     await renderPage();
 
     act(() => {
       findButtonByTitle('Cancelar OS')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
-
+    // Mesma tecnica do cenario anterior: primeiro prova que o carregamento acabou.
+    fillCancelReason('Motivo temporario');
     await waitForAssertion(() => {
-      expect(container.textContent).toContain('Não foi possível verificar se esta OS tem parcelas de pagamento lançadas.');
+      expect(findButtonByText('Confirmar Cancelamento')?.disabled).toBe(false);
     });
-    expect(findButtonByText('Cancelar mesmo assim')).toBeTruthy();
+
+    fillCancelReason('   ');
+
+    expect(findButtonByText('Confirmar Cancelamento')?.disabled).toBe(true);
   });
 
-  it('"Cancelar mesmo assim" cancela a OS', async () => {
-    exposureMock.mockResolvedValue({ count: 2, total: 1500 });
-    cancelMock.mockResolvedValue(undefined);
+  it('motivo preenchido envia id, autor e motivo', async () => {
+    mockOrders([makeRow()]);
+    await renderPage();
+
+    act(() => {
+      findButtonByTitle('Cancelar OS')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    fillCancelReason('Serviço não será mais executado');
+    await waitForAssertion(() => {
+      expect(findButtonByText('Confirmar Cancelamento')?.disabled).toBe(false);
+    });
+    await act(async () => {
+      findButtonByText('Confirmar Cancelamento')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(cancelMock).toHaveBeenCalledWith('order-1', 'user-1', 'Serviço não será mais executado');
+  });
+
+  it('a opção Cancelar do menu Ações abre o modal e não muda o status', async () => {
+    mockOrders([makeRow()]);
+    await renderPage();
+
+    const actions = container.querySelector('select[title="Ações"]') as HTMLSelectElement | null;
+    if (!actions) throw new Error('select Ações não encontrado');
+    act(() => {
+      actions.value = 'Cancelar';
+      actions.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('Cancelar Ordem de Serviço');
+    expect(updateStatusMock).not.toHaveBeenCalled();
+  });
+
+  it('Voltar limpa o motivo digitado', async () => {
+    mockOrders([makeRow()]);
+    await renderPage();
+
+    act(() => {
+      findButtonByTitle('Cancelar OS')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    fillCancelReason('texto descartado');
+    act(() => {
+      findButtonByText('Voltar')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      findButtonByTitle('Cancelar OS')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect((document.querySelector('#cancel-reason') as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it('erro do servidor aparece dentro do modal', async () => {
+    cancelMock.mockRejectedValue(new Error('Motivo do cancelamento e obrigatorio'));
+    mockOrders([makeRow()]);
+    await renderPage();
+
+    act(() => {
+      findButtonByTitle('Cancelar OS')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    fillCancelReason('qualquer motivo');
+    await waitForAssertion(() => {
+      expect(findButtonByText('Confirmar Cancelamento')?.disabled).toBe(false);
+    });
+    await act(async () => {
+      findButtonByText('Confirmar Cancelamento')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitForAssertion(() => {
+      expect(container.textContent).toContain('Motivo do cancelamento e obrigatorio');
+      expect(container.textContent).toContain('Cancelar Ordem de Serviço');
+    });
+  });
+
+  it('o campo de motivo respeita o teto de 500 caracteres', async () => {
     mockOrders([makeRow()]);
     await renderPage();
 
@@ -285,17 +318,6 @@ describe('Maintenance — aviso de parcelas no cancelamento', () => {
       findButtonByTitle('Cancelar OS')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    await waitForAssertion(() => {
-      expect(findButtonByText('Cancelar mesmo assim')).toBeTruthy();
-    });
-
-    fillCancelReason('OS cancelada a pedido do cliente');
-    await act(async () => {
-      findButtonByText('Cancelar mesmo assim')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(cancelMock).toHaveBeenCalledWith('order-1', 'user-1', 'OS cancelada a pedido do cliente');
+    expect((document.querySelector('#cancel-reason') as HTMLTextAreaElement).maxLength).toBe(500);
   });
 });

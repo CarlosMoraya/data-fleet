@@ -1051,6 +1051,8 @@ Atualizar a cada registro novo.
 | Delegável | lógica pura + teste, somente arquivos novos | codex / `gpt-5.6-luna` (medium) | 1 | 1/1 | 0 | 0 |
 | Supervisionado | edição em arquivo existente + integração de página | codex / `gpt-5.6-luna` (medium) | 1 | 1/1 | 1 | 0 |
 | Supervisionado | edição de testes E2E existentes | codex / `gpt-5.6-luna` (medium) | 1 | 0/1 | 2 | 0 |
+| Delegável | lógica pura + teste, só arquivos novos | **opencode-go** / `deepseek-v4-flash` | 1 | 1/1 | 0 | 0 |
+| Supervisionado | edição em arquivo existente + teste (arquivo novo) | **opencode-go** / `gpt-5.6-luna` | 2 | 1/2¹⁵ | 0 | **1**¹⁶ |
 
 ¹ Reprovou o portão por 2 warnings de `import/order`, resolvidos por `eslint --fix`; nenhuma falha de modelo.
 ² Os 2 ciclos foram indisponibilidade de provedor (`grok-code`) e falha do plano, não do modelo.
@@ -1058,6 +1060,8 @@ Atualizar a cada registro novo.
 ⁴ As duas reprovações foram 1 warning de `import/order` e 1 de `classnames-order`, ambos resolvidos por `eslint --fix`; o segundo estava no JSX ditado literalmente pelo plano. Nenhuma falha de modelo.
 ⁵ A reprovação foram 8 warnings de `no-explicit-any` decorrentes de o plano não ter tipado o espião do mock (registro #026); nenhuma falha de modelo.
 ⁶ O runner marcou reprovação só pelo +1 de lint previsto no plano (registro #033); contra os valores esperados, passou na 1ª vez. A falha do #033 foi do plano (cenário Fail Closed ausente), acrescentado pelo revisor.
+¹⁵ A reprovação foi de **escopo**, não de portão: no registro #058 o executor rodou `eslint --fix` em diretório e alterou 6 arquivos sem relação, porque o prompt autorizou. Falha do plano; arquivos restaurados pelo revisor.
+¹⁶ Falha de modelo de gravidade cosmética (indentação espúria em 6 linhas, 3 delas fora da mudança pretendida), registro #058. Nenhuma falha funcional.
 ⁷ No #037 o runner marcou reprovação só pelo erro de tsc transitório causado pelo plano no #036; contra o esperado, passou.
 ⁸ A reprovação do #036 foi 1 erro de tsc por falha do plano (chamador atualizado só na etapa seguinte) + 2 warnings de `import/order`; nenhuma falha de modelo. O #039 registrou um **incidente de protocolo** (`git stash` + `pop`, sem dano), anotado fora da coluna de falhas.
 ⁹ Timeout de 15 min sem entrega (#040). Primeira falha de modelo do `big-pickle` neste projeto, numa forma nova para ele.
@@ -1626,3 +1630,119 @@ O executor entregou o script, passou o self-test 8/8 e então **reprovou os docu
 **Controle negativo:** `sorted.map` → `filtered.map` no `tbody` → casos 5 e 6 falham. Arquivo restaurado.
 
 **Veredito:** aprovado sem correção. Zero falhas de modelo. **Revisão aplicada:** linha a linha (Supervisionado + Tier C).
+
+---
+
+### #057 — 2026-09-19 · Manutenção: motivo obrigatório no cancelamento — Etapa 3 (regra pura do motivo)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Delegável |
+| **Grau** | D2 |
+| **AAII mínimo do grau** | 30 |
+| **Forma** | lógica pura + teste, somente arquivos novos |
+| **Camada** | frontend (biblioteca pura) |
+| **Ferramenta** | opencode (`opencode run --auto`, formato padrão, `timeout 1200`, via `scripts/plan-runner.mjs run 3`) |
+| **Modelo** | `opencode-go/deepseek-v4-flash` |
+| `aaii` | **35** (coleta de 2026-09-11) — acima do piso 30 do grau |
+| **Custo marginal** | zero (assinatura **OpenCode Go**) |
+
+**Por que este executor, e não o do histórico:** o usuário informou no início da sessão que o **parque gratuito do Zen está bloqueado** (cota de requisições esgotada). Os 5 registros da combinação exata (`Delegável / lógica pura + teste, só arquivos novos`) são todos do `big-pickle`, gratuito e indisponível. **Amostra insuficiente para este executor nesta combinação: zero registros.** Decisão pela camada 2, no degrau 2 da cadeia de fallback (`EXECUTORS.md` §9): o mais barato do OpenCode Go que alcança o piso do grau. **Primeira execução registrada no canal `opencode-go/`.**
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim · `baseline` sim
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — o runner acusou "fora do manifesto" os 3 arquivos SQL da Etapa 1, escritos pelo próprio planejador; a checagem compara contra o snapshot e não é cumulativa (**falso positivo da ferramenta**, mesmo padrão do #055) |
+| `portao_1a` | **sim** |
+| `ciclos` | **0** |
+| `regressoes` | **0** |
+| `lacunas` | **1, do plano** — nenhum dos 14 casos prova que `formatMaintenanceCancellationReason` **apara** o valor de saída: o caso 9 usa `'Veículo vendido'`, sem espaços ao redor. Uma implementação que devolvesse `reason` sem `trim` passaria. Consequência prática nula (o gatilho do banco normaliza com `btrim` antes de gravar), por isso não foi corrigido. **Atribuição: falha do plano** |
+
+**Números verificados independentemente pelo revisor:** tsc 0 · lint 0 erros/264 warnings · test:unit 264→265 arquivos, 2.485→2.499 testes (+14) · smoke 7/7
+
+**Controle negativo:** trocar `>` por `>=` na checagem de comprimento → casos 5 e 7 falham. Arquivo restaurado.
+
+**Revisão dirigida:** leitura integral dos 2 arquivos com olhar adversarial; log varrido por `git stash/checkout/reset/restore/clean` e por leitura de `.env` — nenhuma ocorrência. Desvio benigno: o executor usou `toBeNull()` onde o plano dizia `toBe(null)` — equivalente e mais idiomático.
+
+**Veredito:** aprovado sem correção. Zero falhas de modelo. **Revisão aplicada:** revisão dirigida (um nível acima do mínimo da tabela, por ser estreia de canal).
+
+---
+
+### #058 — 2026-09-19 · Manutenção: motivo obrigatório no cancelamento — Etapa 4 (modal + caminho único)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Grau** | S2 |
+| **AAII mínimo do grau** | 38 |
+| **Forma** | edição em arquivo existente (página em produção, 1.019 linhas) + edição de teste existente + teste (arquivo novo) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --auto`, formato padrão, `timeout 1800`, via `scripts/plan-runner.mjs run 4`) |
+| **Modelo** | `opencode-go/gpt-5.6-luna` |
+| `aaii` | **38** (coleta de 2026-09-11) — alcança o piso de S2 **no limite exato**; insuficiente para S3 |
+| **Custo marginal** | zero (assinatura **OpenCode Go**) |
+
+**Por que este executor:** os 10 registros de `Supervisionado / edição em arquivo existente` são do `muse-spark-1.2` gratuito, bloqueado nesta sessão. O `gpt-5.6-luna` tem 3 registros no projeto, **todos via `codex`** — amostra insuficiente neste canal, usados apenas como indício. Escolha pela camada 2, degrau 2 da cadeia.
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim · `baseline` sim
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **NÃO** — 6 arquivos sem relação com o plano foram alterados (`ChecklistFill.tsx`, `Checklists.contextFilter.test.ts`, `Drivers.tsx`, `SosTicket.tsx`, `SosTicket.test.tsx`, `Vehicles.test.tsx`), todos com reordenação de `import/order`. Causa: **o prompt mandou rodar `npx eslint src/pages/ --fix`**, em diretório. **Atribuição: falha do plano.** O revisor conferiu que os 6 estavam limpos no snapshot, fez backup e restaurou o conteúdo de `HEAD`; o lint voltou de 255 para os 264 warnings do baseline |
+| `portao_1a` | **portão numérico sim; veredito mecânico não** (reprovado por escopo, acima) |
+| `ciclos` | **0** — 1 iteração interna do próprio executor (3 testes falharam e foram corrigidos por ele antes de entregar) |
+| `regressoes` | **0** |
+| `lacunas` | **2, ambas do plano** — ver abaixo |
+
+**Lacuna 1 — teste que confirmava a si mesmo.** Os casos literais 1 e 2 do plano mandavam abrir o modal e assertar `disabled === true` **sem esperar** a consulta de exposição de parcelas terminar. Como `cancelExposureQuery.isLoading` também desabilita o botão, os dois cenários passavam pelo motivo errado: o controle negativo (remover a trava de motivo) **não derrubou nenhum teste**. O revisor reescreveu os dois cenários para primeiro preencher um motivo e esperar o botão habilitar (provando que o carregamento acabou) e só então esvaziar o campo — isolando o motivo como única causa de `disabled`. Refeito o controle negativo, os 2 cenários falham como devem. **Atribuição: falha do plano** — os casos literais fui eu que escrevi.
+
+**Lacuna 2 — indentação espúria.** O executor inseriu um espaço a mais em 6 linhas, 3 delas fora da mudança pretendida (linhas do `.select()` que não precisavam mudar). Sem efeito funcional; corrigido pelo revisor. **Atribuição: falha do modelo**, de gravidade cosmética.
+
+**Números verificados independentemente pelo revisor, após as correções:** tsc 0 · lint 0 erros/264 warnings · test:unit 266 arquivos, 2.508 testes · smoke 7/7 · `npx eslint src/pages/Maintenance.tsx` = 24 warnings (igual ao baseline — a exigência de posicionamento de hooks antes do `return <Navigate />` foi cumprida)
+
+**Controles negativos:** remover `normalizeMaintenanceCancellationReason(cancelReason) === null` do `disabled` → cenários 1 e 2 falham; remover o desvio `next === 'Cancelar'` do `<select>` → cenário 4 falha. Arquivo restaurado nas duas vezes.
+
+**Veredito:** aprovado **com 2 correções do revisor**. Uma falha de modelo (cosmética). **Revisão aplicada:** linha a linha.
+
+**Lição de prompt, para a próxima sessão:** nunca autorizar `eslint --fix` em diretório dentro de um prompt de executor. Sempre citar os caminhos exatos dos arquivos do manifesto. O prompt da Etapa 5 já saiu corrigido e o problema não se repetiu.
+
+---
+
+### #059 — 2026-09-19 · Manutenção: motivo obrigatório no cancelamento — Etapa 5 (bloco no modal de visualização)
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Grau** | S2 |
+| **AAII mínimo do grau** | 38 |
+| **Forma** | edição em arquivo existente (modal de 314 linhas) + teste (arquivo novo) |
+| **Camada** | frontend |
+| **Ferramenta** | opencode (`opencode run --auto`, formato padrão, `timeout 1800`, via `scripts/plan-runner.mjs run 5`) |
+| **Modelo** | `opencode-go/gpt-5.6-luna` |
+| `aaii` | **38** (coleta de 2026-09-11) |
+| **Custo marginal** | zero (assinatura **OpenCode Go**) |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim · `baseline` sim
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — só `MaintenanceDetailModal.tsx` e o teste novo; as 12 acusações do runner são arquivos das Etapas 1–4, já aprovados. A proibição explícita de `eslint --fix` em diretório, acrescentada ao prompt após o #058, funcionou |
+| `portao_1a` | **sim** |
+| `ciclos` | **0** |
+| `regressoes` | **0** |
+| `lacunas` | **0** |
+
+**Números verificados independentemente pelo revisor:** tsc 0 · lint 0 erros/264 warnings · test:unit 267 arquivos, 2.511 testes (+3) · smoke 7/7 — exatamente os números previstos no `IMPLEMENTATION.md`
+
+**Controle negativo:** trocar `order.status === 'Cancelado'` por `true` → cenário 3 falha. Arquivo restaurado.
+
+**Revisão linha a linha:** diff de 22 inserções, todas dentro do bloco especificado; `Field`, `formatDate` e as 6 seções existentes intactos; nenhuma ação adicionada ao modal, que segue apresentacional. Log sem comandos git destrutivos e sem leitura de `.env`.
+
+**Veredito:** aprovado **sem nenhuma correção**. Zero falhas de modelo. **Revisão aplicada:** linha a linha.

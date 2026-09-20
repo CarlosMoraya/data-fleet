@@ -17,6 +17,10 @@ import { formatDate } from '../lib/dateUtils';
 import { downloadBlobFile } from '../lib/downloadBlobFile';
 import { type BudgetLockKind } from '../lib/maintenanceBudgetLock';
 import { canReopenBudget } from '../lib/maintenanceBudgetReopen';
+import {
+  MAINTENANCE_CANCELLATION_REASON_MAX_LENGTH,
+  normalizeMaintenanceCancellationReason,
+} from '../lib/maintenanceCancellation';
 import { buildMaintenanceFilterOptions, applyMaintenanceListFilters, matchesMaintenanceSearch, getVehicleIdsWithOpenMaintenance, matchesMaintenanceCard, countVehiclesNotWithdrawn, BUDGET_STATUS_FILTER_OPTIONS, daysInWorkshop } from '../lib/maintenanceFilters';
 import { maintenanceFromRow, MaintenanceOrderRow, BudgetItem } from '../lib/maintenanceMappers';
 import { describeCancelPaymentExposure } from '../lib/maintenanceOrderPaymentSignal';
@@ -188,6 +192,8 @@ export default function Maintenance() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [selectedOrder, setSelectedOrder] = React.useState<MaintenanceOrder | null>(null);
+  const [cancelReason, setCancelReason] = React.useState('');
+  const [cancelError, setCancelError] = React.useState<string | null>(null);
   const allowedRoles: Role[] = [
     'Workshop',
     'Fleet Assistant',
@@ -256,6 +262,7 @@ export default function Maintenance() {
           workshops (name),
           profiles!created_by_id (name),
           budget_reviewer:profiles!budget_reviewed_by (name),
+          cancelled_by:profiles!maintenance_orders_cancelled_by_id_fkey (name),
           clients (name)
         `)
         .order('created_at', { ascending: false });
@@ -310,13 +317,18 @@ export default function Maintenance() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: async (order: MaintenanceOrder) => {
-      await cancelMaintenanceOrder(order.id, profile?.id ?? null);
+    mutationFn: async ({ order, reason }: { order: MaintenanceOrder; reason: string }) => {
+      await cancelMaintenanceOrder(order.id, profile?.id ?? null, reason);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['maintenanceOrders', currentClient?.id] });
       void queryClient.invalidateQueries({ queryKey: ['budgetApprovals'] });
       setOrderToCancel(null);
+      setCancelReason('');
+      setCancelError(null);
+    },
+    onError: (err: unknown) => {
+      setCancelError(err instanceof Error ? err.message : 'Falha ao cancelar a OS.');
     },
   });
 
@@ -823,10 +835,15 @@ export default function Maintenance() {
                               value=""
                               onChange={(e) => {
                                 const next = e.target.value;
-                                if (next) {
-                                  updateStatusMutation.mutate({ id: o.id, status: next as MaintenanceStatus, budgetStatus: o.budgetStatus });
-                                  e.target.value = '';
+                                if (!next) return;
+                                e.target.value = '';
+                                if (next === 'Cancelar') {
+                                  setOrderToCancel(o);
+                                  setCancelReason('');
+                                  setCancelError(null);
+                                  return;
                                 }
+                                updateStatusMutation.mutate({ id: o.id, status: next as MaintenanceStatus, budgetStatus: o.budgetStatus });
                               }}
                               onClick={(e) => e.stopPropagation()}
                               title="Ações"
@@ -850,7 +867,7 @@ export default function Maintenance() {
                           )}
                           {canWriteMaintenance && o.status !== 'Concluído' && o.status !== 'Cancelado' && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); setOrderToCancel(o); }}
+                              onClick={(e) => { e.stopPropagation(); setOrderToCancel(o); setCancelReason(''); setCancelError(null); }}
                               title="Cancelar OS"
                               className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600"
                             >
@@ -862,7 +879,7 @@ export default function Maintenance() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                  
-                                const { id, os, status, createdAt, cancelledAt, cancelledById, ...rest } = o;
+                                const { id, os, status, createdAt, cancelledAt, cancelledById, cancellationReason, cancelledByName, ...rest } = o;
                                 setPrefillData({ ...rest, status: 'Aguardando orçamento' });
                                 setOrderToEdit(null);
                                 setIsFormOpen(true);
@@ -970,7 +987,7 @@ export default function Maintenance() {
 
       {orderToCancel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
                 <Ban className="h-5 w-5 text-red-600" />
@@ -994,17 +1011,42 @@ export default function Maintenance() {
               A OS será marcada como <strong>Cancelado</strong> e não contará mais para cálculos de custo.
               Caso seja necessário, você poderá reabrir uma nova OS a partir deste registro.
             </p>
+            <div>
+              <label htmlFor="cancel-reason" className="mb-1 block text-sm font-medium text-zinc-700">
+                Motivo do cancelamento <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="cancel-reason"
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                maxLength={MAINTENANCE_CANCELLATION_REASON_MAX_LENGTH}
+                rows={3}
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none"
+              />
+              <p className="mt-1 text-right text-xs text-zinc-400">
+                {cancelReason.length}/{MAINTENANCE_CANCELLATION_REASON_MAX_LENGTH}
+              </p>
+            </div>
+            {cancelError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+                {cancelError}
+              </div>
+            )}
             <div className="flex justify-end gap-3 pt-2">
               <button
-                onClick={() => setOrderToCancel(null)}
+                onClick={() => { setOrderToCancel(null); setCancelReason(''); setCancelError(null); }}
                 disabled={cancelMutation.isPending}
                 className="rounded-lg px-4 py-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50"
               >
                 Voltar
               </button>
               <button
-                onClick={() => cancelMutation.mutate(orderToCancel)}
-                disabled={cancelMutation.isPending || cancelExposureQuery.isLoading}
+                onClick={() => cancelMutation.mutate({ order: orderToCancel, reason: cancelReason })}
+                disabled={
+                  normalizeMaintenanceCancellationReason(cancelReason) === null ||
+                  cancelMutation.isPending ||
+                  cancelExposureQuery.isLoading
+                }
                 className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
               >
                 {cancelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
