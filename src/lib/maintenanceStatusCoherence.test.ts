@@ -36,13 +36,12 @@ describe('canAdvanceMaintenanceStatus', () => {
   });
 
   it('não bloqueia estados que não exigem decisão de orçamento', () => {
-    for (const budgetStatus of ['sem_orcamento', 'pendente', 'aprovado', 'reprovado', 'reaberto'] as const) {
-      expect(canAdvanceMaintenanceStatus('Aguardando orçamento', budgetStatus)).toBe(true);
-    }
-    // 'Aguardando aprovação' com orçamento 'aprovado' deixou de ser livre em
-    // 2026-09-20 — ver o describe dedicado à volta para "Aguardando aprovação".
-    for (const budgetStatus of ['sem_orcamento', 'pendente', 'reprovado', 'reaberto'] as const) {
-      expect(canAdvanceMaintenanceStatus('Aguardando aprovação', budgetStatus)).toBe(true);
+    // Os dois status pré-aprovação deixaram de ser livres com orçamento
+    // 'aprovado' em 2026-09-20 — ver o describe dedicado logo abaixo.
+    for (const target of ['Aguardando orçamento', 'Aguardando aprovação'] as const) {
+      for (const budgetStatus of ['sem_orcamento', 'pendente', 'reprovado', 'reaberto'] as const) {
+        expect(canAdvanceMaintenanceStatus(target, budgetStatus)).toBe(true);
+      }
     }
   });
 });
@@ -162,38 +161,43 @@ describe('requiresBudgetOverrideReason — Regra C', () => {
   });
 });
 
-describe('canAdvanceMaintenanceStatus — volta para "Aguardando aprovação"', () => {
-  it('bloqueia a volta quando o orçamento já foi aprovado', () => {
+describe('canAdvanceMaintenanceStatus — orçamento aprovado não volta para a faixa pré-aprovação', () => {
+  it('bloqueia os dois status anteriores à decisão do orçamento', () => {
+    expect(canAdvanceMaintenanceStatus('Aguardando orçamento', 'aprovado')).toBe(false);
     expect(canAdvanceMaintenanceStatus('Aguardando aprovação', 'aprovado')).toBe(false);
   });
 
   it('libera a volta em todos os demais estados do orçamento', () => {
-    expect(canAdvanceMaintenanceStatus('Aguardando aprovação', 'pendente')).toBe(true);
-    expect(canAdvanceMaintenanceStatus('Aguardando aprovação', 'reaberto')).toBe(true);
-    expect(canAdvanceMaintenanceStatus('Aguardando aprovação', 'reprovado')).toBe(true);
-    expect(canAdvanceMaintenanceStatus('Aguardando aprovação', 'sem_orcamento')).toBe(true);
-    expect(canAdvanceMaintenanceStatus('Aguardando aprovação', undefined)).toBe(true);
-    expect(canAdvanceMaintenanceStatus('Aguardando aprovação', null)).toBe(true);
+    for (const target of ['Aguardando orçamento', 'Aguardando aprovação'] as const) {
+      expect(canAdvanceMaintenanceStatus(target, 'pendente')).toBe(true);
+      expect(canAdvanceMaintenanceStatus(target, 'reaberto')).toBe(true);
+      expect(canAdvanceMaintenanceStatus(target, 'reprovado')).toBe(true);
+      expect(canAdvanceMaintenanceStatus(target, 'sem_orcamento')).toBe(true);
+      expect(canAdvanceMaintenanceStatus(target, undefined)).toBe(true);
+      expect(canAdvanceMaintenanceStatus(target, null)).toBe(true);
+    }
   });
 
   it('não interfere nos demais alvos com orçamento aprovado', () => {
     expect(canAdvanceMaintenanceStatus('Serviço em execução', 'aprovado')).toBe(true);
     expect(canAdvanceMaintenanceStatus('Concluído', 'aprovado')).toBe(true);
     expect(canAdvanceMaintenanceStatus('Veículo retirado', 'aprovado')).toBe(true);
-    expect(canAdvanceMaintenanceStatus('Aguardando orçamento', 'aprovado')).toBe(true);
     expect(canAdvanceMaintenanceStatus('Cancelado', 'aprovado')).toBe(true);
   });
 });
 
-describe('describeStatusBlockReason — volta para "Aguardando aprovação"', () => {
-  it('aponta "Reabrir orçamento" como caminho correto', () => {
+describe('describeStatusBlockReason — faixa pré-aprovação', () => {
+  it('nomeia o status alvo e aponta "Reabrir orçamento" como caminho correto', () => {
     expect(describeStatusBlockReason('Aguardando aprovação', 'aprovado')).toBe(
       'Este orçamento já foi aprovado no Financeiro, então a OS não volta para "Aguardando aprovação". Para revisá-lo, use "Reabrir orçamento".',
+    );
+    expect(describeStatusBlockReason('Aguardando orçamento', 'aprovado')).toBe(
+      'Este orçamento já foi aprovado no Financeiro, então a OS não volta para "Aguardando orçamento". Para revisá-lo, use "Reabrir orçamento".',
     );
   });
 
   it('não descreve bloqueio quando o orçamento não está aprovado', () => {
     expect(describeStatusBlockReason('Aguardando aprovação', 'pendente')).toBeUndefined();
-    expect(describeStatusBlockReason('Aguardando aprovação', 'reaberto')).toBeUndefined();
+    expect(describeStatusBlockReason('Aguardando orçamento', 'reaberto')).toBeUndefined();
   });
 });
