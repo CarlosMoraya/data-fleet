@@ -2,6 +2,17 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-09-20 (continuação): mensagem de erro do banco engolida no modal de OS
+
+- **Pedido do usuário**: com orçamento aprovado, tentar voltar o status para "Aguardando aprovação" exibia "Erro ao salvar. Tente novamente." — pediu mensagem amigável e inteligível.
+- **Causa raiz, comprovada empiricamente antes de corrigir**: o `supabase-js` devolve o erro do PostgREST como **objeto simples** (`constructor: Object`, `instanceof Error === false`). `new PostgrestError(...)` só é construído quando se usa `.throwOnError()`, que o projeto não usa (`PostgrestBuilder.ts:213`). O serviço faz `throw error` e o `catch` do formulário fazia `err instanceof Error ? err.message : '<genérico>'` — a mensagem real era descartada. Sonda autenticada contra DEV confirmou: `message` = "Orcamento ja aprovado: a OS nao volta para Aguardando aprovacao", exibido = "Erro ao salvar. Tente novamente."
+- **Alcance do defeito, maior que o print sugeria**: valia para **toda** recusa de banco no modal, inclusive os gatilhos da Regra A e da Regra C subidos horas antes. A tabela de tratamento de erros do `IMPLEMENTATION.md` afirmava que apareceria "a mensagem crua do banco" nesses casos — **estava errada**, nunca apareceu. As guardas de frontend funcionavam (lançam `Error` de verdade); as de banco, não.
+- **Por que raramente aparecia**: quase toda regra de banco já tem espelho no frontend que desabilita a opção antes. O caso reportado é a exceção — `canAdvanceMaintenanceStatus` não cobre a volta para "Aguardando aprovação", então a opção fica habilitada e a falha só acontece na rede.
+- **Decisão do usuário sobre escopo**: corrigir a extração e traduzir, **sem prevenção** (a opção continua selecionável e o erro continua acontecendo, agora legível) e **sem varredura** das outras 60 ocorrências em ~20 telas. Ele pediu explicitamente o impacto funcional antes de decidir; a resposta foi que não há risco de integridade — nenhuma regra é burlada e nada inválido é gravado —, mas há beco sem saída para a pessoa, porque o texto diz "Tente novamente" e tentar de novo falha idêntico.
+- **Execução**: módulo puro novo `src/lib/maintenanceSaveError.ts` (`describeMaintenanceSaveError`), no padrão de `describeReopenError`, mais 12 testes e **uma linha** trocada em `MaintenanceForm.tsx`. As **10** mensagens de `RAISE EXCEPTION` de `maintenance_orders` em PROD foram lidas por `pg_get_functiondef` e **todas as 10 estão mapeadas**; mensagem não mapeada passa a aparecer crua em vez de sumir. Regra A e Regra C traduzem para a **mesma frase** da guarda de frontend, para não divergir entre camadas.
+- **Verificação ponta a ponta contra DEV**, com sessão autenticada real, nos quatro caminhos: volta para "Aguardando aprovação", Regra B (orçamento pendente), Regra A e Regra C. OS de teste criadas e removidas por `service_role`.
+- **Portão**: tsc 0, lint 0 erros/264 warnings, unitários **2.569/2.569 em 273 arquivos** (+12), smoke 7/7.
+
 ## Sessão — 2026-09-20: Manutenção — trava de orçamento na mudança de status da OS
 
 - **Pedido do usuário**: "Orçamento aprovado" deixa de ser escolhível por qualquer usuário (passa a ser consequência exclusiva da aprovação no Financeiro); e entrar na faixa operacional sem orçamento aprovado deixa de ser silencioso, passando a exigir motivo registrado com autor e data.

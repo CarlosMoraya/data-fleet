@@ -14,6 +14,7 @@ import {
 import { canReopenBudget, isBudgetDiscountLocked, isBudgetUnderRevision } from '../lib/maintenanceBudgetReopen';
 import { validateMaintenanceCurrentKm } from '../lib/maintenanceKmValidation';
 import { budgetItemFromRow, calcBudgetSubtotal, type MaintenanceBudgetItemRow, BudgetItem } from '../lib/maintenanceMappers';
+import { describeMaintenanceSaveError } from '../lib/maintenanceSaveError';
 import {
   canAdvanceMaintenanceStatus,
   describeStatusBlockReason,
@@ -349,7 +350,7 @@ export default function MaintenanceForm({ order, prefill, mode = 'default', bloc
       await onSave(formData, budgetItems, budgetFile, partPhotoDrafts, budgetLock);
       handleClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erro ao salvar. Tente novamente.');
+      setError(describeMaintenanceSaveError(err));
       setSaving(false);
     }
   };
