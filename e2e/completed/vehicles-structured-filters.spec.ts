@@ -53,6 +53,37 @@ test.describe.serial('Veículos: filtros estruturados', () => {
     await expect(page).toHaveURL(/shipper=/);
   });
 
+  test('selecionar proprietário atualiza a URL e restaura o deep-link', async ({ page }) => {
+    await page.goto('/cadastros/veiculos');
+    await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 10000 });
+
+    await openFilter(page, 'Proprietário');
+    const options = filterOptions(page);
+    const count = await options.count();
+
+    if (count === 0) {
+      test.info().annotations.push({
+        type: 'not-covered',
+        description: 'Seed sem proprietário derivado da lista de veículos; controle existe, mas não há opção selecionável.',
+      });
+      await closeFilter(page);
+      return;
+    }
+
+    const selectedOwner = await options.first().innerText();
+    await options.first().click();
+    await closeFilter(page);
+    await expect(page).toHaveURL(/[?&]owner=[^&]+/);
+
+    const deepLink = page.url();
+    await page.goto(deepLink);
+    await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 10000 });
+    await openFilter(page, 'Proprietário');
+    await expect(option(page, selectedOwner)).toHaveAttribute('aria-checked', 'true');
+    await closeFilter(page);
+    await expect(page).toHaveURL(deepLink);
+  });
+
   test('permite combinar duas pendências e repete o parâmetro na URL', async ({ page }) => {
     await page.goto('/cadastros/veiculos');
     await expect(page.locator('h1', { hasText: 'Veículos' })).toBeVisible({ timeout: 10000 });

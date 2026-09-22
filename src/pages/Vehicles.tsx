@@ -247,6 +247,15 @@ export default function Vehicles() {
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   }, [vehicles]);
 
+  const ownerOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const vehicle of vehicles) {
+      const owner = vehicle.owner.trim();
+      if (owner) names.add(owner);
+    }
+    return [...names].sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }));
+  }, [vehicles]);
+
   const unitOptions = useMemo(() => {
     if (filters.shipperIds.length === 0) return allUnitOptions;
     const units = allUnitOptions.map((unit) => ({ id: unit.id, shipperId: unit.shipperId }));
@@ -668,6 +677,12 @@ export default function Vehicles() {
           options={unitOptions.map((unit) => ({ value: unit.id, label: unit.name }))}
           selected={filters.operationalUnitIds}
           onChange={(next) => updateFilter({ operationalUnitIds: next })}
+        />
+        <MultiSelectDropdown
+          label="Proprietário"
+          options={ownerOptions}
+          selected={filters.ownerNames}
+          onChange={(next) => updateFilter({ ownerNames: next })}
         />
         <MultiSelectDropdown
           label="Pendência"

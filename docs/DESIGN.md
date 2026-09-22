@@ -79,7 +79,8 @@ O dashboard utiliza o princípio de "Progressive Disclosure", mostrando KPIs ger
 
 ### Cadastros — filtros de listagem em multisseleção
 
-- Os filtros de lista de Veículos e Motoristas (Embarcador, Unidade Operacional, Pendência/Situação, Disponibilidade e Última rota) usam um dropdown de multisseleção em checkbox visual.
+- Os filtros de lista de Veículos e Motoristas (Embarcador, Unidade Operacional, Proprietário, Pendência/Situação, Disponibilidade e Última rota) usam um dropdown de multisseleção em checkbox visual.
+- Em Veículos, Proprietário reutiliza o mesmo `MultiSelectDropdown`, com checkbox visual e contagem no rótulo; várias opções combinam com OR e dimensões distintas com AND.
 - Cada dimensão permite marcar várias opções; dentro da dimensão as opções combinam com OR e entre dimensões com AND.
 - O contêiner dos filtros usa `flex-wrap` para quebrar linha sem overflow na largura suportada.
 - Disponibilidade reflete a regra de indisponibilidade por ordem de manutenção; Última rota permanece exclusiva do tenant Deluna Transportes.

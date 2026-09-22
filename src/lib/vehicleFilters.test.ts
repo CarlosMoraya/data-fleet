@@ -76,6 +76,7 @@ describe('vehicleFilters', () => {
       pendencies: ['gr_expiring'],
       lastRoutes: [],
       availability: [],
+      ownerNames: [],
     });
     expect(serializeVehicleFiltersToParams(parsed).toString()).toBe('shipper=s1&unit=u1&issue=gr_expiring');
   });
@@ -90,7 +91,27 @@ describe('vehicleFilters', () => {
       pendencies: ['crlv_expired'],
       lastRoutes: [],
       availability: [],
+      ownerNames: [],
     });
+  });
+
+  it('parseia dois proprietários repetidos preservando a ordem', () => {
+    const parsed = parseVehicleFiltersFromParams(new URLSearchParams('owner=Frota%20Pr%C3%B3pria&owner=Locadora%20X'));
+
+    expect(parsed).toEqual({
+      shipperIds: [],
+      operationalUnitIds: [],
+      pendencies: [],
+      lastRoutes: [],
+      availability: [],
+      ownerNames: ['Frota Própria', 'Locadora X'],
+    });
+  });
+
+  it('aparas, descarta vazios e deduplica proprietários no parse', () => {
+    const parsed = parseVehicleFiltersFromParams(new URLSearchParams('owner=%20Frota%20Pr%C3%B3pria%20&owner=Frota%20Pr%C3%B3pria&owner='));
+
+    expect(parsed.ownerNames).toEqual(['Frota Própria']);
   });
 
   it('parseia dois shipper, unit e issue em arrays', () => {
@@ -112,6 +133,19 @@ describe('vehicleFilters', () => {
     expect(params.getAll('shipper')).toEqual(['s1', 's2']);
     expect(params.getAll('issue')).toEqual(['crlv_expired', 'no_driver']);
     expect(params.toString()).toBe('shipper=s1&shipper=s2&unit=u1&issue=crlv_expired&issue=no_driver');
+  });
+
+  it('serializa proprietários como parâmetros repetidos antes de q', () => {
+    const params = serializeVehicleFiltersToParams(filters({ ownerNames: ['Frota Própria', 'Locadora X'] }));
+
+    expect(params.getAll('owner')).toEqual(['Frota Própria', 'Locadora X']);
+    expect(params.get('q')).toBeNull();
+  });
+
+  it('aparas, descarta vazios e deduplica proprietários no serialize', () => {
+    const params = serializeVehicleFiltersToParams(filters({ ownerNames: [' Empresa ', 'Empresa', ''] }));
+
+    expect(params.getAll('owner')).toEqual(['Empresa']);
   });
 
   it('deduplica valores e descarta códigos inválidos', () => {
@@ -205,6 +239,7 @@ describe('vehicleFilters', () => {
     expect(hasActiveStructuredFilters(filters({ pendencies: ['no_driver'] }))).toBe(true);
     expect(hasActiveStructuredFilters(filters({ lastRoutes: ['2026-08-15'] }))).toBe(true);
     expect(hasActiveStructuredFilters(filters({ availability: ['available'] }))).toBe(true);
+    expect(hasActiveStructuredFilters(filters({ ownerNames: ['Empresa'] }))).toBe(true);
   });
 
   it('aplica pendência crlv_expired', () => {
@@ -316,6 +351,69 @@ describe('vehicleFilters', () => {
       pendencies: ['crlv_expired', 'no_driver'],
     }), ctx))
       .toEqual([vehicles[0], vehicles[1]]);
+  });
+
+  it('filtra um proprietário selecionado', () => {
+    const vehicles = [
+      vehicle({ id: 'v1', owner: 'Empresa A' }),
+      vehicle({ id: 'v2', owner: 'Empresa B' }),
+      vehicle({ id: 'v3', owner: '' }),
+    ];
+
+    expect(applyVehicleFilters(vehicles, '', filters({ ownerNames: ['Empresa A'] }), ctx).map((item) => item.id))
+      .toEqual(['v1']);
+  });
+
+  it('combina dois proprietários com lógica OR dentro da dimensão', () => {
+    const vehicles = [
+      vehicle({ id: 'v1', owner: 'Empresa A' }),
+      vehicle({ id: 'v2', owner: 'Empresa B' }),
+      vehicle({ id: 'v3', owner: '' }),
+    ];
+
+    expect(applyVehicleFilters(vehicles, '', filters({ ownerNames: ['Empresa A', 'Empresa B'] }), ctx).map((item) => item.id))
+      .toEqual(['v1', 'v2']);
+  });
+
+  it('não restringe por proprietário quando a seleção está vazia', () => {
+    const vehicles = [
+      vehicle({ id: 'v1', owner: 'Empresa A' }),
+      vehicle({ id: 'v2', owner: 'Empresa B' }),
+      vehicle({ id: 'v3', owner: '' }),
+    ];
+
+    expect(applyVehicleFilters(vehicles, '', filters({ ownerNames: [] }), ctx)).toEqual(vehicles);
+  });
+
+  it('combina proprietário e busca com AND entre dimensões', () => {
+    const vehicles = [
+      vehicle({ id: 'v1', owner: 'Empresa A', licensePlate: 'ABC-001' }),
+      vehicle({ id: 'v2', owner: 'Empresa B', licensePlate: 'XYZ-002' }),
+    ];
+
+    expect(applyVehicleFilters(vehicles, 'XYZ-002', filters({ ownerNames: ['Empresa A'] }), ctx)).toEqual([]);
+  });
+
+  it('combina proprietário e embarcador com AND entre dimensões', () => {
+    const vehicles = [
+      vehicle({ id: 'v1', owner: 'Empresa A', shipperId: 'shipper-a' }),
+      vehicle({ id: 'v2', owner: 'Empresa B', shipperId: 'shipper-b' }),
+    ];
+
+    expect(applyVehicleFilters(vehicles, '', filters({ ownerNames: ['Empresa A'], shipperIds: ['shipper-b'] }), ctx))
+      .toEqual([]);
+  });
+
+  it('retorna vazio para proprietário inexistente', () => {
+    const vehicles = [vehicle({ id: 'v1', owner: 'Empresa A' })];
+
+    expect(applyVehicleFilters(vehicles, '', filters({ ownerNames: ['Empresa inexistente'] }), ctx)).toEqual([]);
+  });
+
+  it('aparas o proprietário do veículo antes de comparar', () => {
+    const vehicles = [vehicle({ id: 'v1', owner: ' Empresa A ' })];
+
+    expect(applyVehicleFilters(vehicles, '', filters({ ownerNames: ['Empresa A'] }), ctx)).toEqual([vehicles[0]]);
   });
 
   it('combina embarcador, unidade, pendência e busca com AND entre dimensões', () => {

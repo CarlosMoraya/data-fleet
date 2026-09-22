@@ -74,12 +74,15 @@ Filtros de navegação acionável vivem em query params da URL. São filtros de 
 | `issue` | Pendência (Veículos) ou Situação (Motoristas) (repetível) |
 | `lastRoute` | Categoria ou data de Última rota (repetível, somente tenant Deluna) |
 | `availability` | `available` ou `unavailable` (repetível, somente Veículos) |
+| `owner` | Nome de Proprietário (repetível, somente Veículos) |
+
+Na tela de Veículos, o estado estruturado mantém `ownerNames[]` com os nomes selecionados. Os valores de `owner` são nomes, não IDs; não há alias legado para esse parâmetro.
 
 ### Semântica de multisseleção
 
 - Filtros de listagem em Cadastros (Veículos e Motoristas) são multisseleções visuais em checkbox.
 - **OR dentro da dimensão**: duas opções selecionadas da mesma dimensão são combinadas com OR.
-- **AND entre dimensões**: dimensões distintas (embarcador, unidade, pendência, disponibilidade, última rota, busca `q`) são combinadas com AND.
+- **AND entre dimensões**: dimensões distintas (embarcador, unidade, Proprietário, pendência, disponibilidade, última rota, busca `q`) são combinadas com AND.
 - A URL guarda arrays por parâmetros canônicos repetidos (`URLSearchParams.append` na escrita e `getAll` na leitura).
 - Links antigos com valor singular continuam funcionando (lidos por `getAll`).
 - Aliases legados (`embarcador`, `unidade`, `pendencia`, `situacao`) continuam válidos quando o canônico da dimensão não existe.
@@ -117,7 +120,7 @@ Filtros de navegação acionável vivem em query params da URL. São filtros de 
 | `without_vehicle` | Sem veículo |
 
 ### Comportamento de `setSearchParams`
-- **Filtros estruturados** (`issue`, `shipper`, `unit`, `lastRoute`, `availability`): `replace: false` — cada mudança entra no histórico do navegador, permitindo que o botão voltar desfaça o filtro.
+- **Filtros estruturados** (`issue`, `shipper`, `unit`, `owner`, `lastRoute`, `availability`): `replace: false` — cada mudança entra no histórico do navegador, permitindo que o botão voltar desfaça o filtro.
 - **Digitação de busca** (`q`): `replace: true` — não polui o histórico a cada tecla digitada.
 
 ### Retrocompatibilidade

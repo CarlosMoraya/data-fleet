@@ -119,12 +119,13 @@ Parâmetros canônicos:
 - `issue` — Pendências de Veículos ou Situações de Motoristas, repetível.
 - `lastRoute` — categorias (`none`, `older_7d`, `older_30d`) ou datas de Última rota, repetível e somente aplicável ao tenant Deluna.
 - `availability` — `available` ou `unavailable`, repetível e somente em Veículos.
+- `owner` — nomes de Proprietário presentes na lista bruta de Veículos, repetível.
 
-Semântica: **OR dentro da dimensão** (opções da mesma dimensão) e **AND entre dimensões** (incluindo a busca `q`). A URL guarda arrays por parâmetros repetidos (`append` na escrita, `getAll` na leitura) e aceita links antigos com valor singular. Aliases legados (`embarcador`, `unidade`, `pendencia`, `situacao`) valem quando o canônico da dimensão não existe.
+Semântica: **OR dentro da dimensão** (opções da mesma dimensão, inclusive Proprietário) e **AND entre dimensões** (incluindo a busca `q`). A URL guarda arrays por parâmetros repetidos (`append` na escrita, `getAll` na leitura) e aceita links antigos com valor singular. Os valores de `owner` são nomes aparados, não vazios e deduplicados; Proprietário não participa da busca textual `q`. Aliases legados (`embarcador`, `unidade`, `pendencia`, `situacao`) valem quando o canônico da dimensão não existe.
 
 ### Tipos de filtro
 
-`VehicleStructuredFilters`: `shipperIds[]`, `operationalUnitIds[]`, `pendencies[]`, `lastRoutes[]`, `availability[]`.
+`VehicleStructuredFilters`: `shipperIds[]`, `operationalUnitIds[]`, `pendencies[]`, `lastRoutes[]`, `availability[]`, `ownerNames[]`.
 `DriverStructuredFilters`: `shipperIds[]`, `operationalUnitIds[]`, `pendencies[]`.
 
 ### Regra oficial de disponibilidade

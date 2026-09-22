@@ -67,6 +67,7 @@ export interface VehicleStructuredFilters {
   pendencies: VehiclePendency[];
   lastRoutes: LastRouteFilterValue[];
   availability: VehicleAvailability[];
+  ownerNames: string[];
 }
 
 export const EMPTY_STRUCTURED_FILTERS: VehicleStructuredFilters = {
@@ -75,6 +76,7 @@ export const EMPTY_STRUCTURED_FILTERS: VehicleStructuredFilters = {
   pendencies: [],
   lastRoutes: [],
   availability: [],
+  ownerNames: [],
 };
 
 function dedupe(values: string[]): string[] {
@@ -98,6 +100,10 @@ export function readMultiValueParam(
     ? canonical
     : legacyKey ? params.getAll(legacyKey).filter(Boolean) : [];
   return dedupe(rawValues);
+}
+
+function readTrimmedMultiValueParam(params: URLSearchParams, key: string): string[] {
+  return dedupe(params.getAll(key).map((value) => value.trim()).filter(Boolean));
 }
 
 export function appendMultiValueParam(
@@ -173,12 +179,14 @@ export function parseVehicleFiltersFromParams(params: URLSearchParams): VehicleS
     .filter(isVehiclePendency);
   const lastRoutes = readMultiValueParam(params, LAST_ROUTE_PARAM).filter(isLastRouteFilterValue);
   const availability = readMultiValueParam(params, 'availability').filter(isVehicleAvailability);
+  const ownerNames = readTrimmedMultiValueParam(params, 'owner');
   return {
     shipperIds,
     operationalUnitIds,
     pendencies,
     lastRoutes,
     availability,
+    ownerNames,
   };
 }
 
@@ -189,6 +197,7 @@ export function serializeVehicleFiltersToParams(filters: VehicleStructuredFilter
   appendMultiValueParam(params, 'issue', filters.pendencies);
   appendMultiValueParam(params, LAST_ROUTE_PARAM, filters.lastRoutes);
   appendMultiValueParam(params, 'availability', filters.availability);
+  appendMultiValueParam(params, 'owner', dedupe(filters.ownerNames.map((name) => name.trim()).filter(Boolean)));
   if (search) params.set(SEARCH_PARAM, search);
   return params;
 }
@@ -206,7 +215,8 @@ export function hasActiveStructuredFilters(filters: VehicleStructuredFilters): b
     filters.operationalUnitIds.length > 0 ||
     filters.pendencies.length > 0 ||
     filters.lastRoutes.length > 0 ||
-    filters.availability.length > 0;
+    filters.availability.length > 0 ||
+    filters.ownerNames.length > 0;
 }
 
 export function buildLastRouteFilterOptions(
@@ -332,6 +342,7 @@ export function applyVehicleFilters(
 
   return vehicles.filter((vehicle) => {
     if (!vehicleMatchesSearch(vehicle, search)) return false;
+    if (filters.ownerNames.length > 0 && !filters.ownerNames.includes(vehicle.owner.trim())) return false;
     if (filters.shipperIds.length > 0 && (!vehicle.shipperId || !filters.shipperIds.includes(vehicle.shipperId))) return false;
     if (filters.operationalUnitIds.length > 0 && (!vehicle.operationalUnitId || !filters.operationalUnitIds.includes(vehicle.operationalUnitId))) return false;
     if (
