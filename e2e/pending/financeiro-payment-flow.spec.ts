@@ -72,7 +72,25 @@ async function getWorkshop(clientId: string) {
   return data as { id: string; name: string; cnpj: string | null } | null;
 }
 
-async function createApprovedOrder(clientId: string, workshopId: string, createdById: string) {
+async function getOperationalUnit(clientId: string) {
+  const { data, error } = await adminClient()
+    .from('operational_units')
+    .select('id, name')
+    .eq('client_id', clientId)
+    .eq('active', true)
+    .order('name')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as { id: string; name: string } | null;
+}
+
+async function createApprovedOrder(
+  clientId: string,
+  workshopId: string,
+  createdById: string,
+  operationalUnitId: string,
+) {
   const supabase = adminClient();
   const suffix = String(Date.now()).slice(-6);
 
@@ -84,6 +102,7 @@ async function createApprovedOrder(clientId: string, workshopId: string, created
     type: 'Passeio', energy_source: 'Combustão', cooling_equipment: false,
     acquisition: 'Owned', fipe_price: 100000, tracker: 'Teste', antt: '123456',
     owner: 'E2E', autonomy: 500, category: 'Leve',
+    operational_unit_id: operationalUnitId,
   }).select('id').single();
   if (vehicle.error) throw vehicle.error;
 
@@ -106,6 +125,11 @@ async function createApprovedOrder(clientId: string, workshopId: string, created
   return { osId: os.data.id as string, osNumber, vehicleId: vehicle.data.id as string };
 }
 
+async function selectApprovedOrder(page: Page, osNumber: string) {
+  await page.getByRole('combobox', { name: 'Ordem de Serviço (orçamento aprovado)' }).click();
+  await page.getByRole('option', { name: new RegExp(osNumber) }).click();
+}
+
 async function cleanup(vehicleId: string, osId: string) {
   const supabase = adminClient();
   await supabase.from('payment_installments').delete().eq('maintenance_order_id', osId);
@@ -122,6 +146,8 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
   let osId = '';
   let osNumber = '';
   let vehicleId = '';
+  let operationalUnitName = '';
+  let fixtureBlockedReason = '';
 
   test.beforeAll(async () => {
     const assistantEmail = optionalEnv('TEST_ASSISTANT_EMAIL');
@@ -134,7 +160,19 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
     workshopId = workshop.id;
     workshopName = workshop.name;
     workshopCnpj = workshop.cnpj;
-    const order = await createApprovedOrder(clientId, workshopId, assistantId);
+    const operationalUnit = await getOperationalUnit(clientId);
+    if (!operationalUnit) {
+      fixtureBlockedReason = [
+        'not-covered',
+        'comando: PLAYWRIGHT_INCLUDE_PENDING=1 npx playwright test e2e/pending/financeiro-payment-flow.spec.ts --project=chromium',
+        'causa: não há unidade operacional ativa utilizável no tenant do fixture',
+        'risco: o autopreenchimento derivado do veículo não foi validado em navegador',
+        'ação: criar/ativar uma unidade operacional no tenant e reexecutar o comando',
+      ].join(' | ');
+      return;
+    }
+    operationalUnitName = operationalUnit.name;
+    const order = await createApprovedOrder(clientId, workshopId, assistantId, operationalUnit.id);
     osId = order.osId;
     osNumber = order.osNumber;
     vehicleId = order.vehicleId;
@@ -148,7 +186,7 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
     const email = optionalEnv('TEST_ASSISTANT_EMAIL');
     const password = optionalEnv('TEST_ASSISTANT_PASSWORD');
     if (!email || !password || !osId) {
-      test.skip(true, 'TEST_ASSISTANT_EMAIL/PASSWORD ausentes ou fixture de OS aprovada indisponível.');
+      test.skip(true, fixtureBlockedReason || 'TEST_ASSISTANT_EMAIL/PASSWORD ausentes ou fixture de OS aprovada indisponível.');
       return;
     }
 
@@ -161,16 +199,26 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
       await page.getByRole('button', { name: /Cadastrar Pagamento/i }).click();
       await expect(page.getByText('Ordem de Serviço (orçamento aprovado)')).toBeVisible({ timeout: 10000 });
 
-      await page.locator('select').first().selectOption(osId);
-      await page.getByLabel('Nº de parcelas').fill('3');
-      await page.getByLabel('1º vencimento').fill(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
+      await selectApprovedOrder(page, osNumber);
+      const centerCostInput = page.locator('input[name="financeiro-centro-custo"]');
+      await expect(centerCostInput).toHaveValue(operationalUnitName);
+      await centerCostInput.fill('Centro Manual E2E');
+      await page.locator('input[type="number"]').first().fill('3');
+      await page.locator('input[type="date"]').last().fill(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
       await page.getByRole('button', { name: 'Gerar parcelas' }).click();
 
-      await expect(page.getByText(/3 parcela\(s\)/)).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('button', { name: /Salvar 3 parcela/ })).toBeVisible({ timeout: 10000 });
       await page.getByRole('button', { name: /Salvar 3 parcela/ }).click();
 
-      await expect(page.getByText('Cadastrar Pagamento')).not.toBeVisible({ timeout: 15000 });
-      await expect(page.getByText(osNumber).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.getByRole('heading', { name: 'Cadastrar Pagamento' })).not.toBeVisible({ timeout: 15000 });
+
+      const { data: installments, error } = await adminClient()
+        .from('payment_installments')
+        .select('centro_custo')
+        .eq('maintenance_order_id', osId);
+      if (error) throw error;
+      expect(installments).toHaveLength(3);
+      expect(installments?.every((row) => row.centro_custo === 'Centro Manual E2E')).toBe(true);
     } finally {
       await page.context().close();
     }
@@ -199,11 +247,11 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
       await expect(card.getByText('3 parcela(s) pendente(s)')).toBeVisible();
       await expect(page.getByText('Já processados')).toHaveCount(0);
 
-      await card.getByRole('button', { name: 'Aprovar todas' }).click();
+      await card.getByRole('button', { name: 'Aprovar todas' }).first().click();
       await expect(page.getByRole('dialog', { name: 'Aprovar parcelas' })).toBeVisible({ timeout: 10000 });
       await page.getByRole('button', { name: 'Confirmar aprovação' }).click();
 
-      await expect(page.locator('div', { hasText: osNumber })).toHaveCount(0, { timeout: 15000 });
+      await expect(card).toHaveCount(0, { timeout: 15000 });
     } finally {
       await page.context().close();
     }
@@ -319,9 +367,9 @@ test.describe.serial('Módulo Financeiro — cadastro, aprovação e pagamento d
       await page.getByRole('button', { name: /Cadastrar Pagamento/i }).click();
       await expect(page.getByText('Ordem de Serviço (orçamento aprovado)')).toBeVisible({ timeout: 10000 });
 
-      await page.locator('select').first().selectOption(osId);
-      await page.getByLabel('Nº de parcelas').fill('1');
-      await page.getByLabel('1º vencimento').fill(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
+      await selectApprovedOrder(page, osNumber);
+      await page.locator('input[type="number"]').first().fill('1');
+      await page.locator('input[type="date"]').last().fill(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
       await page.getByRole('button', { name: 'Gerar parcelas' }).click();
 
       const valueInput = page.locator('table input[type="number"]').first();

@@ -164,6 +164,13 @@ export default function PaymentInstallmentFormModal({
     }
   };
 
+  const handleOrderChange = (nextOrderId: string) => {
+    setOrderId(nextOrderId);
+    setDrafts([]);
+    const nextOrder = approvedOrders.find((order) => order.id === nextOrderId);
+    setCentroCusto(nextOrder?.operationalUnitName ?? '');
+  };
+
   const handleGenerate = () => {
     setError('');
     if (!selectedOrder) { setError('Selecione uma OS aprovada.'); return; }
@@ -348,7 +355,7 @@ export default function PaymentInstallmentFormModal({
                   label: buildOrderOptionLabel(o),
                 }))}
                 value={orderId}
-                onChange={(next) => { setOrderId(next); setDrafts([]); }}
+                onChange={handleOrderChange}
                 query={orderQuery}
                 onQueryChange={setOrderQuery}
                 ariaLabel="Ordem de Serviço (orçamento aprovado)"

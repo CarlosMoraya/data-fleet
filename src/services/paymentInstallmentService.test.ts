@@ -131,6 +131,7 @@ describe('listApprovedOrdersForPayment', () => {
           approved_cost: 1000,
           budget_pdf_url: 'budget-1.pdf',
           workshops: { name: 'Oficina A', cnpj: '111' },
+          vehicles: { license_plate: 'ABC1D23', operational_units: { name: 'Unidade Norte' } },
           payment_installments: [],
         },
         {
@@ -140,6 +141,7 @@ describe('listApprovedOrdersForPayment', () => {
           approved_cost: 1000,
           budget_pdf_url: null,
           workshops: { name: 'Oficina B', cnpj: null },
+          vehicles: { license_plate: 'XYZ9K88', operational_units: null },
           payment_installments: [
             { value: 400, status: 'pendente_aprovacao' },
             { value: 600, status: 'aprovado' },
@@ -152,6 +154,7 @@ describe('listApprovedOrdersForPayment', () => {
           approved_cost: 1000,
           budget_pdf_url: null,
           workshops: null,
+          vehicles: null,
           payment_installments: [
             { value: 400, status: 'reprovado' },
             { value: 600, status: 'aprovado' },
@@ -164,6 +167,7 @@ describe('listApprovedOrdersForPayment', () => {
           approved_cost: null,
           budget_pdf_url: null,
           workshops: { name: 'Oficina D', cnpj: null },
+          vehicles: { license_plate: 'DEF4G56', operational_units: [{ name: 'Unidade Sul' }] },
           payment_installments: [],
         },
       ],
@@ -182,6 +186,8 @@ describe('listApprovedOrdersForPayment', () => {
         budgetPdfUrl: 'budget-1.pdf',
         workshopName: 'Oficina A',
         workshopCnpj: '111',
+        vehiclePlate: 'ABC1D23',
+        operationalUnitName: 'Unidade Norte',
         clientId: 'client-1',
       },
       {
@@ -191,6 +197,8 @@ describe('listApprovedOrdersForPayment', () => {
         remainingBudget: 0,
         workshopName: 'Oficina B',
         workshopCnpj: undefined,
+        vehiclePlate: 'XYZ9K88',
+        operationalUnitName: undefined,
         clientId: 'client-1',
       },
       {
@@ -199,6 +207,8 @@ describe('listApprovedOrdersForPayment', () => {
         approvedCost: 1000,
         remainingBudget: 400,
         workshopName: '—',
+        vehiclePlate: undefined,
+        operationalUnitName: undefined,
         clientId: 'client-1',
       },
       {
@@ -207,10 +217,13 @@ describe('listApprovedOrdersForPayment', () => {
         approvedCost: 0,
         remainingBudget: 0,
         workshopName: 'Oficina D',
+        vehiclePlate: 'DEF4G56',
+        operationalUnitName: 'Unidade Sul',
         clientId: 'client-1',
       },
     ]);
     expect(fromMock).toHaveBeenCalledWith('maintenance_orders');
+    expect(query.select).toHaveBeenCalledWith(expect.stringContaining('vehicles(license_plate, operational_units(name))'));
     expect(query.eq).toHaveBeenCalledWith('budget_status', 'aprovado');
     expect(query.eq).toHaveBeenCalledWith('client_id', 'client-1');
   });

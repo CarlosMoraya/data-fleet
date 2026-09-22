@@ -280,6 +280,17 @@ As parcelas de Pagamentos Extras **não** têm tabela própria — `payment_inst
 ### Frontend
 `ExtraPaymentFormModal` (criação, Fleet Assistant+), `ExtraPaymentsTab` (fila operacional/ledger do pedido, sem exportação), `ApprovalsTab` (inbox única com segmentos Pagamentos/Extras), `PaymentApprovalsTab`/`MaintenancePaymentApprovalGroupCard` (segmento Pagamentos, agrupado por OS), `ExtraPaymentApprovalsTab` (segmento Extras, cards por pedido), `FinancialApprovalConfirmModal` (confirmação compartilhada de aprovação em lote), `ExtraPaymentViewModal` (detalhe + auditoria). `PaymentsTab`/`PaymentInstallmentViewModal`/CSV do Financeiro seguem exibindo e exportando origem mista sem duplicar componentes; ícones de documentos usam Lucide (`FileText`, `ReceiptText`, `KeyRound`) em vez de emojis.
 
+Nos modais `PaymentInstallmentFormModal` e `ExtraPaymentFormModal`, o campo
+`Centro de Custo` permanece um input controlado e editável. Ao selecionar uma
+OS, o primeiro modal usa `vehicles.operational_units.name` do veículo da OS;
+ao selecionar um veículo no segundo, a mesma relação do veículo é usada. O
+caminho motorista → veículo do segundo modal reutiliza a resolução do veículo.
+Relação ausente, veículo sem unidade ou OS sem veículo resulta em string vazia.
+Uma nova seleção atualiza o valor para a nova unidade ou para vazio, enquanto
+uma edição manual permanece até a próxima seleção de origem. O valor final,
+automático ou manual, continua sendo enviado nas parcelas de
+`payment_installments.centro_custo` pelos batches existentes.
+
 ---
 
 ## 🚨 Módulo Chamados/S.O.S.

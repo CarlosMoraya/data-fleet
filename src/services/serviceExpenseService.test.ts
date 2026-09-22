@@ -132,8 +132,14 @@ describe('listExtraPaymentVehicles', () => {
       eq: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       data: [
-        { id: 'v1', license_plate: 'ABC1D23', driver_id: 'd1', drivers: { name: 'João Motorista' } },
-        { id: 'v2', license_plate: 'XYZ9K88', driver_id: null, drivers: null },
+        {
+          id: 'v1',
+          license_plate: 'ABC1D23',
+          driver_id: 'd1',
+          drivers: { name: 'João Motorista' },
+          operational_units: { name: 'Unidade Norte' },
+        },
+        { id: 'v2', license_plate: 'XYZ9K88', driver_id: null, drivers: null, operational_units: null },
       ],
       error: null,
     };
@@ -142,9 +148,24 @@ describe('listExtraPaymentVehicles', () => {
     const result = await listExtraPaymentVehicles('client-1');
 
     expect(result).toEqual([
-      { id: 'v1', licensePlate: 'ABC1D23', driverId: 'd1', driverName: 'João Motorista' },
-      { id: 'v2', licensePlate: 'XYZ9K88', driverId: undefined, driverName: undefined },
+      {
+        id: 'v1',
+        licensePlate: 'ABC1D23',
+        driverId: 'd1',
+        driverName: 'João Motorista',
+        operationalUnitName: 'Unidade Norte',
+      },
+      {
+        id: 'v2',
+        licensePlate: 'XYZ9K88',
+        driverId: undefined,
+        driverName: undefined,
+        operationalUnitName: undefined,
+      },
     ]);
+    expect(query.select).toHaveBeenCalledWith(
+      'id, license_plate, driver_id, drivers(name), operational_units(name)',
+    );
   });
 });
 

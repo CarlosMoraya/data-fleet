@@ -59,7 +59,20 @@ async function profileByEmail(email: string) {
   return data as { id: string; client_id: string; role: string };
 }
 
-async function createVehicleWithDriver(clientId: string) {
+async function getOperationalUnit(clientId: string) {
+  const { data, error } = await adminClient()
+    .from('operational_units')
+    .select('id, name')
+    .eq('client_id', clientId)
+    .eq('active', true)
+    .order('name')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as { id: string; name: string } | null;
+}
+
+async function createVehicleWithDriver(clientId: string, operationalUnitId: string) {
   const supabase = adminClient();
   const suffix = String(Date.now()).slice(-6);
 
@@ -79,6 +92,7 @@ async function createVehicleWithDriver(clientId: string) {
     acquisition: 'Owned', fipe_price: 100000, tracker: 'Teste', antt: '123456',
     owner: 'E2E', autonomy: 500, category: 'Leve',
     driver_id: driver.data.id,
+    operational_unit_id: operationalUnitId,
   }).select('id').single();
   if (vehicle.error) throw vehicle.error;
 
@@ -107,6 +121,8 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
   let vehicleId = '';
   let driverId = '';
   let vehiclePlate = '';
+  let operationalUnitName = '';
+  let fixtureBlockedReason = '';
   const createdRequestNumbers: string[] = [];
 
   test.beforeAll(async () => {
@@ -114,7 +130,19 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
     if (!assistantEmail) return;
     const assistant = await profileByEmail(assistantEmail);
     clientId = assistant.client_id;
-    const fixture = await createVehicleWithDriver(clientId);
+    const operationalUnit = await getOperationalUnit(clientId);
+    if (!operationalUnit) {
+      fixtureBlockedReason = [
+        'not-covered',
+        'comando: PLAYWRIGHT_INCLUDE_PENDING=1 npx playwright test e2e/pending/extra-payments-flow.spec.ts --project=chromium',
+        'causa: não há unidade operacional ativa utilizável no tenant do fixture',
+        'risco: o autopreenchimento derivado do veículo não foi validado em navegador',
+        'ação: criar/ativar uma unidade operacional no tenant e reexecutar o comando',
+      ].join(' | ');
+      return;
+    }
+    operationalUnitName = operationalUnit.name;
+    const fixture = await createVehicleWithDriver(clientId, operationalUnit.id);
     vehicleId = fixture.vehicleId;
     driverId = fixture.driverId;
   });
@@ -127,7 +155,7 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
     const email = optionalEnv('TEST_ASSISTANT_EMAIL');
     const password = optionalEnv('TEST_ASSISTANT_PASSWORD');
     if (!email || !password || !vehicleId) {
-      test.skip(true, 'TEST_ASSISTANT_EMAIL/PASSWORD ausentes ou fixture de veículo indisponível.');
+      test.skip(true, fixtureBlockedReason || 'TEST_ASSISTANT_EMAIL/PASSWORD ausentes ou fixture de veículo indisponível.');
       return;
     }
 
@@ -144,22 +172,49 @@ test.describe.serial('Pagamentos Extras — lançamento, aprovação, visão do 
       await page.getByRole('button', { name: /Novo Pagamento Extra/i }).click();
       await expect(page.getByRole('heading', { name: 'Novo Pagamento Extra' })).toBeVisible({ timeout: 10000 });
 
-      await page.getByLabel('Data do serviço').fill(new Date().toISOString().split('T')[0]);
-      await page.getByLabel('Fornecedor').fill('Guincho E2E LTDA');
-      await page.getByLabel('Veículo').selectOption(vehicleId);
+      const modal = page.locator('div.fixed.inset-0');
+      await modal.locator('input[type="date"]').first().fill(new Date().toISOString().split('T')[0]);
+      await modal.locator('input[name="financeiro-fornecedor"]').fill('Guincho E2E LTDA');
+      const vehicleSelect = modal.locator('label').filter({ hasText: /^Veículo$/ }).locator('xpath=following-sibling::select[1]');
+      await expect(vehicleSelect).toBeVisible({ timeout: 15000 });
+      await vehicleSelect.selectOption({ label: vehiclePlate });
+      await expect(vehicleSelect).toHaveValue(vehicleId);
+      const centerCostInput = modal.locator('input[name="financeiro-centro-custo"]');
+      await expect(centerCostInput).toHaveValue(operationalUnitName);
+      await centerCostInput.fill('Centro Manual Extra E2E');
 
-      const driverSelect = page.getByLabel('Motorista');
+      const driverSelect = modal.locator('label').filter({ hasText: /^Motorista$/ }).locator('xpath=following-sibling::select[1]');
       await expect(driverSelect).not.toHaveValue('');
 
-      await page.getByLabel('Valor').fill('350');
-      await page.getByLabel('1º vencimento').fill(new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0]);
+      await modal.locator('input[type="number"]').fill('350');
+      await modal.locator('input[type="date"]').last().fill(new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0]);
       await page.getByRole('button', { name: 'Gerar parcelas' }).click();
 
-      await expect(page.getByText(/1 parcela\(s\)/)).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('button', { name: /Salvar 1 parcela/ })).toBeVisible({ timeout: 10000 });
       await page.getByRole('button', { name: /Salvar 1 parcela/ }).click();
 
       await expect(page.getByRole('heading', { name: 'Novo Pagamento Extra' })).not.toBeVisible({ timeout: 15000 });
       await expect(page.getByText('Guincho E2E LTDA').first()).toBeVisible({ timeout: 15000 });
+
+      const supabase = adminClient();
+      const { data: request, error: requestError } = await supabase
+        .from('extra_payment_requests')
+        .select('id, request_number')
+        .eq('vehicle_id', vehicleId)
+        .eq('supplier_name', 'Guincho E2E LTDA')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (requestError) throw requestError;
+      createdRequestNumbers.push(request.request_number as string);
+
+      const { data: installments, error: installmentError } = await supabase
+        .from('payment_installments')
+        .select('centro_custo')
+        .eq('extra_payment_request_id', request.id);
+      if (installmentError) throw installmentError;
+      expect(installments).toHaveLength(1);
+      expect(installments?.[0]?.centro_custo).toBe('Centro Manual Extra E2E');
     } finally {
       await page.context().close();
     }

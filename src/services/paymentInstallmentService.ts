@@ -85,6 +85,7 @@ export interface ApprovedOrderForPayment {
   workshopName: string;
   workshopCnpj?: string;
   vehiclePlate?: string;
+  operationalUnitName?: string;
   clientId: string;
 }
 
@@ -382,7 +383,7 @@ export async function listApprovedOrdersForPayment(
     .select(`
       id, os_number, client_id, status, approved_cost, budget_pdf_url,
       workshops(name, cnpj),
-      vehicles(license_plate),
+      vehicles(license_plate, operational_units(name)),
       payment_installments(value, status)
     `)
     .eq('budget_status', 'aprovado')
@@ -403,7 +404,10 @@ export async function listApprovedOrdersForPayment(
     approved_cost: number | null;
     budget_pdf_url: string | null;
     workshops: { name: string; cnpj: string | null } | null;
-    vehicles: { license_plate: string } | null;
+    vehicles: {
+      license_plate: string;
+      operational_units: { name: string } | { name: string }[] | null;
+    } | null;
     payment_installments:
       | { value: number | string | null; status?: PaymentInstallmentStatus | null }[]
       | null;
@@ -426,6 +430,9 @@ export async function listApprovedOrdersForPayment(
       workshopName: row.workshops?.name ?? '—',
       workshopCnpj: row.workshops?.cnpj ?? undefined,
       vehiclePlate: row.vehicles?.license_plate ?? undefined,
+      operationalUnitName: (Array.isArray(row.vehicles?.operational_units)
+        ? row.vehicles.operational_units[0]?.name
+        : row.vehicles?.operational_units?.name) ?? undefined,
       clientId: row.client_id,
     };
   });

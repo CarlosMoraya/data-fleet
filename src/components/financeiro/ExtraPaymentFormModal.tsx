@@ -91,6 +91,14 @@ export function resolveDriverVehiclePrefill(
   return { vehicleId: driver.vehicleId, licensePlate: driver.vehicleLicensePlate };
 }
 
+export function resolveVehicleCostCenterPrefill(
+  vehicleId: string,
+  vehicles: ExtraPaymentVehicleOption[],
+): string {
+  const vehicle = vehicles.find((item) => item.id === vehicleId);
+  return vehicle?.operationalUnitName ?? '';
+}
+
 export default function ExtraPaymentFormModal({
   open,
   onClose,
@@ -156,6 +164,7 @@ export default function ExtraPaymentFormModal({
 
   const handleVehicleChange = (nextVehicleId: string) => {
     setVehicleId(nextVehicleId);
+    setCentroCusto(resolveVehicleCostCenterPrefill(nextVehicleId, vehicles));
     const prefill = resolveVehicleDriverPrefill(nextVehicleId, vehicles);
     if (prefill) setDriverId(prefill.driverId);
     if (!description) {
@@ -167,6 +176,7 @@ export default function ExtraPaymentFormModal({
   const handleDriverChange = (nextDriverId: string) => {
     setDriverId(nextDriverId);
     const prefill = resolveDriverVehiclePrefill(nextDriverId, drivers);
+    setCentroCusto(resolveVehicleCostCenterPrefill(prefill?.vehicleId ?? '', vehicles));
     if (prefill) setVehicleId(prefill.vehicleId);
   };
 

@@ -114,6 +114,7 @@ export interface ExtraPaymentVehicleOption {
   licensePlate: string;
   driverId?: string;
   driverName?: string;
+  operationalUnitName?: string;
 }
 
 export interface ExtraPaymentDriverOption {

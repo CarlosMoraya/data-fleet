@@ -299,6 +299,86 @@ describe('ExtraPaymentFormModal', () => {
       expect.objectContaining({ centroCusto: 'Frota SP' }),
     );
   });
+
+  it('selecionar veículo preenche a unidade, mas o valor manual prevalece no batch', async () => {
+    mockQueries(
+      [{ id: 'v1', licensePlate: 'ABC1D23', driverId: 'd1', driverName: 'João Motorista', operationalUnitName: 'Unidade Norte' }],
+      [{ id: 'd1', name: 'João Motorista', vehicleId: 'v1', vehicleLicensePlate: 'ABC1D23' }],
+    );
+    renderModal();
+
+    const setNativeValue = (el: HTMLInputElement, value: string) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(el, value);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    const vehicleSelect = container.querySelectorAll('select')[1] as HTMLSelectElement;
+    const centroCustoInput = container.querySelector('input[name="financeiro-centro-custo"]') as HTMLInputElement;
+    act(() => {
+      vehicleSelect.value = 'v1';
+      vehicleSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(centroCustoInput.value).toBe('Unidade Norte');
+
+    const textInputs = container.querySelectorAll('input[type="text"]');
+    const dateInputs = container.querySelectorAll('input[type="date"]');
+    const amountInput = container.querySelector('input[type="number"]') as HTMLInputElement;
+    act(() => {
+      setNativeValue(centroCustoInput, 'Centro Manual');
+      setNativeValue(dateInputs[0] as HTMLInputElement, '2026-07-10');
+      setNativeValue(textInputs[0] as HTMLInputElement, 'Guincho Rápido LTDA');
+      setNativeValue(amountInput, '100');
+      setNativeValue(dateInputs[1] as HTMLInputElement, '2026-08-01');
+    });
+
+    const generateButton = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Gerar parcelas'),
+    );
+    act(() => {
+      generateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    const saveButton = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.startsWith('Salvar'),
+    );
+    await act(async () => {
+      saveButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(createExtraPaymentInstallmentsBatchMock).toHaveBeenCalledWith(
+      expect.objectContaining({ centroCusto: 'Centro Manual' }),
+    );
+  });
+
+  it('sincroniza Centro de Custo por motorista e limpa ao trocar para veículo sem unidade', () => {
+    mockQueries(
+      [
+        { id: 'v1', licensePlate: 'ABC1D23', driverId: 'd1', driverName: 'João Motorista', operationalUnitName: 'Unidade Norte' },
+        { id: 'v2', licensePlate: 'XYZ9K88' },
+      ],
+      [{ id: 'd1', name: 'João Motorista', vehicleId: 'v1', vehicleLicensePlate: 'ABC1D23' }],
+    );
+    renderModal();
+
+    const driverSelect = container.querySelectorAll('select')[2] as HTMLSelectElement;
+    act(() => {
+      driverSelect.value = 'd1';
+      driverSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const centroCustoInput = container.querySelector('input[name="financeiro-centro-custo"]') as HTMLInputElement;
+    expect(centroCustoInput.value).toBe('Unidade Norte');
+
+    const vehicleSelect = container.querySelectorAll('select')[1] as HTMLSelectElement;
+    act(() => {
+      vehicleSelect.value = 'v2';
+      vehicleSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(centroCustoInput.value).toBe('');
+  });
 });
 
 describe('ExtraPaymentFormModal — boleto único', () => {

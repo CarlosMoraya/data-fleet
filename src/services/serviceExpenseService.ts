@@ -69,7 +69,7 @@ export async function getNextExtraPaymentRequestNumber(clientId: string): Promis
 export async function listExtraPaymentVehicles(clientId?: string): Promise<ExtraPaymentVehicleOption[]> {
   let query = supabase
     .from('vehicles')
-    .select('id, license_plate, driver_id, drivers(name)')
+    .select('id, license_plate, driver_id, drivers(name), operational_units(name)')
     .eq('active', true)
     .order('license_plate');
 
@@ -85,6 +85,7 @@ export async function listExtraPaymentVehicles(clientId?: string): Promise<Extra
     license_plate: string;
     driver_id: string | null;
     drivers: { name: string } | null;
+    operational_units: { name: string } | { name: string }[] | null;
   };
 
   return ((data ?? []) as unknown as Row[]).map((row) => ({
@@ -92,6 +93,9 @@ export async function listExtraPaymentVehicles(clientId?: string): Promise<Extra
     licensePlate: row.license_plate,
     driverId: row.driver_id ?? undefined,
     driverName: row.drivers?.name ?? undefined,
+    operationalUnitName: (Array.isArray(row.operational_units)
+      ? row.operational_units[0]?.name
+      : row.operational_units?.name) ?? undefined,
   }));
 }
 
