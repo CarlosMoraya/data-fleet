@@ -125,7 +125,7 @@ export default function CameraCapture({ onCapture, onClose, requireLiveCapture =
       {/* Header */}
       <div className="pt-safe-top flex items-center justify-between px-4 pt-4 pb-2 text-white">
         <span className="text-sm font-medium">Tirar foto</span>
-        <button onClick={onClose} className="p-2">
+        <button type="button" onClick={onClose} className="p-2">
           <X className="h-6 w-6" />
         </button>
       </div>
@@ -196,6 +196,7 @@ export default function CameraCapture({ onCapture, onClose, requireLiveCapture =
         {preview ? (
           <>
             <button
+              type="button"
               onClick={retake}
               className="flex flex-col items-center gap-1 text-white"
             >
@@ -206,6 +207,7 @@ export default function CameraCapture({ onCapture, onClose, requireLiveCapture =
             </button>
 
             <button
+              type="button"
               onClick={confirm}
               className="flex flex-col items-center gap-1 text-white"
             >
@@ -217,6 +219,7 @@ export default function CameraCapture({ onCapture, onClose, requireLiveCapture =
           </>
         ) : !useFileInput && !cameraBlocked ? (
           <button
+            type="button"
             onClick={capturePhoto}
             className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-white/20"
           >
