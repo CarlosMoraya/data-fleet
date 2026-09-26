@@ -17,6 +17,7 @@ import {
 } from '../lib/maintenanceStatusCoherence';
 import { uploadMaintenanceBudget } from '../lib/storageHelpers';
 import { supabase } from '../lib/supabase';
+import { safeRandomUUID } from '../lib/uuid';
 
 import type { MaintenanceOrder, BudgetItem, BudgetStatus, MaintenanceBudgetItemRow, MaintenanceStatus } from '../types/maintenance';
 
@@ -144,6 +145,8 @@ export async function saveMaintenanceOrder(
   }
 
   let orderId: string;
+  // Caminho do PDF já enviado antes do INSERT (somente em criação).
+  let uploadedPdfPath: string | null = null;
 
   if (data.id) {
     // UPDATE
@@ -155,10 +158,17 @@ export async function saveMaintenanceOrder(
     orderId = data.id;
   } else {
     // INSERT
+    // O id é gerado aqui para que o PDF seja enviado ANTES do INSERT: se o
+    // Storage falhar (ex.: HTTP 520), nada fica gravado no banco e salvar de
+    // novo não duplica a OS.
+    const newOrderId = safeRandomUUID();
+    if (budgetFile && !budgetLock) {
+      uploadedPdfPath = await uploadMaintenanceBudget(effectiveClientId, newOrderId, budgetFile);
+    }
     const osNumber = generateOSNumber();
     const { data: inserted, error } = await supabase
       .from('maintenance_orders')
-      .insert([{ ...commonFields, os_number: osNumber, created_by_id: profileId }])
+      .insert([{ ...commonFields, id: newOrderId, os_number: osNumber, created_by_id: profileId }])
       .select('id')
       .single();
     if (error) throw error;
@@ -169,7 +179,8 @@ export async function saveMaintenanceOrder(
   // 'vehicle-documents' é privado: persistimos o CAMINHO do objeto, nunca a URL
   // assinada (que é temporária e não pode ser gravada no banco).
   if (budgetFile && !budgetLock) {
-    const pdfPath = await uploadMaintenanceBudget(effectiveClientId, orderId, budgetFile);
+    const pdfPath = uploadedPdfPath
+      ?? await uploadMaintenanceBudget(effectiveClientId, orderId, budgetFile);
     const { error } = await supabase
       .from('maintenance_orders')
       .update({

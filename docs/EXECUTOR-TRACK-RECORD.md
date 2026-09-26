@@ -1746,3 +1746,80 @@ O executor entregou o script, passou o self-test 8/8 e então **reprovou os docu
 **Revisão linha a linha:** diff de 22 inserções, todas dentro do bloco especificado; `Field`, `formatDate` e as 6 seções existentes intactos; nenhuma ação adicionada ao modal, que segue apresentacional. Log sem comandos git destrutivos e sem leitura de `.env`.
 
 **Veredito:** aprovado **sem nenhuma correção**. Zero falhas de modelo. **Revisão aplicada:** linha a linha.
+
+### #060 — 2026-09-25 · Fixbug: PDF do orçamento antes do INSERT da OS — Etapa 1
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Grau** | S2 |
+| **AAII mínimo do grau** | 38 |
+| **Forma** | edição em arquivo existente (`maintenanceService.ts`, fluxo de gravação em produção) + teste (arquivo novo) |
+| **Camada** | frontend (serviço de dados) |
+| **Ferramenta** | codex (`codex exec --approve-for-me -c model_reasoning_effort="max"`, via `scripts/plan-runner.mjs run 1`) |
+| **Modelo** | `gpt-6-luna`, effort `max` — **estreia**, por decisão explícita do usuário (reserva do executor gratuito); fora da regra do Passo 4.2, que só permite estreia em D1/D2 |
+| `aaii` | **—** (ausente de `docs/model-cache.md`, coleta de 2026-09-11) |
+| **Custo marginal** | zero (assinatura ChatGPT) — consome a janela do codex |
+| `alterou_teste_preexistente` | **não** |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim · `baseline` sim
+
+**Tentativas anteriores (nenhuma atribuída a modelo):**
+1. `opencode/muse-spark-1.2-contributor-free` → `UnknownError: Unexpected server error` (ref `err_0bab66d3`), nenhum arquivo tocado. **Falha de ferramenta** (provedor Zen gratuito).
+2. `codex` → exit 127, `codex: comando não encontrado`: o shell do runner não tinha `~/.npm-global/bin` no PATH. **Falha de orquestração** (mesmo padrão do #054).
+3. `codex exec -s workspace-write --approve-for-me` → exit 2, `the argument '--sandbox' cannot be used with '--approve-for-me'`. **Falha de orquestração**: `--approve-for-me` já aplica a sandbox workspace-write. O comando correto é `codex exec --approve-for-me ...`.
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — só os 2 arquivos do manifesto |
+| `portao_1a` | **não** — lint 267 (+2 `require-await`) |
+| `ciclos` | **0** do executor; o revisor corrigiu plano e teste novo |
+| `regressoes` | **0** |
+| `lacunas` | **1** auto-reportada (os 2 avisos), corretamente sem alterar o teste |
+
+**Atribuição:** **falha do plano**. O teste literal usava `mockImplementation(async () => { ...; return 'x'; })` sem `await`. Corrigido no plano e no teste novo para `() => { ...; return Promise.resolve('x'); }`. O executor transcreveu fielmente: diff idêntico ao plano e teste byte a byte igual ao especificado.
+
+**Controle negativo:** com `maintenanceService.ts` de `HEAD`, 3 dos 4 testes novos falham (o 4º é o adjacente de edição, previsto para passar). Arquivo restaurado e conferido por `cmp`.
+
+**Números verificados pelo revisor:** tsc 0 · lint 0/265 · unit 277 arquivos / 2.604 · smoke 7/7.
+
+**Veredito:** aprovado após correção do plano. **Revisão aplicada:** linha a linha.
+
+### #061 — 2026-09-25 · Fixbug: novas tentativas no upload do orçamento — Etapa 2
+
+| Campo | Valor |
+|---|---|
+| **Classe** | Supervisionado |
+| **Grau** | S2 |
+| **AAII mínimo do grau** | 38 |
+| **Forma** | edição em arquivo existente (`storageHelpers.ts`) + teste (arquivo novo, com fake timers) |
+| **Camada** | frontend (integração com Supabase Storage) |
+| **Ferramenta** | codex (`codex exec --approve-for-me -c model_reasoning_effort="max"`, via `scripts/plan-runner.mjs run 2`) |
+| **Modelo** | `gpt-6-luna`, effort `max` (2º registro; decisão do usuário) |
+| `aaii` | **—** |
+| **Custo marginal** | zero (assinatura ChatGPT) — consome a janela do codex |
+| `alterou_teste_preexistente` | **não** |
+
+**Condições da especificação:** `manifesto` sim · `testes_literais` sim · `baseline` sim
+
+**Resultado**
+
+| Métrica | Valor |
+|---|---|
+| `escopo_ok` | **sim** — só os 2 arquivos do manifesto |
+| `portao_1a` | **não** — lint 266 (+1 `no-unsafe-return` em `mock.calls.map((call) => call[0])`) |
+| `ciclos` | **0** |
+| `regressoes` | **0** |
+| `lacunas` | **1** auto-reportada; o executor parou sem alterar o teste, como mandava o prompt |
+
+**Atribuição:** **falha do plano** (asserção literal sem tipo). Corrigida para `call[0] as string` no plano e no teste novo.
+
+**Controle negativo:** com `storageHelpers.ts` de `HEAD`, 8 dos 10 testes novos falham. Os 2 que passam são os adjacentes previstos: sucesso de 1ª e 403 sem nova tentativa.
+
+**Números verificados pelo revisor:** tsc 0 · lint 0/265 · unit 278 arquivos / 2.614 · smoke 7/7. Validação em DEV no navegador (Manager): upload 200 → INSERT 201 → PATCH 204, OS em "Aguardando aprovação" com `budget_pdf_url` no caminho do próprio id; dados de teste removidos.
+
+**Veredito:** aprovado após correção do plano. **Revisão aplicada:** linha a linha.
+
+**Lição para planos futuros:** nas duas etapas, o único defeito foi lint em código de teste **escrito pelo planejador**. Antes de publicar um plano, rodar `npx eslint` sobre os testes literais (em arquivo temporário dentro de `src/`) teria evitado os dois ciclos.

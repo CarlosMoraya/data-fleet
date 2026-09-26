@@ -260,9 +260,27 @@ export async function deleteVehicleDocument(crlvUrl: string): Promise<void> {
 // Path: {clientId}/maintenance/{orderId}/budget.{ext}
 // ─────────────────────────────────────────────────────────────
 
+/** Budget PDF upload attempts: the first try plus two retries. */
+const BUDGET_UPLOAD_MAX_ATTEMPTS = 3;
+/** Wait before retry N (1-based): 500ms, then 1500ms. */
+const BUDGET_UPLOAD_RETRY_DELAYS_MS = [500, 1500];
+
+/**
+ * A Storage failure is worth retrying when it is transient: any 5xx (including
+ * Cloudflare's 520) or a network failure that carries no HTTP status. 4xx
+ * (RLS, size, type) is final and must surface immediately.
+ */
+export function isTransientStorageError(error: unknown): boolean {
+  const status = (error as { status?: unknown } | null)?.status;
+  if (typeof status !== 'number') return true;
+  return status >= 500;
+}
+
 /**
  * Uploads a maintenance budget PDF or image to Supabase Storage.
  * Images are compressed before upload. PDFs are sent as-is.
+ * Transient Storage failures are retried; the upload is idempotent
+ * (same path, upsert).
  * Returns the storage PATH (bucket is private — resolve a signed URL to view).
  */
 export async function uploadMaintenanceBudget(
@@ -276,13 +294,21 @@ export async function uploadMaintenanceBudget(
   const ext = prepared.type === 'application/pdf' ? 'pdf' : 'jpg';
   const path = `${clientId}/maintenance/${orderId}/budget.${ext}`;
 
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, prepared, { upsert: true, contentType: prepared.type });
+  for (let attempt = 1; ; attempt++) {
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, prepared, { upsert: true, contentType: prepared.type });
 
-  if (error) throw new Error(`Erro ao enviar orçamento: ${error.message}`);
+    if (!error) return path;
 
-  return path;
+    if (attempt >= BUDGET_UPLOAD_MAX_ATTEMPTS || !isTransientStorageError(error)) {
+      throw new Error(`Erro ao enviar orçamento: ${error.message}`);
+    }
+
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, BUDGET_UPLOAD_RETRY_DELAYS_MS[attempt - 1]);
+    });
+  }
 }
 
 export function buildMaintenancePartPhotoPath(clientId: string, orderId: string, fileName: string): string {

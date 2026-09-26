@@ -2,6 +2,15 @@
 
 Este documento preserva o histórico de evolução do projeto **βetaFleet** e as principais decisões de arquitetura tomadas ao longo do tempo.
 
+## Sessão — 2026-09-25: Fixbug — falha no upload do PDF do orçamento deixava OS órfã/duplicada
+
+- Diagnóstico por logs de PROD (`edge_logs`): em 2026-09-26T00:58:40Z, o `POST` do PDF (253 KB) recebeu 520 do Cloudflare. Foi 1 falha em 131 uploads em 24h, e o mesmo arquivo tinha subido 11 min antes. A OS-2609-9976 (`00c888a2-...`) ficou gravada sem PDF e sem itens, porque o INSERT precedia o upload. Sem trava de banco contra duas OS abertas por veículo, um novo clique duplicaria a OS.
+- Correção em 2 etapas (Tipo B, Supervisionado S2): (1) em criação, id da OS gerado no cliente e PDF enviado antes do INSERT, com o UPDATE pós-upload mantido idêntico para preservar triggers e auditoria; (2) `isTransientStorageError` + até 3 tentativas no upload do orçamento. Verificado em PROD que a política de INSERT do bucket não exige a OS existente e que `authenticated` pode inserir `id`.
+- Execução: o executor gratuito (`muse-spark-1.2`) falhou por erro de servidor (falha de ferramenta). O reserva definido pelo usuário, `codex gpt-6-luna` effort `max`, executou as duas etapas com escopo exato. Os dois ciclos de lint foram falhas do plano (testes literais do planejador). Registros #060 e #061 em `EXECUTOR-TRACK-RECORD.md`.
+- Comando codex correto em modo automático: `codex exec --approve-for-me ...`. `--approve-for-me` já aplica a sandbox workspace-write e é incompatível com `-s`. O shell do `plan-runner` precisa de `~/.npm-global/bin` no PATH.
+- Achado de segurança fora do escopo, registrado como dívida técnica DT-SEC-01 fora do repositório (repo público; detalhes não versionados até a correção).
+- Observações para o futuro (no `IMPLEMENTATION_FIXBUG.md`): fotos de peças salvas após a OS têm o mesmo risco de duplicação; falta trava de banco para uma OS aberta por veículo; a mensagem de erro não diz se algo foi salvo; um PDF pode ficar órfão no Storage se o INSERT falhar depois do upload.
+
 ## Sessão — 2026-09-20 (continuação): mensagem de erro do banco engolida no modal de OS
 
 - **Pedido do usuário**: com orçamento aprovado, tentar voltar o status para "Aguardando aprovação" exibia "Erro ao salvar. Tente novamente." — pediu mensagem amigável e inteligível.
